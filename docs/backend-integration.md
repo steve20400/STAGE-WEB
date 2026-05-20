@@ -8,7 +8,7 @@ Objectif : permettre a l'equipe backend de brancher l'API sans casser le front.
 2. Creer ou mettre a jour `.env.local` cote front :
 
 ```env
-VITE_API_BASE_URL=http://localhost:3000
+VITE_API_BASE_URL=http://localhost:8080
 VITE_DATA_MODE=auto
 ```
 
@@ -87,8 +87,8 @@ npm run dev
 ## Priorite Backend
 
 1. `POST /api/auth/login`
-2. `POST /api/auth/register/request-otp`
-3. `POST /api/auth/register/verify`
+2. `POST /api/auth/register-otp`
+3. `POST /api/auth/register`
 4. `GET /api/users/me`
 5. `GET /api/contacts`
 6. `GET /api/chats`
@@ -96,3 +96,21 @@ npm run dev
 8. `POST /api/chats/:chatId/messages`
 9. `GET /api/calls`
 10. `POST /api/calls`
+
+## Structure Backend Cible
+
+Le backend reste dans un dossier/repo separe pour le moment. La structure cible a
+conserver pour la suite :
+
+- `config/` : `SecurityConfig`, `CorsConfig`, `WebSocketConfig`
+- `security/` : `JwtUtil`, `JwtFilter`, `UserDetailsServiceImpl`
+- `model/` : `User`, `Contact`, `Conversation`, `Message`, `CallHistory`
+- `repository/` : repositories JPA correspondants
+- `service/` : `AuthService`, `UserService`, puis `ContactService`, `ConversationService`, `MessageService`, `CallService`
+- `controller/` : `AuthController`, `UserController`, `ContactController`, `ChatController`, `CallController`
+- `dto/request/` : login/register plus `VerifyOtpRequest`, `UpdateUserRequest`, `CreateChatRequest`, `SendMessageRequest`, `CreateCallRequest`
+- `dto/response/` : `AuthResponse`, `UserResponse`, puis responses contacts, conversations, messages et appels
+- `exception/` : `GlobalExceptionHandler` et exceptions metier
+
+Pour le commit front actuel, seules les routes auth deja disponibles sont branchees.
+Les routes utilisateur, contacts, chats, messages et appels restent a implementer cote backend.

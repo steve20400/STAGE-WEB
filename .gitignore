@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 
+# Local backend checkout
+ALANYA/
+
 # TypeScript incremental build info
 *.tsbuildinfo
 

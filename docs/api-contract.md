@@ -9,7 +9,7 @@ brancher le backend progressivement sans modifier toutes les pages React.
 Dans `.env.local` :
 
 ```env
-VITE_API_BASE_URL=http://localhost:3000
+VITE_API_BASE_URL=http://localhost:8080
 VITE_DATA_MODE=prototype
 ```
 
@@ -161,7 +161,7 @@ Request :
 
 ```json
 {
-  "phone": "+237690000001",
+  "identifier": "+237690000001",
   "password": "password123"
 }
 ```
@@ -170,7 +170,9 @@ Response `200` :
 
 ```json
 {
-  "token": "jwt_or_session_token",
+  "accessToken": "jwt_or_session_token",
+  "refreshToken": "refresh_token",
+  "tokenType": "Bearer",
   "user": {
     "name": "Kevin Manga",
     "phone": "+237690000001",
@@ -181,7 +183,7 @@ Response `200` :
 }
 ```
 
-### POST `/api/auth/register/request-otp`
+### POST `/api/auth/register-otp`
 
 Request :
 
@@ -211,15 +213,16 @@ En developpement, le backend peut retourner :
 }
 ```
 
-### POST `/api/auth/register/verify`
+### POST `/api/auth/register`
 
 Request :
 
 ```json
 {
+  "name": "Kevin Manga",
   "phone": "+237690000001",
   "email": "k.manga@enspy.cm",
-  "otp": "123456"
+  "password": "password123"
 }
 ```
 
@@ -227,7 +230,9 @@ Response `200` :
 
 ```json
 {
-  "token": "jwt_or_session_token",
+  "accessToken": "jwt_or_session_token",
+  "refreshToken": "refresh_token",
+  "tokenType": "Bearer",
   "user": {
     "name": "Kevin Manga",
     "phone": "+237690000001",
