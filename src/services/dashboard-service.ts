@@ -65,8 +65,7 @@ function formatCallTime(ts: Date): string {
   const hhmm = ts.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
   if (diffDays === 0) return hhmm
   if (diffDays === 1) return `Hier ${hhmm}`
-  if (diffDays < 7)
-    return `${ts.toLocaleDateString("fr-FR", { weekday: "short" })} ${hhmm}`
+  if (diffDays < 7) return `${ts.toLocaleDateString("fr-FR", { weekday: "short" })} ${hhmm}`
   return ts.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
 }
 

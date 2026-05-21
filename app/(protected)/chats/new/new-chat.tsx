@@ -1,10 +1,7 @@
 ﻿import { useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
-import {
-  CONTACT_COLORS,
-  normalizePhone,
-} from "../../../../src/data/contacts"
+import { CONTACT_COLORS, normalizePhone } from "../../../../src/data/contacts"
 import { useContacts } from "../../../../src/hooks/use-contacts"
 import { addContactByPhone } from "../../../../src/services/contacts-service"
 import { createGroupChat, createPrivateChat } from "../../../../src/services/chats-service"

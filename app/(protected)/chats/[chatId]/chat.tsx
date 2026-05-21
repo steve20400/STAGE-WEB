@@ -379,9 +379,7 @@ export default function ChatRoomPage() {
       if (cancelled) return
       if (myPhone && event.readBy === myPhone) return // c'est nous qui avons lu
       const ids = new Set(event.messageIds)
-      setMessages((prev) =>
-        prev.map((m) => (ids.has(m.id) ? { ...m, status: "read" } : m))
-      )
+      setMessages((prev) => prev.map((m) => (ids.has(m.id) ? { ...m, status: "read" } : m)))
     })
 
     // Quand on ouvre la conv, on marque tout comme lu
@@ -457,9 +455,7 @@ export default function ChatRoomPage() {
       })
     } catch (err) {
       // En cas d'echec, on marque le message comme "non envoye" pour informer l'user
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, status: "sending" } : m))
-      )
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "sending" } : m)))
       const message = err instanceof Error ? err.message : "Envoi impossible."
       error("Message non envoye", message)
     } finally {
@@ -531,7 +527,9 @@ export default function ChatRoomPage() {
 
   if (chatLoading && !chat) {
     return (
-      <div style={{ padding: 24, color: "var(--text-muted)" }}>Chargement de la conversation...</div>
+      <div style={{ padding: 24, color: "var(--text-muted)" }}>
+        Chargement de la conversation...
+      </div>
     )
   }
 

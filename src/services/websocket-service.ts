@@ -105,9 +105,7 @@ export function subscribeToTyping(
   conversationId: string,
   handler: (event: TypingEvent) => void
 ): () => void {
-  return subscribe(`/topic/chats/${conversationId}/typing`, (data) =>
-    handler(data as TypingEvent)
-  )
+  return subscribe(`/topic/chats/${conversationId}/typing`, (data) => handler(data as TypingEvent))
 }
 
 /** Publie un evenement "je suis en train d'ecrire" (ou j'ai arrete). */
@@ -125,7 +123,5 @@ export function subscribeToStatus(
   conversationId: string,
   handler: (event: StatusEvent) => void
 ): () => void {
-  return subscribe(`/topic/chats/${conversationId}/status`, (data) =>
-    handler(data as StatusEvent)
-  )
+  return subscribe(`/topic/chats/${conversationId}/status`, (data) => handler(data as StatusEvent))
 }

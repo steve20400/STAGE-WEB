@@ -37,8 +37,7 @@ function mapStatus(status?: string): MessageStatus {
 /** Transforme la reponse backend vers le type front, en distinguant "me" vs autre. */
 export function toFrontMessage(m: BackendMessage, myPhone: string | null): ChatMessageMock {
   const isMine =
-    myPhone !== null &&
-    normalizePhoneNumber(m.senderId) === normalizePhoneNumber(myPhone)
+    myPhone !== null && normalizePhoneNumber(m.senderId) === normalizePhoneNumber(myPhone)
   return {
     id: m.id,
     senderId: isMine ? "me" : m.senderId,
