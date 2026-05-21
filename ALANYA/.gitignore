@@ -1,0 +1,40 @@
+# Compiled / build
+target/
+*.class
+*.jar
+*.war
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.project
+.classpath
+.settings/
+.factorypath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+codex-backend.*.log
+
+# Environment / secrets
+.env
+.env.local
+application-local.properties
+src/main/resources/application-local.properties
+
+# Spring
+*.original
+spring.log

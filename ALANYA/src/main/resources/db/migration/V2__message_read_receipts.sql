@@ -1,0 +1,9 @@
+CREATE TABLE message_read (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    msgID BIGINT NOT NULL,
+    alanyaID INT NOT NULL,
+    readAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (msgID) REFERENCES message(msgID) ON DELETE CASCADE,
+    FOREIGN KEY (alanyaID) REFERENCES users(alanyaID) ON DELETE CASCADE,
+    UNIQUE KEY unique_message_reader (msgID, alanyaID)
+);

@@ -5,8 +5,9 @@ node_modules/
 dist/
 build/
 
-# Local backend checkout
-ALANYA/
+# Backend internal Git backup (kept only if converting from a nested repo)
+ALANYA/.git-backup-before-monorepo/
+ALANYA/create-backend.sh
 
 # TypeScript incremental build info
 *.tsbuildinfo
