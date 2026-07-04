@@ -5,22 +5,27 @@
 ### 1. Java 17
 
 Telecharge **Temurin 17** : https://adoptium.net/
+
 - Choisis le `.msi` Windows x64
 - Pendant l'install, coche **"Set JAVA_HOME"** et **"Add to PATH"**
 
 Verifie :
+
 ```
 java -version
 ```
+
 Tu dois voir `openjdk version "17.x"`.
 
 ### 2. Maven
 
 Telecharge `apache-maven-3.9.x-bin.zip` : https://maven.apache.org/download.cgi
+
 - Dezippe dans `C:\maven`
 - Ajoute `C:\maven\bin` au PATH Windows (Variables d'environnement utilisateur)
 
 Verifie (dans un **nouveau** terminal) :
+
 ```
 mvn -version
 ```
@@ -28,13 +33,16 @@ mvn -version
 ### 3. MySQL Server
 
 Telecharge MySQL Installer : https://dev.mysql.com/downloads/installer/
+
 - Choisis **"Server only"**
 - Pendant le setup, **note bien ton mot de passe root**.
 
 Verifie :
+
 ```
 mysql -u root -p
 ```
+
 Si tu rentres dans le prompt `mysql>`, c'est bon.
 
 ---
@@ -67,6 +75,7 @@ spring.datasource.password=TonMotDePasseMysql
 ```
 
 Si tu ne mets pas de mdp sur ton MySQL local, laisse vide :
+
 ```properties
 spring.datasource.password=
 ```
@@ -84,6 +93,7 @@ mvn spring-boot:run
 **Premier lancement** : Maven telecharge toutes les dependances (~3-5 min).
 
 Tu sais que ca marche quand tu vois :
+
 ```
 Tomcat started on port 8080 (http) with context path '/api'
 Started AlanyaApplication in X seconds
@@ -94,13 +104,15 @@ Le backend repond sur `http://localhost:8080/api`.
 ### Verification rapide
 
 Dans un autre terminal :
+
 ```
 curl http://localhost:8080/api/users/me
 ```
 
 Tu dois recevoir :
+
 ```json
-{"message":"Authentification requise."}
+{ "message": "Authentification requise." }
 ```
 
 (C'est normal et bon signe : ca veut dire que le filtre JWT marche.)
@@ -109,15 +121,15 @@ Tu dois recevoir :
 
 ## Problemes courants
 
-| Erreur | Cause | Solution |
-| --- | --- | --- |
-| `Access denied for user 'root'` | Mauvais mdp MySQL | Verifie `application-local.properties` |
-| `Communications link failure` | MySQL pas demarre | Touche Windows -> "Services" -> trouve `MySQL80` -> Demarrer |
-| `Unknown database 'alanya_db'` | Etape 2 oubliee | Cree la base avec la commande de l'etape 2 |
-| `Port 8080 was already in use` | Autre process sur 8080 | Ajoute `server.port=8081` dans `application-local.properties` |
-| `mvn n'est pas reconnu` | PATH pas pris en compte | Ferme et rouvre ton terminal |
+| Erreur                                    | Cause                   | Solution                                                                    |
+| ----------------------------------------- | ----------------------- | --------------------------------------------------------------------------- |
+| `Access denied for user 'root'`           | Mauvais mdp MySQL       | Verifie `application-local.properties`                                      |
+| `Communications link failure`             | MySQL pas demarre       | Touche Windows -> "Services" -> trouve `MySQL80` -> Demarrer                |
+| `Unknown database 'alanya_db'`            | Etape 2 oubliee         | Cree la base avec la commande de l'etape 2                                  |
+| `Port 8080 was already in use`            | Autre process sur 8080  | Ajoute `server.port=8081` dans `application-local.properties`               |
+| `mvn n'est pas reconnu`                   | PATH pas pris en compte | Ferme et rouvre ton terminal                                                |
 | `FlywayException: Found non-empty schema` | Base existante non vide | `DROP DATABASE alanya_db; CREATE DATABASE alanya_db CHARACTER SET utf8mb4;` |
-| `Validation failed for column X` | Decalage entites / BDD | Pareil : drop + recreer la base |
+| `Validation failed for column X`          | Decalage entites / BDD  | Pareil : drop + recreer la base                                             |
 
 ---
 
