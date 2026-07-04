@@ -180,12 +180,50 @@ export const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.cloudflare.com:3478" },
 ]
 
-/** GET /api/calls/ice — serveurs STUN/TURN (Metered ou fallback statique). */
+/**
+ * Relais TURN configure cote front (VITE_TURN_*). Indispensable quand les deux
+ * participants sont derriere des NAT stricts (4G, box) : sans TURN, l'appel
+ * "decroche" mais aucun flux audio/video ne passe. La vraie solution est de
+ * configurer METERED_DOMAIN / METERED_API_KEY sur le backend (profite aussi au
+ * mobile) ; ces variables front sont un complement/depannage.
+ */
+function envTurnServers(): RTCIceServer[] {
+  const urls = String(import.meta.env.VITE_TURN_URLS ?? "")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean)
+  if (urls.length === 0) return []
+  return [
+    {
+      urls,
+      username: import.meta.env.VITE_TURN_USERNAME ?? undefined,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL ?? undefined,
+    },
+  ]
+}
+
+function hasTurnServer(servers: RTCIceServer[]): boolean {
+  return servers.some((server) => {
+    const urls = Array.isArray(server.urls) ? server.urls : [server.urls]
+    return urls.some((url) => typeof url === "string" && url.startsWith("turn"))
+  })
+}
+
+/** GET /api/calls/ice — serveurs STUN/TURN du backend, completes par un TURN public si absent. */
 export async function fetchIceServers(): Promise<RTCIceServer[]> {
+  let servers: RTCIceServer[]
   try {
     const response = await apiRequest<{ iceServers: RTCIceServer[] }>("/api/calls/ice")
-    return response.iceServers?.length ? response.iceServers : FALLBACK_ICE_SERVERS
+    servers = response.iceServers?.length ? response.iceServers : [...FALLBACK_ICE_SERVERS]
   } catch {
-    return FALLBACK_ICE_SERVERS
+    servers = [...FALLBACK_ICE_SERVERS]
   }
+
+  // Le backend sans identifiants Metered ne renvoie que du STUN : on complete
+  // avec le TURN configure cote front (VITE_TURN_*) s'il existe.
+  if (!hasTurnServer(servers)) {
+    servers = [...servers, ...envTurnServers()]
+  }
+
+  return servers
 }

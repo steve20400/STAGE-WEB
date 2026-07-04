@@ -115,6 +115,12 @@ class PeerSession {
       }
     }
 
+    // Diagnostic : visible dans la console (F12) si le media ne passe pas.
+    pc.oniceconnectionstatechange = () => {
+      // eslint-disable-next-line no-console
+      console.info(`[webrtc] ICE ${this.peerId.slice(0, 8)}… : ${pc.iceConnectionState}`)
+    }
+
     for (const track of this.localStream.getTracks()) {
       pc.addTrack(track, this.localStream)
     }
