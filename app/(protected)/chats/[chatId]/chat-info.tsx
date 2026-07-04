@@ -832,7 +832,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
     color: colorName,
     isGroup: false,
     online: conv.online,
-    statusMsg: conv.online ? "En ligne" : "Hors ligne",
+    statusMsg: conv.online ? "En ligne" : "Statut inconnu",
     members: [
       {
         id: conv.id,
@@ -896,7 +896,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
     color: contact.color,
     isGroup: false,
     online: contact.online,
-    statusMsg: contact.online ? "En ligne" : "Hors ligne",
+    statusMsg: contact.online ? "En ligne" : "Statut inconnu",
     members: [
       {
         id: contact.id,

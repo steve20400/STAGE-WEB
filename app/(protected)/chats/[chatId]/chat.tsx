@@ -649,6 +649,10 @@ export default function ChatRoomPage() {
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   // typing de l'interlocuteur (recu via WebSocket)
   const [isTyping, setIsTyping] = useState(false)
+  // Presence deduite de l'activite reelle (message recu, frappe, lecture) :
+  // le backend ne diffuse pas de presence, on ne peut donc jamais affirmer "hors ligne".
+  const [lastPeerActivity, setLastPeerActivity] = useState<number | null>(null)
+  const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
   // Visionneuse d'image plein ecran
@@ -702,6 +706,7 @@ export default function ChatRoomPage() {
         return [...prev, incoming]
       })
       if (incoming.senderId !== "me") {
+        setLastPeerActivity(Date.now())
         void markChatAsRead(chatId)
       }
     })
@@ -712,6 +717,7 @@ export default function ChatRoomPage() {
       if (cancelled) return
       // Ignore ses propres evenements
       if (myId && event.userId === myId) return
+      setLastPeerActivity(Date.now())
       setIsTyping(Boolean(event.isTyping))
       if (typingTimeoutId) clearTimeout(typingTimeoutId)
       // Failsafe : si on ne recoit pas le "stopped typing", on coupe apres 4s
@@ -725,6 +731,7 @@ export default function ChatRoomPage() {
     const unsubscribeStatus = subscribeToStatus(chatId, (event) => {
       if (cancelled) return
       if (myId && event.readBy === myId) return // c'est nous qui avons lu
+      setLastPeerActivity(Date.now())
       setMessages((prev) =>
         prev.map((m) => (m.senderId === "me" && m.status !== "read" ? { ...m, status: "read" } : m))
       )
@@ -787,6 +794,17 @@ export default function ChatRoomPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
+
+  // Reevalue la presence toutes les 30 s (pour faire expirer le "En ligne").
+  useEffect(() => {
+    if (lastPeerActivity === null) return
+    const id = setInterval(() => setPresenceTick((t) => t + 1), 30_000)
+    return () => clearInterval(id)
+  }, [lastPeerActivity])
+
+  // "En ligne" si activite reelle (message, frappe, lecture) dans les 2 dernieres minutes.
+  void presenceTick
+  const peerOnline = lastPeerActivity !== null && Date.now() - lastPeerActivity < 2 * 60 * 1000
 
   // Envoi d'un message — POST /api/chats/{chatId}/messages
   const sendMessage = useCallback(async () => {
@@ -1062,7 +1080,7 @@ export default function ChatRoomPage() {
 
         <div className="room-av" style={{ background: color.bg, color: color.text }}>
           {chat.initials}
-          {chat.online && !chat.isGroup && <div className="room-av-dot" />}
+          {peerOnline && !chat.isGroup && <div className="room-av-dot" />}
         </div>
 
         <div className="room-info">
@@ -1072,18 +1090,20 @@ export default function ChatRoomPage() {
             style={{
               color: isTyping
                 ? "var(--accent)"
-                : chat.online
+                : peerOnline
                   ? "var(--success)"
                   : "var(--text-muted)",
             }}
           >
+            {/* Le backend ne diffuse pas de presence : on affiche "En ligne" sur
+                activite recente, et rien (plutot qu'un faux "Hors ligne") sinon. */}
             {isTyping
               ? "en train d'ecrire..."
               : chat.isGroup
                 ? `${chat.members?.length ?? 0} membres`
-                : chat.online
+                : peerOnline
                   ? "En ligne"
-                  : "Hors ligne"}
+                  : " "}
           </div>
         </div>
 
