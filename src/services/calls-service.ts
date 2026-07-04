@@ -173,6 +173,18 @@ export async function leaveCallRest(callId: string): Promise<void> {
   await apiRequest<void>(`/api/calls/${callId}/leave`, { method: "POST" })
 }
 
+/**
+ * Ids des appels encore actifs cote serveur (RINGING/ONGOING) ou l'on figure.
+ * Sert a nettoyer les appels fantomes laisses par un onglet ferme/recharge
+ * (le backend n'a pas de timeout : sans nettoyage, il repond 409 BUSY a vie).
+ */
+export async function listActiveCallIds(): Promise<string[]> {
+  const response = await apiRequest<ListCallsResponse>("/api/calls")
+  return (response.calls ?? [])
+    .filter((c) => c.status === "RINGING" || c.status === "ONGOING")
+    .map((c) => c.id)
+}
+
 export const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },

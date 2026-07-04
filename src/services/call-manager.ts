@@ -1,9 +1,12 @@
 import { getMyUserId, loadSessionUser } from "../data/session-user"
+import { loadSessionToken } from "../data/session-auth"
+import { ApiError } from "../lib/api-client"
 import {
   acceptCallRest,
   endCallRest,
   fetchIceServers,
   leaveCallRest,
+  listActiveCallIds,
   rejectCallRest,
   startCallRest,
   type CallType,
@@ -275,6 +278,31 @@ function shouldOffer(myId: string, peerId: string): boolean {
 function ensureEventSubscription() {
   if (eventsUnsubscribe) return
   eventsUnsubscribe = subscribeToCallEvents(handleServerEvent)
+  registerPageHideCleanup()
+}
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "")
+let pageHideRegistered = false
+
+/**
+ * Si l'onglet est ferme/recharge en plein appel, on previent quand meme le
+ * backend (fetch keepalive survit au dechargement de la page). Sans cela,
+ * l'appel reste RINGING/ONGOING en base et bloque tous les appels suivants.
+ */
+function registerPageHideCleanup() {
+  if (pageHideRegistered || typeof window === "undefined") return
+  pageHideRegistered = true
+  window.addEventListener("pagehide", () => {
+    const callId = state.activeCallId
+    if (!callId) return
+    const token = loadSessionToken()
+    if (!token) return
+    void fetch(`${API_BASE_URL}/api/calls/${callId}/end`, {
+      method: "POST",
+      keepalive: true,
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => undefined)
+  })
 }
 
 function publishRemoteStreams() {
@@ -499,6 +527,28 @@ export function isCallBusy(): boolean {
 }
 
 /**
+ * Termine cote serveur les appels fantomes (RINGING/ONGOING) laisses par un
+ * onglet ferme ou recharge en plein appel : sans cela, le backend repond
+ * "Vous etes deja en appel" (409 BUSY) indefiniment.
+ */
+async function endStaleServerCalls(): Promise<void> {
+  let staleIds: string[] = []
+  try {
+    staleIds = await listActiveCallIds()
+  } catch {
+    return
+  }
+  for (const callId of staleIds) {
+    try {
+      await endCallRest(callId)
+      sendCallState(callId, "ended", myUserId() ?? undefined, myDisplayName())
+    } catch {
+      // deja termine cote serveur : tant mieux
+    }
+  }
+}
+
+/**
  * Demarre un appel sortant dans une conversation.
  * Renvoie l'id de l'appel cree (RINGING cote backend).
  */
@@ -508,11 +558,29 @@ export async function startOutgoingCall(
   title: string
 ): Promise<string> {
   ensureEventSubscription()
-  if (isCallBusy()) {
-    throw new Error("Terminez l'appel en cours avant d'en lancer un autre.")
+
+  // Un appel entrant sonne a l'ecran : l'utilisateur doit d'abord repondre.
+  if (state.incoming) {
+    throw new Error("Un appel entrant est en cours. Repondez-y d'abord.")
+  }
+  // Appel local residuel (ecran quitte sans raccrocher) : on le remplace.
+  if (state.activeCallId !== null || state.role !== null) {
+    await hangUp()
   }
 
-  const started = await startCallRest(convId, type)
+  let started
+  try {
+    started = await startCallRest(convId, type)
+  } catch (err) {
+    // 409 BUSY = appel fantome cote serveur (onglet ferme en plein appel) :
+    // on nettoie puis on retente une fois.
+    if (err instanceof ApiError && err.status === 409) {
+      await endStaleServerCalls()
+      started = await startCallRest(convId, type)
+    } else {
+      throw err
+    }
+  }
   sendCallRing(started.id)
 
   const participantNames: Record<string, string> = {}
