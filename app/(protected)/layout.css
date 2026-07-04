@@ -16,8 +16,8 @@
   --font-display: "Bricolage Grotesque", sans-serif;
   --font-body: "DM Sans", sans-serif;
 
-  --radius: 9px;
-  --radius-sm: 6px;
+  --radius: 14px; /* arrondi generalise 14px, comme le mobile */
+  --radius-sm: 8px;
   --sidebar-width: 240px;
 }
 
@@ -32,6 +32,13 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* Motif africain du mobile sous un voile creme (MotifBackground) */
+  background-image:
+    linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png");
+  background-repeat: repeat;
+  background-size:
+    auto,
+    280px auto;
 }
 
 .sidebar {
@@ -49,21 +56,23 @@
 
 /* --- Logo --- */
 
+/* Bandeau de marque terracotta, comme l'AppBar du mobile */
 .sb-logo {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 24px 20px 20px;
-  border-bottom: 1px solid var(--bg-border);
+  padding: 20px;
+  background: var(--brand);
+  border-bottom: 1px solid var(--brand-strong);
 }
 
 .sb-school-logo {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   object-fit: contain;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--bg-card) 82%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--brand-strong);
   flex-shrink: 0;
 }
 
@@ -78,13 +87,13 @@
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 800;
-  color: var(--gold);
+  color: var(--brand-text);
   letter-spacing: -0.5px;
   line-height: 1;
 }
 
 .sb-logo-subtitle {
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.75);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -291,13 +300,14 @@
   transform: translateX(0);
 }
 
+/* Barre superieure mobile : terracotta comme l'AppBar Flutter */
 .topbar {
   display: none;
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--bg-border);
-  background: var(--bg-deep);
+  border-bottom: 1px solid var(--brand-strong);
+  background: var(--brand);
   position: sticky;
   top: 0;
   z-index: 30;
@@ -307,7 +317,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-dim);
+  color: var(--brand-text);
   padding: 4px;
   display: flex;
 }
@@ -325,8 +335,8 @@
   height: 30px;
   object-fit: contain;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--bg-card) 82%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--brand-strong);
   flex-shrink: 0;
 }
 
@@ -341,13 +351,13 @@
   font-family: var(--font-display);
   font-size: 17px;
   font-weight: 800;
-  color: var(--gold);
+  color: var(--brand-text);
   letter-spacing: -0.4px;
   line-height: 1;
 }
 
 .topbar-subtitle {
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.75);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;

@@ -14,6 +14,24 @@ interface ThemeContextValue {
 
 const ThemeCtx = createContext<ThemeContextValue | null>(null)
 
+// localStorage peut etre inaccessible (navigation privee, contexte embarque) :
+// on ne doit jamais planter pour une preference de theme.
+function safeGet(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function safeSet(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    // tant pis, la preference ne sera pas memorisee
+  }
+}
+
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeCtx)
   if (!ctx) throw new Error("useTheme must be inside <ThemeProvider>")
@@ -21,13 +39,14 @@ export function useTheme(): ThemeContextValue {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark")
-  const [resolved, setResolved] = useState<"dark" | "light">("dark")
+  // Clair creme par defaut, comme l'app mobile (le sombre reste une option).
+  const [theme, setThemeState] = useState<Theme>("light")
+  const [resolved, setResolved] = useState<"dark" | "light">("light")
   const [palette, setPaletteState] = useState<Palette>("default")
 
   useEffect(() => {
-    const stored = (localStorage.getItem("alanya-theme") ?? "system") as Theme
-    const storedPalette = (localStorage.getItem("alanya-palette") ?? "default") as Palette
+    const stored = (safeGet("alanya-theme") ?? "light") as Theme
+    const storedPalette = (safeGet("alanya-palette") ?? "default") as Palette
     setThemeState(stored)
     setPalette(storedPalette === "soft" ? "soft" : "default")
     applyTheme(stored)
@@ -57,14 +76,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   function setTheme(t: Theme) {
     setThemeState(t)
-    localStorage.setItem("alanya-theme", t)
+    safeSet("alanya-theme", t)
     applyTheme(t)
   }
 
   function setPalette(next: Palette) {
     const paletteValue = next === "soft" ? "soft" : "default"
     setPaletteState(paletteValue)
-    localStorage.setItem("alanya-palette", paletteValue)
+    safeSet("alanya-palette", paletteValue)
     document.documentElement.setAttribute("data-palette", paletteValue)
   }
 

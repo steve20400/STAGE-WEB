@@ -6,7 +6,7 @@ import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
 import { acceptIncomingCall, rejectIncomingCall } from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
-import polytechLogo from "../(public)/polytech.png"
+const alanyaLogo = "/alanya-logo.png"
 import "./layout.css"
 
 // TYPES
@@ -191,7 +191,7 @@ function Sidebar({ onClose }: SidebarProps) {
     <aside className="sidebar">
       {/* Logo + bouton fermeture (mobile) */}
       <div className="sb-logo">
-        <img src={polytechLogo} alt="Logo Polytech Yaounde" className="sb-school-logo" />
+        <img src={alanyaLogo} alt="Logo Alanya" className="sb-school-logo" />
         <div className="sb-brand-copy">
           <span className="sb-logo-txt">Alanya</span>
           <span className="sb-logo-subtitle">Messagerie ENSPY</span>
@@ -301,7 +301,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             <Icons.Menu />
           </button>
           <div className="topbar-brand">
-            <img src={polytechLogo} alt="Logo Polytech Yaounde" className="topbar-school-logo" />
+            <img src={alanyaLogo} alt="Logo Alanya" className="topbar-school-logo" />
             <div className="topbar-brand-copy">
               <span className="topbar-title">Alanya</span>
               <span className="topbar-subtitle">Messagerie ENSPY</span>

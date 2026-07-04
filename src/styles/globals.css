@@ -24,8 +24,7 @@ button {
 /* Palette Alanya mobile (app_theme.dart) :
    terracotta #8a4b2b · chocolat #4a2c1a · argile #c8895e · creme #f5efe6
    sable #eadbc8 · encre #2b1b12 · vert foret #2e7d32 · bleu coche #53bde5 · fab #c04d29 */
-:root,
-[data-theme="dark"] {
+:root[data-theme="dark"] {
   --bg-base: #150d08; /* fond principal de l'app (chocolat profond) */
   --bg-surface: #1e130c; /* cartes, sidebars, panels */
   --bg-elevated: #281a10;
@@ -85,9 +84,18 @@ button {
   --overlay: #00000080;
 
   --dot-color: #c8895e0a;
+
+  /* Marque : barre terracotta identique au mobile, quel que soit le theme */
+  --brand: #8a4b2b;
+  --brand-strong: #4a2c1a;
+  --brand-text: #ffffff;
+  /* Voile pose sur le motif africain de fond (sombre ici) */
+  --motif-overlay: rgba(21, 13, 8, 0.95);
 }
 
-[data-theme="light"] {
+/* Theme par defaut : clair creme, comme l'app mobile. */
+:root,
+:root[data-theme="light"] {
   --bg-base: #f5efe6; /* creme (fond mobile) */
   --bg-surface: #ffffff; /* cartes, panels */
   --bg-elevated: #fdfaf4; /* dropdowns */
@@ -147,6 +155,13 @@ button {
   --overlay: #00000050;
 
   --dot-color: #8a4b2b0b;
+
+  /* Marque : barre terracotta identique au mobile, quel que soit le theme */
+  --brand: #8a4b2b;
+  --brand-strong: #4a2c1a;
+  --brand-text: #ffffff;
+  /* Voile creme sur le motif africain (0.90 ~ MotifBackground du mobile) */
+  --motif-overlay: rgba(245, 239, 230, 0.9);
 }
 
 /* Palette technique : double tap sur le bouton de theme */
@@ -288,6 +303,16 @@ body {
   z-index: 0;
 }
 
+/* Fond decoratif : motif africain du mobile sous un voile (MotifBackground). */
+.motif-bg {
+  background-image:
+    linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png");
+  background-repeat: repeat;
+  background-size:
+    auto,
+    280px auto;
+}
+
 .display {
   font-family: "Bricolage Grotesque", sans-serif;
 }
@@ -348,7 +373,7 @@ body {
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
-  border-radius: 10px;
+  border-radius: 14px; /* arrondi 14px comme les champs du mobile */
   font-family: "DM Sans", sans-serif;
   transition: border-color 0.2s;
 }

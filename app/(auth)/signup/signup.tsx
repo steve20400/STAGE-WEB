@@ -2,7 +2,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { requestRegistrationOtp } from "../../../src/services/auth-api"
-import polytechLogo from "../../(public)/polytech.png"
+const alanyaLogo = "/alanya-logo.png"
 import "./signup-page.css"
 
 type Step = 1 | 2 | 3
@@ -212,7 +212,7 @@ export default function SignUpPage() {
     <div className="si-root">
       <aside className="si-left">
         <div className="logo">
-          <img src={polytechLogo} alt="Logo Polytech Yaounde" className="auth-school-logo" />
+          <img src={alanyaLogo} alt="Logo Alanya" className="auth-school-logo" />
           <div className="auth-brand-copy">
             <span className="logo-txt">Alanya</span>
             <span className="auth-brand-subtitle">Messagerie ENSPY</span>

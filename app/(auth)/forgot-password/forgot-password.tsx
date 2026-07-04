@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import polytechLogo from "../../(public)/polytech.png"
+const alanyaLogo = "/alanya-logo.png"
 import "./forgot-password-page.css"
 
 function isValidIdentifier(value: string) {
@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
     <div className="fp-root">
       <main className="fp-card">
         <Link to="/" className="fp-brand" aria-label="Retour a l'accueil">
-          <img src={polytechLogo} alt="Logo Polytech Yaounde" className="fp-logo" />
+          <img src={alanyaLogo} alt="Logo Alanya" className="fp-logo" />
           <span>
             <strong>Alanya</strong>
             <small>Messagerie ENSPY</small>

@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
-import polytechLogo from "../../(public)/polytech.png"
+const alanyaLogo = "/alanya-logo.png"
 import "./login-page.css"
 
 function normalizeIdentifier(value: string) {
@@ -52,7 +52,7 @@ export default function LoginPage() {
     <div className="login-root">
       <div className="left-panel">
         <div className="logo">
-          <img src={polytechLogo} alt="Logo Polytech Yaounde" className="auth-school-logo" />
+          <img src={alanyaLogo} alt="Logo Alanya" className="auth-school-logo" />
           <div className="auth-brand-copy">
             <span className="logo-name">Alanya</span>
             <span className="auth-brand-subtitle">Messagerie ENSPY</span>
@@ -73,16 +73,16 @@ export default function LoginPage() {
 
         <div className="stat-row">
           <div>
-            <div className="stat-num">2.8k</div>
-            <div className="stat-lbl">en ligne maintenant</div>
+            <div className="stat-num">Messages</div>
+            <div className="stat-lbl">texte, vocaux et fichiers</div>
           </div>
           <div>
-            <div className="stat-num">50Mo</div>
-            <div className="stat-lbl">taille max fichiers</div>
+            <div className="stat-num">Appels</div>
+            <div className="stat-lbl">audio et video</div>
           </div>
           <div>
-            <div className="stat-num">95%</div>
-            <div className="stat-lbl">disponibilite</div>
+            <div className="stat-num">Statuts</div>
+            <div className="stat-lbl">ephemeres 24 h</div>
           </div>
         </div>
       </div>

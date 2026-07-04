@@ -1,6 +1,6 @@
 ﻿import { Link } from "react-router-dom"
 import { ThemeToggle } from "../../../src/components/theme-toggle"
-import polytechLogo from "../polytech.png"
+const alanyaLogo = "/alanya-logo.png"
 import "./welcome-page.css"
 
 export default function WelcomePage() {
@@ -10,7 +10,7 @@ export default function WelcomePage() {
         {/* Navbar */}
         <nav className="nav">
           <div className="nav-logo">
-            <img src={polytechLogo} alt="Logo Polytech Yaounde" className="school-logo" />
+            <img src={alanyaLogo} alt="Logo Alanya" className="school-logo" />
             <div className="brand-copy">
               <span className="display-font brand-name">Alanya</span>
               <span className="brand-subtitle">Messagerie ENSPY</span>
