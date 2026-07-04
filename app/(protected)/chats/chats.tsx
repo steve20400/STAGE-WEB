@@ -1,7 +1,11 @@
-﻿import { useState, useMemo, useEffect } from "react"
+﻿import { useState, useMemo, useEffect, useRef } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data"
 import { fetchChatConversations } from "../../../src/services/chats-service"
+import {
+  subscribeToAllMessages,
+  subscribeToWsConnected,
+} from "../../../src/services/websocket-service"
 import "./chats-page.css"
 
 function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
@@ -17,14 +21,35 @@ export default function ChatsPage() {
   const [filter, setFilter] = useState<"all" | "unread" | "groups">("all")
 
   const [conversations, setConversations] = useState<ConversationMock[]>([])
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    void fetchChatConversations().then((list) => {
-      if (!cancelled) setConversations(list)
-    })
+
+    const refresh = () => {
+      void fetchChatConversations().then((list) => {
+        if (!cancelled) setConversations(list)
+      })
+    }
+
+    refresh()
+
+    // Temps reel : un nouveau message (n'importe quelle conversation) rafraichit
+    // la liste (dernier message, tri, compteur non-lus). Debounce leger pour
+    // eviter une rafale de requetes si plusieurs messages arrivent d'un coup.
+    const scheduleRefresh = () => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current)
+      refreshTimer.current = setTimeout(refresh, 400)
+    }
+    const unsubscribeMessages = subscribeToAllMessages(scheduleRefresh)
+    // Et on se resynchronise apres chaque (re)connexion du WebSocket.
+    const unsubscribeConnected = subscribeToWsConnected(scheduleRefresh)
+
     return () => {
       cancelled = true
+      unsubscribeMessages()
+      unsubscribeConnected()
+      if (refreshTimer.current) clearTimeout(refreshTimer.current)
     }
   }, [])
 

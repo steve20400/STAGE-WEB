@@ -102,6 +102,9 @@ function connect() {
       const data = pendingSends.shift()
       if (data) ws.send(data)
     }
+    // Evenement synthetique : permet aux ecrans de se resynchroniser apres
+    // une (re)connexion (messages arrives pendant la coupure).
+    for (const listener of listeners) listener({ type: "ws_connected" })
   }
 
   ws.onmessage = (frame) => {
@@ -132,6 +135,8 @@ function connect() {
 
   ws.onclose = async (event) => {
     if (socket === ws) socket = null
+    // eslint-disable-next-line no-console
+    console.info(`[ws] connexion fermee (code ${event.code}) — reconnexion dans 4s`)
 
     // 4001 = token invalide/expire -> on tente un refresh une fois avant de reessayer.
     if (event.code === 4001 && !hasTriedRefresh) {
@@ -185,6 +190,23 @@ export function subscribeToConversation(
     if (event.type === "message" && event.message?.convId === conversationId) {
       handler(event.message)
     }
+  })
+}
+
+/**
+ * S'abonne a TOUS les nouveaux messages (toutes conversations).
+ * Utilise par la liste des conversations et le dashboard pour se rafraichir en direct.
+ */
+export function subscribeToAllMessages(handler: (message: WsMessagePayload) => void): () => void {
+  return addListener((event) => {
+    if (event.type === "message" && event.message) handler(event.message)
+  })
+}
+
+/** S'abonne aux (re)connexions du WebSocket — utile pour resynchroniser l'ecran. */
+export function subscribeToWsConnected(handler: () => void): () => void {
+  return addListener((event) => {
+    if (event.type === "ws_connected") handler()
   })
 }
 

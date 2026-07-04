@@ -37,6 +37,7 @@ import {
   subscribeToMessageDeleted,
   subscribeToStatus,
   subscribeToTyping,
+  subscribeToWsConnected,
 } from "../../../../src/services/websocket-service"
 import { loadSessionUser } from "../../../../src/data/session-user"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
@@ -743,6 +744,14 @@ export default function ChatRoomPage() {
       )
     })
 
+    // Apres une coupure du WebSocket, on recharge l'historique pour rattraper
+    // les messages arrives pendant la deconnexion.
+    const unsubscribeConnected = subscribeToWsConnected(() => {
+      if (cancelled) return
+      void refreshMessages().catch(() => undefined)
+      void markChatAsRead(chatId)
+    })
+
     // Quand on ouvre la conv, on marque tout comme lu
     void markChatAsRead(chatId)
 
@@ -752,6 +761,7 @@ export default function ChatRoomPage() {
       unsubscribeTyping()
       unsubscribeStatus()
       unsubscribeDeleted()
+      unsubscribeConnected()
       if (typingTimeoutId) clearTimeout(typingTimeoutId)
     }
   }, [chat, chatId, refreshMessages, fallbackContact, fallbackGroup])

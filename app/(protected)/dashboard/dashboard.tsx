@@ -5,6 +5,7 @@ import {
   type DashboardCall,
   type DashboardData,
 } from "../../../src/services/dashboard-service"
+import { subscribeToAllMessages } from "../../../src/services/websocket-service"
 import "./dashboard-page.css"
 
 // TYPES
@@ -93,11 +94,27 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false
-    void fetchDashboardData().then((result) => {
-      if (!cancelled) setData(result)
-    })
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null
+
+    const refresh = () => {
+      void fetchDashboardData().then((result) => {
+        if (!cancelled) setData(result)
+      })
+    }
+
+    refresh()
+
+    // Rafraichit les "messages recents" quand un nouveau message arrive en direct.
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(refresh, 500)
+    }
+    const unsubscribeMessages = subscribeToAllMessages(scheduleRefresh)
+
     return () => {
       cancelled = true
+      unsubscribeMessages()
+      if (refreshTimer) clearTimeout(refreshTimer)
     }
   }, [])
 
