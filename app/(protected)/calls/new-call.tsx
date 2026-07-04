@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { CONTACT_COLORS } from "../../../src/data/contacts"
 import { useContacts } from "../../../src/hooks/use-contacts"
 import { useToast } from "../../../src/components/toast"
-import { createCall } from "../../../src/services/calls-service"
+import { createPrivateChat } from "../../../src/services/chats-service"
+import { startOutgoingCall } from "../../../src/services/call-manager"
 import "./calls-page.css"
 
 export default function NewCallPage() {
@@ -28,20 +29,27 @@ export default function NewCallPage() {
     })
   }, [contacts, query])
 
+  // Cree/retrouve la conversation directe puis demarre l'appel WebRTC (RINGING).
+  const launchCall = async (publicNumber: string, name: string, callType: "audio" | "video") => {
+    const conversation = await createPrivateChat(publicNumber)
+    return startOutgoingCall(conversation.id, callType, name)
+  }
+
   useEffect(() => {
     if (!presetContact) return
-    const contactExists = contacts.some((contact) => contact.id === presetContact)
-    if (!contactExists) return
+    // presetContact peut etre l'id du contact ou son numero Alanya (historique d'appels).
+    const preset = contacts.find(
+      (contact) => contact.id === presetContact || contact.phone === presetContact
+    )
+    if (!preset) return
 
-    // Raccourci : on enregistre l'appel via POST /api/calls puis on navigue.
     let cancelled = false
-    void createCall(presetContact, presetType)
-      .then((call) => {
+    void launchCall(preset.phone, preset.name, presetType)
+      .then((callId) => {
         if (cancelled) return
-        navigate(
-          `/calls/${call.id}?contact=${presetContact}&type=${presetType}&returnTo=${encodeURIComponent(returnTo)}`,
-          { replace: true }
-        )
+        navigate(`/calls/${callId}?type=${presetType}&returnTo=${encodeURIComponent(returnTo)}`, {
+          replace: true,
+        })
       })
       .catch((e) => {
         if (cancelled) return
@@ -52,16 +60,17 @@ export default function NewCallPage() {
     return () => {
       cancelled = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contacts, navigate, presetContact, presetType, returnTo, error])
 
   const startCall = async () => {
     if (!selectedId || starting) return
+    const contact = contacts.find((c) => c.id === selectedId)
+    if (!contact) return
     setStarting(true)
     try {
-      const call = await createCall(selectedId, type)
-      navigate(
-        `/calls/${call.id}?contact=${selectedId}&type=${type}&returnTo=${encodeURIComponent(returnTo)}`
-      )
+      const callId = await launchCall(contact.phone, contact.name, type)
+      navigate(`/calls/${callId}?type=${type}&returnTo=${encodeURIComponent(returnTo)}`)
     } catch (e) {
       const message = e instanceof Error ? e.message : "Impossible de demarrer l'appel."
       error("Appel impossible", message)

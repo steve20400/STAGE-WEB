@@ -1,0 +1,7 @@
+# Copie ce fichier en `application-local.properties` (sans le .example) et mets TON mdp MySQL.
+# Le fichier `application-local.properties` est dans .gitignore : il ne partira jamais sur Git.
+
+spring.datasource.password=MetsTonMotDePasseIci
+
+# Optionnel : si le port 8080 est deja pris chez toi
+# server.port=8081

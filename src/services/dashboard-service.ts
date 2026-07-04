@@ -39,15 +39,14 @@ export interface DashboardData {
   contacts: DashboardContact[]
 }
 
+/** GET /api/me — reponse a plat du backend Next.js. */
 interface UserMeResponse {
-  user?: {
-    name?: string
-    phone?: string
-    email?: string
-    statusMsg?: string
-    avatar?: string | null
-    createdAt?: string
-  }
+  id?: string
+  email?: string
+  publicNumber?: string
+  pseudo?: string | null
+  avatarUrl?: string | null
+  statusMsg?: string | null
 }
 
 /* ---------- Mapping helpers ---------- */
@@ -99,9 +98,9 @@ function toDashboardCall(c: CallRecord): DashboardCall {
  */
 export async function fetchDashboardData(): Promise<DashboardData> {
   const [meResult, contactsList, chatsList, callsList] = await Promise.all([
-    apiRequest<UserMeResponse>("/api/users/me").catch((err) => {
+    apiRequest<UserMeResponse>("/api/me").catch((err) => {
       // eslint-disable-next-line no-console
-      console.warn("[dashboard] /users/me a echoue", err)
+      console.warn("[dashboard] /api/me a echoue", err)
       return null
     }),
     fetchContacts(),
@@ -110,11 +109,10 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   ])
 
   const sessionUser = loadSessionUser()
-  const userFromApi = meResult?.user
-  const name = userFromApi?.name?.trim() || sessionUser?.name || "Utilisateur"
-  const email = userFromApi?.email ?? sessionUser?.email ?? ""
-  const statusMsg = userFromApi?.statusMsg ?? sessionUser?.statusMsg ?? "Disponible"
-  const memberSince = formatMemberSince(userFromApi?.createdAt)
+  const name = meResult?.pseudo?.trim() || sessionUser?.name || "Utilisateur"
+  const email = meResult?.email ?? sessionUser?.email ?? ""
+  const statusMsg = meResult?.statusMsg ?? sessionUser?.statusMsg ?? "Disponible"
+  const memberSince = formatMemberSince(undefined)
 
   const currentUser: DashboardUser = {
     name,

@@ -15,25 +15,36 @@ import {
 import { findLocalGroup, toChatInfoMock } from "../../../../src/data/local-groups"
 import { useToast } from "../../../../src/components/toast"
 import {
+  deleteChatMessage,
   fetchMessages,
+  forwardChatMessage,
   markChatAsRead,
   sendChatMessage,
   toFrontMessage,
-  type BackendMessage,
 } from "../../../../src/services/messages-service"
-import { fetchConversationById } from "../../../../src/services/chats-service"
+import {
+  fetchChatConversations,
+  fetchConversationById,
+} from "../../../../src/services/chats-service"
+import {
+  formatAudioDuration,
+  resolveMediaUrl,
+  uploadMedia,
+} from "../../../../src/services/media-service"
 import {
   publishTyping,
   subscribeToConversation,
+  subscribeToMessageDeleted,
   subscribeToStatus,
   subscribeToTyping,
 } from "../../../../src/services/websocket-service"
 import { loadSessionUser } from "../../../../src/data/session-user"
+import { startOutgoingCall } from "../../../../src/services/call-manager"
 import "./chat-room-page.css"
 
 type Message = ChatMessageMock
 
-// Realtime : WebSocket STOMP sur /topic/chats/{id} (subscribeToConversation)
+// Realtime : WebSocket natif du backend Alanya (evenements { type: "message" | "typing" | "read" })
 
 function formatTime(d: Date) {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
@@ -48,29 +59,254 @@ function formatDateSeparator(d: Date) {
   return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
 }
 
+/** Coche simple (envoye) / double grise (recu) / double bleue (lu), comme sur mobile. */
 function StatusIcon({ status }: { status: MessageStatus }) {
-  if (status === "sending")
-    return <span style={{ color: "var(--text-faint)", fontSize: 10 }}>...</span>
-  if (status === "sent") return <span style={{ color: "var(--text-muted)", fontSize: 11 }}>ok</span>
-  if (status === "delivered")
-    return <span style={{ color: "var(--text-muted)", fontSize: 11 }}>vu</span>
-  return <span style={{ color: "var(--info)", fontSize: 11 }}>lu</span>
+  if (status === "sending") {
+    return (
+      <svg
+        width="12"
+        height="12"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--text-faint)"
+        strokeWidth="2"
+        strokeLinecap="round"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 3" />
+      </svg>
+    )
+  }
+
+  const color = status === "read" ? "var(--info)" : "var(--text-muted)"
+  const doubleCheck = status === "delivered" || status === "read"
+
+  return (
+    <svg
+      width="16"
+      height="12"
+      viewBox="0 0 28 16"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2 8.5l4 4L14 4" />
+      {doubleCheck && <path d="M10 8.5l4 4L22 4" />}
+    </svg>
+  )
 }
+
+/** Lecteur audio compact style WhatsApp (vocaux et fichiers audio). */
+function AudioPlayer({
+  src,
+  durationMs,
+  isMe,
+}: {
+  src: string
+  durationMs?: number
+  isMe: boolean
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [elapsedSec, setElapsedSec] = useState(0)
+
+  const toggle = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (playing) {
+      audio.pause()
+    } else {
+      void audio.play()
+    }
+  }
+
+  const fg = isMe ? "var(--bubble-me-text)" : "var(--text-primary)"
+
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 190, padding: "2px 0" }}
+    >
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false)
+          setProgress(0)
+          setElapsedSec(0)
+        }}
+        onTimeUpdate={(e) => {
+          const audio = e.currentTarget
+          const total =
+            Number.isFinite(audio.duration) && audio.duration > 0
+              ? audio.duration
+              : (durationMs ?? 0) / 1000
+          setElapsedSec(audio.currentTime)
+          setProgress(total > 0 ? audio.currentTime / total : 0)
+        }}
+      />
+      <button
+        onClick={toggle}
+        aria-label={playing ? "Pause" : "Lecture"}
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: "50%",
+          border: "none",
+          background: isMe ? "#ffffff30" : "var(--accent-dim)",
+          color: isMe ? fg : "var(--accent)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          flexShrink: 0,
+        }}
+      >
+        {playing ? (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" rx="1" />
+            <rect x="14" y="4" width="4" height="16" rx="1" />
+          </svg>
+        ) : (
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="6 3 21 12 6 21 6 3" />
+          </svg>
+        )}
+      </button>
+      <div style={{ flex: 1, minWidth: 110 }}>
+        <div
+          style={{
+            height: 4,
+            borderRadius: 2,
+            background: isMe ? "#ffffff35" : "var(--border-default)",
+            position: "relative",
+            cursor: "pointer",
+          }}
+          onClick={(e) => {
+            const audio = audioRef.current
+            if (!audio || !Number.isFinite(audio.duration)) return
+            const rect = e.currentTarget.getBoundingClientRect()
+            audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: `${Math.min(100, progress * 100)}%`,
+              borderRadius: 2,
+              background: isMe ? fg : "var(--accent)",
+            }}
+          />
+        </div>
+        <div style={{ fontSize: 10, opacity: 0.75, marginTop: 4 }}>
+          {playing || elapsedSec > 0
+            ? formatAudioDuration(elapsedSec * 1000)
+            : formatAudioDuration(durationMs)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const SWIPE_REPLY_THRESHOLD = 56
 
 function MessageBubble({
   msg,
   isMe,
   replyMsg,
   onReply,
+  onOpenImage,
+  onDelete,
+  onForward,
+  onCopy,
   chatColor,
 }: {
   msg: Message
   isMe: boolean
   replyMsg?: Message
   onReply: (m: Message) => void
+  onOpenImage: (url: string, name?: string) => void
+  onDelete: (m: Message, scope: "me" | "everyone") => void
+  onForward: (m: Message) => void
+  onCopy: (m: Message) => void
   chatColor: { bg: string; text: string }
 }) {
   const [hovered, setHovered] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [dragX, setDragX] = useState(0)
+  const dragStart = useRef<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false })
+
+  // Apercu du message cite : snapshot backend en priorite, sinon lookup local.
+  const quote = msg.replySnapshot
+    ? {
+        content: msg.replySnapshot.isDeleted
+          ? "Message supprime"
+          : msg.replySnapshot.content || "[media]",
+      }
+    : replyMsg
+      ? { content: replyMsg.content || "[media]" }
+      : undefined
+
+  const mediaSrc = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
+  const isVideoFile = (msg.mediaMime ?? "").startsWith("video/")
+
+  // --- Swipe-to-reply (pointeur / tactile) ---
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (msg.isDeleted) return
+    dragStart.current = { x: e.clientX, y: e.clientY, active: true }
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragStart.current.active) return
+    const dx = e.clientX - dragStart.current.x
+    const dy = Math.abs(e.clientY - dragStart.current.y)
+    if (dy > 40) {
+      dragStart.current.active = false
+      setDragX(0)
+      return
+    }
+    // On glisse vers la droite (messages recus) ou la gauche (mes messages).
+    const directional = isMe ? Math.min(0, dx) : Math.max(0, dx)
+    setDragX(Math.max(-90, Math.min(90, directional)))
+  }
+  const endDrag = () => {
+    if (!dragStart.current.active) return
+    dragStart.current.active = false
+    if (Math.abs(dragX) >= SWIPE_REPLY_THRESHOLD) onReply(msg)
+    setDragX(0)
+  }
+
+  const menuItem = (label: string, onClick: () => void, danger = false) => (
+    <button
+      key={label}
+      onClick={() => {
+        setMenuOpen(false)
+        onClick()
+      }}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        padding: "8px 14px",
+        background: "none",
+        border: "none",
+        color: danger ? "var(--danger)" : "var(--text-primary)",
+        fontSize: 12,
+        cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <div
@@ -81,7 +317,10 @@ function MessageBubble({
         marginBottom: 2,
       }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseLeave={() => {
+        setHovered(false)
+        setMenuOpen(false)
+      }}
     >
       <div
         style={{
@@ -89,31 +328,97 @@ function MessageBubble({
           alignItems: "flex-end",
           gap: 6,
           flexDirection: isMe ? "row-reverse" : "row",
+          transform: dragX ? `translateX(${dragX}px)` : undefined,
+          transition: dragStart.current.active ? "none" : "transform 0.18s ease",
+          touchAction: "pan-y",
+          position: "relative",
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onContextMenu={(e) => {
+          if (msg.isDeleted) return
+          e.preventDefault()
+          setMenuOpen((v) => !v)
         }}
       >
-        {/* Bouton repondre */}
-        {hovered && (
-          <button
-            onClick={() => onReply(msg)}
+        {/* Indicateur de swipe */}
+        {Math.abs(dragX) > 16 && (
+          <div
             style={{
-              background: "var(--border-subtle)",
-              border: "1px solid var(--border-default)",
-              borderRadius: 6,
-              padding: "4px 8px",
-              color: "var(--text-secondary)",
-              fontSize: 10,
-              cursor: "pointer",
-              flexShrink: 0,
-              fontFamily: "'DM Sans', sans-serif",
+              position: "absolute",
+              [isMe ? "right" : "left"]: -34,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--accent)",
+              opacity: Math.min(1, Math.abs(dragX) / SWIPE_REPLY_THRESHOLD),
             }}
           >
-            Repondre
-          </button>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <polyline points="9 17 4 12 9 7" />
+              <path d="M20 18v-2a4 4 0 00-4-4H4" />
+            </svg>
+          </div>
+        )}
+
+        {/* Menu actions */}
+        {hovered && !msg.isDeleted && (
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Actions du message"
+              style={{
+                background: "var(--border-subtle)",
+                border: "1px solid var(--border-default)",
+                borderRadius: 6,
+                padding: "4px 7px",
+                color: "var(--text-secondary)",
+                fontSize: 12,
+                cursor: "pointer",
+                lineHeight: 1,
+              }}
+            >
+              ⋮
+            </button>
+            {menuOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "110%",
+                  [isMe ? "right" : "left"]: 0,
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 10,
+                  boxShadow: "0 12px 32px #00000060",
+                  zIndex: 50,
+                  padding: "4px 0",
+                  minWidth: 170,
+                }}
+              >
+                {menuItem("Repondre", () => onReply(msg))}
+                {msg.content ? menuItem("Copier", () => onCopy(msg)) : null}
+                {menuItem("Transferer", () => onForward(msg))}
+                {menuItem("Supprimer pour moi", () => onDelete(msg, "me"), true)}
+                {isMe
+                  ? menuItem("Supprimer pour tous", () => onDelete(msg, "everyone"), true)
+                  : null}
+              </div>
+            )}
+          </div>
         )}
 
         <div style={{ maxWidth: "72%", display: "flex", flexDirection: "column", gap: 2 }}>
           {/* Citation */}
-          {replyMsg && (
+          {quote && !msg.isDeleted && (
             <div
               style={{
                 background: isMe ? "var(--accent-dim)" : "var(--border-subtle)",
@@ -129,109 +434,138 @@ function MessageBubble({
                 whiteSpace: "nowrap",
               }}
             >
-              {replyMsg.content}
+              {quote.content}
             </div>
           )}
 
           {/* Bulle */}
           <div
             style={{
-              background: isMe ? "var(--accent)" : "var(--border-subtle)",
-              color: isMe ? "var(--bg-base)" : "var(--text-primary)",
-              padding: msg.type === "file" ? "10px 14px" : "10px 14px",
+              background: isMe ? "var(--bubble-me-bg)" : "var(--bubble-them-bg)",
+              color: isMe ? "var(--bubble-me-text)" : "var(--bubble-them-text)",
+              padding: msg.type === "image" && mediaSrc ? 4 : "10px 14px",
               borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
               fontSize: 13,
               lineHeight: 1.55,
               wordBreak: "break-word",
             }}
           >
-            {msg.type === "file" && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 200 }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 8,
-                    background: isMe ? "var(--accent-border)" : "var(--border-default)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                    color: isMe ? "var(--bg-base)" : "var(--text-secondary)",
-                  }}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  >
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
+            {msg.isDeleted ? (
+              <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: 12 }}>
+                Ce message a ete supprime
+              </span>
+            ) : (
+              <>
+                {msg.type === "image" && mediaSrc && (
+                  <img
+                    src={mediaSrc}
+                    alt={msg.fileName ?? "image"}
+                    onClick={() => onOpenImage(mediaSrc, msg.fileName)}
                     style={{
-                      fontSize: 12,
-                      fontWeight: 500,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      maxWidth: 280,
+                      maxHeight: 320,
+                      borderRadius: 12,
+                      display: "block",
+                      cursor: "zoom-in",
+                    }}
+                  />
+                )}
+
+                {msg.type === "audio" && mediaSrc && (
+                  <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
+                )}
+
+                {msg.type === "file" && mediaSrc && isVideoFile && (
+                  <video
+                    src={mediaSrc}
+                    controls
+                    preload="metadata"
+                    style={{ maxWidth: 300, maxHeight: 260, borderRadius: 10, display: "block" }}
+                  />
+                )}
+
+                {msg.type === "file" && (!mediaSrc || !isVideoFile) && (
+                  <a
+                    href={msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      minWidth: 200,
+                      color: "inherit",
+                      textDecoration: "none",
                     }}
                   >
-                    {msg.fileName}
-                  </div>
-                  <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
-                </div>
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                >
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                </svg>
-              </div>
-            )}
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 8,
+                        background: isMe ? "#ffffff28" : "var(--border-default)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      >
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {msg.fileName ?? msg.content ?? "Fichier"}
+                      </div>
+                      {msg.fileSize && (
+                        <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
+                      )}
+                    </div>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    >
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                    </svg>
+                  </a>
+                )}
 
-            {msg.type === "image" && (
-              <div
-                style={{
-                  width: 200,
-                  height: 140,
-                  background: isMe ? "var(--accent-border)" : "var(--border-default)",
-                  borderRadius: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 4,
-                }}
-              >
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  style={{ opacity: 0.4 }}
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              </div>
+                {msg.content && msg.type !== "file" && msg.type !== "audio" && (
+                  <span
+                    style={
+                      msg.type === "image"
+                        ? { display: "block", padding: "6px 8px 4px" }
+                        : undefined
+                    }
+                  >
+                    {msg.content}
+                  </span>
+                )}
+              </>
             )}
-
-            {(msg.type === "text" || msg.type === "image") && <span>{msg.content}</span>}
           </div>
 
           {/* Meta */}
@@ -247,7 +581,7 @@ function MessageBubble({
             <span style={{ fontSize: 10, color: "var(--text-faint)" }}>
               {formatTime(msg.timestamp)}
             </span>
-            {isMe && <StatusIcon status={msg.status} />}
+            {isMe && !msg.isDeleted && <StatusIcon status={msg.status} />}
           </div>
         </div>
       </div>
@@ -260,7 +594,7 @@ export default function ChatRoomPage() {
   const navigate = useNavigate()
   const chatId = params.chatId as string
   const returnTo = `/chats/${chatId}`
-  const { error } = useToast()
+  const { error, success } = useToast()
 
   const contacts = useMemo(() => loadContacts(), [])
   const fallbackContact = useMemo(
@@ -312,15 +646,26 @@ export default function ChatRoomPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [replyTo, setReplyTo] = useState<Message | null>(null)
-  // typing de l'interlocuteur (recu via WebSocket /topic/chats/{id}/typing)
+  // typing de l'interlocuteur (recu via WebSocket)
   const [isTyping, setIsTyping] = useState(false)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
+  // Visionneuse d'image plein ecran
+  const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null)
+  // Message en cours de transfert (ouvre le selecteur de conversations)
+  const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
+  // Enregistrement vocal en cours
+  const [recording, setRecording] = useState(false)
+  const [recordSec, setRecordSec] = useState(0)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const typingTimer = useRef<ReturnType<typeof setTimeout>>()
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const recordChunksRef = useRef<Blob[]>([])
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const recordCancelledRef = useRef(false)
 
   const refreshMessages = useCallback(async () => {
     const list = await fetchMessages(chatId)
@@ -346,11 +691,11 @@ export default function ChatRoomPage() {
       if (!cancelled) setMessages([])
     })
 
-    // Temps reel : abonnement STOMP sur /topic/chats/{id} (nouveaux messages)
-    const myPhone = loadSessionUser()?.phone ?? null
-    const unsubscribeMessages = subscribeToConversation(chatId, (data) => {
+    // Temps reel : abonnement aux nouveaux messages de la conversation
+    const myId = loadSessionUser()?.id ?? null
+    const unsubscribeMessages = subscribeToConversation(chatId, (message) => {
       if (cancelled) return
-      const incoming = toFrontMessage(data as BackendMessage, myPhone)
+      const incoming = toFrontMessage(message, myId)
       setMessages((prev) => {
         if (prev.some((m) => m.id === incoming.id)) return prev
         return [...prev, incoming]
@@ -365,7 +710,7 @@ export default function ChatRoomPage() {
     const unsubscribeTyping = subscribeToTyping(chatId, (event) => {
       if (cancelled) return
       // Ignore ses propres evenements
-      if (myPhone && event.phone === myPhone) return
+      if (myId && event.userId === myId) return
       setIsTyping(Boolean(event.isTyping))
       if (typingTimeoutId) clearTimeout(typingTimeoutId)
       // Failsafe : si on ne recoit pas le "stopped typing", on coupe apres 4s
@@ -374,12 +719,28 @@ export default function ChatRoomPage() {
       }
     })
 
-    // Abonnement aux mises a jour de statut (messages lus par l'autre)
+    // Abonnement aux accuses de lecture : l'autre a ouvert la conversation,
+    // tous nos messages envoyes passent en "lu".
     const unsubscribeStatus = subscribeToStatus(chatId, (event) => {
       if (cancelled) return
-      if (myPhone && event.readBy === myPhone) return // c'est nous qui avons lu
-      const ids = new Set(event.messageIds)
-      setMessages((prev) => prev.map((m) => (ids.has(m.id) ? { ...m, status: "read" } : m)))
+      if (myId && event.readBy === myId) return // c'est nous qui avons lu
+      setMessages((prev) =>
+        prev.map((m) => (m.senderId === "me" && m.status !== "read" ? { ...m, status: "read" } : m))
+      )
+    })
+
+    // Abonnement aux suppressions de messages (pour moi / pour tous)
+    const unsubscribeDeleted = subscribeToMessageDeleted(chatId, (event) => {
+      if (cancelled) return
+      setMessages((prev) =>
+        event.scope === "me"
+          ? prev.filter((m) => m.id !== event.messageId)
+          : prev.map((m) =>
+              m.id === event.messageId
+                ? { ...m, isDeleted: true, content: "", mediaUrl: undefined }
+                : m
+            )
+      )
     })
 
     // Quand on ouvre la conv, on marque tout comme lu
@@ -390,6 +751,7 @@ export default function ChatRoomPage() {
       unsubscribeMessages()
       unsubscribeTyping()
       unsubscribeStatus()
+      unsubscribeDeleted()
       if (typingTimeoutId) clearTimeout(typingTimeoutId)
     }
   }, [chat, chatId, refreshMessages, fallbackContact, fallbackGroup])
@@ -438,14 +800,11 @@ export default function ChatRoomPage() {
     setSending(true)
 
     // On a envoye -> on n'ecrit plus
-    const myPhone = loadSessionUser()?.phone
-    if (myPhone) {
-      clearTimeout(typingTimer.current)
-      publishTyping(chatId, myPhone, false)
-    }
+    clearTimeout(typingTimer.current)
+    publishTyping(chatId, false)
 
     try {
-      const saved = await sendChatMessage(chatId, text, "text")
+      const saved = await sendChatMessage(chatId, text, "text", { replyToId: replyTo?.id })
       // Replace le message optimiste par celui renvoye par le backend.
       // Si le broadcast WebSocket est arrive avant (id deja present), on retire juste le tempId.
       setMessages((prev) => {
@@ -477,17 +836,59 @@ export default function ChatRoomPage() {
     e.target.style.height = "auto"
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
 
-    const myPhone = loadSessionUser()?.phone
-    if (myPhone) {
-      publishTyping(chatId, myPhone, true)
-      clearTimeout(typingTimer.current)
-      typingTimer.current = setTimeout(() => {
-        publishTyping(chatId, myPhone, false)
-      }, 1500)
-    }
+    publishTyping(chatId, true)
+    clearTimeout(typingTimer.current)
+    typingTimer.current = setTimeout(() => {
+      publishTyping(chatId, false)
+    }, 1500)
   }
 
-  // Upload fichier
+  // Envoie un blob/fichier : upload vers /api/media puis message avec mediaId.
+  const sendMediaMessage = useCallback(
+    async (
+      file: File | Blob,
+      filename: string,
+      mime: string,
+      msgType: "image" | "audio" | "file",
+      durationMs?: number
+    ) => {
+      const tempId = `tmp-${Date.now()}`
+      const optimistic: Message = {
+        id: tempId,
+        senderId: "me",
+        content: "",
+        type: msgType,
+        status: "sending",
+        timestamp: new Date(),
+        fileName: filename,
+        fileSize: `${(file.size / 1024 / 1024).toFixed(1)} Mo`,
+        mediaMime: mime,
+        durationMs,
+      }
+      setMessages((prev) => [...prev, optimistic])
+
+      try {
+        const media = await uploadMedia(file, filename, durationMs)
+        const saved = await sendChatMessage(chatId, "", msgType, {
+          mediaId: media.id,
+          replyToId: replyTo?.id,
+        })
+        setReplyTo(null)
+        setMessages((prev) => {
+          const alreadyReceived = prev.some((m) => m.id === saved.id)
+          if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
+          return prev.map((m) => (m.id === tempId ? saved : m))
+        })
+      } catch (err) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId))
+        const message = err instanceof Error ? err.message : "Envoi du fichier impossible."
+        error("Fichier non envoye", message)
+      }
+    },
+    [chatId, replyTo, error]
+  )
+
+  // Selection de fichier (photo, document, audio)
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -496,24 +897,117 @@ export default function ChatRoomPage() {
       e.target.value = ""
       return
     }
-    const isImage = file.type.startsWith("image/")
-    const msg: Message = {
-      id: `tmp-${Date.now()}`,
-      senderId: "me",
-      content: file.name,
-      type: isImage ? "image" : "file",
-      status: "sending",
-      timestamp: new Date(),
-      fileName: file.name,
-      fileSize: `${(file.size / 1024 / 1024).toFixed(1)} Mo`,
-    }
-    setMessages((prev) => [...prev, msg])
     setShowAttach(false)
-    // TODO : POST /api/chats/:id/files (multipart/form-data)
-    setTimeout(() => {
-      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, status: "delivered" } : m)))
-    }, 1200)
+    const msgType = file.type.startsWith("image/")
+      ? "image"
+      : file.type.startsWith("audio/")
+        ? "audio"
+        : "file"
+    void sendMediaMessage(file, file.name, file.type, msgType)
     e.target.value = ""
+  }
+
+  // --- Vocaux (MediaRecorder), comme sur WhatsApp ---
+  const startRecording = async () => {
+    if (recording) return
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      error("Micro inaccessible", "Autorisez le micro pour envoyer un vocal.")
+      return
+    }
+
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : ""
+    const recorder = mime
+      ? new MediaRecorder(stream, { mimeType: mime })
+      : new MediaRecorder(stream)
+    recorderRef.current = recorder
+    recordChunksRef.current = []
+    recordCancelledRef.current = false
+    setRecordSec(0)
+    setRecording(true)
+    recordTimerRef.current = setInterval(() => setRecordSec((s) => s + 1), 1000)
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordChunksRef.current.push(event.data)
+    }
+    recorder.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop())
+      if (recordTimerRef.current) {
+        clearInterval(recordTimerRef.current)
+        recordTimerRef.current = null
+      }
+      setRecording(false)
+
+      if (recordCancelledRef.current) return
+      // Le backend valide le MIME exact : on retire le suffixe ";codecs=..." du navigateur.
+      const type = (recorder.mimeType || "audio/webm").split(";")[0]
+      const blob = new Blob(recordChunksRef.current, { type })
+      if (blob.size === 0) return
+      const ext = type.includes("mp4") ? "m4a" : "webm"
+      const durationMs = recordChunksRef.current.length > 0 ? recordSecRef.current * 1000 : 0
+      void sendMediaMessage(blob, `vocal-${Date.now()}.${ext}`, type, "audio", durationMs)
+    }
+
+    recorder.start()
+  }
+
+  // La duree est lue dans onstop : on la garde dans une ref pour eviter une closure figee.
+  const recordSecRef = useRef(0)
+  useEffect(() => {
+    recordSecRef.current = recordSec
+  }, [recordSec])
+
+  const stopRecording = (cancelled: boolean) => {
+    recordCancelledRef.current = cancelled
+    recorderRef.current?.stop()
+    recorderRef.current = null
+  }
+
+  useEffect(() => {
+    return () => {
+      // Nettoyage si on quitte la page en plein enregistrement.
+      recordCancelledRef.current = true
+      recorderRef.current?.stop()
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current)
+    }
+  }, [])
+
+  // --- Actions sur un message ---
+  const handleCopy = (msg: Message) => {
+    void navigator.clipboard
+      .writeText(msg.content)
+      .then(() => success("Copie", "Message copie dans le presse-papiers."))
+      .catch(() => error("Copie impossible", "Le presse-papiers est inaccessible."))
+  }
+
+  const handleDelete = (msg: Message, scope: "me" | "everyone") => {
+    deleteChatMessage(msg.id, scope)
+    // L'evenement message_deleted confirmera ; mise a jour optimiste immediate.
+    setMessages((prev) =>
+      scope === "me"
+        ? prev.filter((m) => m.id !== msg.id)
+        : prev.map((m) =>
+            m.id === msg.id ? { ...m, isDeleted: true, content: "", mediaUrl: undefined } : m
+          )
+    )
+  }
+
+  // Demarre un appel WebRTC dans cette conversation puis ouvre la salle d'appel.
+  const startCallFromChat = (callType: "audio" | "video") => {
+    void startOutgoingCall(chatId, callType, chat?.name ?? "Contact")
+      .then((newCallId) => {
+        navigate(`/calls/${newCallId}?type=${callType}&returnTo=${encodeURIComponent(returnTo)}`)
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : "Impossible de demarrer l'appel."
+        error("Appel impossible", message)
+      })
   }
 
   // Grouper les messages par date
@@ -589,11 +1083,7 @@ export default function ChatRoomPage() {
             className="action-btn"
             aria-label="Appel audio"
             title="Appel audio"
-            onClick={() =>
-              navigate(
-                `/calls/new?contact=${chatId}&type=audio&returnTo=${encodeURIComponent(returnTo)}`
-              )
-            }
+            onClick={() => startCallFromChat("audio")}
           >
             <svg
               width="15"
@@ -612,11 +1102,7 @@ export default function ChatRoomPage() {
             className="action-btn"
             aria-label="Appel video"
             title="Appel video"
-            onClick={() =>
-              navigate(
-                `/calls/new?contact=${chatId}&type=video&returnTo=${encodeURIComponent(returnTo)}`
-              )
-            }
+            onClick={() => startCallFromChat("video")}
           >
             <svg
               width="15"
@@ -674,6 +1160,10 @@ export default function ChatRoomPage() {
                   isMe={isMe}
                   replyMsg={reply}
                   onReply={setReplyTo}
+                  onOpenImage={(url, name) => setLightbox({ url, name })}
+                  onDelete={handleDelete}
+                  onForward={setForwardMsg}
+                  onCopy={handleCopy}
                   chatColor={color}
                 />
               )
@@ -848,39 +1338,410 @@ export default function ChatRoomPage() {
             </svg>
           </button>
 
-          <textarea
-            ref={inputRef}
-            className="room-textarea"
-            placeholder="Message..."
-            value={input}
-            onChange={handleInput}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            aria-label="Saisir un message"
-          />
-
-          <button
-            className="send-btn"
-            onClick={sendMessage}
-            disabled={!input.trim()}
-            aria-label="Envoyer"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--bg-base)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
+          {recording ? (
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "8px 12px",
+              }}
             >
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "var(--danger)",
+                  animation: "pulse 1.2s ease-in-out infinite",
+                }}
+              />
+              <span
+                style={{
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {formatAudioDuration(recordSec * 1000)}
+              </span>
+              <span style={{ color: "var(--text-muted)", fontSize: 12, flex: 1 }}>
+                Enregistrement du vocal...
+              </span>
+              <button
+                onClick={() => stopRecording(true)}
+                aria-label="Annuler le vocal"
+                style={{
+                  background: "none",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  color: "var(--text-secondary)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                className="send-btn"
+                onClick={() => stopRecording(false)}
+                aria-label="Envoyer le vocal"
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--bg-base)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <textarea
+                ref={inputRef}
+                className="room-textarea"
+                placeholder="Message..."
+                value={input}
+                onChange={handleInput}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                aria-label="Saisir un message"
+              />
+
+              {input.trim() ? (
+                <button
+                  className="send-btn"
+                  onClick={sendMessage}
+                  disabled={sending}
+                  aria-label="Envoyer"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--bg-base)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                  >
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  className="send-btn"
+                  onClick={() => void startRecording()}
+                  aria-label="Enregistrer un vocal"
+                  title="Enregistrer un message vocal"
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--bg-base)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                    <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
+                  </svg>
+                </button>
+              )}
+            </>
+          )}
         </div>
         <div className="input-hint">
           Entree pour envoyer - Shift+Entree pour sauter une ligne - Max 50 Mo par fichier
+        </div>
+      </div>
+
+      {/* Visionneuse d'image plein ecran */}
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9000,
+            background: "#000000d9",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            cursor: "zoom-out",
+          }}
+        >
+          <img
+            src={lightbox.url}
+            alt={lightbox.name ?? "image"}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "92vw",
+              maxHeight: "88vh",
+              borderRadius: 8,
+              boxShadow: "0 24px 80px #000000a0",
+              cursor: "default",
+            }}
+          />
+          <div style={{ position: "absolute", top: 16, right: 16, display: "flex", gap: 10 }}>
+            <a
+              href={lightbox.url.includes("?") ? `${lightbox.url}&download=1` : lightbox.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Telecharger l'image"
+              style={{
+                background: "#ffffff20",
+                border: "none",
+                borderRadius: 8,
+                padding: "8px 10px",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+              </svg>
+            </a>
+            <button
+              onClick={() => setLightbox(null)}
+              aria-label="Fermer"
+              style={{
+                background: "#ffffff20",
+                border: "none",
+                borderRadius: 8,
+                padding: "8px 10px",
+                color: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Selecteur de conversations pour le transfert */}
+      {forwardMsg && (
+        <ForwardDialog
+          onClose={() => setForwardMsg(null)}
+          onForward={async (convIds) => {
+            try {
+              const count = await forwardChatMessage(forwardMsg.id, convIds)
+              success("Message transfere", `Envoye dans ${count} conversation(s).`)
+            } catch (err) {
+              const message = err instanceof Error ? err.message : "Transfert impossible."
+              error("Transfert echoue", message)
+            } finally {
+              setForwardMsg(null)
+            }
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Modal de selection des conversations cibles pour transferer un message. */
+function ForwardDialog({
+  onClose,
+  onForward,
+}: {
+  onClose: () => void
+  onForward: (convIds: string[]) => Promise<void>
+}) {
+  const [conversations, setConversations] = useState<
+    Array<{ id: string; name: string; initials: string }>
+  >([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchChatConversations().then((list) => {
+      if (cancelled) return
+      setConversations(list.map((c) => ({ id: c.id, name: c.name, initials: c.initials })))
+      setLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 8500,
+        background: "var(--overlay)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(420px, 100%)",
+          maxHeight: "80vh",
+          display: "flex",
+          flexDirection: "column",
+          borderRadius: 16,
+          border: "1px solid var(--border-subtle)",
+          background: "var(--bg-surface)",
+          boxShadow: "0 24px 64px #00000080",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "16px 18px",
+            borderBottom: "1px solid var(--border-subtle)",
+            fontFamily: "'Bricolage Grotesque', sans-serif",
+            fontWeight: 800,
+            fontSize: 17,
+            color: "var(--text-primary)",
+          }}
+        >
+          Transferer vers...
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+          {loading && (
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
+              Chargement...
+            </div>
+          )}
+          {!loading && conversations.length === 0 && (
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
+              Aucune conversation disponible.
+            </div>
+          )}
+          {conversations.map((conv) => (
+            <label
+              key={conv.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "9px 10px",
+                borderRadius: 10,
+                cursor: "pointer",
+                background: selected.has(conv.id) ? "var(--accent-dim)" : "transparent",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(conv.id)}
+                onChange={() => toggle(conv.id)}
+              />
+              <span
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: "50%",
+                  background: "var(--accent-dim)",
+                  color: "var(--accent)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >
+                {conv.initials}
+              </span>
+              <span style={{ color: "var(--text-primary)", fontSize: 13 }}>{conv.name}</span>
+            </label>
+          ))}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+            padding: 14,
+            borderTop: "1px solid var(--border-subtle)",
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "1px solid var(--border-default)",
+              borderRadius: 8,
+              padding: "8px 14px",
+              color: "var(--text-secondary)",
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Annuler
+          </button>
+          <button
+            disabled={selected.size === 0 || sending}
+            onClick={() => {
+              setSending(true)
+              void onForward(Array.from(selected))
+            }}
+            style={{
+              background: "var(--accent)",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 16px",
+              color: "var(--accent-text)",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: selected.size === 0 || sending ? "not-allowed" : "pointer",
+              opacity: selected.size === 0 || sending ? 0.6 : 1,
+            }}
+          >
+            {sending ? "Transfert..." : `Transferer (${selected.size})`}
+          </button>
         </div>
       </div>
     </div>

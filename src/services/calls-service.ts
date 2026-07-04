@@ -1,4 +1,5 @@
 import { apiRequest } from "../lib/api-client"
+import { createPrivateChat } from "./chats-service"
 
 export type CallDirection = "in" | "out" | "missed"
 export type CallType = "audio" | "video"
@@ -6,6 +7,7 @@ export type CallStatus = "ended" | "declined" | "no_answer"
 
 export interface CallRecord {
   id: string
+  /** Numero Alanya du correspondant (ou id de conversation pour un groupe). */
   contactId: string
   contactName: string
   contactInitials: string
@@ -19,8 +21,8 @@ export interface CallRecord {
 }
 
 export const CALL_COLORS = {
-  amber: { bg: "#E8B84B22", fg: "#E8B84B" },
-  blue: { bg: "#60a5fa22", fg: "#60a5fa" },
+  amber: { bg: "#C8895E22", fg: "#C8895E" },
+  blue: { bg: "#53bde522", fg: "#53bde5" },
   violet: { bg: "#a78bfa22", fg: "#a78bfa" },
   teal: { bg: "#34d39922", fg: "#34d399" },
   rose: { bg: "#fb718522", fg: "#fb7185" },
@@ -34,39 +36,69 @@ function pickColor(id: string): keyof typeof CALL_COLORS {
   return COLOR_WHEEL[sum % COLOR_WHEEL.length]
 }
 
+/** Appel tel que renvoye par GET /api/calls sur le backend Next.js. */
 interface BackendCall {
   id: string
-  contactId: string
-  contactName: string
-  contactInitials?: string
-  direction: CallDirection
-  type: CallType
-  status: CallStatus
-  duration?: string
-  createdAt?: string
-  isGroup?: boolean
+  convId: string | null
+  type: string // AUDIO | VIDEO
+  status: string // RINGING | ONGOING | ENDED | MISSED | REJECTED
+  isOutgoing: boolean
+  isGroup: boolean
+  peerName: string
+  peerNumber: string | null
+  participantCount: number
+  startedAt: string
+  answeredAt: string | null
+  endedAt: string | null
+  durationSec: number | null
 }
 
 interface ListCallsResponse {
   calls: BackendCall[]
 }
 
-interface CreateCallResponse {
-  call: BackendCall
+function toInitials(name: string) {
+  const initials = name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("")
+  return initials || "??"
+}
+
+function mapStatus(status: string): CallStatus {
+  if (status === "REJECTED") return "declined"
+  if (status === "MISSED" || status === "RINGING") return "no_answer"
+  return "ended"
+}
+
+function mapDirection(c: BackendCall): CallDirection {
+  if (c.isOutgoing) return "out"
+  if (c.status === "MISSED" || c.status === "REJECTED") return "missed"
+  return "in"
+}
+
+function formatDuration(seconds: number | null): string | undefined {
+  if (!seconds || seconds <= 0) return undefined
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
 
 function toCallRecord(c: BackendCall): CallRecord {
+  const contactId = c.peerNumber ?? c.convId ?? c.id
   return {
     id: c.id,
-    contactId: c.contactId,
-    contactName: c.contactName,
-    contactInitials: c.contactInitials ?? "??",
-    contactColor: pickColor(c.contactId),
-    direction: c.direction,
-    type: c.type,
-    status: c.status,
-    duration: c.duration && c.duration !== "00:00" ? c.duration : undefined,
-    ts: c.createdAt ? new Date(c.createdAt) : new Date(),
+    contactId,
+    contactName: c.peerName,
+    contactInitials: toInitials(c.peerName),
+    contactColor: pickColor(contactId),
+    direction: mapDirection(c),
+    type: c.type === "VIDEO" ? "video" : "audio",
+    status: mapStatus(c.status),
+    duration: formatDuration(c.durationSec),
+    ts: new Date(c.startedAt),
     isGroup: Boolean(c.isGroup),
   }
 }
@@ -83,11 +115,77 @@ export async function fetchCallsHistory(): Promise<CallRecord[]> {
   }
 }
 
-/** POST /api/calls — enregistre un nouvel appel sortant. */
-export async function createCall(contactId: string, type: CallType): Promise<CallRecord> {
-  const response = await apiRequest<CreateCallResponse>("/api/calls", {
+/* ----------------- Endpoints WebRTC ----------------- */
+
+export interface StartedCall {
+  id: string
+  convId: string
+  type: string
+  status: string
+  isGroup: boolean
+  groupName: string | null
+  memberCount: number
+  callerName: string
+  callees: Array<{ userId: string; pseudo: string | null; publicNumber: string }>
+}
+
+/** POST /api/calls — cree l'appel (statut RINGING) dans une conversation existante. */
+export async function startCallRest(convId: string, type: CallType): Promise<StartedCall> {
+  return apiRequest<StartedCall>("/api/calls", {
     method: "POST",
-    body: { contactId, type },
+    body: { convId, type: type === "video" ? "VIDEO" : "AUDIO" },
   })
-  return toCallRecord(response.call)
+}
+
+/** Demarre un appel direct vers un numero Alanya (cree/retrouve la conversation d'abord). */
+export async function startCallToNumber(
+  publicNumber: string,
+  type: CallType
+): Promise<StartedCall> {
+  const conversation = await createPrivateChat(publicNumber)
+  return startCallRest(conversation.id, type)
+}
+
+export interface AcceptCallResult {
+  id: string
+  isGroup: boolean
+  groupName: string | null
+  activeParticipants: Array<{ userId: string; displayName: string }>
+}
+
+/** POST /api/calls/:id/accept — accepte / rejoint l'appel. */
+export async function acceptCallRest(callId: string): Promise<AcceptCallResult> {
+  return apiRequest<AcceptCallResult>(`/api/calls/${callId}/accept`, { method: "POST" })
+}
+
+/** POST /api/calls/:id/reject — refuse (direct) ou decline (groupe). */
+export async function rejectCallRest(callId: string): Promise<void> {
+  await apiRequest<void>(`/api/calls/${callId}/reject`, { method: "POST" })
+}
+
+/** POST /api/calls/:id/end — termine l'appel pour tout le monde. */
+export async function endCallRest(callId: string): Promise<void> {
+  await apiRequest<void>(`/api/calls/${callId}/end`, { method: "POST" })
+}
+
+/** POST /api/calls/:id/leave — quitte un appel de groupe sans le terminer. */
+export async function leaveCallRest(callId: string): Promise<void> {
+  await apiRequest<void>(`/api/calls/${callId}/leave`, { method: "POST" })
+}
+
+export const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" },
+]
+
+/** GET /api/calls/ice — serveurs STUN/TURN (Metered ou fallback statique). */
+export async function fetchIceServers(): Promise<RTCIceServer[]> {
+  try {
+    const response = await apiRequest<{ iceServers: RTCIceServer[] }>("/api/calls/ice")
+    return response.iceServers?.length ? response.iceServers : FALLBACK_ICE_SERVERS
+  } catch {
+    return FALLBACK_ICE_SERVERS
+  }
 }

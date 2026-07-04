@@ -3,26 +3,26 @@ import {
   type Contact,
   type ContactColor,
   loadContacts,
-  normalizePhone,
   persistContacts,
   toInitials,
 } from "../data/contacts"
 
+/** Contact tel que renvoye par le backend Next.js. */
 interface BackendContact {
   id: string
-  name: string
-  initials?: string
-  email?: string
-  phone: string
-  online?: boolean
+  alias: string | null
+  isBlocked?: boolean
+  user: {
+    id: string
+    publicNumber: string
+    pseudo: string | null
+    avatarUrl?: string | null
+    statusMsg?: string | null
+  }
 }
 
 interface ContactsListResponse {
   contacts: BackendContact[]
-}
-
-interface AddContactResponse {
-  contact: BackendContact
 }
 
 const COLOR_WHEEL: ContactColor[] = ["amber", "blue", "violet", "teal", "rose"]
@@ -34,14 +34,16 @@ function pickColor(id: string): ContactColor {
 }
 
 function toFrontContact(c: BackendContact): Contact {
+  const name = c.alias?.trim() || c.user.pseudo?.trim() || c.user.publicNumber
   return {
     id: c.id,
-    name: c.name,
-    initials: c.initials || toInitials(c.name),
+    name,
+    initials: toInitials(name),
     color: pickColor(c.id),
-    online: Boolean(c.online),
-    email: c.email ?? "",
-    phone: c.phone,
+    online: false, // pas d'info de presence via REST sur ce backend
+    email: "",
+    // Le champ "phone" du front porte le numero Alanya a 6 chiffres.
+    phone: c.user.publicNumber,
   }
 }
 
@@ -62,14 +64,14 @@ export async function fetchContacts(): Promise<Contact[]> {
   }
 }
 
-/** POST /api/contacts — Ajoute un contact par numero. */
-export async function addContactByPhone(rawPhone: string): Promise<Contact> {
-  const phone = normalizePhone(rawPhone)
-  const response = await apiRequest<AddContactResponse>("/api/contacts", {
+/** POST /api/contacts — Ajoute un contact par son numero Alanya (6 chiffres), avec alias optionnel. */
+export async function addContactByPhone(rawNumber: string, alias?: string): Promise<Contact> {
+  const publicNumber = rawNumber.replace(/\D/g, "")
+  const response = await apiRequest<BackendContact>("/api/contacts", {
     method: "POST",
-    body: { phone },
+    body: { publicNumber, alias: alias?.trim() || undefined },
   })
-  return toFrontContact(response.contact)
+  return toFrontContact(response)
 }
 
 /** DELETE /api/contacts/{id} — Retire un contact. */

@@ -21,129 +21,132 @@ button {
   font-family: inherit;
 }
 
+/* Palette Alanya mobile (app_theme.dart) :
+   terracotta #8a4b2b · chocolat #4a2c1a · argile #c8895e · creme #f5efe6
+   sable #eadbc8 · encre #2b1b12 · vert foret #2e7d32 · bleu coche #53bde5 · fab #c04d29 */
 :root,
 [data-theme="dark"] {
-  --bg-base: #05070d; /* fond principal de l'app */
-  --bg-surface: #0a0f1a; /* cartes, sidebars, panels */
-  --bg-elevated: #111827;
-  --bg-hover: #172033; /* hover sur les items de liste */
-  --bg-input: #0a0f1a; /* fond des champs */
-  --bg-muted: #151d2e; /* bulles de messages "them" */
+  --bg-base: #150d08; /* fond principal de l'app (chocolat profond) */
+  --bg-surface: #1e130c; /* cartes, sidebars, panels */
+  --bg-elevated: #281a10;
+  --bg-hover: #322114; /* hover sur les items de liste */
+  --bg-input: #1e130c; /* fond des champs */
+  --bg-muted: #2b1b12; /* bulles de messages "them" (encre) */
 
-  --border-subtle: #1c2638;
-  --border-default: #2a3548; /* bordures normales */
-  --border-strong: #3f4f68;
+  --border-subtle: #372417;
+  --border-default: #4a2c1a; /* bordures normales (chocolat) */
+  --border-strong: #6b4128;
 
-  --text-primary: #f8fafc; /* texte principal */
-  --text-secondary: #b7c0d1; /* texte secondaire */
-  --text-muted: #7e8aa0;
-  --text-faint: #3f4f68;
-  --text-ghost: #334055; /* timestamps, labels */
+  --text-primary: #f5efe6; /* texte principal (creme) */
+  --text-secondary: #dcc9b6; /* texte secondaire */
+  --text-muted: #a98d75;
+  --text-faint: #6b4128;
+  --text-ghost: #59371f; /* timestamps, labels */
 
-  --accent: #d08a3a;
-  --accent-dim: #d08a3a20;
-  --accent-border: #d08a3a40;
-  --accent-text: #05070d; /* texte SUR fond accent */
+  --accent: #c8895e; /* argile, lisible sur fond sombre */
+  --accent-dim: #c8895e20;
+  --accent-border: #c8895e40;
+  --accent-text: #2b1b12; /* texte SUR fond accent */
 
-  --success: #4ade80;
-  --success-dim: #4ade8020;
-  --success-border: #4ade8040;
+  --success: #5cae60; /* vert foret eclairci */
+  --success-dim: #5cae6020;
+  --success-border: #5cae6040;
   --danger: #ef4444;
   --danger-dim: #ef444415;
   --danger-border: #ef444430;
-  --warning: #c98231;
-  --warning-dim: #c9823115;
-  --info: #60a5fa;
-  --info-dim: #60a5fa15;
+  --warning: #c04d29; /* orange FAB mobile */
+  --warning-dim: #c04d2915;
+  --info: #53bde5; /* bleu des coches de lecture */
+  --info-dim: #53bde515;
 
-  --bubble-them-bg: #151d2e;
-  --bubble-them-text: #f8fafc;
-  --bubble-them-border: #1c2638;
-  --bubble-me-bg: #d08a3a;
-  --bubble-me-text: #05070d;
+  --bubble-them-bg: #2b1b12;
+  --bubble-them-text: #f5efe6;
+  --bubble-them-border: #372417;
+  --bubble-me-bg: #8a4b2b; /* terracotta */
+  --bubble-me-text: #f5efe6;
 
-  --av-0-bg: #d08a3a22;
-  --av-0-fg: #d08a3a;
-  --av-1-bg: #60a5fa22;
-  --av-1-fg: #60a5fa;
-  --av-2-bg: #a78bfa22;
-  --av-2-fg: #a78bfa;
-  --av-3-bg: #34d39922;
-  --av-3-fg: #34d399;
-  --av-4-bg: #fb718522;
-  --av-4-fg: #fb7185;
+  --av-0-bg: #c8895e22;
+  --av-0-fg: #c8895e;
+  --av-1-bg: #53bde522;
+  --av-1-fg: #53bde5;
+  --av-2-bg: #c04d2922;
+  --av-2-fg: #d97e5f;
+  --av-3-bg: #5cae6022;
+  --av-3-fg: #5cae60;
+  --av-4-bg: #eadbc822;
+  --av-4-fg: #eadbc8;
 
-  --scrollbar-thumb: #1c2638;
+  --scrollbar-thumb: #372417;
   --scrollbar-track: transparent;
 
-  --skeleton-base: #1c2638;
-  --skeleton-shine: #2a3548;
+  --skeleton-base: #372417;
+  --skeleton-shine: #4a2c1a;
 
   --overlay: #00000080;
 
-  --dot-color: #d08a3a0a;
+  --dot-color: #c8895e0a;
 }
 
 [data-theme="light"] {
-  --bg-base: #fbf7f2;
+  --bg-base: #f5efe6; /* creme (fond mobile) */
   --bg-surface: #ffffff; /* cartes, panels */
-  --bg-elevated: #fffdf9; /* dropdowns */
-  --bg-hover: #f7ece1; /* hover liste */
+  --bg-elevated: #fdfaf4; /* dropdowns */
+  --bg-hover: #efe4d3; /* hover liste */
   --bg-input: #ffffff; /* champs */
-  --bg-muted: #f3f5f8; /* bulles "them" */
+  --bg-muted: #eadbc8; /* bulles "them" (sable) */
 
-  --border-subtle: #e8d6c4;
-  --border-default: #d7b394;
-  --border-strong: #b86a2a;
+  --border-subtle: #eadbc8;
+  --border-default: #d9bfa0;
+  --border-strong: #8a4b2b;
 
-  --text-primary: #121826;
-  --text-secondary: #4a5568;
-  --text-muted: #718096;
-  --text-faint: #9aa4b2;
-  --text-ghost: #b6c0ce;
+  --text-primary: #2b1b12; /* encre */
+  --text-secondary: #5c4433;
+  --text-muted: #866a54;
+  --text-faint: #b39a83;
+  --text-ghost: #c6b09a;
 
-  --accent: #b86a2a;
-  --accent-dim: #b86a2a18;
-  --accent-border: #b86a2a40;
+  --accent: #8a4b2b; /* terracotta */
+  --accent-dim: #8a4b2b18;
+  --accent-border: #8a4b2b40;
   --accent-text: #ffffff;
 
-  --success: #16a34a;
-  --success-dim: #16a34a15;
-  --success-border: #16a34a35;
+  --success: #2e7d32; /* vert foret */
+  --success-dim: #2e7d3215;
+  --success-border: #2e7d3235;
   --danger: #dc2626;
   --danger-dim: #dc262615;
   --danger-border: #dc262630;
-  --warning: #8f4f1f;
-  --warning-dim: #8f4f1f15;
-  --info: #2563eb;
-  --info-dim: #2563eb15;
+  --warning: #c04d29; /* orange FAB mobile */
+  --warning-dim: #c04d2915;
+  --info: #53bde5; /* bleu des coches de lecture */
+  --info-dim: #53bde515;
 
-  --bubble-them-bg: #f3f5f8;
-  --bubble-them-text: #121826;
-  --bubble-them-border: #e8d6c4;
-  --bubble-me-bg: #b86a2a;
+  --bubble-them-bg: #eadbc8;
+  --bubble-them-text: #2b1b12;
+  --bubble-them-border: #d9bfa0;
+  --bubble-me-bg: #8a4b2b;
   --bubble-me-text: #ffffff;
 
-  --av-0-bg: #b86a2a18;
-  --av-0-fg: #8f4f1f;
-  --av-1-bg: #2563eb15;
-  --av-1-fg: #1d4ed8;
-  --av-2-bg: #7c3aed15;
-  --av-2-fg: #6d28d9;
-  --av-3-bg: #16a34a15;
-  --av-3-fg: #15803d;
-  --av-4-bg: #e1113115;
-  --av-4-fg: #be123c;
+  --av-0-bg: #8a4b2b18;
+  --av-0-fg: #8a4b2b;
+  --av-1-bg: #53bde518;
+  --av-1-fg: #2e7fa3;
+  --av-2-bg: #c04d2915;
+  --av-2-fg: #c04d29;
+  --av-3-bg: #2e7d3215;
+  --av-3-fg: #2e7d32;
+  --av-4-bg: #4a2c1a15;
+  --av-4-fg: #4a2c1a;
 
-  --scrollbar-thumb: #d7b394;
+  --scrollbar-thumb: #d9bfa0;
   --scrollbar-track: transparent;
 
-  --skeleton-base: #e8d6c4;
-  --skeleton-shine: #f7ece1;
+  --skeleton-base: #eadbc8;
+  --skeleton-shine: #efe4d3;
 
   --overlay: #00000050;
 
-  --dot-color: #b86a2a0b;
+  --dot-color: #8a4b2b0b;
 }
 
 /* Palette technique : double tap sur le bouton de theme */

@@ -41,8 +41,11 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
   }
 
   const startDirectChat = async (contactId: string) => {
+    const contact = contacts.find((c) => c.id === contactId)
+    if (!contact) return
     try {
-      const conversation = await createPrivateChat(contactId)
+      // Le backend identifie les gens par leur numero Alanya (6 chiffres).
+      const conversation = await createPrivateChat(contact.phone)
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
       const message = e instanceof Error ? e.message : "Impossible de creer la conversation."
@@ -58,7 +61,10 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
 
     setLoading(true)
     try {
-      const conversation = await createGroupChat(groupName.trim(), Array.from(selected))
+      const memberNumbers = contacts
+        .filter((contact) => selected.has(contact.id))
+        .map((contact) => contact.phone)
+      const conversation = await createGroupChat(groupName.trim(), memberNumbers)
       success("Groupe cree", `${selected.size} membres ajoutes.`)
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
@@ -70,10 +76,10 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
   }
 
   const createContact = async () => {
-    const phone = normalizePhone(newPhone)
+    const phone = normalizePhone(newPhone).replace(/\D/g, "")
 
-    if (!/^\+?[0-9]{8,15}$/.test(phone)) {
-      error("Numero invalide", "Utilisez un numero valide (8 a 15 chiffres).")
+    if (!/^[0-9]{6}$/.test(phone)) {
+      error("Numero invalide", "Utilisez le numero Alanya a 6 chiffres du contact.")
       return
     }
 

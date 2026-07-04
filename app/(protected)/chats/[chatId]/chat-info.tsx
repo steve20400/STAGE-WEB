@@ -7,6 +7,7 @@ import { findLocalGroup } from "../../../../src/data/local-groups"
 import { CHAT_COLORS } from "../../../../src/mocks/chat-data"
 import { fetchContacts } from "../../../../src/services/contacts-service"
 import { fetchConversationById } from "../../../../src/services/chats-service"
+import { startOutgoingCall } from "../../../../src/services/call-manager"
 
 interface Member {
   id: string
@@ -390,11 +391,20 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </button>
               <button
                 className="ca-btn"
-                onClick={() =>
-                  navigate(
-                    `/calls/new?contact=${conv.id}&type=audio&returnTo=${encodeURIComponent(`/chats/${conv.id}/info`)}`
-                  )
-                }
+                onClick={() => {
+                  void startOutgoingCall(conv.id, "audio", conv.name)
+                    .then((callId) =>
+                      navigate(
+                        `/calls/${callId}?type=audio&returnTo=${encodeURIComponent(`/chats/${conv.id}/info`)}`
+                      )
+                    )
+                    .catch((err) =>
+                      warning(
+                        "Appel impossible",
+                        err instanceof Error ? err.message : "Reessayez plus tard."
+                      )
+                    )
+                }}
                 aria-label="Audio"
               >
                 <div className="ca-icon">
@@ -414,11 +424,20 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </button>
               <button
                 className="ca-btn"
-                onClick={() =>
-                  navigate(
-                    `/calls/new?contact=${conv.id}&type=video&returnTo=${encodeURIComponent(`/chats/${conv.id}/info`)}`
-                  )
-                }
+                onClick={() => {
+                  void startOutgoingCall(conv.id, "video", conv.name)
+                    .then((callId) =>
+                      navigate(
+                        `/calls/${callId}?type=video&returnTo=${encodeURIComponent(`/chats/${conv.id}/info`)}`
+                      )
+                    )
+                    .catch((err) =>
+                      warning(
+                        "Appel impossible",
+                        err instanceof Error ? err.message : "Reessayez plus tard."
+                      )
+                    )
+                }}
                 aria-label="Video"
               >
                 <div className="ca-icon">

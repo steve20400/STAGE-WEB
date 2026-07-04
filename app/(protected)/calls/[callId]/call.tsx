@@ -1,86 +1,16 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
-import { loadContacts } from "../../../../src/data/contacts"
+import { useCallState } from "../../../../src/hooks/use-call"
+import {
+  acknowledgeCallEnded,
+  hangUp as hangUpCall,
+  toggleCamera,
+  toggleMicrophone,
+} from "../../../../src/services/call-manager"
+import { toInitials } from "../../../../src/data/session-user"
 import "./call-room-page.css"
-type CallState = "connecting" | "ringing" | "active" | "ended"
-type CallType = "audio" | "video"
 
-interface Participant {
-  id: string
-  name: string
-  initials: string
-  color: { bg: string; fg: string }
-  muted: boolean
-  videoOff: boolean
-}
-
-const CONTACTS: Record<string, Participant> = {
-  "1": {
-    id: "1",
-    name: "Kevin Manga",
-    initials: "KM",
-    color: { bg: "#E8B84B22", fg: "#E8B84B" },
-    muted: false,
-    videoOff: false,
-  },
-  "2": {
-    id: "2",
-    name: "Groupe Alanya II",
-    initials: "GA",
-    color: { bg: "#60a5fa22", fg: "#60a5fa" },
-    muted: false,
-    videoOff: false,
-  },
-  "3": {
-    id: "3",
-    name: "Dr. NANA BINKEU",
-    initials: "NB",
-    color: { bg: "#a78bfa22", fg: "#a78bfa" },
-    muted: false,
-    videoOff: true,
-  },
-  "4": {
-    id: "4",
-    name: "Laure Ateba",
-    initials: "LA",
-    color: { bg: "#34d39922", fg: "#34d399" },
-    muted: false,
-    videoOff: true,
-  },
-  "5": {
-    id: "5",
-    name: "Paul Essomba",
-    initials: "PE",
-    color: { bg: "#fb718522", fg: "#fb7185" },
-    muted: false,
-    videoOff: true,
-  },
-  "6": {
-    id: "6",
-    name: "Nina Fouda",
-    initials: "NF",
-    color: { bg: "#E8B84B22", fg: "#E8B84B" },
-    muted: false,
-    videoOff: true,
-  },
-}
-
-const MOCK_CALLS: Record<string, { contact: Participant; type: CallType }> = {
-  c1: { type: "video", contact: CONTACTS["1"] },
-  c2: { type: "audio", contact: CONTACTS["4"] },
-  c3: { type: "audio", contact: CONTACTS["5"] },
-  c8: { type: "audio", contact: CONTACTS["3"] },
-  c9: { type: "video", contact: CONTACTS["1"] },
-}
-
-const FALLBACK_CONTACT: Participant = {
-  id: "unknown",
-  name: "Contact",
-  initials: "CT",
-  color: { bg: "#60a5fa22", fg: "#60a5fa" },
-  muted: false,
-  videoOff: true,
-}
+type CallScreenState = "ringing" | "active" | "ended"
 
 function formatElapsed(seconds: number): string {
   const h = Math.floor(seconds / 3600)
@@ -94,76 +24,40 @@ export default function CallRoomPage() {
   const navigate = useNavigate()
   const { callId } = useParams<{ callId?: string }>()
   const [searchParams] = useSearchParams()
-
-  const contactId = searchParams.get("contact") ?? "1"
-  const queryType = searchParams.get("type") === "video" ? "video" : "audio"
   const returnTo = searchParams.get("returnTo") || "/calls"
 
-  const callData = useMemo(() => {
-    if (callId && callId !== "new" && MOCK_CALLS[callId]) {
-      return MOCK_CALLS[callId]
-    }
+  const call = useCallState()
 
-    const contactFromStore = loadContacts().find((entry) => entry.id === contactId)
-    if (contactFromStore) {
-      return {
-        type: queryType,
-        contact: {
-          id: contactFromStore.id,
-          name: contactFromStore.name,
-          initials: contactFromStore.initials,
-          color: { bg: "var(--accent-dim)", fg: "var(--accent)" },
-          muted: false,
-          videoOff: true,
-        },
-      }
-    }
+  const isOurCall = call.activeCallId !== null && call.activeCallId === callId
+  const remoteStreamEntries = useMemo(
+    () => Object.entries(call.remoteStreams),
+    [call.remoteStreams]
+  )
+  const hasRemote = remoteStreamEntries.length > 0
 
-    return {
-      type: queryType,
-      contact: CONTACTS[contactId] ?? FALLBACK_CONTACT,
-    }
-  }, [callId, contactId, queryType])
+  const callState: CallScreenState = !isOurCall
+    ? "ended"
+    : call.role === "outgoing" && !hasRemote
+      ? "ringing"
+      : "active"
 
-  const isVideo = callData.type === "video"
+  const isVideo = call.callType === "video"
+  const peerName = call.peerName || "Contact"
+  const peerInitials = toInitials(peerName)
 
-  const [callState, setCallState] = useState<CallState>("connecting")
   const [elapsed, setElapsed] = useState(0)
-  const [micOn, setMicOn] = useState(true)
-  const [camOn, setCamOn] = useState(isVideo)
   const [speakerOn, setSpeakerOn] = useState(true)
-  const [screenShare, setScreenShare] = useState(false)
   const [controlsVisible, setControlsVisible] = useState(true)
-  const [contact, setContact] = useState<Participant>(callData.contact)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
 
   const liveTimerRef = useRef<number | null>(null)
   const showControlsTimerRef = useRef<number | null>(null)
-  const connectStageTimerRef = useRef<number | null>(null)
-  const ringingStageTimerRef = useRef<number | null>(null)
   const leaveTimerRef = useRef<number | null>(null)
   const localVideoRef = useRef<HTMLVideoElement | null>(null)
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
+  const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map())
 
-  useEffect(() => {
-    setContact(callData.contact)
-    setCamOn(callData.type === "video")
-    setCallState("connecting")
-    setElapsed(0)
-
-    connectStageTimerRef.current = window.setTimeout(() => {
-      setCallState("ringing")
-      ringingStageTimerRef.current = window.setTimeout(() => {
-        setCallState("active")
-      }, 2200)
-    }, 900)
-
-    return () => {
-      if (connectStageTimerRef.current !== null) window.clearTimeout(connectStageTimerRef.current)
-      if (ringingStageTimerRef.current !== null) window.clearTimeout(ringingStageTimerRef.current)
-    }
-  }, [callData])
-
+  // Chronometre pendant l'appel actif
   useEffect(() => {
     if (callState !== "active") {
       if (liveTimerRef.current !== null) {
@@ -172,9 +66,7 @@ export default function CallRoomPage() {
       }
       return
     }
-
     liveTimerRef.current = window.setInterval(() => setElapsed((value) => value + 1), 1000)
-
     return () => {
       if (liveTimerRef.current !== null) {
         window.clearInterval(liveTimerRef.current)
@@ -183,13 +75,46 @@ export default function CallRoomPage() {
     }
   }, [callState])
 
+  // Appel termine (par nous ou a distance) : petit ecran de fin puis retour.
+  useEffect(() => {
+    if (callState !== "ended") return
+    leaveTimerRef.current = window.setTimeout(() => {
+      acknowledgeCallEnded()
+      navigate(returnTo)
+    }, 1600)
+    return () => {
+      if (leaveTimerRef.current !== null) window.clearTimeout(leaveTimerRef.current)
+    }
+  }, [callState, navigate, returnTo])
+
+  // Branche le flux local sur l'apercu video (PiP)
+  useEffect(() => {
+    if (localVideoRef.current && call.localStream) {
+      localVideoRef.current.srcObject = call.localStream
+    }
+  }, [call.localStream, callState, call.camOn])
+
+  // Branche le premier flux distant sur la grande video
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStreamEntries.length > 0) {
+      remoteVideoRef.current.srcObject = remoteStreamEntries[0][1]
+    }
+  }, [remoteStreamEntries, callState])
+
+  // Volume des sorties audio distantes (haut-parleur on/off)
+  useEffect(() => {
+    for (const audio of remoteAudioRefs.current.values()) {
+      audio.muted = !speakerOn
+    }
+    if (remoteVideoRef.current) remoteVideoRef.current.muted = !speakerOn
+  }, [speakerOn, remoteStreamEntries])
+
   const resetHideTimer = useCallback(() => {
     setControlsVisible(true)
     if (showControlsTimerRef.current !== null) {
       window.clearTimeout(showControlsTimerRef.current)
       showControlsTimerRef.current = null
     }
-
     if (isVideo && callState === "active") {
       showControlsTimerRef.current = window.setTimeout(() => setControlsVisible(false), 4000)
     }
@@ -205,70 +130,48 @@ export default function CallRoomPage() {
     }
   }, [resetHideTimer])
 
-  useEffect(() => {
-    let stream: MediaStream | null = null
-
-    async function openLocalCamera() {
-      if (!isVideo || !camOn || callState === "ended") return
-      if (!navigator.mediaDevices?.getUserMedia) return
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream
-        }
-      } catch {
-        // keep demo resilient if camera permission is denied
-      }
-    }
-
-    void openLocalCamera()
-
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
-      }
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null
-      }
-    }
-  }, [isVideo, camOn, callState])
-
-  useEffect(() => {
-    return () => {
-      if (leaveTimerRef.current !== null) window.clearTimeout(leaveTimerRef.current)
-    }
+  const doHangUp = useCallback(() => {
+    setShowEndConfirm(false)
+    void hangUpCall()
   }, [])
 
-  const hangUp = useCallback(() => {
-    setShowEndConfirm(false)
-    setCallState("ended")
-
-    if (liveTimerRef.current !== null) {
-      window.clearInterval(liveTimerRef.current)
-      liveTimerRef.current = null
-    }
-
-    leaveTimerRef.current = window.setTimeout(() => {
-      navigate(returnTo)
-    }, 1400)
-  }, [navigate, returnTo])
-
-  const stateLabel: Record<CallState, string> = {
-    connecting: "Connexion en cours...",
+  const stateLabel: Record<CallScreenState, string> = {
     ringing: "Appel en cours...",
     active: formatElapsed(elapsed),
     ended: "Appel termine",
   }
 
   const statusColor =
-    callState === "active" ? "#4ade80" : callState === "ended" ? "#ef4444" : "#E8B84B"
+    callState === "active"
+      ? "var(--success)"
+      : callState === "ended"
+        ? "var(--danger)"
+        : "var(--accent)"
+
+  const showRemoteVideo = isVideo && callState === "active" && hasRemote
 
   return (
     <>
       <div className="call-room-root" onMouseMove={resetHideTimer} onClick={resetHideTimer}>
+        {/* Sorties audio des participants distants (aussi utilisees en appel video coupe) */}
+        {remoteStreamEntries.map(([peerId, stream]) => (
+          <audio
+            key={peerId}
+            autoPlay
+            ref={(el) => {
+              if (el) {
+                if (el.srcObject !== stream) el.srcObject = stream
+                el.muted = !speakerOn
+                remoteAudioRefs.current.set(peerId, el)
+              } else {
+                remoteAudioRefs.current.delete(peerId)
+              }
+            }}
+          />
+        ))}
+
         <div className="bg-layer">
-          {isVideo && callState === "active" ? (
+          {showRemoteVideo ? (
             <video ref={remoteVideoRef} className="bg-video" autoPlay playsInline muted />
           ) : (
             <div className="bg-audio-pattern" />
@@ -281,6 +184,8 @@ export default function CallRoomPage() {
               className="back-btn"
               onClick={() => {
                 if (callState === "active") {
+                  setShowEndConfirm(true)
+                } else if (callState === "ringing") {
                   setShowEndConfirm(true)
                 } else {
                   navigate(returnTo)
@@ -330,6 +235,7 @@ export default function CallRoomPage() {
                 </svg>
               )}
               Appel {isVideo ? "video" : "audio"}
+              {call.isGroup ? " (groupe)" : ""}
             </div>
           </div>
 
@@ -337,29 +243,37 @@ export default function CallRoomPage() {
             <div className="contact-avatar-wrap">
               <div
                 className="contact-avatar"
-                style={{ background: contact.color.bg, color: contact.color.fg }}
+                style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
               >
                 {callState === "active" && (
                   <>
-                    <div className="pulse-ring" style={{ color: contact.color.fg }} />
-                    <div className="pulse-ring" style={{ color: contact.color.fg }} />
-                    <div className="pulse-ring" style={{ color: contact.color.fg }} />
+                    <div className="pulse-ring" style={{ color: "var(--accent)" }} />
+                    <div className="pulse-ring" style={{ color: "var(--accent)" }} />
+                    <div className="pulse-ring" style={{ color: "var(--accent)" }} />
                   </>
                 )}
-                {contact.initials}
+                {peerInitials}
               </div>
             </div>
 
-            <div className="contact-name">{contact.name}</div>
+            <div className="contact-name">{peerName}</div>
             <div className="call-status" style={{ color: statusColor }}>
               {callState === "active" && <div className="status-dot-live" />}
               {stateLabel[callState]}
+              {callState === "active" && call.isGroup
+                ? ` — ${remoteStreamEntries.length + 1} participants`
+                : ""}
             </div>
+            {call.error && (
+              <div className="call-status" style={{ color: "var(--danger)", marginTop: 8 }}>
+                {call.error}
+              </div>
+            )}
           </div>
 
           {isVideo && callState === "active" && (
             <div className="local-video-pip">
-              {camOn ? (
+              {call.camOn ? (
                 <video
                   ref={localVideoRef}
                   autoPlay
@@ -397,11 +311,11 @@ export default function CallRoomPage() {
             <div className="controls-inner">
               <button
                 className="ctrl-btn"
-                onClick={() => setMicOn((value) => !value)}
-                aria-label={micOn ? "Couper le micro" : "Activer le micro"}
+                onClick={() => toggleMicrophone()}
+                aria-label={call.micOn ? "Couper le micro" : "Activer le micro"}
               >
-                <div className={`ctrl-btn-icon ${micOn ? "ctrl-on" : "ctrl-off"}`}>
-                  {micOn ? (
+                <div className={`ctrl-btn-icon ${call.micOn ? "ctrl-on" : "ctrl-off"}`}>
+                  {call.micOn ? (
                     <svg
                       width="20"
                       height="20"
@@ -430,17 +344,17 @@ export default function CallRoomPage() {
                     </svg>
                   )}
                 </div>
-                <span className="ctrl-btn-label">{micOn ? "Micro" : "Muet"}</span>
+                <span className="ctrl-btn-label">{call.micOn ? "Micro" : "Muet"}</span>
               </button>
 
               {isVideo && (
                 <button
                   className="ctrl-btn"
-                  onClick={() => setCamOn((value) => !value)}
-                  aria-label={camOn ? "Couper la camera" : "Activer la camera"}
+                  onClick={() => toggleCamera()}
+                  aria-label={call.camOn ? "Couper la camera" : "Activer la camera"}
                 >
-                  <div className={`ctrl-btn-icon ${camOn ? "ctrl-on" : "ctrl-off"}`}>
-                    {camOn ? (
+                  <div className={`ctrl-btn-icon ${call.camOn ? "ctrl-on" : "ctrl-off"}`}>
+                    {call.camOn ? (
                       <svg
                         width="20"
                         height="20"
@@ -468,33 +382,7 @@ export default function CallRoomPage() {
                       </svg>
                     )}
                   </div>
-                  <span className="ctrl-btn-label">{camOn ? "Camera" : "Camera off"}</span>
-                </button>
-              )}
-
-              {isVideo && (
-                <button
-                  className="ctrl-btn"
-                  onClick={() => setScreenShare((value) => !value)}
-                  aria-label="Partager l'ecran"
-                >
-                  <div className={`ctrl-btn-icon ${screenShare ? "ctrl-on" : "ctrl-off"}`}>
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    >
-                      <rect x="2" y="3" width="20" height="14" rx="2" />
-                      <line x1="8" y1="21" x2="16" y2="21" />
-                      <line x1="12" y1="17" x2="12" y2="21" />
-                      {screenShare && <path d="M9 10l3-3 3 3M12 7v7" strokeWidth="2" />}
-                    </svg>
-                  </div>
-                  <span className="ctrl-btn-label">{screenShare ? "Partage" : "Ecran"}</span>
+                  <span className="ctrl-btn-label">{call.camOn ? "Camera" : "Camera off"}</span>
                 </button>
               )}
 
@@ -536,30 +424,35 @@ export default function CallRoomPage() {
                 <span className="ctrl-btn-label">{speakerOn ? "Son" : "Muet"}</span>
               </button>
 
-              <button
-                className="ctrl-btn"
-                onClick={() => navigate(`/chats/${contact.id}`)}
-                aria-label="Ouvrir le chat"
-              >
-                <div className="ctrl-btn-icon ctrl-on">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  >
-                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                  </svg>
-                </div>
-                <span className="ctrl-btn-label">Chat</span>
-              </button>
+              {call.activeConvId && (
+                <button
+                  className="ctrl-btn"
+                  onClick={() => navigate(`/chats/${call.activeConvId}`)}
+                  aria-label="Ouvrir le chat"
+                >
+                  <div className="ctrl-btn-icon ctrl-on">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    >
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                    </svg>
+                  </div>
+                  <span className="ctrl-btn-label">Chat</span>
+                </button>
+              )}
 
               <button
                 className="ctrl-btn"
-                onClick={() => setShowEndConfirm(true)}
+                onClick={() => {
+                  if (callState === "active") setShowEndConfirm(true)
+                  else doHangUp()
+                }}
                 aria-label="Raccrocher"
               >
                 <div className="ctrl-btn-icon ctrl-end" style={{ width: 60, height: 60 }}>
@@ -602,7 +495,7 @@ export default function CallRoomPage() {
               </svg>
             </div>
             <div className="ended-title">Appel termine</div>
-            <div className="ended-duration">Duree: {formatElapsed(elapsed)}</div>
+            {elapsed > 0 && <div className="ended-duration">Duree: {formatElapsed(elapsed)}</div>}
           </div>
         )}
 
@@ -611,15 +504,19 @@ export default function CallRoomPage() {
             <div className="confirm-card">
               <div className="confirm-title">Raccrocher ?</div>
               <div className="confirm-sub">
-                L'appel avec {contact.name} sera termine.
-                <br />
-                Duree actuelle: {formatElapsed(elapsed)}
+                L'appel avec {peerName} sera termine.
+                {elapsed > 0 && (
+                  <>
+                    <br />
+                    Duree actuelle: {formatElapsed(elapsed)}
+                  </>
+                )}
               </div>
               <div className="confirm-btns">
                 <button className="confirm-cancel" onClick={() => setShowEndConfirm(false)}>
                   Annuler
                 </button>
-                <button className="confirm-end" onClick={hangUp}>
+                <button className="confirm-end" onClick={doHangUp}>
                   Raccrocher
                 </button>
               </div>

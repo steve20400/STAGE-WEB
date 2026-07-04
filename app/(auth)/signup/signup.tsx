@@ -17,14 +17,6 @@ interface FormData {
 
 const OTP_LEN = 6
 
-function normalizePhone(phone: string) {
-  return phone.replace(/\s+/g, "").replace(/[()-]/g, "")
-}
-
-function validPhone(phone: string) {
-  return /^\+?[0-9]{8,15}$/.test(normalizePhone(phone))
-}
-
 function validEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 }
@@ -137,14 +129,12 @@ export default function SignUpPage() {
     event.preventDefault()
     setError("")
     if (!form.name.trim()) return setError("Le nom est requis.")
-    if (!validPhone(form.phone)) return setError("Numero de telephone invalide.")
     if (!form.email.trim()) return setError("L'adresse email est requise.")
     if (!validEmail(form.email)) return setError("Adresse email invalide.")
 
     setForm((prev) => ({
       ...prev,
       name: prev.name.trim(),
-      phone: normalizePhone(prev.phone),
       email: prev.email.trim().toLowerCase(),
     }))
     setStep(2)
@@ -162,7 +152,7 @@ export default function SignUpPage() {
     try {
       const response = await requestRegistrationOtp({
         name: form.name.trim(),
-        phone: normalizePhone(form.phone),
+        phone: "",
         email: form.email.trim().toLowerCase(),
         password: form.password,
       })
@@ -197,7 +187,7 @@ export default function SignUpPage() {
       await register(
         {
           name: form.name.trim(),
-          phone: normalizePhone(form.phone),
+          phone: "",
           email: form.email.trim().toLowerCase(),
           password: form.password,
         },
@@ -277,7 +267,7 @@ export default function SignUpPage() {
               <StepHeader
                 step={1}
                 title="Creer un compte."
-                subtitle="Nom, numero de telephone et email."
+                subtitle="Votre nom et votre adresse email. Votre numero Alanya sera genere automatiquement."
               />
 
               <div className="field">
@@ -290,18 +280,6 @@ export default function SignUpPage() {
                   required
                 />
                 <label htmlFor="name">Nom complet</label>
-              </div>
-
-              <div className="field">
-                <input
-                  id="phone"
-                  type="tel"
-                  placeholder=" "
-                  value={form.phone}
-                  onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
-                  required
-                />
-                <label htmlFor="phone">Numero de telephone</label>
               </div>
 
               <div className="field">
@@ -320,12 +298,7 @@ export default function SignUpPage() {
               <button
                 type="submit"
                 className="btn-submit"
-                disabled={
-                  !form.name.trim() ||
-                  !validPhone(form.phone) ||
-                  !form.email.trim() ||
-                  !validEmail(form.email)
-                }
+                disabled={!form.name.trim() || !form.email.trim() || !validEmail(form.email)}
               >
                 Continuer -&gt;
               </button>
@@ -340,7 +313,7 @@ export default function SignUpPage() {
               <StepHeader
                 step={2}
                 title="Securisez votre compte."
-                subtitle={`Pour ${normalizePhone(form.phone)}`}
+                subtitle={`Pour ${form.email.trim().toLowerCase()}`}
               />
 
               <div className="field">
@@ -434,7 +407,7 @@ export default function SignUpPage() {
                       <strong className="countdown-accent">{demoOtp}</strong>
                     </>
                   ) : (
-                    <>Code genere par la couche de prototype.</>
+                    <>Consultez votre boite mail pour recuperer le code.</>
                   )}
                 </div>
                 <div className="resend-row">
@@ -449,7 +422,7 @@ export default function SignUpPage() {
                         try {
                           const response = await requestRegistrationOtp({
                             name: form.name.trim(),
-                            phone: normalizePhone(form.phone),
+                            phone: "",
                             email: form.email.trim().toLowerCase(),
                             password: form.password,
                           })

@@ -4,8 +4,14 @@ import { useAuth } from "../../../src/components/auth-provider"
 import polytechLogo from "../../(public)/polytech.png"
 import "./login-page.css"
 
-function normalizePhone(phone: string) {
-  return phone.replace(/\s+/g, "").replace(/[()-]/g, "")
+function normalizeIdentifier(value: string) {
+  return value.trim().replace(/\s+/g, "")
+}
+
+// Le backend accepte un email ou le numero Alanya a 6 chiffres.
+function isValidIdentifier(value: string) {
+  const normalized = normalizeIdentifier(value)
+  return /^\d{6}$/.test(normalized) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
 }
 
 export default function LoginPage() {
@@ -19,8 +25,7 @@ export default function LoginPage() {
   const [error, setError] = useState("")
 
   const canSubmit = useMemo(() => {
-    const normalized = normalizePhone(phone)
-    return /^\+?[0-9]{8,15}$/.test(normalized) && pwd.length >= 4
+    return isValidIdentifier(phone) && pwd.length >= 4
   }, [phone, pwd])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,7 +66,7 @@ export default function LoginPage() {
             te <em>revoir.</em>
           </h1>
           <p className="left-sub">
-            Utilisez votre numero de telephone et votre mot de passe pour reprendre vos
+            Utilisez votre email ou votre numero Alanya et votre mot de passe pour reprendre vos
             conversations.
           </p>
         </div>
@@ -107,15 +112,14 @@ export default function LoginPage() {
           <div className="field">
             <input
               id="phone"
-              type="tel"
+              type="text"
               placeholder=" "
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
               required
-              autoComplete="tel"
-              inputMode="tel"
+              autoComplete="username"
             />
-            <label htmlFor="phone">Numero de telephone</label>
+            <label htmlFor="phone">Email ou numero Alanya (6 chiffres)</label>
           </div>
 
           <div className="field">

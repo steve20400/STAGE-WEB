@@ -36,7 +36,21 @@ export interface ChatMessageMock {
   timestamp: Date
   fileName?: string
   fileSize?: string
+  /** Id du message cite (reponse). */
   replyTo?: string
+  /** Apercu du message cite, fourni par le backend meme si le message n'est pas charge. */
+  replySnapshot?: {
+    senderId: string
+    content: string | null
+    type: MessageType
+    isDeleted: boolean
+  }
+  /** URL relative backend du media attache (/api/media/{id}). */
+  mediaUrl?: string
+  mediaMime?: string
+  durationMs?: number
+  /** Message supprime "pour tous" : on affiche un placeholder. */
+  isDeleted?: boolean
 }
 
 export const CHAT_COLORS = [

@@ -115,8 +115,8 @@ export function ThemeSelector() {
             width: "100%",
             height: 56,
             borderRadius: 7,
-            background: "#F5F5F0",
-            border: "1px solid #E5E3DC",
+            background: "#F5EFE6",
+            border: "1px solid #EADBC8",
             overflow: "hidden",
             marginBottom: 10,
             display: "flex",
@@ -127,27 +127,27 @@ export function ThemeSelector() {
             style={{
               height: 14,
               background: "#FFFFFF",
-              borderBottom: "1px solid #E5E3DC",
+              borderBottom: "1px solid #EADBC8",
               display: "flex",
               alignItems: "center",
               paddingLeft: 7,
               gap: 4,
             }}
           >
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#E5E3DC" }} />
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#E5E3DC" }} />
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#EADBC8" }} />
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#EADBC8" }} />
             <div
               style={{
                 width: 28,
                 height: 4,
                 borderRadius: 2,
-                background: "#C9973A",
+                background: "#8A4B2B",
                 marginLeft: 4,
               }}
             />
           </div>
           <div style={{ flex: 1, display: "flex" }}>
-            <div style={{ width: 40, background: "#FFFFFF", borderRight: "1px solid #E5E3DC" }} />
+            <div style={{ width: 40, background: "#FFFFFF", borderRight: "1px solid #EADBC8" }} />
             <div style={{ flex: 1, padding: 5, display: "flex", flexDirection: "column", gap: 3 }}>
               <div
                 style={{
@@ -155,10 +155,10 @@ export function ThemeSelector() {
                   width: "55%",
                   height: 9,
                   borderRadius: 5,
-                  background: "#C9973A",
+                  background: "#8A4B2B",
                 }}
               />
-              <div style={{ width: "70%", height: 9, borderRadius: 5, background: "#EFF0EC" }} />
+              <div style={{ width: "70%", height: 9, borderRadius: 5, background: "#EADBC8" }} />
             </div>
           </div>
         </div>
@@ -186,8 +186,8 @@ export function ThemeSelector() {
             width: "100%",
             height: 56,
             borderRadius: 7,
-            background: "#080C14",
-            border: "1px solid #1E2736",
+            background: "#150D08",
+            border: "1px solid #372417",
             overflow: "hidden",
             marginBottom: 10,
             display: "flex",
@@ -197,28 +197,28 @@ export function ThemeSelector() {
           <div
             style={{
               height: 14,
-              background: "#0D1118",
-              borderBottom: "1px solid #1E2736",
+              background: "#1E130C",
+              borderBottom: "1px solid #372417",
               display: "flex",
               alignItems: "center",
               paddingLeft: 7,
               gap: 4,
             }}
           >
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#1E2736" }} />
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#1E2736" }} />
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#372417" }} />
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#372417" }} />
             <div
               style={{
                 width: 28,
                 height: 4,
                 borderRadius: 2,
-                background: "#E8B84B",
+                background: "#C8895E",
                 marginLeft: 4,
               }}
             />
           </div>
           <div style={{ flex: 1, display: "flex" }}>
-            <div style={{ width: 40, background: "#0D1118", borderRight: "1px solid #1E2736" }} />
+            <div style={{ width: 40, background: "#1E130C", borderRight: "1px solid #372417" }} />
             <div style={{ flex: 1, padding: 5, display: "flex", flexDirection: "column", gap: 3 }}>
               <div
                 style={{
@@ -226,10 +226,10 @@ export function ThemeSelector() {
                   width: "55%",
                   height: 9,
                   borderRadius: 5,
-                  background: "#E8B84B",
+                  background: "#C8895E",
                 }}
               />
-              <div style={{ width: "70%", height: 9, borderRadius: 5, background: "#1A2030" }} />
+              <div style={{ width: "70%", height: 9, borderRadius: 5, background: "#2B1B12" }} />
             </div>
           </div>
         </div>
@@ -270,7 +270,7 @@ export function ThemeSelector() {
             <div
               style={{
                 flex: 1,
-                background: "#F5F5F0",
+                background: "#F5EFE6",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -281,7 +281,7 @@ export function ThemeSelector() {
                 height="14"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#C9973A"
+                stroke="#8A4B2B"
                 strokeWidth="2"
                 strokeLinecap="round"
               >
@@ -292,7 +292,7 @@ export function ThemeSelector() {
             <div
               style={{
                 flex: 1,
-                background: "#080C14",
+                background: "#150D08",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -303,7 +303,7 @@ export function ThemeSelector() {
                 height="14"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#E8B84B"
+                stroke="#C8895E"
                 strokeWidth="2"
                 strokeLinecap="round"
               >
