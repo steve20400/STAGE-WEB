@@ -271,7 +271,8 @@ export default function CallRoomPage() {
             )}
           </div>
 
-          {isVideo && callState === "active" && (
+          {/* Apercu de sa propre camera : visible aussi pendant la sonnerie */}
+          {isVideo && callState !== "ended" && call.localStream && (
             <div className="local-video-pip">
               {call.camOn ? (
                 <video
