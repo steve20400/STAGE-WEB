@@ -318,7 +318,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [mobileOpen, setMobileOpen] = useState(false)
   // Navigation repliee par defaut (plus de place pour les discussions).
   const [collapsed, setCollapsed] = useState(() => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem("alanya-nav-collapsed") : null
+    const stored =
+      typeof window !== "undefined" ? localStorage.getItem("alanya-nav-collapsed") : null
     return stored === null ? true : stored === "1"
   })
   const toggleCollapsed = () => {

@@ -1,0 +1,101 @@
+/* Cadre deux colonnes facon WhatsApp Web (Appels, Statuts) */
+.section-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Colonne de gauche : liste (fond uni comme la navigation, pas de motif) */
+.section-split-list {
+  width: 380px;
+  flex-shrink: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+}
+
+/* La page liste remplit la colonne et defile a l'interieur */
+.section-split-list .calls-root {
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+
+/* En-tete de liste : reste visible pendant le defilement */
+.section-split-list .calls-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-base);
+  padding: 20px 18px 0 !important;
+}
+
+/* Les statistiques ne rentrent pas dans une colonne etroite -> masquees */
+.section-split-list .stats-strip {
+  display: none;
+}
+
+.section-split-list .calls-body {
+  padding: 0 12px 16px !important;
+}
+
+/* Colonne de droite : panneau d'accueil */
+.section-split-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 40px;
+  background:
+    linear-gradient(var(--motif-overlay), var(--motif-overlay)),
+    url("/motif-bg.png") repeat;
+  background-size:
+    auto,
+    280px auto;
+}
+
+.section-split-badge {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-split-title {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text-primary);
+}
+
+.section-split-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+/* Sur ecran etroit : une seule colonne (la liste) */
+@media (max-width: 900px) {
+  .section-split-list {
+    width: 100%;
+    border-right: none;
+  }
+  .section-split-panel {
+    display: none;
+  }
+}
