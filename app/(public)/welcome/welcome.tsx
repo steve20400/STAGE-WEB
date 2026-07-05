@@ -33,7 +33,7 @@ export default function WelcomePage() {
           <div className="hero-left">
             <div className="badge">
               <div className="badge-dot" />
-              <span>2 746 utilisateurs en ligne maintenant</span>
+              <span>Discutez, appelez, partagez — en toute simplicite.</span>
             </div>
 
             <h1 className="headline">

@@ -60,7 +60,8 @@ function formatDateSeparator(d: Date) {
   return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
 }
 
-/** Coche simple (envoye) / double grise (recu) / double bleue (lu), comme sur mobile. */
+/** Coche simple (envoye) / double blanche (recu) / double bleue (lu), comme sur WhatsApp.
+    Affichee uniquement sur la bulle terracotta de l'expediteur -> teintes claires. */
 function StatusIcon({ status }: { status: MessageStatus }) {
   if (status === "sending") {
     return (
@@ -69,7 +70,7 @@ function StatusIcon({ status }: { status: MessageStatus }) {
         height="12"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="var(--text-faint)"
+        stroke="rgba(255, 255, 255, 0.6)"
         strokeWidth="2"
         strokeLinecap="round"
       >
@@ -79,7 +80,8 @@ function StatusIcon({ status }: { status: MessageStatus }) {
     )
   }
 
-  const color = status === "read" ? "var(--info)" : "var(--text-muted)"
+  // Bleu vif quand lu, blanc translucide sinon (lisible sur le terracotta).
+  const color = status === "read" ? "#6fd0f5" : "rgba(255, 255, 255, 0.8)"
   const doubleCheck = status === "delivered" || status === "read"
 
   return (
@@ -448,11 +450,15 @@ function MessageBubble({
             style={{
               background: isMe ? "var(--bubble-me-bg)" : "var(--bubble-them-bg)",
               color: isMe ? "var(--bubble-me-text)" : "var(--bubble-them-text)",
-              padding: msg.type === "image" && mediaSrc ? 4 : "10px 14px",
-              borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-              fontSize: 13,
-              lineHeight: 1.55,
+              border: isMe ? "none" : "1px solid var(--bubble-them-border)",
+              boxShadow: "0 1px 1px rgba(0, 0, 0, 0.06)",
+              padding: msg.type === "image" && mediaSrc ? 4 : "6px 9px 5px",
+              borderRadius: isMe ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+              fontSize: 13.5,
+              lineHeight: 1.4,
               wordBreak: "break-word",
+              // flow-root : contient l'heure flottante facon WhatsApp
+              display: "flow-root",
             }}
           >
             {msg.isDeleted ? (
@@ -571,22 +577,29 @@ function MessageBubble({
                 )}
               </>
             )}
-          </div>
 
-          {/* Meta */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              justifyContent: isMe ? "flex-end" : "flex-start",
-              padding: "0 2px",
-            }}
-          >
-            <span style={{ fontSize: 10, color: "var(--text-faint)" }}>
-              {formatTime(msg.timestamp)}
-            </span>
-            {isMe && !msg.isDeleted && <StatusIcon status={msg.status} />}
+            {/* Heure + coches a l'interieur de la bulle, en bas a droite (WhatsApp).
+                float: right -> le texte court reste sur la meme ligne, le texte
+                long passe au-dessus ; le parent en flow-root contient le flottant. */}
+            {!msg.isDeleted && (
+              <span
+                style={{
+                  float: "right",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  marginLeft: 8,
+                  transform: "translateY(4px)",
+                  fontSize: 10,
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                  color: isMe ? "rgba(255, 255, 255, 0.75)" : "var(--text-faint)",
+                }}
+              >
+                {formatTime(msg.timestamp)}
+                {isMe && <StatusIcon status={msg.status} />}
+              </span>
+            )}
           </div>
         </div>
       </div>

@@ -10,9 +10,24 @@
 }
 
 .call-room-root {
+  /* Ecran d'appel toujours immersif (chocolat), comme l'app mobile, quel que
+     soit le theme clair/sombre : on surcharge les variables localement pour
+     que toutes les regles ci-dessous adoptent la palette sombre. */
+  --bg-base: #2b1b12;
+  --bg-muted: #1c120b;
+  --bg-elevated: rgba(255, 255, 255, 0.14);
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.72);
+  --text-muted: rgba(255, 255, 255, 0.55);
+  --text-faint: rgba(255, 255, 255, 0.32);
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --border-default: rgba(255, 255, 255, 0.22);
+  --accent-dim: rgba(138, 75, 43, 0.45);
+  --overlay: rgba(20, 12, 7, 0.82);
+
   font-family: "DM Sans", sans-serif;
   height: 100vh;
-  background: var(--bg-base);
+  background: #4a2c1a; /* chocolat mobile */
   color: var(--text-primary);
   display: flex;
   flex-direction: column;

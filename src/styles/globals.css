@@ -129,9 +129,9 @@ button {
   --info: #53bde5; /* bleu des coches de lecture */
   --info-dim: #53bde515;
 
-  --bubble-them-bg: #eadbc8;
+  --bubble-them-bg: #ffffff; /* blanc franc facon WhatsApp (ressort sur le fond creme) */
   --bubble-them-text: #2b1b12;
-  --bubble-them-border: #d9bfa0;
+  --bubble-them-border: #e4d5c1;
   --bubble-me-bg: #8a4b2b;
   --bubble-me-text: #ffffff;
 
