@@ -1,122 +1,94 @@
-# Alanya
+# Alanya — client web
 
-Alanya est une application web de messagerie et d'appels, realisee comme projet academique ENSPY 2025/2026.
+Alanya est une messagerie (chat, appels, statuts) développée dans le cadre du projet
+de Base de Données de l'ENSPY, promotion 2025/2026. Ce dépôt contient le **client web**.
 
-Le projet contient actuellement le client web. Il permet deja de naviguer dans l'application, creer un compte en mode prototype, se connecter, consulter les conversations, ouvrir une discussion, simuler des appels et modifier le profil utilisateur.
+L'application mobile (Flutter) et le backend vivent dans des dépôts séparés :
 
-## Etat actuel
+- Backend (Next.js) : https://github.com/Dominique-BRIA/backend-alanya
+- Application mobile : https://github.com/Dominique-BRIA/alanya
 
-Le client web est utilisable sans backend grace au mode prototype. Les donnees sont conservees localement dans le navigateur, ce qui permet de tester les parcours principaux pendant que le backend est encore en developpement.
+Web et mobile partagent le même backend et le même serveur temps réel : un message
+envoyé depuis le web arrive sur le mobile, et inversement.
 
-Fonctionnalites deja presentes :
+## Ce que fait l'application
 
-- page d'accueil ;
-- inscription et connexion ;
-- verification OTP simulee pendant l'inscription ;
-- tableau de bord ;
-- liste des conversations ;
-- detail d'une conversation ;
-- creation locale de conversation ;
-- page d'informations d'une conversation ;
-- historique et lancement d'appels audio/video simules ;
-- parametres du profil ;
-- mode clair/sombre.
+- Comptes et connexion réels (email ou numéro Alanya à 6 chiffres), avec session
+  persistante — on ne redemande pas les identifiants à chaque ouverture.
+- Discussions en direct : texte, images, documents, vocaux enregistrés dans le
+  navigateur, et messages à trois états (envoyé, reçu, lu).
+- Répondre en glissant un message, supprimer / transférer / copier, visionneuse
+  d'image plein écran.
+- Appels audio et vidéo en WebRTC, avec sonnerie de l'autre côté.
+- Statuts éphémères (texte sur fond coloré, photo ou vidéo) visibles 24 h.
+- Répertoire de contacts et assistant IA (Gemini) intégré.
+- Interface deux colonnes façon WhatsApp Web, thème clair/sombre, palette
+  reprise de l'application mobile.
 
-## Lancer le projet
-
-Installer les dependances :
+## Démarrer en local
 
 ```bash
 npm install
-```
-
-Demarrer l'application :
-
-```bash
 npm run dev
 ```
 
-Puis ouvrir l'adresse affichee dans le terminal, generalement :
+Vite affiche l'adresse dans le terminal (en général `http://localhost:5173`).
 
-```text
-http://localhost:5173
-```
-
-## Configuration
-
-Le fichier `.env.example` donne les variables disponibles :
-
-```env
-VITE_API_BASE_URL=
-VITE_DATA_MODE=auto
-```
-
-En attendant le backend, il est conseille d'utiliser :
-
-```env
-VITE_DATA_MODE=prototype
-```
-
-Modes disponibles :
-
-- `prototype` : utilise les donnees locales du navigateur ;
-- `auto` : essaie l'API si elle existe, puis revient au mode prototype si besoin ;
-- `api` : prepare l'utilisation du backend, mais tous les endpoints ne sont pas encore branches.
-
-## Parcours disponibles
-
-| Section          | Pages                                                           |
-| ---------------- | --------------------------------------------------------------- |
-| Accueil          | `/`, `/welcome`                                                 |
-| Authentification | `/login`, `/signup`, `/forgot-password`                         |
-| Tableau de bord  | `/dashboard`                                                    |
-| Conversations    | `/chats`, `/chats/new`, `/chats/:chatId`, `/chats/:chatId/info` |
-| Appels           | `/calls`, `/calls/new`, `/calls/:callId`                        |
-| Parametres       | `/settings`                                                     |
-
-## Backend
-
-Le client web est pret a etre relie progressivement a un backend via les services dans `src/services`.
-
-Pour l'instant, le backend complet reste a finaliser :
-
-- authentification reelle ;
-- stockage des utilisateurs ;
-- stockage des conversations et messages ;
-- appels et notifications en temps reel ;
-- WebSocket ou autre mecanisme temps reel ;
-- recherche et gestion avancee des contacts.
-
-## Commandes utiles
-
-Lancer en developpement :
-
-```bash
-npm run dev
-```
-
-Verifier la compilation :
+Par défaut, l'application pointe déjà vers le backend déployé — il n'y a donc rien
+d'autre à configurer pour tester. Pour builder la version de production :
 
 ```bash
 npm run build
 ```
 
-Previsualiser la version de production :
+## Configuration
 
-```bash
-npm run preview
+Les variables se trouvent dans `.env.example`. En production, elles sont dans
+`.env.production` (URLs publiques uniquement) ; en local, on peut les surcharger
+dans un `.env.local`.
+
+```env
+# Backend Next.js (local : http://localhost:3000)
+VITE_API_BASE_URL=https://backend-alanya.vercel.app
+# Serveur WebSocket (local : ws://localhost:3001)
+VITE_WS_URL=wss://alanya-ws.onrender.com
+VITE_DATA_MODE=api
 ```
 
-## Organisation rapide
+`VITE_DATA_MODE` accepte `api` (backend uniquement), `auto` (backend avec repli
+local) ou `prototype` (données locales du navigateur, sans backend).
+
+### Appels entre réseaux différents (TURN)
+
+Deux navigateurs sur la même machine se voient sans rien configurer. Mais dès que
+les deux personnes sont sur des réseaux différents (Wi-Fi, 4G), il faut un serveur
+TURN pour relayer l'audio et la vidéo. La bonne façon de faire est de renseigner un
+compte [Metered](https://www.metered.ca) **côté backend** (`METERED_API_KEY` et
+`METERED_DOMAIN`) : le backend distribue alors le TURN au web **et** au mobile.
+
+Le front peut aussi recevoir un TURN de dépannage via `VITE_TURN_URLS`,
+`VITE_TURN_USERNAME` et `VITE_TURN_CREDENTIAL`, mais cela ne couvre pas les appels
+mobile ↔ mobile — la configuration côté backend reste préférable.
+
+## Déploiement
+
+- Le client web et le backend sont déployés sur **Vercel**.
+- Le serveur WebSocket temps réel tourne sur **Render**.
+- `vercel.json` réécrit toutes les routes vers `index.html` (application monopage).
+
+## Organisation du code
 
 ```text
-app/             Pages de l'application
-src/components/  Composants partages
-src/data/        Donnees locales du mode prototype
-src/services/    Services prepares pour l'API
-src/styles/      Styles globaux
+app/             Pages et écrans (discussions, appels, statuts, IA, paramètres…)
+src/components/  Composants partagés (thème, toasts, gardes de route…)
+src/services/    Appels au backend et logique temps réel (WebSocket, WebRTC)
+src/data/        Session utilisateur et données locales
+src/styles/      Styles globaux et thème
+public/          Logo et fond décoratif
 ```
 
-## Note
+## Stack
 
-Le projet est dans un bon etat pour une demonstration du client web. Le plus important maintenant est de garder l'interface stable, puis de connecter le backend endpoint par endpoint sans casser les parcours deja fonctionnels.
+React + Vite + TypeScript pour le web, Next.js (App Router) et Prisma/PostgreSQL
+pour le backend, un serveur WebSocket Node pour le temps réel, et WebRTC pour les
+appels.
