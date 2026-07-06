@@ -5,6 +5,7 @@ import { useToast } from "../../../src/components/toast"
 import { ThemeSelector } from "../../../src/components/theme-toggle"
 import { type SessionUser } from "../../../src/data/session-user"
 import { isTurnConfigured } from "../../../src/services/calls-service"
+import TurnTester from "../../../src/components/turn-tester"
 
 type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
 
@@ -1649,6 +1650,9 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Comparateur de fournisseurs TURN (Metered, Cloudflare, coturn...) */}
+              <TurnTester />
             </>
           )}
         </main>
