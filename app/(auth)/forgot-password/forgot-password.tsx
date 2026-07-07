@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-const alanyaLogo = "/alanya-logo.png"
+const alanyaLogo = "/alanya-logo.jpeg"
 import "./forgot-password-page.css"
 
 function isValidIdentifier(value: string) {

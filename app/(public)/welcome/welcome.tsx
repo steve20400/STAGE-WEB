@@ -1,6 +1,6 @@
 ﻿import { Link } from "react-router-dom"
 import { ThemeToggle } from "../../../src/components/theme-toggle"
-const alanyaLogo = "/alanya-logo.png"
+const alanyaLogo = "/alanya-logo.jpeg"
 import "./welcome-page.css"
 
 export default function WelcomePage() {

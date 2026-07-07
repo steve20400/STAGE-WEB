@@ -2,7 +2,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { isValidAlanyaNumber } from "../../../src/lib/alanya-number"
-const alanyaLogo = "/alanya-logo.png"
+const alanyaLogo = "/alanya-logo.jpeg"
 import "./login-page.css"
 
 function normalizeIdentifier(value: string) {

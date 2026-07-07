@@ -2,7 +2,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { requestRegistrationOtp } from "../../../src/services/auth-api"
-const alanyaLogo = "/alanya-logo.png"
+const alanyaLogo = "/alanya-logo.jpeg"
 import "./signup-page.css"
 
 type Step = 1 | 2 | 3

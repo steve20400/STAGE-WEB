@@ -6,7 +6,7 @@ import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
 import { acceptIncomingCall, rejectIncomingCall } from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
-const alanyaLogo = "/alanya-logo.png"
+const alanyaLogo = "/alanya-logo.jpeg"
 import "./layout.css"
 
 // TYPES
