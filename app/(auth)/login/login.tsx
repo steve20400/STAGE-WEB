@@ -22,7 +22,7 @@ function normalizeIdentifier(value: string) {
 
 function formatIdentifierInput(value: string) {
   if (value.trim() === "") return ""
-  return /^[\d\s-]+$/.test(value) ? formatAlanyaNumber(value) : value
+  return /^[\d\s-]+$/.test(value) ? formatAlanyaNumber(value).replace(/-/g, " ") : value
 }
 
 // Le backend accepte un email ou le numero Alanya (6 ou 8 chiffres).
