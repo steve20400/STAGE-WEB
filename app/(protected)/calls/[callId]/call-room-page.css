@@ -220,13 +220,44 @@
   position: absolute;
   bottom: 140px;
   right: 24px;
-  width: 130px;
-  aspect-ratio: 16/9;
+  /* Agrandi pour etre plus visible : largeur x1.5 (130 -> 195),
+     hauteur x2 (~73 -> 146). */
+  width: 195px;
+  height: 146px;
   border-radius: 12px;
   overflow: hidden;
   border: 2px solid var(--border-default);
   z-index: 10;
   background: var(--bg-muted);
+}
+
+/* Bandeau discret nom + duree pendant l'appel video connecte */
+.call-room-root .video-name-chip {
+  position: absolute;
+  top: 74px;
+  left: 24px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--overlay) 55%, transparent);
+  backdrop-filter: blur(6px);
+}
+.call-room-root .video-name-chip-name {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.2px;
+}
+.call-room-root .video-name-chip-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
 }
 .call-room-root .local-video-pip video {
   width: 100%;

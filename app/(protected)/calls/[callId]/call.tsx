@@ -239,37 +239,54 @@ export default function CallRoomPage() {
             </div>
           </div>
 
-          <div className="room-center">
-            <div className="contact-avatar-wrap">
-              <div
-                className="contact-avatar"
-                style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
-              >
-                {callState === "active" && (
-                  <>
-                    <div className="pulse-ring" style={{ color: "var(--accent)" }} />
-                    <div className="pulse-ring" style={{ color: "var(--accent)" }} />
-                    <div className="pulse-ring" style={{ color: "var(--accent)" }} />
-                  </>
-                )}
-                {peerInitials}
+          {/* Avatar + nom + statut : masques quand la video distante s'affiche
+              (sinon le nom en gros recouvre l'image de l'interlocuteur). */}
+          {!showRemoteVideo && (
+            <div className="room-center">
+              <div className="contact-avatar-wrap">
+                <div
+                  className="contact-avatar"
+                  style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+                >
+                  {callState === "active" && (
+                    <>
+                      <div className="pulse-ring" style={{ color: "var(--accent)" }} />
+                      <div className="pulse-ring" style={{ color: "var(--accent)" }} />
+                      <div className="pulse-ring" style={{ color: "var(--accent)" }} />
+                    </>
+                  )}
+                  {peerInitials}
+                </div>
               </div>
-            </div>
 
-            <div className="contact-name">{peerName}</div>
-            <div className="call-status" style={{ color: statusColor }}>
-              {callState === "active" && <div className="status-dot-live" />}
-              {stateLabel[callState]}
-              {callState === "active" && call.isGroup
-                ? ` — ${remoteStreamEntries.length + 1} participants`
-                : ""}
-            </div>
-            {call.error && (
-              <div className="call-status" style={{ color: "var(--danger)", marginTop: 8 }}>
-                {call.error}
+              <div className="contact-name">{peerName}</div>
+              <div className="call-status" style={{ color: statusColor }}>
+                {callState === "active" && <div className="status-dot-live" />}
+                {stateLabel[callState]}
+                {callState === "active" && call.isGroup
+                  ? ` — ${remoteStreamEntries.length + 1} participants`
+                  : ""}
               </div>
-            )}
-          </div>
+              {call.error && (
+                <div className="call-status" style={{ color: "var(--danger)", marginTop: 8 }}>
+                  {call.error}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* En appel video connecte : un bandeau discret rappelle le nom + duree
+              sans masquer la video. */}
+          {showRemoteVideo && (
+            <div className="video-name-chip">
+              <span className="video-name-chip-name">{peerName}</span>
+              <span className="video-name-chip-time">
+                <span className="status-dot-live" />
+                {formatElapsed(elapsed)}
+                {call.isGroup ? ` — ${remoteStreamEntries.length + 1} participants` : ""}
+              </span>
+            </div>
+          )}
 
           {/* Apercu de sa propre camera : visible aussi pendant la sonnerie */}
           {isVideo && callState !== "ended" && call.localStream && (
