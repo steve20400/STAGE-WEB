@@ -14,6 +14,8 @@ export interface ConversationMock {
   isGroup: boolean
   members?: string[]
   isPinned?: boolean
+  /** Photo de profil de l'interlocuteur (data-URL miniature ou URL). */
+  avatar?: string | null
 }
 
 export interface ChatInfoMock {

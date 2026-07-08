@@ -41,6 +41,7 @@ import {
 } from "../../../../src/services/websocket-service"
 import { getMyUserId } from "../../../../src/data/session-user"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
+import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./chat-room-page.css"
 
 type Message = ChatMessageMock
@@ -1112,8 +1113,19 @@ export default function ChatRoomPage() {
           </svg>
         </button>
 
-        <div className="room-av" style={{ background: color.bg, color: color.text }}>
-          {chat.initials}
+        <div
+          className="room-av"
+          style={{ background: color.bg, color: color.text, overflow: "hidden" }}
+        >
+          {avatarDisplaySrc((chat as { avatar?: string | null }).avatar) ? (
+            <img
+              src={avatarDisplaySrc((chat as { avatar?: string | null }).avatar)!}
+              alt=""
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+            />
+          ) : (
+            chat.initials
+          )}
           {peerOnline && !chat.isGroup && <div className="room-av-dot" />}
         </div>
 

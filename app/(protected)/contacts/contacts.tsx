@@ -12,6 +12,7 @@ import {
   isValidAlanyaNumber,
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
+import { avatarDisplaySrc } from "../../../src/lib/avatar"
 import "../calls/calls-page.css"
 
 /**
@@ -189,8 +190,24 @@ export default function ContactsPage() {
           const color = CONTACT_COLORS[contact.color]
           return (
             <div key={contact.id} className="call-item">
-              <div className="call-av" style={{ background: color.bg, color: color.fg }}>
-                {contact.initials}
+              <div
+                className="call-av"
+                style={{ background: color.bg, color: color.fg, overflow: "hidden" }}
+              >
+                {avatarDisplaySrc(contact.avatar) ? (
+                  <img
+                    src={avatarDisplaySrc(contact.avatar)!}
+                    alt=""
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      borderRadius: "50%",
+                    }}
+                  />
+                ) : (
+                  contact.initials
+                )}
                 {contact.online && <div className="ncm-online" />}
               </div>
 

@@ -6,6 +6,7 @@ import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
 import { acceptIncomingCall, rejectIncomingCall } from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
+import { avatarDisplaySrc } from "../../src/lib/avatar"
 const alanyaLogo = "/alanya-logo.jpeg"
 import "./layout.css"
 
@@ -287,8 +288,16 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           <ThemeToggle />
         </div>
         <div className="sb-profile" onClick={() => navigate("/settings")}>
-          <div className="sb-avatar">
-            {user.initials}
+          <div className="sb-avatar" style={{ overflow: "hidden" }}>
+            {avatarDisplaySrc(sessionUser?.avatar) ? (
+              <img
+                src={avatarDisplaySrc(sessionUser?.avatar)!}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              user.initials
+            )}
             <div className="sb-avatar-dot" />
           </div>
           <div className="sb-user-info">

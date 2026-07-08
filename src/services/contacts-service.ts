@@ -44,6 +44,7 @@ function toFrontContact(c: BackendContact): Contact {
     email: "",
     // Le champ "phone" du front porte le numero Alanya (6 ou 8 chiffres).
     phone: c.user.publicNumber,
+    avatar: c.user.avatarUrl ?? null,
   }
 }
 

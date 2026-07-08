@@ -8,6 +8,8 @@ export interface Contact {
   online: boolean
   email: string
   phone: string
+  /** Photo de profil (data-URL miniature ou URL). */
+  avatar?: string | null
 }
 
 export const CONTACT_COLORS: Record<ContactColor, { bg: string; fg: string }> = {

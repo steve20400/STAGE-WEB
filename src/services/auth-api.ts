@@ -272,3 +272,17 @@ export function storeAuthenticatedSession(session: AuthSession) {
 
   return session.user
 }
+
+/**
+ * PATCH /api/account/profile — persiste le profil cote backend (pseudo,
+ * message de statut, avatar). C'est ce qui rend la photo visible par les
+ * autres et la fait survivre a une reconnexion. L'avatar est une data-URL
+ * miniature (le backend limite avatarUrl a 2048 caracteres).
+ */
+export async function updateProfileApi(payload: {
+  pseudo?: string
+  statusMsg?: string | null
+  avatarUrl?: string | null
+}): Promise<{ pseudo: string | null; avatarUrl: string | null; statusMsg: string | null }> {
+  return apiRequest("/api/account/profile", { method: "PATCH", body: payload })
+}

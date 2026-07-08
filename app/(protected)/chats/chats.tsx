@@ -9,6 +9,7 @@ import {
 import { useAuth } from "../../../src/components/auth-provider"
 import { toInitials } from "../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
+import { avatarDisplaySrc } from "../../../src/lib/avatar"
 import "./chats-page.css"
 
 function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
@@ -109,9 +110,18 @@ export default function ChatsPage() {
               fontWeight: 800,
               fontSize: 15,
               flexShrink: 0,
+              overflow: "hidden",
             }}
           >
-            {toInitials(sessionUser?.name ?? "Moi")}
+            {avatarDisplaySrc(sessionUser?.avatar) ? (
+              <img
+                src={avatarDisplaySrc(sessionUser?.avatar)!}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              toInitials(sessionUser?.name ?? "Moi")
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
@@ -289,8 +299,16 @@ function ConvItem({ conv }: { conv: ConversationMock }) {
       to={`/chats/${conv.id}`}
       className={({ isActive }) => `conv-item ${isActive ? "active" : ""}`}
     >
-      <div className="av" style={{ background: color.bg, color: color.text }}>
-        {conv.initials}
+      <div className="av" style={{ background: color.bg, color: color.text, overflow: "hidden" }}>
+        {avatarDisplaySrc(conv.avatar) ? (
+          <img
+            src={avatarDisplaySrc(conv.avatar)!}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+          />
+        ) : (
+          conv.initials
+        )}
         {conv.online && !conv.isGroup && <div className="av-dot" />}
         {conv.isGroup && <div className="group-stack">{conv.members?.length ?? "+"}</div>}
       </div>

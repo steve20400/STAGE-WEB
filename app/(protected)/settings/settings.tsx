@@ -7,6 +7,8 @@ import { type SessionUser } from "../../../src/data/session-user"
 import { isTurnConfigured } from "../../../src/services/calls-service"
 import TurnTester from "../../../src/components/turn-tester"
 import RealtimeStatus from "../../../src/components/realtime-status"
+import { updateProfileApi } from "../../../src/services/auth-api"
+import { fileToAvatarDataUrl } from "../../../src/lib/avatar"
 
 type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
 
@@ -542,38 +544,47 @@ export default function SettingsPage() {
       return toastError("Message trop long", "Maximum 100 caracteres.")
     setSaving(true)
     try {
-      // TODO : PATCH /api/users/me
-      await new Promise((r) => setTimeout(r, 900))
+      // Persistance reelle cote backend : c'est ce qui rend le profil (photo
+      // comprise) visible par les autres et le fait survivre aux reconnexions.
+      const saved = await updateProfileApi({
+        pseudo: draft.name.trim(),
+        statusMsg: draft.statusMsg || null,
+        avatarUrl: draft.avatar ?? null,
+      })
       setProfile(draft)
       updateUser({
-        name: draft.name.trim(),
+        name: saved.pseudo ?? draft.name.trim(),
         phone: draft.phone,
         email: draft.email,
-        statusMsg: draft.statusMsg,
-        avatar: draft.avatar,
+        statusMsg: saved.statusMsg ?? draft.statusMsg,
+        avatar: saved.avatarUrl ?? draft.avatar,
       })
       success("Profil mis a jour", "Vos informations ont bien ete enregistrees.")
-    } catch {
-      toastError("Erreur", "Impossible de sauvegarder. Reessayez.")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Impossible de sauvegarder. Reessayez."
+      toastError("Erreur", message)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ""
     if (!file) return
-    if (file.size > 5 * 1024 * 1024)
-      return toastError("Fichier trop volumineux", "L'avatar ne doit pas depasser 5 Mo.")
+    if (file.size > 10 * 1024 * 1024)
+      return toastError("Fichier trop volumineux", "L'avatar ne doit pas depasser 10 Mo.")
     if (!file.type.startsWith("image/"))
       return toastError("Format invalide", "Choisissez une image (JPEG, PNG, WebP).")
-    const reader = new FileReader()
-    reader.onload = () => {
-      setDraft((prev) => ({ ...prev, avatar: reader.result as string }))
+    try {
+      // Miniature compacte : le backend limite avatarUrl a ~2 Ko.
+      const dataUrl = await fileToAvatarDataUrl(file)
+      setDraft((prev) => ({ ...prev, avatar: dataUrl }))
       info("Avatar selectionne", "Cliquez sur 'Sauvegarder' pour confirmer.")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Image illisible."
+      toastError("Avatar refuse", message)
     }
-    reader.readAsDataURL(file)
-    e.target.value = ""
   }
 
   const changePassword = async () => {

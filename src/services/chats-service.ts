@@ -75,6 +75,7 @@ function toFrontConversation(c: BackendConversation): ConversationMock {
     online: false, // pas d'info de presence via REST sur ce backend
     isGroup: Boolean(c.isGroup),
     members: c.members?.map((m) => toInitials(m.pseudo ?? m.publicNumber)),
+    avatar: c.avatarUrl ?? null,
   }
 }
 
