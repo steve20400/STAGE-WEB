@@ -193,18 +193,38 @@ export const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
 ]
 
 /**
- * Relais TURN configure cote front (VITE_TURN_*). Indispensable quand les deux
- * participants sont derriere des NAT stricts (4G, box) : sans TURN, l'appel
- * "decroche" mais aucun flux audio/video ne passe. La vraie solution est de
- * configurer METERED_DOMAIN / METERED_API_KEY sur le backend (profite aussi au
- * mobile) ; ces variables front sont un complement/depannage.
+ * Serveur TURN par defaut du projet (fourni par l'encadrant), accessible sur
+ * open.alanya.cloud en TLS sur le port 443 (seul point d'acces ouvert). C'est
+ * ce relais qui fait passer l'audio/video quand les deux participants sont
+ * derriere des NAT stricts (4G, box) : sans lui, l'appel "decroche" mais aucun
+ * flux ne circule. Utilise par defaut, sans configuration.
  */
-function envTurnServers(): RTCIceServer[] {
+const DEFAULT_TURN_SERVERS: RTCIceServer[] = [
+  {
+    urls: [
+      // Le relais fonctionne sur le port 3478 (UDP le plus rapide, TCP en repli).
+      "turn:open.alanya.cloud:3478",
+      "turn:open.alanya.cloud:3478?transport=tcp",
+      // 443/TLS ajoute pour traverser les pare-feux stricts si l'encadrant
+      // l'active (aujourd'hui il ne delivre pas de relais, donc simplement ignore).
+      "turns:open.alanya.cloud:443?transport=tcp",
+    ],
+    username: "alanya",
+    credential: "alanya2026",
+  },
+]
+
+/**
+ * Relais TURN configure cote front (VITE_TURN_*). Permet de surcharger le
+ * serveur par defaut (autre fournisseur, tests). Si aucune variable n'est
+ * definie, on retombe sur DEFAULT_TURN_SERVERS (open.alanya.cloud).
+ */
+function configuredTurnServers(): RTCIceServer[] {
   const urls = String(import.meta.env.VITE_TURN_URLS ?? "")
     .split(",")
     .map((url) => url.trim())
     .filter(Boolean)
-  if (urls.length === 0) return []
+  if (urls.length === 0) return DEFAULT_TURN_SERVERS
   return [
     {
       urls,
@@ -214,9 +234,9 @@ function envTurnServers(): RTCIceServer[] {
   ]
 }
 
-/** Le build actuel embarque-t-il un relais TURN (variables VITE_TURN_*) ? */
+/** Un relais TURN est-il disponible ? (toujours vrai : serveur par defaut du projet). */
 export function isTurnConfigured(): boolean {
-  return envTurnServers().length > 0
+  return configuredTurnServers().length > 0
 }
 
 function hasTurnServer(servers: RTCIceServer[]): boolean {
@@ -237,9 +257,10 @@ export async function fetchIceServers(): Promise<RTCIceServer[]> {
   }
 
   // Le backend sans identifiants Metered ne renvoie que du STUN : on complete
-  // avec le TURN configure cote front (VITE_TURN_*) s'il existe.
+  // avec le TURN du projet (open.alanya.cloud par defaut, surchargeable via
+  // VITE_TURN_*).
   if (!hasTurnServer(servers)) {
-    servers = [...servers, ...envTurnServers()]
+    servers = [...servers, ...configuredTurnServers()]
   }
 
   return servers
