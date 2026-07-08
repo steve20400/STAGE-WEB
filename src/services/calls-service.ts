@@ -7,6 +7,8 @@ export type CallStatus = "ended" | "declined" | "no_answer"
 
 export interface CallRecord {
   id: string
+  /** Conversation a laquelle l'appel est rattache (pour l'afficher dans le fil). */
+  convId: string | null
   /** Numero Alanya du correspondant (ou id de conversation pour un groupe). */
   contactId: string
   contactName: string
@@ -90,6 +92,7 @@ function toCallRecord(c: BackendCall): CallRecord {
   const contactId = c.peerNumber ?? c.convId ?? c.id
   return {
     id: c.id,
+    convId: c.convId ?? null,
     contactId,
     contactName: c.peerName,
     contactInitials: toInitials(c.peerName),
@@ -113,6 +116,15 @@ export async function fetchCallsHistory(): Promise<CallRecord[]> {
     console.warn("[calls] fetch a echoue", error)
     return []
   }
+}
+
+/**
+ * Appels rattaches a une conversation donnee — sert a afficher les evenements
+ * d'appel dans le fil de discussion, comme sur WhatsApp.
+ */
+export async function fetchCallsForConversation(convId: string): Promise<CallRecord[]> {
+  const all = await fetchCallsHistory()
+  return all.filter((call) => call.convId === convId)
 }
 
 /* ----------------- Endpoints WebRTC ----------------- */

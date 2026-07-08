@@ -41,6 +41,7 @@ import {
 } from "../../../../src/services/websocket-service"
 import { getMyUserId } from "../../../../src/data/session-user"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
+import { fetchCallsForConversation, type CallRecord } from "../../../../src/services/calls-service"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./chat-room-page.css"
 
@@ -99,6 +100,83 @@ function StatusIcon({ status }: { status: MessageStatus }) {
       <path d="M2 8.5l4 4L14 4" />
       {doubleCheck && <path d="M10 8.5l4 4L22 4" />}
     </svg>
+  )
+}
+
+/**
+ * Evenement d'appel affiche dans le fil de discussion, comme sur WhatsApp :
+ * pastille centree avec icone, type d'appel, heure et duree (ou "manque").
+ */
+function CallEventChip({ call }: { call: CallRecord }) {
+  const missed = call.direction === "missed" || call.status === "no_answer"
+  const declined = call.status === "declined"
+  const label =
+    (call.type === "video" ? "Appel video" : "Appel vocal") +
+    (missed ? " manque" : declined ? " refuse" : "")
+  const tint = missed || declined ? "var(--danger)" : "var(--text-secondary)"
+
+  return (
+    <div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: 18,
+          padding: "6px 14px",
+          fontSize: 12,
+          color: tint,
+        }}
+      >
+        <span
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: "50%",
+            background: missed || declined ? "#ef444418" : "var(--accent-dim)",
+            color: missed || declined ? "var(--danger)" : "var(--accent)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          {call.type === "video" ? (
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+          ) : (
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+            </svg>
+          )}
+        </span>
+        <span style={{ fontWeight: 600 }}>{label}</span>
+        <span style={{ color: "var(--text-faint)" }}>
+          {formatTime(call.ts)}
+          {call.duration ? ` — ${call.duration}` : ""}
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -663,6 +741,8 @@ export default function ChatRoomPage() {
   )
 
   const [messages, setMessages] = useState<Message[]>([])
+  // Appels passes dans cette conversation, affiches dans le fil (facon WhatsApp)
+  const [callEvents, setCallEvents] = useState<CallRecord[]>([])
   const [input, setInput] = useState("")
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   // typing de l'interlocuteur (recu via WebSocket)
@@ -702,6 +782,15 @@ export default function ChatRoomPage() {
     })
   }, [chatId])
 
+  // Evenements d'appel de cette conversation (pastilles dans le fil).
+  const refreshCallEvents = useCallback(async () => {
+    try {
+      setCallEvents(await fetchCallsForConversation(chatId))
+    } catch {
+      // non bloquant : le fil de messages reste utilisable sans l'historique d'appels
+    }
+  }, [chatId])
+
   useEffect(() => {
     if (!chat) return
 
@@ -720,6 +809,7 @@ export default function ChatRoomPage() {
       console.warn("[chat] fetchMessages a echoue", err)
       if (!cancelled) setMessages([])
     })
+    void refreshCallEvents()
 
     // Temps reel : abonnement aux nouveaux messages de la conversation
     const myId = getMyUserId()
@@ -791,6 +881,7 @@ export default function ChatRoomPage() {
     const pollId = setInterval(() => {
       if (cancelled || document.hidden) return
       void refreshMessages().catch(() => undefined)
+      void refreshCallEvents()
     }, 10_000)
 
     // Quand on ouvre la conv, on marque tout comme lu
@@ -806,7 +897,7 @@ export default function ChatRoomPage() {
       clearInterval(pollId)
       if (typingTimeoutId) clearTimeout(typingTimeoutId)
     }
-  }, [chat, chatId, refreshMessages, fallbackContact, fallbackGroup])
+  }, [chat, chatId, refreshMessages, refreshCallEvents, fallbackContact, fallbackGroup])
 
   useEffect(() => {
     if (!chat || messages.length === 0) return
@@ -1073,12 +1164,21 @@ export default function ChatRoomPage() {
       })
   }
 
-  // Grouper les messages par date
-  const grouped = messages.reduce<{ date: string; msgs: Message[] }[]>((acc, msg) => {
-    const dateStr = formatDateSeparator(msg.timestamp)
+  // Fil unifie : messages + evenements d'appel (facon WhatsApp), tries par date.
+  type TimelineItem =
+    | { kind: "msg"; ts: Date; msg: Message }
+    | { kind: "call"; ts: Date; call: CallRecord }
+  const timeline: TimelineItem[] = [
+    ...messages.map((msg): TimelineItem => ({ kind: "msg", ts: msg.timestamp, msg })),
+    ...callEvents.map((call): TimelineItem => ({ kind: "call", ts: call.ts, call })),
+  ].sort((a, b) => a.ts.getTime() - b.ts.getTime())
+
+  // Grouper par date
+  const grouped = timeline.reduce<{ date: string; items: TimelineItem[] }[]>((acc, item) => {
+    const dateStr = formatDateSeparator(item.ts)
     const last = acc[acc.length - 1]
-    if (!last || last.date !== dateStr) acc.push({ date: dateStr, msgs: [msg] })
-    else last.msgs.push(msg)
+    if (!last || last.date !== dateStr) acc.push({ date: dateStr, items: [item] })
+    else last.items.push(item)
     return acc
   }, [])
 
@@ -1218,7 +1318,7 @@ export default function ChatRoomPage() {
       </div>
 
       <div className="room-body">
-        {grouped.map(({ date, msgs }) => (
+        {grouped.map(({ date, items }) => (
           <div key={date}>
             <div className="date-sep">
               <div className="date-sep-line" />
@@ -1226,7 +1326,11 @@ export default function ChatRoomPage() {
               <div className="date-sep-line" />
             </div>
 
-            {msgs.map((msg) => {
+            {items.map((item) => {
+              if (item.kind === "call") {
+                return <CallEventChip key={`call-${item.call.id}`} call={item.call} />
+              }
+              const msg = item.msg
               const isMe = msg.senderId === "me"
               const reply = msg.replyTo ? messages.find((m) => m.id === msg.replyTo) : undefined
               return (

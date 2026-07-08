@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 
+# Generated/local documentation exports
+docs/
+
 # Ancien backend Java/Spring local (abandonne : le front utilise le backend
 # Next.js deploye). Conserve sur disque mais hors du depot.
 ALANYA/
