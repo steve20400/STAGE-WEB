@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
 import {
   CHAT_COLORS,
@@ -17,8 +17,11 @@ import { useToast } from "../../../../src/components/toast"
 import {
   deleteChatMessage,
   fetchMessages,
+  fetchMessagesCacheFirst,
   forwardChatMessage,
   markChatAsRead,
+  persistIncomingWsMessage,
+  removeMessageFromDB,
   sendChatMessage,
   toFrontMessage,
 } from "../../../../src/services/messages-service"
@@ -771,15 +774,27 @@ export default function ChatRoomPage() {
   const recordCancelledRef = useRef(false)
 
   const refreshMessages = useCallback(async () => {
-    const list = await fetchMessages(chatId)
-    // On conserve les bulles optimistes (tmp-...) encore en cours d'envoi pour
-    // qu'une resynchronisation ne les fasse pas disparaitre avant l'ack.
-    setMessages((prev) => {
-      const pending = prev.filter(
-        (m) => m.id.startsWith("tmp-") && !list.some((saved) => saved.id === m.id)
-      )
-      return [...list, ...pending]
-    })
+    await fetchMessagesCacheFirst(
+      chatId,
+      // onCached : affichage instantané depuis IndexedDB (~2ms)
+      (cached) => {
+        setMessages((prev) => {
+          const pending = prev.filter(
+            (m) => m.id.startsWith("tmp-") && !cached.some((saved) => saved.id === m.id)
+          )
+          return [...cached, ...pending]
+        })
+      },
+      // onFresh : mise à jour silencieuse avec les données réseau
+      (fresh) => {
+        setMessages((prev) => {
+          const pending = prev.filter(
+            (m) => m.id.startsWith("tmp-") && !fresh.some((saved) => saved.id === m.id)
+          )
+          return [...fresh, ...pending]
+        })
+      }
+    )
   }, [chatId])
 
   // Evenements d'appel de cette conversation (pastilles dans le fil).
@@ -816,6 +831,8 @@ export default function ChatRoomPage() {
     const unsubscribeMessages = subscribeToConversation(chatId, (message) => {
       if (cancelled) return
       const incoming = toFrontMessage(message, myId)
+      // Persiste le message entrant en IndexedDB
+      void persistIncomingWsMessage(message)
       setMessages((prev) => {
         if (prev.some((m) => m.id === incoming.id)) return prev
         return [...prev, incoming]
@@ -855,6 +872,8 @@ export default function ChatRoomPage() {
     // Abonnement aux suppressions de messages (pour moi / pour tous)
     const unsubscribeDeleted = subscribeToMessageDeleted(chatId, (event) => {
       if (cancelled) return
+      // Supprime aussi du cache IndexedDB
+      void removeMessageFromDB(event.messageId)
       setMessages((prev) =>
         event.scope === "me"
           ? prev.filter((m) => m.id !== event.messageId)
@@ -868,6 +887,8 @@ export default function ChatRoomPage() {
 
     // Apres une coupure du WebSocket, on recharge l'historique pour rattraper
     // les messages arrives pendant la deconnexion.
+    // Après reconnexion WS : delta sync — on ne recharge que les messages
+    // plus récents que le dernier connu (au lieu de tout recharger).
     const unsubscribeConnected = subscribeToWsConnected(() => {
       if (cancelled) return
       void refreshMessages().catch(() => undefined)
@@ -878,11 +899,13 @@ export default function ChatRoomPage() {
     // (4G capricieuse), ses messages partent en REST sans diffusion temps reel.
     // On resynchronise donc la conversation ouverte toutes les 10 s (onglet
     // visible uniquement) pour que rien ne reste bloque.
+    // Intervalle augmenté de 10s → 30s car le cache IndexedDB est fiable
+    // et le WebSocket gère les messages temps réel
     const pollId = setInterval(() => {
       if (cancelled || document.hidden) return
       void refreshMessages().catch(() => undefined)
       void refreshCallEvents()
-    }, 10_000)
+    }, 30_000)
 
     // Quand on ouvre la conv, on marque tout comme lu
     void markChatAsRead(chatId)

@@ -1,7 +1,7 @@
-﻿import { useState, useMemo, useEffect, useRef } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
 import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data"
-import { fetchChatConversations } from "../../../src/services/chats-service"
+import { fetchChatConversations, fetchChatConversationsCacheFirst } from "../../../src/services/chats-service"
 import {
   subscribeToAllMessages,
   subscribeToWsConnected,
@@ -31,13 +31,19 @@ export default function ChatsPage() {
   useEffect(() => {
     let cancelled = false
 
+    // Chargement initial : cache-first (IndexedDB → affichage instantané, puis réseau)
+    void fetchChatConversationsCacheFirst(
+      (cached) => { if (!cancelled) setConversations(cached) },
+      (fresh) => { if (!cancelled) setConversations(fresh) }
+    )
+
+    // Refresh réseau pur pour les mises à jour temps réel
+    // (le cache est déjà alimenté par le service sous-jacent)
     const refresh = () => {
       void fetchChatConversations().then((list) => {
         if (!cancelled) setConversations(list)
       })
     }
-
-    refresh()
 
     // Temps reel : un nouveau message (n'importe quelle conversation) rafraichit
     // la liste (dernier message, tri, compteur non-lus). Debounce leger pour

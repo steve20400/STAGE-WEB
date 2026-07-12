@@ -8,6 +8,13 @@ import {
   sendMessageOverSocket,
   type WsMessagePayload,
 } from "./websocket-service"
+import {
+  cacheMessages,
+  cacheMessage,
+  loadCachedMessages,
+  removeMessageFromCache,
+  enqueueOffline,
+} from "./indexeddb-cache"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
@@ -104,14 +111,72 @@ export function toFrontMessage(
   }
 }
 
-/** GET /api/conversations/{id}/messages — historique (renvoye du plus recent au plus ancien). */
+/** GET /api/conversations/{id}/messages — historique (renvoye du plus recent au plus ancien).
+ *  Persiste les messages dans IndexedDB pour le cache-first. */
 export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> {
   const response = await apiRequest<ListMessagesResponse>(
     `/api/conversations/${chatId}/messages?limit=100`
   )
   const myId = getMyUserId()
+  const backendMessages = response.messages ?? []
+
+  // Persiste en IndexedDB pour le cache-first
+  void cacheMessages(
+    backendMessages.map((m) => ({
+      id: m.id,
+      conversationId: m.convId,
+      senderId: m.senderId,
+      content: m.content,
+      type: m.type,
+      status: m.status,
+      createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+      replyToId: m.replyToId,
+      replyTo: m.replyTo,
+      deletedAt: m.deletedAt,
+      media: m.media,
+    }))
+  )
+
   // Le backend pagine en ordre descendant ; l'UI affiche en ordre chronologique.
-  return (response.messages ?? []).map((m) => toFrontMessage(m, myId)).reverse()
+  return backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
+}
+
+/**
+ * Stratégie cache-first pour les messages :
+ * 1. Appelle onCached() immédiatement avec les messages IndexedDB (~2ms)
+ * 2. Fetch le backend en arrière-plan
+ * 3. Appelle onFresh() avec les messages frais
+ *
+ * Utilisée par chat.tsx pour un affichage instantané de l'historique.
+ */
+export async function fetchMessagesCacheFirst(
+  chatId: string,
+  onCached: (messages: ChatMessageMock[]) => void,
+  onFresh: (messages: ChatMessageMock[]) => void
+): Promise<void> {
+  const myId = getMyUserId()
+
+  // Étape 1 : lecture cache instantanée
+  try {
+    const cached = await loadCachedMessages(chatId, 100)
+    if (cached.length > 0) {
+      onCached(
+        cached.map((m) => toFrontMessage(m as unknown as BackendMessage, myId))
+      )
+    }
+  } catch {
+    // IndexedDB indisponible, on attend le réseau
+  }
+
+  // Étape 2 : fetch réseau si en ligne
+  if (!navigator.onLine) return
+
+  try {
+    const fresh = await fetchMessages(chatId)
+    onFresh(fresh)
+  } catch {
+    // Erreur réseau — le cache est déjà affiché
+  }
 }
 
 /** POST /api/conversations/{id}/read + notification temps reel aux autres participants. */
@@ -133,6 +198,7 @@ interface SendOptions {
  * Envoie un message. On privilegie le WebSocket ({ type: "send" }) car c'est lui
  * qui declenche la diffusion temps reel aux autres participants sur ce backend ;
  * en cas d'echec, on retombe sur le POST REST (persistance sans broadcast).
+ * Si complètement hors ligne, le message est mis en file d'attente (outbox).
  */
 export async function sendChatMessage(
   chatId: string,
@@ -144,6 +210,36 @@ export async function sendChatMessage(
   const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const msgType = toBackendType(type)
 
+  // Hors ligne → outbox pour envoi ultérieur
+  if (!navigator.onLine) {
+    const pending = await enqueueOffline({
+      conversationId: chatId,
+      senderId: myId ?? undefined,
+      content: content || undefined,
+      type: msgType,
+      mediaId: options.mediaId,
+      replyToId: options.replyToId,
+    })
+    // Persiste le message optimiste en cache pour affichage immédiat
+    await cacheMessage({
+      id: pending.tempId,
+      conversationId: chatId,
+      senderId: myId ?? "",
+      content: content || null,
+      type: msgType,
+      status: "PENDING",
+      createdAt: pending.createdAt,
+    })
+    return {
+      id: pending.tempId,
+      senderId: "me",
+      content: content ?? "",
+      type,
+      status: "sending",
+      timestamp: new Date(pending.createdAt),
+    }
+  }
+
   try {
     const message = await sendMessageOverSocket(chatId, {
       content: content || undefined,
@@ -151,6 +247,19 @@ export async function sendChatMessage(
       tempId,
       mediaId: options.mediaId,
       replyToId: options.replyToId,
+    })
+    // Persiste le message confirmé en cache
+    void cacheMessage({
+      id: message.id,
+      conversationId: message.convId,
+      senderId: message.senderId,
+      content: message.content,
+      type: message.type,
+      status: message.status,
+      createdAt: message.createdAt ? new Date(message.createdAt).getTime() : Date.now(),
+      replyToId: message.replyToId,
+      replyTo: message.replyTo,
+      media: message.media,
     })
     return toFrontMessage(message, myId)
   } catch {
@@ -163,6 +272,20 @@ export async function sendChatMessage(
         replyToId: options.replyToId,
       },
     })
+    // Persiste le message confirmé en cache
+    void cacheMessage({
+      id: response.id,
+      conversationId: response.convId,
+      senderId: response.senderId,
+      content: response.content,
+      type: response.type,
+      status: response.status,
+      createdAt: response.createdAt ? new Date(response.createdAt).getTime() : Date.now(),
+      replyToId: response.replyToId,
+      replyTo: response.replyTo,
+      deletedAt: response.deletedAt,
+      media: response.media,
+    })
     return toFrontMessage(response, myId)
   }
 }
@@ -170,9 +293,12 @@ export async function sendChatMessage(
 /**
  * Supprime un message : "me" masque localement, "everyone" efface pour tous
  * (reserve a l'expediteur). La confirmation arrive via l'evenement message_deleted.
+ * Supprime également du cache IndexedDB.
  */
 export function deleteChatMessage(messageId: string, scope: "me" | "everyone") {
   sendDeleteMessage(messageId, scope)
+  // Suppression du cache local
+  void removeMessageFromCache(messageId)
 }
 
 /** Transfere un message vers d'autres conversations (contenu + medias copies). */
@@ -182,4 +308,31 @@ export async function forwardChatMessage(
 ): Promise<number> {
   const results = await forwardMessageOverSocket(messageId, targetConvIds)
   return results.length
+}
+
+/**
+ * Persiste un message entrant (WebSocket) dans le cache IndexedDB.
+ * Appelé par chat.tsx quand un nouveau message arrive via subscribeToConversation.
+ */
+export async function persistIncomingWsMessage(message: WsMessagePayload): Promise<void> {
+  await cacheMessage({
+    id: message.id,
+    conversationId: message.convId,
+    senderId: message.senderId,
+    content: message.content,
+    type: message.type,
+    status: message.status,
+    createdAt: message.createdAt ? new Date(message.createdAt).getTime() : Date.now(),
+    replyToId: message.replyToId,
+    replyTo: message.replyTo,
+    media: message.media,
+  })
+}
+
+/**
+ * Supprime un message du cache IndexedDB.
+ * Appelé lors de la réception d'un événement message_deleted.
+ */
+export async function removeMessageFromDB(messageId: string): Promise<void> {
+  await removeMessageFromCache(messageId)
 }

@@ -1,65 +1,76 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
-import { useWebSocket } from './hooks/useWebSocket';
-import { useOfflineSync } from './hooks/useOfflineSync';
-import { API_BASE_URL } from './config/config';
+import { getOfflineQueue, dequeueOffline } from './services/indexeddb-cache';
 
+/**
+ * App.jsx — Contrôleur additionnel : protection de routes + drain de l'outbox
+ * au retour en ligne.
+ *
+ * NOTE : Ce composant n'est PAS le point d'entrée du routage (c'est main.tsx).
+ * Il sert de middleware global pour la navigation et la synchronisation offline.
+ */
 export default function App() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { token, deviceId, userId, accountStatus } = useAuth();
-    const { status: wsStatus, send: sendWs, disconnect: disconnectWs } = useWebSocket(
-        API_BASE_URL ? `ws://${API_BASE_URL.replace('http', '')}/ws/` : null
-    );
-    const { pendingCount, isSyncing, syncNow, refreshCount } = useOfflineSync();
+    const { token, accountStatus } = useAuth();
     const isMounted = useRef(false);
 
-    // WebSockets : connexion et écoute
+    // Drain de la file d'attente offline au retour en ligne
     useEffect(() => {
-        if (token && userId && deviceId) {
-            // Construire le WS URL avec les infos de session
-            const wsUrl = `${API_BASE_URL.replace('http', 'ws')}?token=${token}&device_id=${deviceId}`;
-            disconnectWs(); // Déconnecter avant de reconnecter
-
-            // On passe un callback pour gérer les messages
-            const handleWsMessage = (data) => {
-                // data est déjà traitée par useWebSocket + indexedDB, ici on peut juste
-                // rafraîchir l'UI si nécessaire
-                console.log('[App] WS message:', data);
-            };
-
-            const { status, send, connect, disconnect } = useWebSocket(wsUrl, {
-                onMessage: handleWsMessage,
-            });
-
-            if (status === 'connected') {
-                console.log('[App] WebSocket connecté');
+        const drainOfflineQueue = async () => {
+            try {
+                const pending = await getOfflineQueue();
+                if (pending.length === 0) return;
+                // eslint-disable-next-line no-console
+                console.log(`[App] Draining ${pending.length} offline message(s)...`);
+                for (const msg of pending) {
+                    try {
+                        // Tente d'envoyer via le service REST
+                        const { apiRequest } = await import('./lib/api-client');
+                        await apiRequest(`/api/conversations/${msg.conversationId}/messages`, {
+                            method: 'POST',
+                            body: {
+                                content: msg.content || undefined,
+                                type: msg.type || 'TEXT',
+                                mediaId: msg.mediaId,
+                                replyToId: msg.replyToId,
+                            },
+                        });
+                        // Supprime de l'outbox après envoi réussi
+                        if (msg.tempId) {
+                            await dequeueOffline(msg.tempId);
+                        }
+                    } catch (err) {
+                        // eslint-disable-next-line no-console
+                        console.warn('[App] Failed to drain message:', err);
+                        // On arrête au premier échec (le réseau est probablement instable)
+                        break;
+                    }
+                }
+            } catch {
+                // IndexedDB indisponible
             }
+        };
 
-            // Expose pour le contexte global si besoin
-            window._wsSend = send;
+        const handleOnline = () => {
+            void drainOfflineQueue();
+        };
 
-            return () => disconnect();
-        }
-    }, [token, userId, deviceId, disconnectWs]);
-
-    // Sync : en ligne => sync, en ligne => refresh
-    useEffect(() => {
+        // Drain immédiat si déjà en ligne au montage
         if (navigator.onLine) {
-            syncNow();
-            // Refresh count en ligne
-            refreshCount();
+            void drainOfflineQueue();
         }
-    }, [navigator.onLine, syncNow, refreshCount]);
 
-    // Empêcher le refresh total de la page lors des changements d'URL
+        window.addEventListener('online', handleOnline);
+        return () => window.removeEventListener('online', handleOnline);
+    }, []);
+
+    // Protection des routes (inchangée)
     useEffect(() => {
-        if (isMounted.current) {
-            // Empêcher le refresh total
-            event.preventDefault();
-        } else {
+        if (!isMounted.current) {
             isMounted.current = true;
+            return;
         }
     }, [location]);
 

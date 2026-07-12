@@ -3,6 +3,11 @@ import { loadLocalGroups, toConversationMock } from "../data/local-groups"
 import { type ConversationMock, type MessageType } from "../mocks/chat-data"
 import { toInitials } from "../data/session-user"
 import { apiRequest } from "../lib/api-client"
+import {
+  cacheConversations,
+  loadCachedConversations,
+  loadCachedConversation,
+} from "./indexeddb-cache"
 
 /**
  * Aggregation purement locale (localStorage + groupes crees en local).
@@ -81,18 +86,81 @@ function toFrontConversation(c: BackendConversation): ConversationMock {
 
 /**
  * GET /api/conversations — Liste des conversations de l'utilisateur.
- * En cas d'erreur, retombe sur les conversations locales (pas sur des mocks).
+ * Persiste le résultat dans IndexedDB pour un affichage instantané au prochain chargement.
+ * En cas d'erreur, retombe sur le cache IndexedDB puis sur les conversations locales.
  */
 export async function fetchChatConversations(): Promise<ConversationMock[]> {
   try {
     const response = await apiRequest<{ conversations: BackendConversation[] }>(
       "/api/conversations"
     )
-    return (response.conversations ?? []).map(toFrontConversation)
+    const conversations = (response.conversations ?? []).map(toFrontConversation)
+
+    // Persiste en IndexedDB pour le cache-first
+    void cacheConversations(
+      (response.conversations ?? []).map((c) => ({
+        id: c.id,
+        isGroup: c.isGroup,
+        title: c.title,
+        avatarUrl: c.avatarUrl,
+        members: c.members,
+        lastMessage: c.lastMessage,
+        unread: c.unread,
+        updatedAt: c.updatedAt ? new Date(c.updatedAt).getTime() : Date.now(),
+      }))
+    )
+
+    return conversations
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.warn("[chats] fetch a echoue", error)
+    console.warn("[chats] fetch a echoue, tentative cache IndexedDB", error)
+    // Tentative de fallback IndexedDB
+    try {
+      const cached = await loadCachedConversations()
+      if (cached.length > 0) {
+        return cached.map((c) =>
+          toFrontConversation(c as unknown as BackendConversation)
+        )
+      }
+    } catch {
+      // IndexedDB indisponible, on continue
+    }
     return getChatConversations()
+  }
+}
+
+/**
+ * Stratégie cache-first pour les conversations :
+ * 1. Appelle onCached() immédiatement avec les données IndexedDB (~2ms)
+ * 2. Fetch le backend en arrière-plan
+ * 3. Appelle onFresh() avec les données fraîches
+ *
+ * Utilisée par chats.tsx pour un affichage instantané.
+ */
+export async function fetchChatConversationsCacheFirst(
+  onCached: (conversations: ConversationMock[]) => void,
+  onFresh: (conversations: ConversationMock[]) => void
+): Promise<void> {
+  // Étape 1 : lecture cache instantanée
+  try {
+    const cached = await loadCachedConversations()
+    if (cached.length > 0) {
+      onCached(
+        cached.map((c) => toFrontConversation(c as unknown as BackendConversation))
+      )
+    }
+  } catch {
+    // IndexedDB indisponible, on attend le réseau
+  }
+
+  // Étape 2 : fetch réseau si en ligne
+  if (!navigator.onLine) return
+
+  try {
+    const fresh = await fetchChatConversations()
+    onFresh(fresh)
+  } catch {
+    // Erreur réseau — le cache est déjà affiché
   }
 }
 
@@ -124,12 +192,25 @@ export async function createGroupChat(
 }
 
 /**
- * Recupere une conversation precise par son id en filtrant la liste backend.
- * Utilise par la page chat pour reconstituer les infos d'une conv ouverte.
+ * Recupere une conversation precise par son id.
+ * Essaie d'abord le cache IndexedDB pour un résultat instantané,
+ * puis la liste backend pour les données les plus fraîches.
  */
 export async function fetchConversationById(
   conversationId: string
 ): Promise<ConversationMock | null> {
+  // Essai cache IndexedDB d'abord
+  try {
+    const cached = await loadCachedConversation(conversationId)
+    if (cached) {
+      // On lance quand même le fetch backend en fond pour mettre à jour
+      void fetchChatConversations().catch(() => undefined)
+      return toFrontConversation(cached as unknown as BackendConversation)
+    }
+  } catch {
+    // IndexedDB indisponible
+  }
+
   const all = await fetchChatConversations()
   return all.find((c) => c.id === conversationId) ?? null
 }
