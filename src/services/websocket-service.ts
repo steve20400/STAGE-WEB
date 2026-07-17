@@ -244,6 +244,19 @@ function connect() {
     dispatchResync()
   }
 
+function getMyUserIdFromToken(): string | null {
+  const token = loadSessionToken()
+  if (!token) return null
+  try {
+    const parts = token.split(".")
+    if (parts.length < 2) return null
+    const payload = JSON.parse(window.atob(parts[1]))
+    return payload.sub || null
+  } catch {
+    return null
+  }
+}
+
   ws.onmessage = (frame) => {
     let event: ServerEvent
     try {
@@ -274,6 +287,21 @@ function connect() {
       clearTimeout(pending.timer)
       pending.reject(new Error(String(event.message ?? "Envoi refuse par le serveur.")))
       return
+    }
+
+    // Joue le son de notification pour les nouveaux messages des autres utilisateurs
+    if (event.type === "message" && event.message) {
+      const msg = event.message
+      const myId = getMyUserIdFromToken()
+      if (myId && msg.senderId !== myId) {
+        const soundsEnabled = localStorage.getItem("notif_sounds") !== "false"
+        if (soundsEnabled) {
+          const audio = new Audio("/sounds/message.mp3")
+          audio.play().catch((err) => {
+            console.warn("[ws] Failed to play message sound:", err)
+          })
+        }
+      }
     }
 
     for (const listener of listeners) listener(event)

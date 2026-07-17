@@ -248,8 +248,39 @@ function initialState(): CallManagerState {
 let state: CallManagerState = initialState()
 const stateListeners = new Set<() => void>()
 
+let ringtoneAudio: HTMLAudioElement | null = null
+
+function startPlayingRingtone() {
+  if (typeof window === "undefined") return
+  const callsEnabled = localStorage.getItem("notif_calls") !== "false"
+  if (!callsEnabled) return
+
+  if (!ringtoneAudio) {
+    ringtoneAudio = new Audio("/sounds/ringtone.mp3")
+    ringtoneAudio.loop = true
+  }
+  ringtoneAudio.play().catch((err) => {
+    console.warn("[CallManager] Failed to play ringtone:", err)
+  })
+}
+
+function stopPlayingRingtone() {
+  if (ringtoneAudio) {
+    ringtoneAudio.pause()
+    ringtoneAudio.currentTime = 0
+  }
+}
+
 function setState(patch: Partial<CallManagerState>) {
+  const prevIncoming = state.incoming
   state = { ...state, ...patch }
+  
+  if (state.incoming && !prevIncoming) {
+    startPlayingRingtone()
+  } else if (!state.incoming && prevIncoming) {
+    stopPlayingRingtone()
+  }
+
   for (const listener of stateListeners) listener()
 }
 
@@ -396,6 +427,7 @@ function clearCall(markEnded: boolean) {
     ringTimeoutId = null
   }
   stopMesh()
+  stopPlayingRingtone()
   const ended = markEnded && (state.activeCallId !== null || state.role !== null)
   state = {
     ...initialState(),

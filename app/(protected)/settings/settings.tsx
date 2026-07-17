@@ -655,10 +655,39 @@ export default function SettingsPage() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
 
   // Notifications
-  const [notifMessages, setNotifMessages] = useState(true)
-  const [notifCalls, setNotifCalls] = useState(true)
-  const [notifSounds, setNotifSounds] = useState(true)
-  const [notifPreview, setNotifPreview] = useState(true)
+  const [notifMessages, setNotifMessages] = useState(() => {
+    const cached = localStorage.getItem("notif_messages")
+    return cached === null ? true : cached === "true"
+  })
+  const [notifCalls, setNotifCalls] = useState(() => {
+    const cached = localStorage.getItem("notif_calls")
+    return cached === null ? true : cached === "true"
+  })
+  const [notifSounds, setNotifSounds] = useState(() => {
+    const cached = localStorage.getItem("notif_sounds")
+    return cached === null ? true : cached === "true"
+  })
+  const [notifPreview, setNotifPreview] = useState(() => {
+    const cached = localStorage.getItem("notif_preview")
+    return cached === null ? true : cached === "true"
+  })
+
+  const updateNotifMessages = (val: boolean) => {
+    setNotifMessages(val)
+    localStorage.setItem("notif_messages", String(val))
+  }
+  const updateNotifCalls = (val: boolean) => {
+    setNotifCalls(val)
+    localStorage.setItem("notif_calls", String(val))
+  }
+  const updateNotifSounds = (val: boolean) => {
+    setNotifSounds(val)
+    localStorage.setItem("notif_sounds", String(val))
+  }
+  const updateNotifPreview = (val: boolean) => {
+    setNotifPreview(val)
+    localStorage.setItem("notif_preview", String(val))
+  }
 
   // Confidentialite
   const [readReceipts, setReadReceipts] = useState(true)
@@ -1572,25 +1601,25 @@ export default function SettingsPage() {
                 <div className="s-card-title">Notifications push</div>
                 <Toggle
                   value={notifMessages}
-                  onChange={setNotifMessages}
+                  onChange={updateNotifMessages}
                   label="Messages"
                   description="Recevoir une notification pour chaque nouveau message."
                 />
                 <Toggle
                   value={notifCalls}
-                  onChange={setNotifCalls}
+                  onChange={updateNotifCalls}
                   label="Appels entrants"
                   description="Etre notifie des appels audio et video."
                 />
                 <Toggle
                   value={notifSounds}
-                  onChange={setNotifSounds}
+                  onChange={updateNotifSounds}
                   label="Sons"
                   description="Jouer un son a la reception d'un message."
                 />
                 <Toggle
                   value={notifPreview}
-                  onChange={setNotifPreview}
+                  onChange={updateNotifPreview}
                   label="Apercu du message"
                   description="Afficher le debut du message dans la notification."
                 />
