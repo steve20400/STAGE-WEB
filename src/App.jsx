@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from './components/auth-provider';
 import { getOfflineQueue, dequeueOffline } from './services/indexeddb-cache';
 
 /**
@@ -65,6 +65,24 @@ export default function App() {
         window.addEventListener('online', handleOnline);
         return () => window.removeEventListener('online', handleOnline);
     }, []);
+
+    // Initialisation des notifications push FCM quand le token d'authentification change
+    const pushInitialized = useRef(false);
+    useEffect(() => {
+        if (token && !pushInitialized.current) {
+            pushInitialized.current = true;
+            import('./services/push-service')
+                .then(({ initPushNotifications }) => {
+                    void initPushNotifications();
+                })
+                .catch((err) => {
+                    // eslint-disable-next-line no-console
+                    console.error('[App] Failed to load push service:', err);
+                });
+        } else if (!token) {
+            pushInitialized.current = false;
+        }
+    }, [token]);
 
     // Protection des routes (inchangée)
     useEffect(() => {

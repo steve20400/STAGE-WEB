@@ -1,0 +1,22 @@
+{
+  "short_name": "Alanya",
+  "name": "Alanya Messenger",
+  "icons": [
+    {
+      "src": "/alanya-logo.jpeg",
+      "type": "image/jpeg",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/alanya-logo.jpeg",
+      "type": "image/jpeg",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0B141A",
+  "theme_color": "#0B141A",
+  "display": "standalone",
+  "orientation": "portrait",
+  "gcm_sender_id": "103953800507"
+}

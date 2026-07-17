@@ -104,6 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    try {
+      const { unregisterPush } = await import("../services/push-service")
+      await unregisterPush()
+    } catch (e) {
+      console.error("[Auth] Failed to unregister push during logout:", e)
+    }
     await logoutCurrentSession()
     clearSessionUser()
     setUser(null)
@@ -111,6 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logoutEverywhere = useCallback(async () => {
+    try {
+      const { unregisterPush } = await import("../services/push-service")
+      await unregisterPush()
+    } catch (e) {
+      console.error("[Auth] Failed to unregister push during logout:", e)
+    }
     await logoutAllSessions()
     clearSessionUser()
     setUser(null)
@@ -126,6 +138,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const deleteAccount = useCallback(async () => {
     const currentUser = user
+    try {
+      const { unregisterPush } = await import("../services/push-service")
+      await unregisterPush()
+    } catch (e) {
+      console.error("[Auth] Failed to unregister push during deleteAccount:", e)
+    }
     await deleteCurrentAccount()
     if (currentUser) {
       deletePrototypeAccount(currentUser.phone)
