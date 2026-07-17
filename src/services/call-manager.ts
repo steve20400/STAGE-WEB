@@ -248,37 +248,66 @@ function initialState(): CallManagerState {
 let state: CallManagerState = initialState()
 const stateListeners = new Set<() => void>()
 
-let ringtoneAudio: HTMLAudioElement | null = null
+let callerRingtoneAudio: HTMLAudioElement | null = null
+let calleeRingtoneAudio: HTMLAudioElement | null = null
 
-function startPlayingRingtone() {
+function startPlayingCallerRingtone() {
   if (typeof window === "undefined") return
   const callsEnabled = localStorage.getItem("notif_calls") !== "false"
   if (!callsEnabled) return
 
-  if (!ringtoneAudio) {
-    ringtoneAudio = new Audio("/sounds/ringtone.mp3")
-    ringtoneAudio.loop = true
+  if (!callerRingtoneAudio) {
+    callerRingtoneAudio = new Audio("/sounds/incoming_ring.mp3")
+    callerRingtoneAudio.loop = true
   }
-  ringtoneAudio.play().catch((err) => {
-    console.warn("[CallManager] Failed to play ringtone:", err)
+  callerRingtoneAudio.play().catch((err) => {
+    console.warn("[CallManager] Failed to play caller ringtone:", err)
   })
 }
 
-function stopPlayingRingtone() {
-  if (ringtoneAudio) {
-    ringtoneAudio.pause()
-    ringtoneAudio.currentTime = 0
+function stopPlayingCallerRingtone() {
+  if (callerRingtoneAudio) {
+    callerRingtoneAudio.pause()
+    callerRingtoneAudio.currentTime = 0
+  }
+}
+
+function startPlayingCalleeRingtone() {
+  if (typeof window === "undefined") return
+  const callsEnabled = localStorage.getItem("notif_calls") !== "false"
+  if (!callsEnabled) return
+
+  if (!calleeRingtoneAudio) {
+    calleeRingtoneAudio = new Audio("/sounds/assets_sounds_outgoing_ring.mp3")
+    calleeRingtoneAudio.loop = true
+  }
+  calleeRingtoneAudio.play().catch((err) => {
+    console.warn("[CallManager] Failed to play callee ringtone:", err)
+  })
+}
+
+function stopPlayingCalleeRingtone() {
+  if (calleeRingtoneAudio) {
+    calleeRingtoneAudio.pause()
+    calleeRingtoneAudio.currentTime = 0
   }
 }
 
 function setState(patch: Partial<CallManagerState>) {
   const prevIncoming = state.incoming
+  const prevRole = state.role
   state = { ...state, ...patch }
   
   if (state.incoming && !prevIncoming) {
-    startPlayingRingtone()
+    startPlayingCalleeRingtone()
   } else if (!state.incoming && prevIncoming) {
-    stopPlayingRingtone()
+    stopPlayingCalleeRingtone()
+  }
+
+  if (state.role === "outgoing" && prevRole !== "outgoing") {
+    startPlayingCallerRingtone()
+  } else if (state.role !== "outgoing" && prevRole === "outgoing") {
+    stopPlayingCallerRingtone()
   }
 
   for (const listener of stateListeners) listener()
@@ -427,7 +456,8 @@ function clearCall(markEnded: boolean) {
     ringTimeoutId = null
   }
   stopMesh()
-  stopPlayingRingtone()
+  stopPlayingCallerRingtone()
+  stopPlayingCalleeRingtone()
   const ended = markEnded && (state.activeCallId !== null || state.role !== null)
   state = {
     ...initialState(),
