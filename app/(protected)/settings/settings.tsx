@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { useToast } from "../../../src/components/toast"
@@ -61,6 +61,144 @@ function analyzePassword(pwd: string): { score: number; label: string; color: st
     { label: "Tres fort", color: "var(--accent)" },
   ]
   return { score, ...levels[Math.min(5, score)] }
+}
+
+function PushDiagnostic() {
+  const [permission, setPermission] = useState<string>("default")
+  const [swStatus, setSwStatus] = useState<string>("Non verifie")
+  const [vapidKeyExists, setVapidKeyExists] = useState<boolean>(false)
+  const [configStatus, setConfigStatus] = useState<string>("")
+  const [loading, setLoading] = useState<boolean>(false)
+
+  const checkStatus = useCallback(() => {
+    if (typeof window === "undefined") return
+
+    setPermission(Notification.permission)
+    
+    const vapid = import.meta.env.VITE_FIREBASE_VAPID_KEY
+    setVapidKeyExists(!!vapid && vapid !== "VOTRE_CLÉ_VAPID_DEPUIS_FIREBASE" && vapid !== "OBTENIR_DEPUIS_CONSOLE_FIREBASE")
+
+    const apiKey = import.meta.env.VITE_FIREBASE_API_KEY
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID
+    const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID
+    const appId = import.meta.env.VITE_FIREBASE_APP_ID
+
+    if (!apiKey || apiKey === "VOTRE_API_KEY_DEPUIS_FIREBASE" || !projectId || !messagingSenderId || !appId) {
+      setConfigStatus("Configuration Firebase incomplete")
+    } else {
+      setConfigStatus("Configuration Firebase valide")
+    }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistration("/").then((reg) => {
+        if (reg) {
+          setSwStatus(`Actif (Scope: ${reg.scope})`)
+        } else {
+          setSwStatus("Non enregistre")
+        }
+      })
+    } else {
+      setSwStatus("Non supporte")
+    }
+  }, [])
+
+  useEffect(() => {
+    checkStatus()
+    window.addEventListener("focus", checkStatus)
+    return () => window.removeEventListener("focus", checkStatus)
+  }, [checkStatus])
+
+  const handleRegister = async () => {
+    setLoading(true)
+    try {
+      const { initPushNotifications } = await import("../../../src/services/push-service")
+      await initPushNotifications()
+      checkStatus()
+      alert("Demande d'initialisation terminee. Verifiez les statuts ci-dessous.")
+    } catch (err: any) {
+      alert(`Erreur d'initialisation : ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 20,
+        padding: 16,
+        background: "var(--bg-surface)",
+        border: "1px solid var(--border-subtle)",
+        borderRadius: 12,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          marginBottom: 12,
+          color: "var(--text-primary)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span>Diagnostic Push FCM</span>
+        <button
+          onClick={handleRegister}
+          disabled={loading}
+          style={{
+            background: "var(--accent)",
+            color: "var(--bg-base)",
+            border: "none",
+            borderRadius: 6,
+            padding: "5px 10px",
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: "pointer",
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          {loading ? "Activation..." : "Activer / Tester"}
+        </button>
+      </div>
+
+      <div style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 8, color: "var(--text-secondary)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>Permission :</span>
+          <span
+            style={{
+              fontWeight: 700,
+              color: permission === "granted" ? "var(--success)" : permission === "denied" ? "var(--danger)" : "var(--text-muted)",
+            }}
+          >
+            {permission === "granted" ? "Accordee ✓" : permission === "denied" ? "Bloquee ✗" : "Non demandee (default)"}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>Service Worker Push :</span>
+          <span style={{ fontWeight: 700, color: swStatus.includes("Actif") ? "var(--success)" : "var(--danger)" }}>
+            {swStatus}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>Variables Firebase Client :</span>
+          <span style={{ fontWeight: 700, color: configStatus.includes("valide") ? "var(--success)" : "var(--danger)" }}>
+            {configStatus}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>Cle VAPID configuree :</span>
+          <span style={{ fontWeight: 700, color: vapidKeyExists ? "var(--success)" : "var(--danger)" }}>
+            {vapidKeyExists ? "Oui ✓" : "Non ✗ (VITE_FIREBASE_VAPID_KEY manquant/invalide)"}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function SectionLink({
@@ -1456,6 +1594,7 @@ export default function SettingsPage() {
                   label="Apercu du message"
                   description="Afficher le debut du message dans la notification."
                 />
+                <PushDiagnostic />
               </div>
             </>
           )}
