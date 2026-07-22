@@ -42,3 +42,10 @@ Les éventuels avertissements ESLint restants ne sont pas des erreurs bloquantes
 Les aperçus texte et PDF ne sont plus relus systématiquement depuis le réseau. Une migration IndexedDB vers la version 3 ajoute le magasin `previewMedia`. Au premier affichage, le fichier est téléchargé puis conservé sous forme de `Blob` (limite de 30 Mo par fichier) ; les affichages suivants utilisent ce cache en priorité. La clé retire le paramètre d'authentification temporaire `token`, afin qu'un renouvellement de session ne provoque pas un nouveau téléchargement. Les données sont incluses dans le nettoyage global des données locales.
 
 Cette correction couvre notamment `.txt`, `.csv`, `.env`, `.md`, `.json`, `.yaml`, `.yml`, `.xml` et les fichiers de code reconnus par l'écran de discussion, ainsi que les PDF. Les fichiers dépassant 30 Mo restent lisibles depuis le réseau mais ne sont pas conservés localement, pour protéger l'espace de stockage du téléphone.
+
+
+### Correctif de fiabilité (aperçus texte et PDF)
+
+Le cache IndexedDB est désormais traité comme une optimisation : une indisponibilité de stockage (quota, navigation privée ou migration en attente) ne bloque plus le téléchargement. Le téléchargement utilise aussi le jeton applicatif dans l'en-tête `Authorization: Bearer`, que l'API média accepte officiellement, en plus du paramètre d'URL nécessaire aux lecteurs HTML.
+
+En dernier recours, si un CDN/redirection refuse la lecture programmée (`fetch`/CORS), l'interface affiche le fichier texte ou PDF dans un `iframe` intégré. Cela conserve l'ouverture dans l'application tout en utilisant le lecteur natif du navigateur.

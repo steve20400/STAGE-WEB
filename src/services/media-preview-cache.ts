@@ -1,4 +1,5 @@
 import { initIndexedDB } from "../indexedDB/schema"
+import { loadSessionToken } from "../data/session-auth"
 
 /** Taille maximale volontaire pour éviter de remplir le stockage du téléphone. */
 const MAX_CACHED_PREVIEW_BYTES = 30 * 1024 * 1024
@@ -34,15 +35,32 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
   }
 
   const key = cacheKey(url)
-  const db = await initIndexedDB()
-  const cached = await db.get("previewMedia", key) as CachedPreview | undefined
-  if (cached?.blob) return cached.blob
+  // IndexedDB peut être indisponible (navigation privée, quota, migration bloquée) :
+  // le cache est une optimisation et ne doit jamais empêcher l'aperçu réseau.
+  try {
+    const db = await initIndexedDB()
+    const cached = await db.get("previewMedia", key) as CachedPreview | undefined
+    if (cached?.blob) return cached.blob
+  } catch {
+    // Continuer avec le téléchargement réseau.
+  }
 
-  const response = await fetch(url, { credentials: "same-origin" })
+  // Le backend accepte le Bearer et aussi ?token=. Le header est indispensable
+  // lorsqu'un navigateur/mobile retire ou ne transmet pas le paramètre après une redirection.
+  const token = loadSessionToken()
+  const response = await fetch(url, {
+    credentials: "omit",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
   if (!response.ok) throw new Error(`Chargement échoué (${response.status})`)
   const blob = await response.blob()
   if (blob.size <= MAX_CACHED_PREVIEW_BYTES) {
-    await db.put("previewMedia", { key, blob, cachedAt: Date.now() } satisfies CachedPreview)
+    try {
+      const db = await initIndexedDB()
+      await db.put("previewMedia", { key, blob, cachedAt: Date.now() } satisfies CachedPreview)
+    } catch {
+      // Quota/IndexedDB indisponible : l'aperçu courant reste affichable.
+    }
   }
   return blob
 }

@@ -174,8 +174,11 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
 function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const [state, setState] = useState("Chargement du PDF...")
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     let cancelled = false
+    setFailed(false)
+    setState("Chargement du PDF...")
     let task: PDFDocumentLoadingTask | undefined
     const render = async () => {
       try {
@@ -198,11 +201,12 @@ function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
           if (!cancelled) host.current?.append(canvas)
         }
         if (!cancelled) setState("")
-      } catch { if (!cancelled) setState("Aperçu PDF indisponible. Vous pouvez le télécharger.") }
+      } catch { if (!cancelled) { setState(""); setFailed(true) } }
     }
     void render()
     return () => { cancelled = true; task?.destroy?.() }
   }, [url])
+  if (failed) return <iframe src={url} title="Aperçu PDF" style={{ width: "100%", height: 480, border: "none", borderRadius: 8, background: "white" }} />
   return <div ref={host} style={{ minHeight: state ? 180 : 0, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: state ? 18 : 0 }}>{state}</div>
 }
 
@@ -580,9 +584,11 @@ const SWIPE_REPLY_THRESHOLD = 56
 function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
   const [text, setText] = useState<string>("")
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     if (!url) return
     setLoading(true)
+    setFailed(false)
     loadPreviewBlob(url).then((blob) => blob.text())
       .then((t) => {
         setText(t.slice(0, 800))
@@ -590,6 +596,7 @@ function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
       })
       .catch(() => {
         setText("")
+        setFailed(true)
         setLoading(false)
       })
   }, [url])
@@ -618,6 +625,10 @@ function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
         <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical" }}>
           {text}
         </pre>
+      ) : failed ? (
+        // Repli navigateur : un iframe peut afficher un texte même lorsqu'un CDN
+        // n'autorise pas fetch/CORS. Le fichier reste dans l'application.
+        <iframe src={url} title="Aperçu du document" style={{ width: "100%", height: 130, border: "none", background: "white", borderRadius: 5 }} />
       ) : (
         <span style={{ opacity: 0.6 }}>Aperçu non disponible</span>
       )}
