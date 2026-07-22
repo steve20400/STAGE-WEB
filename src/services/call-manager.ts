@@ -42,6 +42,7 @@ export interface IncomingCallInfo {
 }
 
 export type CallRole = "outgoing" | "ongoing" | null
+export type CallProgress = "ringtone" | "ringing" | "ongoing" | null
 
 export interface CallManagerState {
   incoming: IncomingCallInfo | null
@@ -50,6 +51,8 @@ export interface CallManagerState {
   peerName: string
   callType: CallType
   role: CallRole
+  /** Etat affichable sans modifier l'interface : Sonnerie, En train de sonner, Appel en cours. */
+  progress: CallProgress
   isGroup: boolean
   isInitiator: boolean
   /** userId -> nom affichable des participants connus. */
@@ -233,6 +236,7 @@ function initialState(): CallManagerState {
     peerName: "",
     callType: "audio",
     role: null,
+    progress: null,
     isGroup: false,
     isInitiator: false,
     participantNames: {},
@@ -501,6 +505,7 @@ async function onPeerJoined(userId: string, displayName: string | null) {
       [userId]: displayName?.trim() || state.participantNames[userId] || "Participant",
     },
     role: state.role === "outgoing" ? "ongoing" : state.role,
+    progress: "ongoing",
   })
   if (ringTimeoutId) {
     clearTimeout(ringTimeoutId)
@@ -530,6 +535,9 @@ async function handleServerEvent(event: CallServerEvent) {
       endedAt: null,
       error: null,
     })
+    // Le destinataire a effectivement l'application ouverte : l'appelant peut
+    // passer de « Sonnerie » à « En train de sonner ».
+    sendCallState(callId, "ringing", myUserId() ?? undefined, myDisplayName())
     return
   }
 
@@ -560,6 +568,13 @@ async function handleServerEvent(event: CallServerEvent) {
     const displayName = (event.displayName as string | null) ?? null
     const me = myUserId()
     if (!callId) return
+
+    if (callState === "ringing") {
+      if (userId !== me && callId === state.activeCallId && state.role === "outgoing") {
+        setState({ progress: "ringing" })
+      }
+      return
+    }
 
     if (callState === "joined" || callState === "accepted") {
       if (userId === me) return // echo de notre propre "joined"
@@ -651,7 +666,14 @@ export async function startOutgoingCall(
     // on nettoie puis on retente une fois.
     if (err instanceof ApiError && err.status === 409) {
       await endStaleServerCalls()
-      started = await startCallRest(convId, type)
+      try {
+        started = await startCallRest(convId, type)
+      } catch (retryError) {
+        if (retryError instanceof ApiError && retryError.status === 409) {
+          throw new Error("Occupé : un appel est déjà en cours. Réessayez plus tard.")
+        }
+        throw retryError
+      }
     } else {
       throw err
     }
@@ -669,6 +691,7 @@ export async function startOutgoingCall(
     peerName: started.isGroup ? (started.groupName ?? title) : title,
     callType: type,
     role: "outgoing",
+    progress: "ringtone",
     isGroup: started.isGroup,
     isInitiator: true,
     participantNames,
@@ -725,6 +748,7 @@ export async function acceptIncomingCall(): Promise<string | null> {
     peerName: incoming.isGroup ? (incoming.groupName ?? incoming.callerName) : incoming.callerName,
     callType: incoming.callType,
     role: "ongoing",
+    progress: "ongoing",
     isGroup: result.isGroup || incoming.isGroup,
     isInitiator: false,
     participantNames,

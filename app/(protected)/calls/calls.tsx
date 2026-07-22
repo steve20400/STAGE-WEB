@@ -273,7 +273,7 @@ export default function CallsPage() {
                 <div className="date-header">{header}</div>
                 {calls.map((call) => {
                   const color = COLORS[call.contactColor]
-                  const isMissed = call.direction === "missed"
+                  const statusLabel = call.status === "missed" ? "Appel manqué" : call.status === "no_answer" ? "Sans réponse" : call.status === "declined" ? "Appel rejeté" : call.status === "busy" ? "Occupé" : null
                   return (
                     <div
                       className="call-item"
@@ -289,19 +289,9 @@ export default function CallsPage() {
                       <div className="call-info">
                         <div className="call-name">
                           {call.contactName}
-                          {isMissed && <span className="missed-badge">Manque</span>}
-                          {call.status === "declined" && (
-                            <span
-                              style={{
-                                fontSize: 10,
-                                background: "var(--border-subtle)",
-                                color: "var(--text-muted)",
-                                padding: "2px 7px",
-                                borderRadius: 5,
-                                fontWeight: 500,
-                              }}
-                            >
-                              Refuse
+                          {statusLabel && (
+                            <span className={call.status === "missed" ? "missed-badge" : undefined} style={call.status === "missed" ? undefined : { fontSize: 10, background: "var(--border-subtle)", color: "var(--text-muted)", padding: "2px 7px", borderRadius: 5, fontWeight: 500 }}>
+                              {statusLabel}
                             </span>
                           )}
                         </div>

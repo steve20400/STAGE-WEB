@@ -401,14 +401,11 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
  * aligne a gauche (entrant) ou a droite (sortant), avec couleurs directionnelles.
  */
 function CallEventChip({ call }: { call: CallRecord }) {
-  const missed = call.direction === "missed" || call.status === "no_answer"
-  const declined = call.status === "declined"
   const isOutgoing = call.direction === "out"
-  const failed = missed || declined
+  const outcome = call.status === "missed" ? "Appel manqué" : call.status === "no_answer" ? "Sans réponse" : call.status === "declined" ? "Appel rejeté" : call.status === "busy" ? "Occupé" : ""
+  const failed = Boolean(outcome)
 
-  const label =
-    (call.type === "video" ? "Appel video" : "Appel vocal") +
-    (missed ? " manque" : declined ? " refuse" : "")
+  const label = `${call.type === "video" ? "Appel vidéo" : "Appel vocal"}${outcome ? ` — ${outcome}` : ""}`
 
   // Couleurs : rouge si manque/refuse, vert si sortant reussi, bleu si entrant reussi
   const tint = failed ? "var(--danger)" : isOutgoing ? "#22c55e" : "#3b82f6"

@@ -3,7 +3,7 @@ import { createPrivateChat } from "./chats-service"
 
 export type CallDirection = "in" | "out" | "missed"
 export type CallType = "audio" | "video"
-export type CallStatus = "ended" | "declined" | "no_answer"
+export type CallStatus = "ended" | "missed" | "declined" | "no_answer" | "busy"
 
 export interface CallRecord {
   id: string
@@ -69,9 +69,12 @@ function toInitials(name: string) {
   return initials || "??"
 }
 
-function mapStatus(status: string): CallStatus {
-  if (status === "REJECTED") return "declined"
-  if (status === "MISSED" || status === "RINGING") return "no_answer"
+function mapStatus(c: BackendCall): CallStatus {
+  if (c.status === "REJECTED") return "declined"
+  // MISSED est produit quand le destinataire laisse sonner/termine avant réponse.
+  // Côté appelant, le même événement se présente comme « Sans réponse ».
+  if (c.status === "MISSED") return c.isOutgoing ? "no_answer" : "missed"
+  if (c.status === "RINGING") return c.isOutgoing ? "no_answer" : "missed"
   return "ended"
 }
 
@@ -99,7 +102,7 @@ function toCallRecord(c: BackendCall): CallRecord {
     contactColor: pickColor(contactId),
     direction: mapDirection(c),
     type: c.type === "VIDEO" ? "video" : "audio",
-    status: mapStatus(c.status),
+    status: mapStatus(c),
     duration: formatDuration(c.durationSec),
     ts: new Date(c.startedAt),
     isGroup: Boolean(c.isGroup),

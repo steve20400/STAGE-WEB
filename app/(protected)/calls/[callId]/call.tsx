@@ -136,8 +136,9 @@ export default function CallRoomPage() {
   }, [])
 
   const stateLabel: Record<CallScreenState, string> = {
-    ringing: "Appel en cours...",
-    active: formatElapsed(elapsed),
+    // Les trois états demandés sont fondés sur les évènements réels de signalisation.
+    ringing: call.progress === "ringing" ? "En train de sonner" : "Sonnerie",
+    active: call.progress === "ongoing" ? `Appel en cours — ${formatElapsed(elapsed)}` : formatElapsed(elapsed),
     ended: "Appel termine",
   }
 
