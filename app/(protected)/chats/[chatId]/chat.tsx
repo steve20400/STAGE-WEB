@@ -959,7 +959,15 @@ function MessageBubble({
                 )}
 
                 {msg.type === "audio" && mediaSrc && (
-                  <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
+                  <div>
+                    <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
+                    {/* Les fichiers audio importés restent identifiables, contrairement aux vocaux. */}
+                    {msg.fileName && <div style={{ marginTop: 5, fontSize: 10, opacity: 0.76, display: "flex", gap: 7, flexWrap: "wrap" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170, whiteSpace: "nowrap" }}>{msg.fileName}</span>
+                      {msg.fileSize && <span>{msg.fileSize}</span>}
+                      <span>{formatAudioDuration(msg.durationMs)}</span>
+                    </div>}
+                  </div>
                 )}
 
                 {msg.type === "video" && mediaSrc && (
