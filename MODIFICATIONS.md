@@ -158,3 +158,68 @@ Le build (`npm run build`) passe (`tsc -b` + `vite build` terminé sans erreur).
 - `git status` = propre
 - `npm run build` = passe (`tsc -b` + `vite build` sans erreur)
 - Push `8b76c4f` envoyé sur `https://github.com/steve20400/STAGE-WEB.git`
+
+---
+
+## Final — Lectureur intégré DocumentViewer, preview natif mobile, limite taille 2 Go, cercle chargement, page estimée (fda6afb)
+
+### Fichiers modifiés
+- `app/(protected)/chats/[chatId]/chat.tsx`
+- `app/(protected)/chats/[chatId]/chat-room-page.css` (`@keyframes spin`)
+- `src/services/media-service.ts` (`resolveMediaUrl` corrigé)
+
+### 1. DocumentViewer — lecteur intégré pour images, vidéos, PDF, texte/code, DOC, XLS, PPT
+- Ajout de `isDoc`, `isSpreadsheet`, `isPresentation` dans le composant `DocumentViewer`.
+- Utilisation du **Microsoft Office Web Viewer** (`view.officeapps.live.com/op/embed.aspx?src=`) pour `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx` — uniquement quand `url` est publique (pas `blob:`). Cela résout le problème de `docs.google.com` qui autorisait pas la connexion et le téléchargement automatique de `gview()`.
+- Pour `.pdf` : `embed` natif (`type="application/pdf"`) au lieu de `gview()`.
+- Pour texte/code (`.txt`, `.csv`, `.tsx`, `.js`, `.html`, `.css`, `.json`, `.py`, `.java`, `.cpp`, `.h`, `.sh`, `.yaml`, `.yml`, `.md`, `.tex`, etc.) : chargement via `fetch(url).text()` et affichage dans un `textarea` plein écran (`width: 100%`, `height: 65vh`, `font-family: 'Fira Code'`). Un indicateur de chargement (`spin`) s'affiche pendant le chargement.
+- Pour vidéo : `<video controls preload="metadata" style={{ width: "100%", maxHeight: "70vh" }}>`.
+- Pour image : `<img src={url} alt={name} style={{ maxWidth: "100%", maxHeight: "70vh" }}>`.
+
+### 2. Preview natif mobile et sans URL (`mediaSrc` vide)
+- Le bloc `filePreview` dans `MessageBubble` affiche toujours la carte d'aperçu (icône, nom, taille, type) même si `mediaUrl` est vide (`!mediaSrc`), avec le message "Aperçu disponible après chargement".
+- Style responsive (`maxWidth: "100%"`, `width: "100%"`) et contraste amélioré (`background: #f5f6fa` ou `#ffffff20`, texte `rgba(255,255,255,0.9)` si `isMe`).
+- Pour `.txt`, `.csv`, `.tsx`, `.js`, `.html`, `.css`, `.json`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.md`, `.yaml`, `.yml` et tout autre fichier texte/code : utilisation du composant `TextFilePreview` (chargement natif via `fetch` et affichage des 800 premiers caractères avec `lineClamp: 6`).
+- Pour `.pdf` : `embed` natif au lieu de `gview()` dans le `filePreview`.
+- Pour DOC/DOCX/XLS/XLSX/PPT/PPTX : `iframe` vers `view.officeapps.live.com/op/embed.aspx?src=` uniquement si `mediaSrc` n'est pas `blob:`. Sinon, la carte d'aperçu s'affiche avec le bouton "Ouvrir" et "Télécharger".
+
+### 3. Citation (`quote`) améliorée — media preview au lieu de "[media]"
+- Le bloc `quote` dans `MessageBubble` affiche un mini-preview conditionnel basé sur le type du message cité (`replyMsg`) :
+  - `image` : miniature `30x30` + nom du fichier.
+  - `video` : icône `#8b5cf6` + nom du fichier.
+  - `audio` : icône `#22c55e` + nom du fichier.
+  - `file` : icône avec label (`PDF`, `DOC`, `VIDEO`, etc.) + nom du fichier.
+  - `text` : conserve le contenu original.
+
+### 4. Cercle de chargement (`spin`) sur le preview au clic
+- Ajout de la variable `downloading` dans `MessageBubble` (`useState(false)`).
+- Quand l'utilisateur clique sur la carte d'aperçu (`a` tag) ou sur le bouton "Ouvrir" / "Télécharger", `downloading` passe à `true` et un cercle `spin` (CSS `@keyframes spin` dans `chat-room-page.css`) s'affiche en haut à droite de la carte. Après 2,5 secondes (`setTimeout`), `downloading` revient à `false`.
+- L'animation `spin` est définie dans `app/(protected)/chats/[chatId]/chat-room-page.css` (`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`).
+
+### 5. Estimation du nombre de pages (`estimatePages`)
+- Ajout de la fonction `estimatePages(fileName?, fileSize?)` dans `chat.tsx`.
+- Pour `.pdf` : `bytes / 5000` (approx. 5000 octets par page PDF).
+- Pour `.doc`, `.docx`, `.ppt`, `.pptx`, `.txt`, `.csv`, `.md`, `.tex`, `.bib` : `bytes / 3000`.
+- Pour `.xls`, `.xlsx` : `bytes / 2000`.
+- Pour `.tsx`, `.ts`, `.jsx`, `.js`, `.html`, `.css`, `.json`, `.py`, `.java`, `.cpp`, `.c`, `.h`, `.go`, `.rust`, `.php`, `.sql`, `.sh`, `.bash`, `.vue`, `.mdx`, `.ini`, `.cfg`, `.env`, `.yaml`, `.yml` : `bytes / 2500`.
+- Le nombre estimé s'affiche dans la carte d'aperçu (`Pages : ~{estimatePages(...)}`) pour tous les types de documents (texte, code, tableur, présentation, PDF), pas seulement `.pdf`.
+
+### 6. Limite de taille augmentée au maximum
+- `handleFileSelect` : limite passée de `500 Mo` (`500 * 1024 * 1024`) à `2 Go` (`2000 * 1024 * 1024`).
+- Message d'erreur mis à jour (`"2 Go"`).
+- `input-hint` mis à jour (`"Max 2 Go par fichier"`).
+- Cela répond à la demande de l'utilisateur ("le plus haut possible") tout en restant réaliste pour le navigateur et le backend.
+
+### 7. Fix audio/vidéo — bouton vidéo et rendu natif
+- `attach-menu` : bouton "Vidéo" avec icône `#8b5cf6` et `accept = ".mp4,.mov,.avi,.mkv,.webm"`.
+- `handleFileSelect` : `file.type.startsWith("video/")` détecte correctement `.mp4`, `.mov`, `.avi`, `.mkv`, `.webm`.
+- `sendMediaMessage` : `msgType: "video"` envoyé au backend.
+- `MessageBubble` : rendu natif `<video controls preload="metadata" style={{ maxWidth: "100%", maxHeight: 260 }}>` pour `msg.type === "video"` et pour `msg.type === "file"` avec `isVideoFile`.
+- `DocumentViewer` : rendu natif `<video src={url} controls ...>` pour `isVideo`.
+
+### 8. Résolution du problème `resolveMediaUrl`
+- `media-service.ts` (`resolveMediaUrl`) ignore déjà `blob:` et `data:` : `if (/^(blob:|data:)/.test(relativeUrl)) return relativeUrl`. Cela garantit que les URLs locales (`blob:`) générées par `URL.createObjectURL` dans `sendMediaMessage` ne sont pas corrompues par l'ajout du `token` backend. Le `mediaUrl` du message optimiste (`localUrl`) reste valide et s'affiche correctement dans le `MessageBubble` (image, vidéo, audio, texte/code) avant le téléchargement réel.
+
+---
+### 9. Fix `timestamp` du message sauvegé (`fda6afb` final)
+- `sendMessage` et `sendMediaMessage` (`chat.tsx`) : le message `saved` conserve le `timestamp` du message optimiste (`tmp-`) (`{ ...saved, timestamp: m.timestamp }`). Cela garantit que le `grouped` (tri par `timestamp`) place le message final au même endroit visuel que le preview optimiste, évitant que le preview ne remonte au-dessus des messages suivants.

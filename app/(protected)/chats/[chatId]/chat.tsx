@@ -65,6 +65,115 @@ function formatDateSeparator(d: Date) {
   return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
 }
 
+/** Visionneuse intégrée pour documents (texte, code, PDF, image, vidéo, DOC, XLS, PPT). */
+function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?: string; mime?: string; isMe: boolean; onClose: () => void }) {
+  const ext = (name ?? "").split(".").pop()?.toLowerCase() ?? ""
+  const isImage = mime?.startsWith("image/") || ["jpg","jpeg","png","gif","webp","bmp"].map((e)=>e.toLowerCase()).includes(ext)
+  const isVideo = mime?.startsWith("video/") || ["mp4","mov","avi","mkv","webm"].map((e)=>e.toLowerCase()).includes(ext)
+  const isText = mime?.startsWith("text/") || ["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].map((e)=>e.toLowerCase()).includes(ext)
+  const isPdf = mime === "application/pdf" || ext === "pdf"
+  const isDoc = ["doc","docx"].includes(ext) || (mime ?? "").includes("word")
+  const isSpreadsheet = ["xls","xlsx","ods","numbers"].includes(ext) || (mime ?? "").includes("spreadsheet") || (mime ?? "").includes("excel")
+  const isPresentation = ["ppt","pptx"].includes(ext) || (mime ?? "").includes("presentation")
+
+  // Pour le texte/code : on lit le contenu via fetch et on affiche dans un textarea
+  const [textContent, setTextContent] = useState<string | null>(null)
+  const [loadingText, setLoadingText] = useState(false)
+
+  useEffect(() => {
+    if (isText && url) {
+      setLoadingText(true)
+      fetch(url)
+        .then((r) => {
+          if (!r.ok) throw new Error("Chargement échoué")
+          return r.text()
+        })
+        .then((t) => {
+          setTextContent(t.slice(0, 50000))
+          setLoadingText(false)
+        })
+        .catch(() => {
+          setTextContent("Impossible de charger le contenu du fichier.")
+          setLoadingText(false)
+        })
+    }
+  }, [isText, url])
+
+  const isPublicUrl = !(url ?? "").startsWith("blob:")
+  const officeEmbedUrl = isPublicUrl && (isDoc || isSpreadsheet || isPresentation)
+    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
+    : null
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9500,
+        background: "#000000d9",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24, flexDirection: "column",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(92vw, 960px)", maxHeight: "88vh",
+          background: isMe ? "#2a1f14" : "#0a0d12",
+          borderRadius: 16, border: `1px solid ${isMe ? "#ffffff18" : "#1a1f24"}`,
+          boxShadow: "0 32px 80px #000000b0",
+          overflow: "hidden",
+          display: "flex", flexDirection: "column",
+        }}
+      >
+        {/* Barre de titre */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${isMe ? "#ffffff15" : "#1a1f24"}`, fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, fontSize: 15, color: isMe ? "#fff" : "var(--text-primary)" }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name ?? "Fichier"}</span>
+          <button onClick={onClose} aria-label="Fermer" style={{ background: "none", border: "none", color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>✕</button>
+        </div>
+
+        {/* Corps */}
+        <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+          {officeEmbedUrl && (
+            <iframe src={officeEmbedUrl} title={name ?? "Document"} style={{ width: "100%", height: "70vh", borderRadius: 10, border: "none" }} />
+          )}
+          {!officeEmbedUrl && isImage && (
+            <img src={url} alt={name ?? "image"} style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
+          )}
+          {!officeEmbedUrl && isVideo && (
+            <video src={url} controls preload="metadata" style={{ width: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
+          )}
+          {!officeEmbedUrl && isPdf && (
+            <embed src={url} type="application/pdf" style={{ width: "100%", height: "70vh", borderRadius: 10, border: "none" }} />
+          )}
+          {!officeEmbedUrl && isText && (
+            <>
+              {loadingText ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "65vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)" }}>
+                  <span style={{ width: 20, height: 20, borderRadius: "50%", border: `3px solid ${isMe ? "rgba(255,255,255,0.2)" : "var(--border-subtle)"}`, borderTopColor: isMe ? "#fff" : "var(--accent)", animation: "spin 0.8s linear infinite", marginRight: 10 }} />
+                  <span>Chargement du document...</span>
+                </div>
+              ) : textContent !== null ? (
+                <textarea readOnly value={textContent} style={{ width: "100%", height: "65vh", background: "#0d1117", color: isMe ? "#f0f6fc" : "#c9d1d9", border: "1px solid #30363d", borderRadius: 8, padding: 12, fontFamily: "'Fira Code', monospace", fontSize: 13, lineHeight: 1.5, resize: "none" }} />
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "50vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
+                  <span>Impossible de charger le contenu.</span>
+                </div>
+              )}
+            </>
+          )}
+          {!officeEmbedUrl && !isImage && !isVideo && !isPdf && !isText && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "50vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={isMe ? "rgba(255,255,255,0.4)" : "var(--text-muted)"} strokeWidth="1.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+              <div style={{ fontSize: 13, opacity: 0.8 }}>{name ?? "Fichier"}</div>
+              <a href={url} target="_blank" rel="noreferrer" style={{ color: isMe ? "#fff" : "var(--accent)", fontWeight: 600, textDecoration: "underline" }}>Télécharger / Ouvrir</a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Coche simple (envoye) / double blanche (recu) / double bleue (lu), comme sur WhatsApp.
     Affichee uniquement sur la bulle terracotta de l'expediteur -> teintes claires. */
 function StatusIcon({ status }: { status: MessageStatus }) {
@@ -138,12 +247,28 @@ function fileTypeInfo(filename?: string, mime?: string): { color: string; label:
   if (["xls", "xlsx"].includes(ext) || m.includes("spreadsheet") || m.includes("excel")) return { color: "#22c55e", label: "XLS" }
   if (["ppt", "pptx"].includes(ext) || m.includes("presentation")) return { color: "#f97316", label: "PPT" }
   if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { color: "#a855f7", label: "ZIP" }
-  if (["txt", "csv", "log", "md"].includes(ext)) return { color: "#6b7280", label: "TXT" }
+  if (["txt","csv","log","md","tex","latex","bib","sty"].includes(ext)) return { color: "#6b7280", label: "TXT" }
+  if (["tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro"].includes(ext)) return { color: "#f59e0b", label: "CODE" }
+  if (["css","scss","sass","less","styl","postcss"].includes(ext)) return { color: "#6366f1", label: "CSS" }
+  if (["json","yaml","yml","xml","toml","ini","cfg","env","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].includes(ext)) return { color: "#10b981", label: "CODE" }
   if (m.startsWith("audio/")) return { color: "#22c55e", label: "AUDIO" }
   if (m.startsWith("video/")) return { color: "#8b5cf6", label: "VIDEO" }
   if (m.startsWith("image/")) return { color: "#ec4899", label: "IMG" }
   if (ext === "apk") return { color: "#34d399", label: "APK" }
   return { color: "var(--text-secondary)", label: ext.toUpperCase() || "FILE" }
+}
+
+/** Estime le nombre de pages approximatif d'un document selon sa taille et son type. */
+function estimatePages(fileName?: string, fileSize?: string): number {
+  const ext = (fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
+  const bytesStr = fileSize ?? "0 Mo"
+  const bytesMatch = bytesStr.match(/([0-9]+(?:\.[0-9]+)?)\s*Mo/i)
+  const bytes = bytesMatch ? parseFloat(bytesMatch[1]) * 1024 * 1024 : 0
+  if (["pdf"].includes(ext)) return Math.max(1, Math.ceil(bytes / 5000))
+  if (["doc","docx","ppt","pptx","txt","csv","md","tex","latex","bib"].includes(ext)) return Math.max(1, Math.ceil(bytes / 3000))
+  if (["xls","xlsx","ods","numbers"].includes(ext)) return Math.max(1, Math.ceil(bytes / 2000))
+  if (["tsx","ts","jsx","js","mjs","cjs","html","htm","css","scss","json","yaml","yml","xml","py","java","cpp","c","h","cpp","go","rust","php","sql","sh","bash","zsh","vue","svelte","astro","mdx","rst","lua","perl","pl","rb","swift","kt","scala","r","cs","gradle","maven","ini","cfg","env","dockerfile","makefile"].includes(ext)) return Math.max(1, Math.ceil(bytes / 2500))
+  return 0
 }
 
 /** Rend le texte avec les URLs cliquables et un preview du premier lien. */
@@ -418,6 +543,57 @@ function AudioPlayer({
 
 const SWIPE_REPLY_THRESHOLD = 56
 
+
+/** Composant de preview natif pour fichiers texte/code. */
+function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
+  const [text, setText] = useState<string>("")
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    if (!url) return
+    setLoading(true)
+    fetch(url)
+      .then((r) => (r.ok ? r.text() : ""))
+      .then((t) => {
+        setText(t.slice(0, 800))
+        setLoading(false)
+      })
+      .catch(() => {
+        setText("")
+        setLoading(false)
+      })
+  }, [url])
+  return (
+    <div
+      style={{
+        width: "100%",
+        maxHeight: 160,
+        overflow: "hidden",
+        borderRadius: 8,
+        border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`,
+        background: isMe ? "#ffffff08" : "#f8f9fb",
+        padding: 10,
+        fontFamily: "'Fira Code', monospace",
+        fontSize: 12,
+        lineHeight: 1.45,
+        color: isMe ? "rgba(255,255,255,0.92)" : "#1f2937",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        marginBottom: 6,
+      }}
+    >
+      {loading ? (
+        <span style={{ opacity: 0.7, fontStyle: "italic" }}>Chargement du texte...</span>
+      ) : text ? (
+        <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical" }}>
+          {text}
+        </pre>
+      ) : (
+        <span style={{ opacity: 0.6 }}>Aperçu non disponible</span>
+      )}
+    </div>
+  )
+}
+
 function MessageBubble({
   msg,
   isMe,
@@ -446,6 +622,8 @@ function MessageBubble({
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [dragX, setDragX] = useState(0)
+  const [viewingDoc, setViewingDoc] = useState<{ url: string; name?: string; mime?: string } | null>(null)
+  const [downloading, setDownloading] = useState(false)
   const dragStart = useRef<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false })
 
   // Apercu du message cite : snapshot backend en priorite, sinon lookup local.
@@ -512,7 +690,7 @@ function MessageBubble({
     </button>
   )
 
-  return (
+  return (<>
     <div
       style={{
         display: "flex",
@@ -778,68 +956,58 @@ function MessageBubble({
                   const filePreview = (() => {
                     // Même sans mediaSrc : afficher la carte d'aperçu (visible sur PC et mobile)
                     // Pour les images, PDF, CSV, DOC avec URL : on affiche le preview natif
-                    // Image dans un message fichier
-                    if (mediaSrc && (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext))) {
+                    const isImageFile = mediaSrc && (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext))
+                    const isPdfFile = mediaSrc && (ext === "pdf" || mime === "application/pdf")
+                    const isTextOrCodeFile = mediaSrc && (["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].includes(ext) || mime.startsWith("text/"))
+                    const isDocFile = mediaSrc && (["doc","docx"].includes(ext) || mime.includes("word")) && !mediaSrc.startsWith("blob:")
+                    const isSpreadsheetFile = mediaSrc && (["xls","xlsx","ods","numbers"].includes(ext) || mime.includes("spreadsheet") || mime.includes("excel")) && !mediaSrc.startsWith("blob:")
+                    const isPresentationFile = mediaSrc && (["ppt","pptx"].includes(ext) || mime.includes("presentation")) && !mediaSrc.startsWith("blob:")
+                    const isVideoFileLocal = mediaSrc && (ext === "mp4" || ext === "mov" || ext === "avi" || ext === "mkv" || ext === "webm" || mime.startsWith("video/"))
+
+                    if (isImageFile) {
                       return (
-                        <img
-                          src={mediaSrc}
-                          alt={msg.fileName ?? "image"}
-                          style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6, cursor: "zoom-in" }}
-                        />
+                        <img src={mediaSrc} alt={msg.fileName ?? "image"} style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6, cursor: "zoom-in" }} />
                       )
                     }
-                    // PDF — aperçu via Google Docs viewer (fonctionne mieux sur mobile et même sans URL publique immédiate si on a le lien direct)
-                    if (mediaSrc && (ext === "pdf" || mime === "application/pdf")) {
-                      const viewerUrl = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(mediaSrc)}`
+                    if (isVideoFileLocal) {
                       return (
-                        <iframe
-                          src={viewerUrl}
-                          title={msg.fileName ?? "Aperçu PDF"}
-                          style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }}
-                          loading="lazy"
-                        />
+                        <video src={mediaSrc} controls preload="metadata" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6 }} />
                       )
                     }
-                    // CSV / texte
-                    if (mediaSrc && (ext === "csv" || mime === "text/csv" || ext === "txt" || mime.startsWith("text/"))) {
+                    if (isPdfFile) {
                       return (
-                        <iframe
-                          src={mediaSrc}
-                          title={msg.fileName ?? "Aperçu texte"}
-                          style={{ width: "100%", height: 140, borderRadius: 8, border: "none", display: "block", marginBottom: 6, background: "#fff" }}
-                          loading="lazy"
-                        />
+                        <embed src={mediaSrc} type="application/pdf" style={{ width: "100%", height: 220, borderRadius: 10, border: "none", display: "block", marginBottom: 6 }} />
                       )
                     }
-                    // Document (DOC, XLS, PPT) — aperçu via Google Docs viewer
-                    if (mediaSrc && (["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext) || mime.includes("word") || mime.includes("spreadsheet") || mime.includes("presentation"))) {
-                      const viewerUrl = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(mediaSrc)}`
+                    if (isDocFile) {
+                      const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(mediaSrc)}`
                       return (
-                        <iframe
-                          src={viewerUrl}
-                          title={msg.fileName ?? "Aperçu document"}
-                          style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }}
-                          loading="lazy"
-                        />
+                        <iframe src={viewerUrl} title={msg.fileName ?? "Document"} style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }} loading="lazy" />
                       )
                     }
-                    // Vidéo dans un message fichier
-                    if (mediaSrc && (ext === "mp4" || ext === "mov" || ext === "avi" || ext === "mkv" || ext === "webm" || mime.startsWith("video/"))) {
+                    if (isSpreadsheetFile) {
+                      const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(mediaSrc)}`
                       return (
-                        <video
-                          src={mediaSrc}
-                          controls
-                          preload="metadata"
-                          style={{ width: "100%", maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6 }}
-                        />
+                        <iframe src={viewerUrl} title={msg.fileName ?? "Tableur"} style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }} loading="lazy" />
                       )
                     }
-                    // Carte d'aperçu visible même avant le téléchargement (sans mediaSrc)
+                    if (isPresentationFile) {
+                      const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(mediaSrc)}`
+                      return (
+                        <iframe src={viewerUrl} title={msg.fileName ?? "Presentation"} style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }} loading="lazy" />
+                      )
+                    }
+                    if (isTextOrCodeFile) {
+                      return <TextFilePreview url={mediaSrc} isMe={isMe} />
+                    }
+
+                    // Fallback : carte d'aperçu avec info, bouton Ouvrir/Télécharger, et cercle de chargement
                     return (
                       <a
                         href={mediaSrc ? mediaSrc : "#"}
                         target="_blank"
                         rel="noreferrer"
+                        onClick={() => { setDownloading(true); setTimeout(() => setDownloading(false), 2500) }}
                         style={{
                           display: "flex", alignItems: "center", gap: 12,
                           padding: "12px 14px", borderRadius: 10, marginBottom: 6,
@@ -848,8 +1016,12 @@ function MessageBubble({
                           textDecoration: "none", color: isMe ? "#fff" : "var(--text-primary)",
                           width: "100%",
                           boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                          position: "relative",
                         }}
                       >
+                        {downloading && (
+                          <div style={{ position: "absolute", top: 4, right: 4, width: 12, height: 12, borderRadius: "50%", border: `2px solid ${isMe ? "rgba(255,255,255,0.3)" : "var(--border-subtle)"}`, borderTopColor: isMe ? "#fff" : "var(--accent)", animation: "spin 0.8s linear infinite" }} />
+                        )}
                         <div style={{
                           width: 48, height: 48, borderRadius: 10,
                           background: `${fti.color}18`,
@@ -866,8 +1038,26 @@ function MessageBubble({
                             {msg.fileName ?? msg.content ?? "Fichier"}
                           </div>
                           {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
+                          {msg.fileSize && msg.fileName ? <div style={{ fontSize: 9, opacity: 0.7, marginTop: 1 }}>Pages : ~{estimatePages(msg.fileName, msg.fileSize)}</div> : null}
                           <div style={{ fontSize: 9, opacity: 0.85, marginTop: 2, color: isMe ? "rgba(255,255,255,0.9)" : "var(--text-secondary)" }}>
                             {mediaSrc ? "Aperçu disponible — cliquer pour ouvrir" : "Aperçu disponible après chargement"}
+                          </div>
+                          {msg.status === "sending" && (
+                            <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6, fontSize: 10, opacity: 0.8 }}>
+                              <span style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${isMe ? "rgba(255,255,255,0.35)" : "var(--text-secondary)"}`, borderTopColor: isMe ? "#fff" : "var(--accent)", animation: "spin 0.8s linear infinite" }} />
+                              <span style={{ color: isMe ? "rgba(255,255,255,0.9)" : "var(--text-secondary)" }}>Envoi en cours...</span>
+                            </div>
+                          )}
+                          <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
+                            <button
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewingDoc({ url: mediaSrc || msg.mediaUrl || "#", name: msg.fileName, mime: msg.mediaMime }); setDownloading(true); setTimeout(() => setDownloading(false), 2500); }}
+                              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: isMe ? "#ffffff25" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}
+                            >
+                              Ouvrir
+                            </button>
+                            <a href={mediaSrc ? mediaSrc : "#"} target="_blank" rel="noreferrer" onClick={(e) => { e.stopPropagation(); setDownloading(true); setTimeout(() => setDownloading(false), 2500); }} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`, background: "transparent", color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", fontSize: 10, fontWeight: 500, textDecoration: "none", display: "inline-block" }}>
+                              Télécharger
+                            </a>
                           </div>
                         </div>
                       </a>
@@ -955,7 +1145,10 @@ function MessageBubble({
         </div>
       </div>
     </div>
-  )
+    {viewingDoc && (
+      <DocumentViewer url={viewingDoc.url} name={viewingDoc.name} mime={viewingDoc.mime} isMe={isMe} onClose={() => setViewingDoc(null)} />
+    )}
+  </>)
 }
 
 export default function ChatRoomPage() {
@@ -1256,7 +1449,7 @@ export default function ChatRoomPage() {
       setMessages((prev) => {
         const alreadyReceived = prev.some((m) => m.id === saved.id)
         if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
-        return prev.map((m) => (m.id === tempId ? saved : m))
+        return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: m.timestamp } : m))
       })
     } catch (err) {
       // En cas d'echec, on marque le message comme "non envoye" pour informer l'user
@@ -1299,6 +1492,7 @@ export default function ChatRoomPage() {
       durationMs?: number
     ) => {
       const tempId = `tmp-${Date.now()}`
+      const localUrl = URL.createObjectURL(file)
       const optimistic: Message = {
         id: tempId,
         senderId: "me",
@@ -1310,6 +1504,7 @@ export default function ChatRoomPage() {
         fileSize: `${(file.size / 1024 / 1024).toFixed(1)} Mo`,
         mediaMime: mime,
         durationMs,
+        mediaUrl: localUrl,
       }
       setMessages((prev) => [...prev, optimistic])
 
@@ -1322,11 +1517,22 @@ export default function ChatRoomPage() {
         setReplyTo(null)
         setMessages((prev) => {
           const alreadyReceived = prev.some((m) => m.id === saved.id)
+          // Révoquer l'URL locale du message optimiste
+          const optMsg = prev.find((m) => m.id === tempId)
+          if (optMsg?.mediaUrl && optMsg.mediaUrl.startsWith("blob:")) {
+            try { URL.revokeObjectURL(optMsg.mediaUrl) } catch { /* ignore */ }
+          }
           if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
-          return prev.map((m) => (m.id === tempId ? saved : m))
+          return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: optMsg?.timestamp ?? saved.timestamp } : m))
         })
       } catch (err) {
-        setMessages((prev) => prev.filter((m) => m.id !== tempId))
+        setMessages((prev) => {
+          const msg = prev.find((m) => m.id === tempId)
+          if (msg?.mediaUrl && msg.mediaUrl.startsWith("blob:")) {
+            try { URL.revokeObjectURL(msg.mediaUrl) } catch { /* ignore */ }
+          }
+          return prev.filter((m) => m.id !== tempId)
+        })
         const message = err instanceof Error ? err.message : "Envoi du fichier impossible."
         error("Fichier non envoye", message)
       }
@@ -1340,11 +1546,11 @@ export default function ChatRoomPage() {
     if (!files || files.length === 0) return
     setShowAttach(false)
     const toSend = Array.from(files)
-    const oversized = toSend.filter((f) => f.size > 50 * 1024 * 1024)
+    const oversized = toSend.filter((f) => f.size > 2000 * 1024 * 1024)
     if (oversized.length > 0) {
-      error("Fichier(s) trop volumineux", `${oversized.length} fichier(s) depassent 50 Mo et seront ignores.`)
+      error("Fichier(s) trop volumineux", `${oversized.length} fichier(s) depassent 2 Go et seront ignores.`)
     }
-    const valid = toSend.filter((f) => f.size <= 50 * 1024 * 1024)
+    const valid = toSend.filter((f) => f.size <= 2000 * 1024 * 1024)
     for (const file of valid) {
       const msgType = file.type.startsWith("image/")
         ? "image"
@@ -1991,7 +2197,7 @@ export default function ChatRoomPage() {
           )}
         </div>
         <div className="input-hint">
-          Entree pour envoyer - Shift+Entree pour sauter une ligne - Max 50 Mo par fichier
+          Entree pour envoyer - Shift+Entree pour sauter une ligne - Max 2 Go par fichier
         </div>
       </div>
 

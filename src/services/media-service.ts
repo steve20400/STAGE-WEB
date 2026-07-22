@@ -36,6 +36,8 @@ export async function uploadMedia(
  */
 export function resolveMediaUrl(relativeUrl: string, options?: { download?: boolean }): string {
   if (!relativeUrl) return ""
+  // Ignorer les URLs locales générées côté client (blob:, data:)
+  if (/^(blob:|data:)/.test(relativeUrl)) return relativeUrl
   const base = /^https?:\/\//.test(relativeUrl) ? relativeUrl : `${API_BASE_URL}${relativeUrl}`
   const token = loadSessionToken() ?? ""
   const sep = base.includes("?") ? "&" : "?"
