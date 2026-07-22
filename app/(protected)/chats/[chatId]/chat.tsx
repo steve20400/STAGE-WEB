@@ -212,10 +212,17 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
           <iframe title="Position GPS" loading="lazy"
             src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.01},${lat - 0.01},${lng + 0.01},${lat + 0.01}&layer=mapnik&marker=${lat},${lng}`}
             style={{ width: "100%", height: "130%", border: "none", pointerEvents: "none", display: "block" }} />
-          {/* Masque tout message d'erreur qui apparaîtrait en bas du preview */}
+          {/* Masque tout message d'erreur ou texte intégré en bas du preview */}
           <div style={{
-            position: "absolute", bottom: 0, left: 0, right: 0, height: 28,
-            background: `linear-gradient(to top, ${isMe ? "#ffffff18" : "var(--bg-elevated)"}, transparent)`,
+            position: "absolute", bottom: 0, left: 0, right: 0, height: 55,
+            background: `linear-gradient(to top, ${isMe ? "rgba(255,255,255,0.25)" : "var(--bg-elevated)"}, transparent 10%)`,
+            pointerEvents: "none",
+          }} />
+          {/* Overlay supplémentaire au centre-bas pour cacher tout texte résiduel */}
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0, height: 35,
+            background: isMe ? "rgba(255,255,255,0.15)" : "var(--bg-elevated)",
+            opacity: 0.9,
             pointerEvents: "none",
           }} />
         </div>
@@ -652,7 +659,53 @@ function MessageBubble({
                 whiteSpace: "nowrap",
               }}
             >
-              {quote.content}
+              {replyMsg ? (() => {
+                if (replyMsg.type === "image" && replyMsg.mediaUrl) {
+                  const src = resolveMediaUrl(replyMsg.mediaUrl)
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <img src={src} alt={replyMsg.fileName ?? "image"} style={{ width: 30, height: 30, borderRadius: 5, objectFit: "cover", flexShrink: 0 }} />
+                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {replyMsg.fileName ?? "Image"}
+                      </span>
+                    </div>
+                  )
+                }
+                if (replyMsg.type === "video" && replyMsg.fileName) {
+                  const fti = fileTypeInfo(replyMsg.fileName, replyMsg.mediaMime)
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                      </div>
+                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Vidéo : {replyMsg.fileName}</span>
+                    </div>
+                  )
+                }
+                if (replyMsg.type === "audio" && replyMsg.fileName) {
+                  const fti = fileTypeInfo(replyMsg.fileName, replyMsg.mediaMime)
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2" /></svg>
+                      </div>
+                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Audio : {replyMsg.fileName}</span>
+                    </div>
+                  )
+                }
+                if ((replyMsg.type === "file" || replyMsg.type === "video") && replyMsg.fileName) {
+                  const fti = fileTypeInfo(replyMsg.fileName, replyMsg.mediaMime)
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 6, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <span style={{ fontSize: 8, fontWeight: 800, color: fti.color, letterSpacing: 0.5 }}>{fti.label}</span>
+                      </div>
+                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyMsg.fileName}</span>
+                    </div>
+                  )
+                }
+                return <span>{quote.content}</span>
+              })() : <span>{quote.content}</span>}
             </div>
           )}
 
@@ -697,6 +750,17 @@ function MessageBubble({
                   <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
                 )}
 
+                {msg.type === "video" && mediaSrc && (
+                  <div style={{ marginBottom: 6 }}>
+                    <video
+                      src={mediaSrc}
+                      controls
+                      preload="metadata"
+                      style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block" }}
+                    />
+                  </div>
+                )}
+
                 {msg.type === "file" && mediaSrc && isVideoFile && (
                   <video
                     src={mediaSrc}
@@ -712,19 +776,20 @@ function MessageBubble({
                   const mime = msg.mediaMime ?? ""
                   // --- Preview du fichier ---
                   const filePreview = (() => {
-                    if (!mediaSrc) return null
+                    // Même sans mediaSrc : afficher la carte d'aperçu (visible sur PC et mobile)
+                    // Pour les images, PDF, CSV, DOC avec URL : on affiche le preview natif
                     // Image dans un message fichier
-                    if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) {
+                    if (mediaSrc && (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext))) {
                       return (
                         <img
                           src={mediaSrc}
                           alt={msg.fileName ?? "image"}
-                          style={{ maxWidth: 260, maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6, cursor: "zoom-in" }}
+                          style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6, cursor: "zoom-in" }}
                         />
                       )
                     }
                     // PDF
-                    if (ext === "pdf" || mime === "application/pdf") {
+                    if (mediaSrc && (ext === "pdf" || mime === "application/pdf")) {
                       return (
                         <iframe
                           src={mediaSrc}
@@ -735,7 +800,7 @@ function MessageBubble({
                       )
                     }
                     // CSV / texte
-                    if (ext === "csv" || mime === "text/csv" || ext === "txt" || mime.startsWith("text/")) {
+                    if (mediaSrc && (ext === "csv" || mime === "text/csv" || ext === "txt" || mime.startsWith("text/"))) {
                       return (
                         <iframe
                           src={mediaSrc}
@@ -745,8 +810,8 @@ function MessageBubble({
                         />
                       )
                     }
-                    // Document (DOC, XLS, PPT) — aperçu via Google Docs viewer (fonctionne si URL publique, sinon montre une carte)
-                    if (["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext) || mime.includes("word") || mime.includes("spreadsheet") || mime.includes("presentation")) {
+                    // Document (DOC, XLS, PPT) — aperçu via Google Docs viewer
+                    if (mediaSrc && (["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext) || mime.includes("word") || mime.includes("spreadsheet") || mime.includes("presentation"))) {
                       const viewerUrl = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(mediaSrc)}`
                       return (
                         <iframe
@@ -757,10 +822,21 @@ function MessageBubble({
                         />
                       )
                     }
-                    // Autres fichiers : carte d'aperçu colorée
+                    // Vidéo dans un message fichier
+                    if (mediaSrc && (ext === "mp4" || ext === "mov" || ext === "avi" || ext === "mkv" || ext === "webm" || mime.startsWith("video/"))) {
+                      return (
+                        <video
+                          src={mediaSrc}
+                          controls
+                          preload="metadata"
+                          style={{ width: "100%", maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6 }}
+                        />
+                      )
+                    }
+                    // Carte d'aperçu visible même avant le téléchargement (sans mediaSrc)
                     return (
                       <a
-                        href={mediaSrc}
+                        href={mediaSrc ? mediaSrc : "#"}
                         target="_blank"
                         rel="noreferrer"
                         style={{
@@ -769,6 +845,7 @@ function MessageBubble({
                           background: isMe ? "#ffffff12" : "var(--bg-elevated)",
                           border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
                           textDecoration: "none", color: "inherit",
+                          width: "100%",
                         }}
                       >
                         <div style={{
@@ -787,7 +864,9 @@ function MessageBubble({
                             {msg.fileName ?? msg.content ?? "Fichier"}
                           </div>
                           {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
-                          <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>Aperçu du fichier</div>
+                          <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>
+                            {mediaSrc ? "Aperçu disponible" : "Aperçu disponible après chargement"}
+                          </div>
                         </div>
                       </a>
                     )
@@ -1214,7 +1293,7 @@ export default function ChatRoomPage() {
       file: File | Blob,
       filename: string,
       mime: string,
-      msgType: "image" | "audio" | "file",
+      msgType: "image" | "audio" | "file" | "video",
       durationMs?: number
     ) => {
       const tempId = `tmp-${Date.now()}`
@@ -1269,7 +1348,9 @@ export default function ChatRoomPage() {
         ? "image"
         : file.type.startsWith("audio/")
           ? "audio"
-          : "file"
+          : file.type.startsWith("video/")
+            ? "video"
+            : "file"
       void sendMediaMessage(file, file.name, file.type || "application/octet-stream", msgType)
     }
     e.target.value = ""
@@ -1668,6 +1749,31 @@ export default function ChatRoomPage() {
                   </svg>
                 </div>
                 Photo / image
+              </button>
+              <button
+                className="attach-opt"
+                onClick={() => {
+                  fileRef.current!.accept = ".mp4,.mov,.avi,.mkv,.webm"
+                  fileRef.current!.click()
+                }}
+              >
+                <div
+                  className="attach-icon"
+                  style={{ background: "#8b5cf620", color: "#8b5cf6" }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+                  </svg>
+                </div>
+                Vidéo
               </button>
               <button
                 className="attach-opt"
