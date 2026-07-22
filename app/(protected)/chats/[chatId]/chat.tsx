@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import type { PDFDocumentLoadingTask } from "pdfjs-dist"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
 import {
   CHAT_COLORS,
@@ -178,7 +179,7 @@ function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
   const [state, setState] = useState("Chargement du PDF...")
   useEffect(() => {
     let cancelled = false
-    let task: any
+    let task: PDFDocumentLoadingTask | undefined
     const render = async () => {
       try {
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
