@@ -90,7 +90,7 @@ export function toFrontMessage(
     id: m.id,
     senderId: isMine ? "me" : m.senderId,
     content: m.content ?? "",
-    type: mapType(m.type),
+    type: media?.mimeType?.startsWith("video/") ? "video" : mapType(m.type),
     status: mapStatus(m.status),
     timestamp: m.createdAt ? new Date(m.createdAt) : new Date(),
     replyTo: m.replyToId ?? undefined,

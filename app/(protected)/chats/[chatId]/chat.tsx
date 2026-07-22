@@ -142,9 +142,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
           {!officeEmbedUrl && isVideo && (
             <video src={url} controls preload="metadata" style={{ width: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
           )}
-          {!officeEmbedUrl && isPdf && (
-            <embed src={url} type="application/pdf" style={{ width: "100%", height: "70vh", borderRadius: 10, border: "none" }} />
-          )}
+          {!officeEmbedUrl && isPdf && <PdfViewer url={url} isMe={isMe} />}
           {!officeEmbedUrl && isText && (
             <>
               {loadingText ? (
@@ -172,6 +170,42 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
       </div>
     </div>
   )
+}
+
+/** Lecteur PDF rendu par PDF.js : ne dépend pas du lecteur PDF du téléphone. */
+function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
+  const host = useRef<HTMLDivElement>(null)
+  const [state, setState] = useState("Chargement du PDF...")
+  useEffect(() => {
+    let cancelled = false
+    let task: any
+    const render = async () => {
+      try {
+        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.mjs", import.meta.url).toString()
+        const bytes = await fetch(url).then((r) => { if (!r.ok) throw new Error(); return r.arrayBuffer() })
+        task = pdfjs.getDocument({ data: bytes })
+        const pdf = await task.promise
+        if (cancelled || !host.current) return
+        host.current.replaceChildren()
+        // Toutes les pages sont rendues dans le lecteur intégré (limite de sécurité à 100).
+        for (let pageNo = 1; pageNo <= Math.min(pdf.numPages, 100); pageNo++) {
+          const page = await pdf.getPage(pageNo)
+          const viewport = page.getViewport({ scale: 1.5 })
+          const canvas = document.createElement("canvas")
+          canvas.width = viewport.width; canvas.height = viewport.height
+          canvas.style.cssText = "display:block;width:100%;height:auto;margin:0 auto 12px;background:white;border-radius:6px"
+          const ctx = canvas.getContext("2d")
+          if (ctx) await page.render({ canvasContext: ctx, viewport }).promise
+          if (!cancelled) host.current?.append(canvas)
+        }
+        if (!cancelled) setState("")
+      } catch { if (!cancelled) setState("Aperçu PDF indisponible. Vous pouvez le télécharger.") }
+    }
+    void render()
+    return () => { cancelled = true; task?.destroy?.() }
+  }, [url])
+  return <div ref={host} style={{ minHeight: state ? 180 : 0, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: state ? 18 : 0 }}>{state}</div>
 }
 
 /** Coche simple (envoye) / double blanche (recu) / double bleue (lu), comme sur WhatsApp.
@@ -976,7 +1010,7 @@ function MessageBubble({
                     }
                     if (isPdfFile) {
                       return (
-                        <embed src={mediaSrc} type="application/pdf" style={{ width: "100%", height: 220, borderRadius: 10, border: "none", display: "block", marginBottom: 6 }} />
+                        <div style={{ maxHeight: 220, overflow: "hidden", borderRadius: 10, marginBottom: 6 }}><PdfViewer url={mediaSrc} isMe={isMe} /></div>
                       )
                     }
                     if (isDocFile) {
@@ -1229,11 +1263,23 @@ export default function ChatRoomPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const attachRef = useRef<HTMLDivElement>(null)
   const typingTimer = useRef<ReturnType<typeof setTimeout>>()
   const recorderRef = useRef<MediaRecorder | null>(null)
   const recordChunksRef = useRef<Blob[]>([])
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordCancelledRef = useRef(false)
+
+  // Fermeture Telegram : clic/tap hors du bouton et du menu. Le survol est géré
+  // séparément pour les appareils ayant une souris.
+  useEffect(() => {
+    if (!showAttach) return
+    const closeOutside = (event: PointerEvent) => {
+      if (attachRef.current && !attachRef.current.contains(event.target as Node)) setShowAttach(false)
+    }
+    document.addEventListener("pointerdown", closeOutside)
+    return () => document.removeEventListener("pointerdown", closeOutside)
+  }, [showAttach])
 
   const refreshMessages = useCallback(async () => {
     await fetchMessagesCacheFirst(
@@ -1519,11 +1565,20 @@ export default function ChatRoomPage() {
           const alreadyReceived = prev.some((m) => m.id === saved.id)
           // Révoquer l'URL locale du message optimiste
           const optMsg = prev.find((m) => m.id === tempId)
-          if (optMsg?.mediaUrl && optMsg.mediaUrl.startsWith("blob:")) {
-            try { URL.revokeObjectURL(optMsg.mediaUrl) } catch { /* ignore */ }
-          }
+          // Ne pas révoquer l'URL blob ici : selon le délai WebSocket, la réponse peut
+          // ne pas encore contenir media. Elle est libérée au rechargement de la page.
           if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
-          return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: optMsg?.timestamp ?? saved.timestamp } : m))
+          return prev.map((m) => m.id === tempId ? {
+            ...saved,
+            timestamp: optMsg?.timestamp ?? saved.timestamp,
+            // Le média confirmé est prioritaire; le blob garde le preview si le WS est incomplet.
+            mediaUrl: saved.mediaUrl || optMsg?.mediaUrl,
+            mediaMime: saved.mediaMime || optMsg?.mediaMime,
+            fileName: saved.fileName || optMsg?.fileName,
+            fileSize: saved.fileSize || optMsg?.fileSize,
+            durationMs: saved.durationMs ?? optMsg?.durationMs,
+            type: saved.mediaMime?.startsWith("video/") ? "video" : saved.type,
+          } : m)
         })
       } catch (err) {
         setMessages((prev) => {
@@ -1540,8 +1595,27 @@ export default function ChatRoomPage() {
     [chatId, replyTo, error]
   )
 
-  // Selection de fichier (photo, document, audio) — supporte la selection multiple
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const mediaKindFromFile = (file: File): "image" | "audio" | "video" | "file" => {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
+    if (file.type.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic"].includes(ext)) return "image"
+    if (file.type.startsWith("video/") || ["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return "video"
+    if (file.type.startsWith("audio/") || ["mp3", "aac", "wav", "ogg", "m4a", "flac", "webm"].includes(ext)) return "audio"
+    return "file"
+  }
+
+  const readAudioDuration = (file: File): Promise<number | undefined> => new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const audio = document.createElement("audio")
+    audio.preload = "metadata"
+    const done = () => { URL.revokeObjectURL(url); resolve(Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : undefined) }
+    audio.onloadedmetadata = done
+    audio.onerror = done
+    audio.src = url
+  })
+
+  // Selection de fichier (photo, document, audio) — supporte la selection multiple.
+  // Certains téléphones ne renseignent pas File.type : l'extension est donc aussi reconnue.
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
     setShowAttach(false)
@@ -1552,14 +1626,9 @@ export default function ChatRoomPage() {
     }
     const valid = toSend.filter((f) => f.size <= 2000 * 1024 * 1024)
     for (const file of valid) {
-      const msgType = file.type.startsWith("image/")
-        ? "image"
-        : file.type.startsWith("audio/")
-          ? "audio"
-          : file.type.startsWith("video/")
-            ? "video"
-            : "file"
-      void sendMediaMessage(file, file.name, file.type || "application/octet-stream", msgType)
+      const msgType = mediaKindFromFile(file)
+      const durationMs = msgType === "audio" ? await readAudioDuration(file) : undefined
+      void sendMediaMessage(file, file.name, file.type || "application/octet-stream", msgType, durationMs)
     }
     e.target.value = ""
   }
@@ -1930,7 +1999,7 @@ export default function ChatRoomPage() {
           onChange={handleFileSelect}
         />
 
-        <div className="room-input-row" style={{ position: "relative" }}>
+        <div ref={attachRef} className="room-input-row" style={{ position: "relative" }} onMouseLeave={() => setShowAttach(false)}>
           {/* Popup attachement */}
           {showAttach && (
             <div className="attach-menu">
@@ -1986,7 +2055,7 @@ export default function ChatRoomPage() {
               <button
                 className="attach-opt"
                 onClick={() => {
-                  fileRef.current!.accept = ".pdf,.doc,.docx,.xls,.xlsx,.txt"
+                  fileRef.current!.accept = ".pdf,.doc,.docx,.txt,.tsx,.css,.json,.py,.java,.cpp,.h,.md,.yaml,.yml,.properties,.xml,.php"
                   fileRef.current!.click()
                 }}
               >
@@ -2012,7 +2081,7 @@ export default function ChatRoomPage() {
               <button
                 className="attach-opt"
                 onClick={() => {
-                  fileRef.current!.accept = ".mp3,.wav,.ogg,.m4a"
+                  fileRef.current!.accept = ".mp3,.aac,.wav,.ogg,.m4a,.flac,.webm"
                   fileRef.current!.click()
                 }}
               >
@@ -2058,7 +2127,9 @@ export default function ChatRoomPage() {
 
           <button
             className="attach-btn"
+            onMouseEnter={() => setShowAttach(true)}
             onClick={() => setShowAttach((v) => !v)}
+            aria-expanded={showAttach}
             aria-label="Joindre un fichier"
           >
             <svg
