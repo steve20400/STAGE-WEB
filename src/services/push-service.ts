@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getMessaging, getToken, deleteToken, onMessage } from "firebase/messaging";
+import { getMessaging, getToken, deleteToken, onMessage, type MessagePayload } from "firebase/messaging";
 import { apiRequest } from "../lib/api-client";
 
 const firebaseConfig = {
@@ -110,7 +110,7 @@ export async function initPushNotifications(): Promise<void> {
       onMessageUnsubscribe();
     }
 
-    onMessageUnsubscribe = onMessage(msging, (payload: any) => {
+    onMessageUnsubscribe = onMessage(msging, (payload: MessagePayload) => {
       console.log("[Push] Foreground message received:", payload);
       
       const title = payload.notification?.title || payload.data?.title || "Nouveau message";

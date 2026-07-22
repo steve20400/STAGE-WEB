@@ -4,11 +4,12 @@ import { useToast } from "../../../../src/components/toast"
 import { loadContacts } from "../../../../src/data/contacts"
 import { loadLocalConversations } from "../../../../src/data/local-conversations"
 import { findLocalGroup } from "../../../../src/data/local-groups"
-import { CHAT_COLORS } from "../../../../src/mocks/chat-data"
 import { fetchContacts } from "../../../../src/services/contacts-service"
 import { fetchConversationById, addMembersToGroup } from "../../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
+
+type BackendGroupMember = string | { id?: string; pseudo?: string | null; publicNumber?: string | null }
 
 interface Member {
   id: string
@@ -831,10 +832,11 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
   if (conv.isGroup) {
     // Utilise membersInfo (backend) pour avoir les vrais IDs + pseudo, puis fetchContacts pour avatar
     const backendMembers = (conv.membersInfo ?? (conv.members ?? []).map((m: string) => ({ id: m, pseudo: null, publicNumber: "" })))
-    const members: Member[] = (Array.isArray(backendMembers) ? backendMembers : []).map((m: any, index: number) => {
-      const memberId = typeof m === "string" ? m : m.id ?? m
-      const pseudoName = typeof m === "object" ? (m.pseudo || m.publicNumber || null) : null
-      const contact = contacts.find((c) => c.id === memberId || c.phone === (m?.publicNumber ?? ""))
+    const members: Member[] = ((Array.isArray(backendMembers) ? backendMembers : []) as BackendGroupMember[]).map((m, index: number) => {
+      const memberId = typeof m === "string" ? m : m.id ?? ""
+      const pseudoName = typeof m === "string" ? null : (m.pseudo || m.publicNumber || null)
+      const publicNumber = typeof m === "string" ? "" : (m.publicNumber ?? "")
+      const contact = contacts.find((c) => c.id === memberId || c.phone === publicNumber)
       return {
         id: memberId,
         name: contact?.name ?? pseudoName ?? `Membre ${index + 1}`,

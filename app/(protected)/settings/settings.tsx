@@ -115,8 +115,9 @@ function PushDiagnostic() {
       await initPushNotifications()
       checkStatus()
       alert("Demande d'initialisation terminee. Verifiez les statuts ci-dessous.")
-    } catch (err: any) {
-      alert(`Erreur d'initialisation : ${err.message}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur inconnue"
+      alert(`Erreur d'initialisation : ${message}`)
     } finally {
       setLoading(false)
     }
