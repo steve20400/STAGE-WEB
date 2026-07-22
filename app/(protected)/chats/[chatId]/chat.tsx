@@ -173,11 +173,9 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
 /** Lecteur PDF rendu par PDF.js : ne dépend pas du lecteur PDF du téléphone. */
 function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
   const host = useRef<HTMLDivElement>(null)
-  const [requested, setRequested] = useState(false)
-  const [state, setState] = useState("")
+  const [state, setState] = useState("Chargement du PDF…")
   const [errorMessage, setErrorMessage] = useState("")
   useEffect(() => {
-    if (!requested) return
     let cancelled = false
     let task: PDFDocumentLoadingTask | undefined
     const render = async () => {
@@ -204,9 +202,8 @@ function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
       } catch (err: unknown) { if (!cancelled) { setState(""); setErrorMessage(err instanceof Error ? err.message : "Le PDF ne peut pas être chargé.") } }
     }
     void render(); return () => { cancelled = true; task?.destroy?.() }
-  }, [url, requested])
-  return <div ref={host} style={{ minHeight: requested ? 120 : 58, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: requested ? 10 : 0 }}>
-    {!requested && <button onClick={() => setRequested(true)} style={{ marginTop: 10, border: "none", borderRadius: 6, padding: "7px 10px", cursor: "pointer", background: isMe ? "#ffffff24" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontWeight: 600 }}>Afficher le PDF</button>}
+  }, [url])
+  return <div ref={host} style={{ minHeight: 120, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: 10 }}>
     {state}{errorMessage && <div style={{ padding: 10, color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</div>}
   </div>
 }
@@ -584,20 +581,21 @@ const SWIPE_REPLY_THRESHOLD = 56
 /** Composant de preview natif pour fichiers texte/code. */
 function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
   const [text, setText] = useState<string>("")
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
-  const load = () => {
-    setLoading(true); setErrorMessage("")
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true); setErrorMessage(""); setText("")
     void loadPreviewBlob(url).then((blob) => blob.text()).then((content) => {
-      // Une réponse XML de stockage (B2 AccessDenied) ne doit jamais être affichée comme document.
       if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(content.slice(0, 1000))) throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
-      setText(content.slice(0, 800)); setLoading(false)
+      if (!cancelled) { setText(content.slice(0, 800)); setLoading(false) }
     }).catch((err: unknown) => {
-      setErrorMessage(err instanceof Error ? err.message : "Le document ne peut pas être chargé."); setLoading(false)
+      if (!cancelled) { setErrorMessage(err instanceof Error ? err.message : "Le document ne peut pas être chargé."); setLoading(false) }
     })
-  }
+    return () => { cancelled = true }
+  }, [url])
   return <div style={{ width: "100%", minHeight: 58, maxHeight: 160, overflow: "auto", borderRadius: 8, border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`, background: isMe ? "#ffffff08" : "#f8f9fb", padding: 10, fontFamily: "'Fira Code', monospace", fontSize: 12, lineHeight: 1.45, color: isMe ? "rgba(255,255,255,0.92)" : "#1f2937", whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: 6 }}>
-    {text ? <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</pre> : loading ? "Chargement de l’aperçu…" : errorMessage ? <span style={{ fontFamily: "inherit", color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</span> : <button onClick={load} style={{ border: "none", borderRadius: 6, padding: "7px 10px", cursor: "pointer", background: isMe ? "#ffffff24" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontWeight: 600 }}>Afficher l’aperçu</button>}
+    {text ? <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</pre> : loading ? "Chargement de l’aperçu…" : <span style={{ fontFamily: "inherit", color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage || "Aperçu non disponible"}</span>}
   </div>
 }
 
