@@ -116,3 +116,45 @@ Le build TypeScript (`tsc -b`) échouait avec deux erreurs dans `chat.tsx` :
 
 ### Résultat
 Le build (`npm run build`) passe (`tsc -b` + `vite build` terminé sans erreur). Le push (`git push`) a envoyé le commit `c4d9754` au dépôt `https://github.com/steve20400/STAGE-WEB.git`. Vercel peut maintenant déployer normalement depuis le dépôt mis à jour.
+
+---
+
+## Tâche supplémentaire — Améliorations GPS, preview mobile, citation média et vidéo (22 juil. 2026)
+
+### Fichiers modifiés
+- `app/(protected)/chats/[chatId]/chat.tsx`
+- `src/mocks/chat-data.ts`
+
+### 1. GPS preview — masquage renforcé
+**Problème** : le texte d'erreur d'OpenStreetMap (ex. "Signaler un problème...") restait visible en bas du preview.
+**Solution** : augmentation du gradient (`height: 55`) et ajout d'un overlay opaque (`height: 35`, `opacity: 0.9`) au bas du conteneur, couvrant tout texte résiduel.
+
+### 2. Preview des fichiers — visible sur mobile et avant téléchargement
+**Problème** : le preview s'affichait uniquement sur PC et uniquement quand `mediaSrc` existait.
+**Solution** :
+- Le bloc `filePreview` rend toujours la carte d'aperçu colorée (avec nom, taille, type) même si `mediaSrc` est vide (`!mediaSrc`).
+- Les styles sont rendus responsive (`maxWidth: "100%"`, `width: "100%"` sur le conteneur) pour s'afficher correctement sur téléphone.
+- Message affiché : "Aperçu disponible après chargement" quand le média n'est pas encore chargé.
+
+### 3. Citation (`quote`) — preview du média au lieu de "[media]"
+**Problème** : quand on répondait à un message contenant une image, une vidéo ou un fichier, la citation affichait le texte vide ou "[media]" au lieu du contenu.
+**Solution** : le bloc `quote` dans `MessageBubble` affiche maintenant un mini-preview basé sur `replyMsg` :
+- Image : miniature avec nom (`width: 30`, `borderRadius: 5`).
+- Vidéo / Audio / Fichier : icône colorée avec label (`PDF`, `VIDEO`, etc.) et nom du fichier.
+- Texte : conserve le contenu original.
+
+### 4. Ajout du type "video" dans l'envoi et la réception
+**Modifications** :
+- `src/mocks/chat-data.ts` : `MessageType` étendu (`"video"`).
+- Menu d'attachement (`attach-menu`) : bouton "Vidéo" avec icône et couleur `#8b5cf6`, filtrant `video/*`.
+- `handleFileSelect` : détection `video/*` et envoi avec `msgType: "video"`.
+- `MessageBubble` : rendu du message vidéo (`<video controls preload="metadata" style={{ maxWidth: "100%", maxHeight: 260 }}>`) et gestion du preview dans le bloc `filePreview`.
+- `sendMediaMessage` : type `msgType` étendu pour accepter `"video"`.
+- Sélection multiple (`multiple`) déjà supportée ; plusieurs vidéos peuvent être sélectionnées et envoyées en même temps (`for (const file of valid)`).
+
+---
+
+## Résultat final
+- `git status` = propre
+- `npm run build` = passe (`tsc -b` + `vite build` sans erreur)
+- Push `8b76c4f` envoyé sur `https://github.com/steve20400/STAGE-WEB.git`
