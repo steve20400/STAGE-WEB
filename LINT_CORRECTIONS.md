@@ -49,3 +49,11 @@ Cette correction couvre notamment `.txt`, `.csv`, `.env`, `.md`, `.json`, `.yaml
 Le cache IndexedDB est désormais traité comme une optimisation : une indisponibilité de stockage (quota, navigation privée ou migration en attente) ne bloque plus le téléchargement. Le téléchargement utilise aussi le jeton applicatif dans l'en-tête `Authorization: Bearer`, que l'API média accepte officiellement, en plus du paramètre d'URL nécessaire aux lecteurs HTML.
 
 En dernier recours, si un CDN/redirection refuse la lecture programmée (`fetch`/CORS), l'interface affiche le fichier texte ou PDF dans un `iframe` intégré. Cela conserve l'ouverture dans l'application tout en utilisant le lecteur natif du navigateur.
+
+### Aperçus à faible débit et stockage B2 — 23 juillet 2026
+
+Les cartes de fichiers texte/code et PDF n'effectuent plus de téléchargement automatique pendant le chargement du fil. Elles montrent un bouton `Afficher l’aperçu` : le transfert ne commence qu'après une action explicite de l'utilisateur. Cela évite que l'ouverture d'une discussion consomme les données mobiles et la bande passante du stockage.
+
+Les réponses de stockage contenant `AccessDenied`, `cap exceeded` ou `Caps & Alerts` sont détectées et présentées sous forme d'un message clair. Il ne s'agit pas d'un format de document invalide : cela signifie que le quota de téléchargement/transactions du fournisseur B2 est atteint. Aucun frontend ne peut lire le fichier tant que ce quota n'est pas rétabli dans le compte de stockage ; l'application ne présente donc plus cette réponse XML comme un écran blanc, noir ou comme le contenu d'un `.html`.
+
+Les extensions `.aac` (standard) et `.acc` (variante courante dans certains gestionnaires Android) sont toutes deux acceptées dans le sélecteur. Pour ces deux cas, le frontend transmet `audio/aac`, MIME autorisé par l'API, plutôt que `application/octet-stream`.

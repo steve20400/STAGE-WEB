@@ -173,41 +173,42 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
 /** Lecteur PDF rendu par PDF.js : ne dépend pas du lecteur PDF du téléphone. */
 function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
   const host = useRef<HTMLDivElement>(null)
-  const [state, setState] = useState("Chargement du PDF...")
-  const [failed, setFailed] = useState(false)
+  const [requested, setRequested] = useState(false)
+  const [state, setState] = useState("")
+  const [errorMessage, setErrorMessage] = useState("")
   useEffect(() => {
+    if (!requested) return
     let cancelled = false
-    setFailed(false)
-    setState("Chargement du PDF...")
     let task: PDFDocumentLoadingTask | undefined
     const render = async () => {
       try {
+        setState("Chargement du PDF…"); setErrorMessage("")
+        const blob = await loadPreviewBlob(url)
+        const sample = await blob.slice(0, 1000).text()
+        if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(sample)) throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
         pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.mjs", import.meta.url).toString()
-        const bytes = await loadPreviewBlob(url).then((blob) => blob.arrayBuffer())
-        task = pdfjs.getDocument({ data: bytes })
+        task = pdfjs.getDocument({ data: await blob.arrayBuffer() })
         const pdf = await task.promise
         if (cancelled || !host.current) return
         host.current.replaceChildren()
-        // Toutes les pages sont rendues dans le lecteur intégré (limite de sécurité à 100).
+        // Premier rendu léger : les pages suivantes sont construites sans relancer le téléchargement.
         for (let pageNo = 1; pageNo <= Math.min(pdf.numPages, 100); pageNo++) {
-          const page = await pdf.getPage(pageNo)
-          const viewport = page.getViewport({ scale: 1.5 })
-          const canvas = document.createElement("canvas")
-          canvas.width = viewport.width; canvas.height = viewport.height
+          const page = await pdf.getPage(pageNo); const viewport = page.getViewport({ scale: 1.25 })
+          const canvas = document.createElement("canvas"); canvas.width = viewport.width; canvas.height = viewport.height
           canvas.style.cssText = "display:block;width:100%;height:auto;margin:0 auto 12px;background:white;border-radius:6px"
-          const ctx = canvas.getContext("2d")
-          if (ctx) await page.render({ canvasContext: ctx, viewport }).promise
+          const ctx = canvas.getContext("2d"); if (ctx) await page.render({ canvasContext: ctx, viewport }).promise
           if (!cancelled) host.current?.append(canvas)
         }
         if (!cancelled) setState("")
-      } catch { if (!cancelled) { setState(""); setFailed(true) } }
+      } catch (err: unknown) { if (!cancelled) { setState(""); setErrorMessage(err instanceof Error ? err.message : "Le PDF ne peut pas être chargé.") } }
     }
-    void render()
-    return () => { cancelled = true; task?.destroy?.() }
-  }, [url])
-  if (failed) return <iframe src={url} title="Aperçu PDF" style={{ width: "100%", height: 480, border: "none", borderRadius: 8, background: "white" }} />
-  return <div ref={host} style={{ minHeight: state ? 180 : 0, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: state ? 18 : 0 }}>{state}</div>
+    void render(); return () => { cancelled = true; task?.destroy?.() }
+  }, [url, requested])
+  return <div ref={host} style={{ minHeight: requested ? 120 : 58, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: requested ? 10 : 0 }}>
+    {!requested && <button onClick={() => setRequested(true)} style={{ marginTop: 10, border: "none", borderRadius: 6, padding: "7px 10px", cursor: "pointer", background: isMe ? "#ffffff24" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontWeight: 600 }}>Afficher le PDF</button>}
+    {state}{errorMessage && <div style={{ padding: 10, color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</div>}
+  </div>
 }
 
 /** Coche simple (envoye) / double blanche (recu) / double bleue (lu), comme sur WhatsApp.
@@ -583,57 +584,21 @@ const SWIPE_REPLY_THRESHOLD = 56
 /** Composant de preview natif pour fichiers texte/code. */
 function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
   const [text, setText] = useState<string>("")
-  const [loading, setLoading] = useState(true)
-  const [failed, setFailed] = useState(false)
-  useEffect(() => {
-    if (!url) return
-    setLoading(true)
-    setFailed(false)
-    loadPreviewBlob(url).then((blob) => blob.text())
-      .then((t) => {
-        setText(t.slice(0, 800))
-        setLoading(false)
-      })
-      .catch(() => {
-        setText("")
-        setFailed(true)
-        setLoading(false)
-      })
-  }, [url])
-  return (
-    <div
-      style={{
-        width: "100%",
-        maxHeight: 160,
-        overflow: "hidden",
-        borderRadius: 8,
-        border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`,
-        background: isMe ? "#ffffff08" : "#f8f9fb",
-        padding: 10,
-        fontFamily: "'Fira Code', monospace",
-        fontSize: 12,
-        lineHeight: 1.45,
-        color: isMe ? "rgba(255,255,255,0.92)" : "#1f2937",
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word",
-        marginBottom: 6,
-      }}
-    >
-      {loading ? (
-        <span style={{ opacity: 0.7, fontStyle: "italic" }}>Chargement du texte...</span>
-      ) : text ? (
-        <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 6, WebkitBoxOrient: "vertical" }}>
-          {text}
-        </pre>
-      ) : failed ? (
-        // Repli navigateur : un iframe peut afficher un texte même lorsqu'un CDN
-        // n'autorise pas fetch/CORS. Le fichier reste dans l'application.
-        <iframe src={url} title="Aperçu du document" style={{ width: "100%", height: 130, border: "none", background: "white", borderRadius: 5 }} />
-      ) : (
-        <span style={{ opacity: 0.6 }}>Aperçu non disponible</span>
-      )}
-    </div>
-  )
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
+  const load = () => {
+    setLoading(true); setErrorMessage("")
+    void loadPreviewBlob(url).then((blob) => blob.text()).then((content) => {
+      // Une réponse XML de stockage (B2 AccessDenied) ne doit jamais être affichée comme document.
+      if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(content.slice(0, 1000))) throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
+      setText(content.slice(0, 800)); setLoading(false)
+    }).catch((err: unknown) => {
+      setErrorMessage(err instanceof Error ? err.message : "Le document ne peut pas être chargé."); setLoading(false)
+    })
+  }
+  return <div style={{ width: "100%", minHeight: 58, maxHeight: 160, overflow: "auto", borderRadius: 8, border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`, background: isMe ? "#ffffff08" : "#f8f9fb", padding: 10, fontFamily: "'Fira Code', monospace", fontSize: 12, lineHeight: 1.45, color: isMe ? "rgba(255,255,255,0.92)" : "#1f2937", whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: 6 }}>
+    {text ? <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</pre> : loading ? "Chargement de l’aperçu…" : errorMessage ? <span style={{ fontFamily: "inherit", color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</span> : <button onClick={load} style={{ border: "none", borderRadius: 6, padding: "7px 10px", cursor: "pointer", background: isMe ? "#ffffff24" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontWeight: 600 }}>Afficher l’aperçu</button>}
+  </div>
 }
 
 function MessageBubble({
@@ -1615,7 +1580,7 @@ export default function ChatRoomPage() {
     const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
     if (file.type.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic"].includes(ext)) return "image"
     if (file.type.startsWith("video/") || ["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return "video"
-    if (file.type.startsWith("audio/") || ["mp3", "aac", "wav", "ogg", "m4a", "flac", "webm"].includes(ext)) return "audio"
+    if (file.type.startsWith("audio/") || ["mp3", "aac", "acc", "wav", "ogg", "m4a", "flac", "webm"].includes(ext)) return "audio"
     return "file"
   }
 
@@ -1643,8 +1608,12 @@ export default function ChatRoomPage() {
     const valid = toSend.filter((f) => f.size <= 2000 * 1024 * 1024)
     for (const file of valid) {
       const msgType = mediaKindFromFile(file)
+      const ext = file.name.split(".").pop()?.toLowerCase()
+      // Certains gestionnaires Android annoncent .aac/.acc comme octet-stream.
+      // On transmet le MIME attendu par le backend afin qu'il ne soit pas rejeté.
+      const mime = (ext === "aac" || ext === "acc") ? "audio/aac" : (file.type || "application/octet-stream")
       const durationMs = msgType === "audio" ? await readAudioDuration(file) : undefined
-      void sendMediaMessage(file, file.name, file.type || "application/octet-stream", msgType, durationMs)
+      void sendMediaMessage(file, file.name, mime, msgType, durationMs)
     }
     e.target.value = ""
   }
@@ -2097,7 +2066,7 @@ export default function ChatRoomPage() {
               <button
                 className="attach-opt"
                 onClick={() => {
-                  fileRef.current!.accept = ".mp3,.aac,.wav,.ogg,.m4a,.flac,.webm"
+                  fileRef.current!.accept = ".mp3,.aac,.acc,.wav,.ogg,.m4a,.flac,.webm"
                   fileRef.current!.click()
                 }}
               >
