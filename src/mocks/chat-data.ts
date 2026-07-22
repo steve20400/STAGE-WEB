@@ -13,6 +13,7 @@ export interface ConversationMock {
   online: boolean
   isGroup: boolean
   members?: string[]
+  membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string }>
   isPinned?: boolean
   /** Photo de profil de l'interlocuteur (data-URL miniature ou URL). */
   avatar?: string | null

@@ -207,10 +207,17 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
           width: "100%", maxWidth: 260, height: 140, borderRadius: 8, overflow: "hidden",
           border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
           background: isMe ? "#ffffff08" : "var(--bg-elevated)",
+          position: "relative",
         }}>
           <iframe title="Position GPS" loading="lazy"
             src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.01},${lat - 0.01},${lng + 0.01},${lat + 0.01}&layer=mapnik&marker=${lat},${lng}`}
-            style={{ width: "100%", height: "100%", border: "none", pointerEvents: "none" }} />
+            style={{ width: "100%", height: "130%", border: "none", pointerEvents: "none", display: "block" }} />
+          {/* Masque tout message d'erreur qui apparaîtrait en bas du preview */}
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0, height: 28,
+            background: `linear-gradient(to top, ${isMe ? "#ffffff18" : "var(--bg-elevated)"}, transparent)`,
+            pointerEvents: "none",
+          }} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 10, opacity: 0.75 }}>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -701,38 +708,125 @@ function MessageBubble({
 
                 {msg.type === "file" && (!mediaSrc || !isVideoFile) && (() => {
                   const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
-                  return (
-                    <a
-                      href={msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        minWidth: 200, color: "inherit", textDecoration: "none",
-                      }}
-                    >
-                      <div style={{
-                        width: 40, height: 40, borderRadius: 8,
-                        background: `${fti.color}18`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0, flexDirection: "column", gap: 1,
-                      }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round">
-                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                          <polyline points="14 2 14 8 20 8" />
-                        </svg>
-                        <span style={{ fontSize: 7, fontWeight: 700, color: fti.color, letterSpacing: 0.5 }}>{fti.label}</span>
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {msg.fileName ?? msg.content ?? "Fichier"}
+                  const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
+                  const mime = msg.mediaMime ?? ""
+                  // --- Preview du fichier ---
+                  const filePreview = (() => {
+                    if (!mediaSrc) return null
+                    // Image dans un message fichier
+                    if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) {
+                      return (
+                        <img
+                          src={mediaSrc}
+                          alt={msg.fileName ?? "image"}
+                          style={{ maxWidth: 260, maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6, cursor: "zoom-in" }}
+                        />
+                      )
+                    }
+                    // PDF
+                    if (ext === "pdf" || mime === "application/pdf") {
+                      return (
+                        <iframe
+                          src={mediaSrc}
+                          title={msg.fileName ?? "Aperçu PDF"}
+                          style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }}
+                          loading="lazy"
+                        />
+                      )
+                    }
+                    // CSV / texte
+                    if (ext === "csv" || mime === "text/csv" || ext === "txt" || mime.startsWith("text/")) {
+                      return (
+                        <iframe
+                          src={mediaSrc}
+                          title={msg.fileName ?? "Aperçu texte"}
+                          style={{ width: "100%", height: 140, borderRadius: 8, border: "none", display: "block", marginBottom: 6, background: "#fff" }}
+                          loading="lazy"
+                        />
+                      )
+                    }
+                    // Document (DOC, XLS, PPT) — aperçu via Google Docs viewer (fonctionne si URL publique, sinon montre une carte)
+                    if (["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext) || mime.includes("word") || mime.includes("spreadsheet") || mime.includes("presentation")) {
+                      const viewerUrl = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(mediaSrc)}`
+                      return (
+                        <iframe
+                          src={viewerUrl}
+                          title={msg.fileName ?? "Aperçu document"}
+                          style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }}
+                          loading="lazy"
+                        />
+                      )
+                    }
+                    // Autres fichiers : carte d'aperçu colorée
+                    return (
+                      <a
+                        href={mediaSrc}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          padding: "10px 12px", borderRadius: 10, marginBottom: 6,
+                          background: isMe ? "#ffffff12" : "var(--bg-elevated)",
+                          border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
+                          textDecoration: "none", color: "inherit",
+                        }}
+                      >
+                        <div style={{
+                          width: 48, height: 48, borderRadius: 10,
+                          background: `${fti.color}18`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0,
+                        }}>
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
                         </div>
-                        {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
-                      </div>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                      </svg>
-                    </a>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {msg.fileName ?? msg.content ?? "Fichier"}
+                          </div>
+                          {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
+                          <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>Aperçu du fichier</div>
+                        </div>
+                      </a>
+                    )
+                  })()
+                  return (
+                    <>
+                      {filePreview}
+                      <a
+                        href={msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          minWidth: 200, color: "inherit", textDecoration: "none",
+                        }}
+                      >
+                        <div style={{
+                          width: 40, height: 40, borderRadius: 8,
+                          background: `${fti.color}18`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0, flexDirection: "column", gap: 1,
+                        }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                          <span style={{ fontSize: 7, fontWeight: 700, color: fti.color, letterSpacing: 0.5 }}>{fti.label}</span>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {msg.fileName ?? msg.content ?? "Fichier"}
+                          </div>
+                          {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
+                        </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                        </svg>
+                      </a>
+                    </>
                   )
                 })()}
 
@@ -1455,7 +1549,12 @@ export default function ChatRoomPage() {
               const reply = msg.replyTo ? messages.find((m) => m.id === msg.replyTo) : undefined
               // Resoudre le nom de l'envoyeur pour les groupes
               const resolvedName = !isMe && chat?.isGroup
-                ? (contacts.find((c) => c.id === msg.senderId)?.name ?? msg.senderId.slice(0, 8))
+                ? (() => {
+                    const backendMember = chat.membersInfo?.find((m) => m.id === msg.senderId)
+                    if (backendMember?.pseudo) return backendMember.pseudo
+                    if (backendMember?.publicNumber) return backendMember.publicNumber
+                    return contacts.find((c) => c.id === msg.senderId)?.name ?? msg.senderId.slice(0, 8)
+                  })()
                 : undefined
               return (
                 <MessageBubble
