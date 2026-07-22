@@ -788,11 +788,12 @@ function MessageBubble({
                         />
                       )
                     }
-                    // PDF
+                    // PDF — aperçu via Google Docs viewer (fonctionne mieux sur mobile et même sans URL publique immédiate si on a le lien direct)
                     if (mediaSrc && (ext === "pdf" || mime === "application/pdf")) {
+                      const viewerUrl = `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(mediaSrc)}`
                       return (
                         <iframe
-                          src={mediaSrc}
+                          src={viewerUrl}
                           title={msg.fileName ?? "Aperçu PDF"}
                           style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }}
                           loading="lazy"
@@ -841,11 +842,12 @@ function MessageBubble({
                         rel="noreferrer"
                         style={{
                           display: "flex", alignItems: "center", gap: 12,
-                          padding: "10px 12px", borderRadius: 10, marginBottom: 6,
-                          background: isMe ? "#ffffff12" : "var(--bg-elevated)",
-                          border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
-                          textDecoration: "none", color: "inherit",
+                          padding: "12px 14px", borderRadius: 10, marginBottom: 6,
+                          background: isMe ? "#ffffff20" : "#f5f6fa",
+                          border: `1px solid ${isMe ? "#ffffff35" : "#dde1e7"}`,
+                          textDecoration: "none", color: isMe ? "#fff" : "var(--text-primary)",
                           width: "100%",
+                          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
                         }}
                       >
                         <div style={{
@@ -864,8 +866,8 @@ function MessageBubble({
                             {msg.fileName ?? msg.content ?? "Fichier"}
                           </div>
                           {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
-                          <div style={{ fontSize: 9, opacity: 0.6, marginTop: 2 }}>
-                            {mediaSrc ? "Aperçu disponible" : "Aperçu disponible après chargement"}
+                          <div style={{ fontSize: 9, opacity: 0.85, marginTop: 2, color: isMe ? "rgba(255,255,255,0.9)" : "var(--text-secondary)" }}>
+                            {mediaSrc ? "Aperçu disponible — cliquer pour ouvrir" : "Aperçu disponible après chargement"}
                           </div>
                         </div>
                       </a>
