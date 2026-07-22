@@ -106,78 +106,179 @@ function StatusIcon({ status }: { status: MessageStatus }) {
   )
 }
 
+/** Extrait les URLs d'un texte. */
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
+
+/** Detecte des coordonnees GPS (lat,lng) ou un lien Google Maps. */
+const GPS_REGEX = /(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})/
+const GMAPS_REGEX = /(?:google\.\w+\/maps|maps\.google\.\w+|goo\.gl\/maps).*?[/@](-?\d+\.\d+),(-?\d+\.\d+)/
+
+function extractGpsCoords(text: string): { lat: number; lng: number } | null {
+  const gm = text.match(GMAPS_REGEX)
+  if (gm) return { lat: parseFloat(gm[1]), lng: parseFloat(gm[2]) }
+  const gps = text.match(GPS_REGEX)
+  if (gps) return { lat: parseFloat(gps[1]), lng: parseFloat(gps[2]) }
+  return null
+}
+
+/** Couleurs distinctes pour les noms d'envoyeurs en groupe. */
+const SENDER_NAME_COLORS = ["#E8B84B", "#60a5fa", "#a78bfa", "#34d399", "#f87171", "#fb923c", "#38bdf8", "#c084fc"]
+function senderNameColor(id: string): string {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0
+  return SENDER_NAME_COLORS[Math.abs(h) % SENDER_NAME_COLORS.length]
+}
+
+/** Icone + couleur par extension de fichier. */
+function fileTypeInfo(filename?: string, mime?: string): { color: string; label: string } {
+  const ext = (filename ?? "").split(".").pop()?.toLowerCase() ?? ""
+  const m = (mime ?? "").toLowerCase()
+  if (ext === "pdf" || m === "application/pdf") return { color: "#ef4444", label: "PDF" }
+  if (["doc", "docx"].includes(ext) || m.includes("word")) return { color: "#3b82f6", label: "DOC" }
+  if (["xls", "xlsx"].includes(ext) || m.includes("spreadsheet") || m.includes("excel")) return { color: "#22c55e", label: "XLS" }
+  if (["ppt", "pptx"].includes(ext) || m.includes("presentation")) return { color: "#f97316", label: "PPT" }
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { color: "#a855f7", label: "ZIP" }
+  if (["txt", "csv", "log", "md"].includes(ext)) return { color: "#6b7280", label: "TXT" }
+  if (m.startsWith("audio/")) return { color: "#22c55e", label: "AUDIO" }
+  if (m.startsWith("video/")) return { color: "#8b5cf6", label: "VIDEO" }
+  if (m.startsWith("image/")) return { color: "#ec4899", label: "IMG" }
+  if (ext === "apk") return { color: "#34d399", label: "APK" }
+  return { color: "var(--text-secondary)", label: ext.toUpperCase() || "FILE" }
+}
+
+/** Rend le texte avec les URLs cliquables et un preview du premier lien. */
+function RichText({ text, isMe }: { text: string; isMe: boolean }) {
+  const urls = text.match(URL_REGEX) || []
+  if (urls.length === 0) return <>{text}</>
+
+  const parts: React.ReactNode[] = []
+  let remaining = text
+  let key = 0
+  for (const url of urls) {
+    const idx = remaining.indexOf(url)
+    if (idx > 0) parts.push(<span key={key++}>{remaining.slice(0, idx)}</span>)
+    parts.push(
+      <a key={key++} href={url} target="_blank" rel="noreferrer"
+        style={{ color: isMe ? "#93c5fd" : "var(--accent)", textDecoration: "underline", wordBreak: "break-all" }}>
+        {url}
+      </a>
+    )
+    remaining = remaining.slice(idx + url.length)
+  }
+  if (remaining) parts.push(<span key={key++}>{remaining}</span>)
+
+  let domain = ""
+  try { if (urls[0]) domain = new URL(urls[0]).hostname.replace("www.", "") } catch { /* ignore */ }
+
+  return (
+    <>
+      {parts}
+      {domain && (
+        <a href={urls[0]} target="_blank" rel="noreferrer"
+          style={{
+            display: "flex", alignItems: "center", gap: 8, marginTop: 6,
+            padding: "8px 10px", background: isMe ? "#ffffff12" : "var(--bg-elevated)",
+            border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
+            borderRadius: 8, textDecoration: "none", color: "inherit",
+          }}>
+          <img src={`https://www.google.com/s2/favicons?sz=32&domain=${domain}`} alt="" width={20} height={20}
+            style={{ borderRadius: 4, flexShrink: 0 }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }} />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{domain}</div>
+            <div style={{ fontSize: 10, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{urls[0]}</div>
+          </div>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+          </svg>
+        </a>
+      )}
+    </>
+  )
+}
+
+/** Preview de coordonnees GPS avec mini-carte OpenStreetMap. */
+function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolean }) {
+  return (
+    <div style={{ marginTop: 6 }}>
+      <a href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`}
+        target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
+        <div style={{
+          width: "100%", maxWidth: 260, height: 140, borderRadius: 8, overflow: "hidden",
+          border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
+          background: isMe ? "#ffffff08" : "var(--bg-elevated)",
+        }}>
+          <iframe title="Position GPS" loading="lazy"
+            src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.01},${lat - 0.01},${lng + 0.01},${lat + 0.01}&layer=mapnik&marker=${lat},${lng}`}
+            style={{ width: "100%", height: "100%", border: "none", pointerEvents: "none" }} />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 10, opacity: 0.75 }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" />
+          </svg>
+          {lat.toFixed(5)}, {lng.toFixed(5)}
+        </div>
+      </a>
+    </div>
+  )
+}
+
 /**
- * Evenement d'appel affiche dans le fil de discussion, comme sur WhatsApp :
- * pastille centree avec icone, type d'appel, heure et duree (ou "manque").
+ * Evenement d'appel affiche dans le fil de discussion :
+ * aligne a gauche (entrant) ou a droite (sortant), avec couleurs directionnelles.
  */
 function CallEventChip({ call }: { call: CallRecord }) {
   const missed = call.direction === "missed" || call.status === "no_answer"
   const declined = call.status === "declined"
+  const isOutgoing = call.direction === "out"
+  const failed = missed || declined
+
   const label =
     (call.type === "video" ? "Appel video" : "Appel vocal") +
     (missed ? " manque" : declined ? " refuse" : "")
-  const tint = missed || declined ? "var(--danger)" : "var(--text-secondary)"
+
+  // Couleurs : rouge si manque/refuse, vert si sortant reussi, bleu si entrant reussi
+  const tint = failed ? "var(--danger)" : isOutgoing ? "#22c55e" : "#3b82f6"
+  const bgTint = failed ? "#ef444412" : isOutgoing ? "#22c55e12" : "#3b82f612"
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
+    <div style={{ display: "flex", justifyContent: isOutgoing ? "flex-end" : "flex-start", margin: "4px 0" }}>
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          background: "var(--bg-surface)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: 18,
-          padding: "6px 14px",
-          fontSize: 12,
-          color: tint,
+          display: "flex", alignItems: "center", gap: 8, background: bgTint,
+          border: `1px solid ${tint}22`,
+          borderRadius: isOutgoing ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+          padding: "8px 14px", fontSize: 12, color: tint, maxWidth: "min(70%, 340px)",
         }}
       >
-        <span
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: "50%",
-            background: missed || declined ? "#ef444418" : "var(--accent-dim)",
-            color: missed || declined ? "var(--danger)" : "var(--accent)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
+        <span style={{
+          width: 28, height: 28, borderRadius: "50%", background: bgTint,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
           {call.type === "video" ? (
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            >
-              <polygon points="23 7 16 12 23 17 23 7" />
-              <rect x="1" y="5" width="15" height="14" rx="2" />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
             </svg>
           ) : (
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
             </svg>
           )}
         </span>
-        <span style={{ fontWeight: 600 }}>{label}</span>
-        <span style={{ color: "var(--text-faint)" }}>
-          {formatTime(call.ts)}
-          {call.duration ? ` — ${call.duration}` : ""}
-        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+            {/* Fleche de direction */}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+              {isOutgoing
+                ? <><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></>
+                : <><line x1="17" y1="7" x2="7" y2="17" /><polyline points="17 17 7 17 7 7" /></>}
+            </svg>
+            {label}
+          </div>
+          <div style={{ fontSize: 10, opacity: 0.75, marginTop: 1 }}>
+            {formatTime(call.ts)}{call.duration ? ` — ${call.duration}` : ""}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -313,6 +414,8 @@ function MessageBubble({
   onForward,
   onCopy,
   chatColor,
+  isGroup,
+  senderName,
 }: {
   msg: Message
   isMe: boolean
@@ -323,6 +426,8 @@ function MessageBubble({
   onForward: (m: Message) => void
   onCopy: (m: Message) => void
   chatColor: { bg: string; text: string }
+  isGroup?: boolean
+  senderName?: string
 }) {
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -506,6 +611,23 @@ function MessageBubble({
         )}
 
         <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+          {/* Nom de l'envoyeur en groupe (pas pour soi-meme) */}
+          {isGroup && !isMe && senderName && !msg.isDeleted && (
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: senderNameColor(msg.senderId),
+                marginBottom: 2,
+                padding: "2px 4px 0",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {senderName}
+            </div>
+          )}
           {/* Citation */}
           {quote && !msg.isDeleted && (
             <div
@@ -577,74 +699,42 @@ function MessageBubble({
                   />
                 )}
 
-                {msg.type === "file" && (!mediaSrc || !isVideoFile) && (
-                  <a
-                    href={msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      minWidth: 200,
-                      color: "inherit",
-                      textDecoration: "none",
-                    }}
-                  >
-                    <div
+                {msg.type === "file" && (!mediaSrc || !isVideoFile) && (() => {
+                  const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
+                  return (
+                    <a
+                      href={msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"}
+                      target="_blank"
+                      rel="noreferrer"
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 8,
-                        background: isMe ? "#ffffff28" : "var(--border-default)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
+                        display: "flex", alignItems: "center", gap: 10,
+                        minWidth: 200, color: "inherit", textDecoration: "none",
                       }}
                     >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      >
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                      </svg>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 500,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {msg.fileName ?? msg.content ?? "Fichier"}
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 8,
+                        background: `${fti.color}18`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0, flexDirection: "column", gap: 1,
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round">
+                          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                        <span style={{ fontSize: 7, fontWeight: 700, color: fti.color, letterSpacing: 0.5 }}>{fti.label}</span>
                       </div>
-                      {msg.fileSize && (
-                        <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
-                      )}
-                    </div>
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                    </svg>
-                  </a>
-                )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {msg.fileName ?? msg.content ?? "Fichier"}
+                        </div>
+                        {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
+                      </div>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                      </svg>
+                    </a>
+                  )
+                })()}
 
                 {msg.content && msg.type !== "file" && msg.type !== "audio" && (
                   <span
@@ -654,7 +744,11 @@ function MessageBubble({
                         : undefined
                     }
                   >
-                    {msg.content}
+                    <RichText text={msg.content} isMe={isMe} />
+                    {(() => {
+                      const gps = extractGpsCoords(msg.content)
+                      return gps ? <GpsPreview lat={gps.lat} lng={gps.lng} isMe={isMe} /> : null
+                    })()}
                   </span>
                 )}
               </>
@@ -1065,22 +1159,25 @@ export default function ChatRoomPage() {
     [chatId, replyTo, error]
   )
 
-  // Selection de fichier (photo, document, audio)
+  // Selection de fichier (photo, document, audio) — supporte la selection multiple
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 50 * 1024 * 1024) {
-      error("Fichier trop volumineux", "Maximum 50 Mo par fichier.")
-      e.target.value = ""
-      return
-    }
+    const files = e.target.files
+    if (!files || files.length === 0) return
     setShowAttach(false)
-    const msgType = file.type.startsWith("image/")
-      ? "image"
-      : file.type.startsWith("audio/")
-        ? "audio"
-        : "file"
-    void sendMediaMessage(file, file.name, file.type, msgType)
+    const toSend = Array.from(files)
+    const oversized = toSend.filter((f) => f.size > 50 * 1024 * 1024)
+    if (oversized.length > 0) {
+      error("Fichier(s) trop volumineux", `${oversized.length} fichier(s) depassent 50 Mo et seront ignores.`)
+    }
+    const valid = toSend.filter((f) => f.size <= 50 * 1024 * 1024)
+    for (const file of valid) {
+      const msgType = file.type.startsWith("image/")
+        ? "image"
+        : file.type.startsWith("audio/")
+          ? "audio"
+          : "file"
+      void sendMediaMessage(file, file.name, file.type || "application/octet-stream", msgType)
+    }
     e.target.value = ""
   }
 
@@ -1356,6 +1453,10 @@ export default function ChatRoomPage() {
               const msg = item.msg
               const isMe = msg.senderId === "me"
               const reply = msg.replyTo ? messages.find((m) => m.id === msg.replyTo) : undefined
+              // Resoudre le nom de l'envoyeur pour les groupes
+              const resolvedName = !isMe && chat?.isGroup
+                ? (contacts.find((c) => c.id === msg.senderId)?.name ?? msg.senderId.slice(0, 8))
+                : undefined
               return (
                 <MessageBubble
                   key={msg.id}
@@ -1368,6 +1469,8 @@ export default function ChatRoomPage() {
                   onForward={setForwardMsg}
                   onCopy={handleCopy}
                   chatColor={color}
+                  isGroup={chat?.isGroup}
+                  senderName={resolvedName}
                 />
               )
             })}
@@ -1434,9 +1537,9 @@ export default function ChatRoomPage() {
         <input
           ref={fileRef}
           type="file"
+          multiple
           style={{ display: "none" }}
           onChange={handleFileSelect}
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.mp3,.mp4,.wav"
         />
 
         <div className="room-input-row" style={{ position: "relative" }}>
@@ -1519,6 +1622,23 @@ export default function ChatRoomPage() {
                   </svg>
                 </div>
                 Audio
+              </button>
+              <button
+                className="attach-opt"
+                onClick={() => {
+                  fileRef.current!.accept = "*/*"
+                  fileRef.current!.click()
+                }}
+              >
+                <div
+                  className="attach-icon"
+                  style={{ background: "#6b728020", color: "#6b7280" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                  </svg>
+                </div>
+                Tout fichier
               </button>
             </div>
           )}

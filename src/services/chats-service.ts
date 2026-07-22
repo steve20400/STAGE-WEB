@@ -214,3 +214,17 @@ export async function fetchConversationById(
   const all = await fetchChatConversations()
   return all.find((c) => c.id === conversationId) ?? null
 }
+
+/**
+ * POST /api/conversations/:id/members — Ajoute des membres a un groupe existant.
+ * Envoie les numeros Alanya des nouveaux membres.
+ */
+export async function addMembersToGroup(
+  convId: string,
+  memberNumbers: string[]
+): Promise<void> {
+  await apiRequest<void>(`/api/conversations/${convId}/members`, {
+    method: "POST",
+    body: { memberNumbers },
+  })
+}

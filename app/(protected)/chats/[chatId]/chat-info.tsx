@@ -6,8 +6,9 @@ import { loadLocalConversations } from "../../../../src/data/local-conversations
 import { findLocalGroup } from "../../../../src/data/local-groups"
 import { CHAT_COLORS } from "../../../../src/mocks/chat-data"
 import { fetchContacts } from "../../../../src/services/contacts-service"
-import { fetchConversationById } from "../../../../src/services/chats-service"
+import { fetchConversationById, addMembersToGroup } from "../../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
+import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 
 interface Member {
   id: string
@@ -16,6 +17,7 @@ interface Member {
   color: string
   role: "admin" | "member"
   online: boolean
+  avatar?: string | null
 }
 
 interface SharedFile {
@@ -119,6 +121,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const [muteNotifs, setMute] = useState(false)
   const [members, setMembers] = useState<Member[]>(conv.members)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+  const [showAddMember, setShowAddMember] = useState(false)
 
   const color = COLORS[conv.color]
   const isAdmin = members.find((member) => member.id === "me")?.role === "admin"
@@ -529,9 +532,17 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <div className="member-item" key={member.id}>
                       <div
                         className="m-av"
-                        style={{ background: memberColor.bg, color: memberColor.fg }}
+                        style={{ background: memberColor.bg, color: memberColor.fg, overflow: "hidden" }}
                       >
-                        {member.initials}
+                        {avatarDisplaySrc(member.avatar) ? (
+                          <img
+                            src={avatarDisplaySrc(member.avatar)!}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                          />
+                        ) : (
+                          member.initials
+                        )}
                         {member.online && <div className="m-dot" />}
                       </div>
                       <div className="m-info">
@@ -618,6 +629,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     event.currentTarget.style.borderColor = "var(--border-default)"
                     event.currentTarget.style.color = "var(--text-muted)"
                   }}
+                  onClick={() => setShowAddMember(true)}
                 >
                   <svg
                     width="13"
@@ -781,6 +793,20 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           </div>
         </div>
       )}
+
+      {/* Modal d'ajout de membre */}
+      {showAddMember && conv.isGroup && (
+        <AddMemberDialog
+          convId={convId ?? conv.id}
+          existingMemberIds={members.map((m) => m.id)}
+          onClose={() => setShowAddMember(false)}
+          onAdded={(newMembers) => {
+            setMembers((prev) => [...prev, ...newMembers])
+            setShowAddMember(false)
+            success(`${newMembers.length} membre(s) ajoute(s)`)
+          }}
+        />
+      )}
     </>
   )
 }
@@ -809,6 +835,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
         color: contact?.color ?? COLOR_NAMES[index % COLOR_NAMES.length],
         role: index === 0 ? "admin" : "member",
         online: contact?.online ?? false,
+        avatar: contact?.avatar ?? null,
       }
     })
 
@@ -874,6 +901,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
           color: contact?.color ?? colorNames[index % colorNames.length],
           role: index === 0 ? "admin" : "member",
           online: contact?.online ?? false,
+          avatar: contact?.avatar ?? null,
         }
       }),
       files: [],
@@ -911,6 +939,148 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
     createdAt: "Date inconnue",
   }
 }
+
+/** Modal de selection des contacts pour ajouter des membres au groupe. */
+function AddMemberDialog({
+  convId,
+  existingMemberIds,
+  onClose,
+  onAdded,
+}: {
+  convId: string
+  existingMemberIds: string[]
+  onClose: () => void
+  onAdded: (newMembers: Member[]) => void
+}) {
+  const [allContacts, setAllContacts] = useState<Array<{ id: string; name: string; initials: string; color: string; avatar?: string | null; phone?: string }>>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [sending, setSending] = useState(false)
+  const { error } = useToast()
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchContacts().then((contacts) => {
+      if (cancelled) return
+      setAllContacts(
+        contacts
+          .filter((c) => !existingMemberIds.includes(c.id))
+          .map((c) => ({ id: c.id, name: c.name, initials: c.initials, color: c.color, avatar: c.avatar, phone: c.phone }))
+      )
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [existingMemberIds])
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleAdd = async () => {
+    if (selected.size === 0) return
+    setSending(true)
+    try {
+      const phones = allContacts.filter((c) => selected.has(c.id)).map((c) => c.phone).filter(Boolean) as string[]
+      await addMembersToGroup(convId, phones)
+      const newMembers: Member[] = allContacts
+        .filter((c) => selected.has(c.id))
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          initials: c.initials,
+          color: c.color,
+          role: "member" as const,
+          online: false,
+          avatar: c.avatar ?? null,
+        }))
+      onAdded(newMembers)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Impossible d'ajouter les membres."
+      error("Erreur", message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const colorMap: Record<string, { bg: string; fg: string }> = {
+    amber: { bg: "var(--av-0-bg)", fg: "var(--av-0-fg)" },
+    blue: { bg: "var(--av-1-bg)", fg: "var(--av-1-fg)" },
+    violet: { bg: "var(--av-2-bg)", fg: "var(--av-2-fg)" },
+    teal: { bg: "var(--av-3-bg)", fg: "var(--av-3-fg)" },
+    rose: { bg: "var(--av-4-bg)", fg: "var(--av-4-fg)" },
+  }
+
+  return (
+    <div className="cip-confirm-overlay" onClick={onClose}>
+      <div
+        className="cip-confirm-card"
+        style={{ maxHeight: "80vh", display: "flex", flexDirection: "column", padding: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border-subtle)", fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 17, color: "var(--text-primary)" }}>
+          Ajouter des membres
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+          {loading && <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>Chargement des contacts...</div>}
+          {!loading && allContacts.length === 0 && (
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>Aucun contact disponible a ajouter.</div>
+          )}
+          {allContacts.map((contact) => {
+            const cc = colorMap[contact.color] ?? colorMap.amber
+            return (
+              <label
+                key={contact.id}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+                  borderRadius: 10, cursor: "pointer",
+                  background: selected.has(contact.id) ? "var(--accent-dim)" : "transparent",
+                }}
+              >
+                <input type="checkbox" checked={selected.has(contact.id)} onChange={() => toggle(contact.id)} />
+                <span style={{
+                  width: 32, height: 32, borderRadius: "50%", background: cc.bg, color: cc.fg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 700, flexShrink: 0, overflow: "hidden",
+                }}>
+                  {avatarDisplaySrc(contact.avatar) ? (
+                    <img src={avatarDisplaySrc(contact.avatar)!} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                  ) : contact.initials}
+                </span>
+                <span style={{ color: "var(--text-primary)", fontSize: 13 }}>{contact.name}</span>
+              </label>
+            )
+          })}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: 14, borderTop: "1px solid var(--border-subtle)" }}>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "1px solid var(--border-default)", borderRadius: 8, padding: "8px 14px", color: "var(--text-secondary)", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+          >
+            Annuler
+          </button>
+          <button
+            disabled={selected.size === 0 || sending}
+            onClick={() => void handleAdd()}
+            style={{
+              background: "var(--accent)", border: "none", borderRadius: 8, padding: "8px 16px",
+              color: "var(--accent-text)", fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+              cursor: selected.size === 0 || sending ? "not-allowed" : "pointer",
+              opacity: selected.size === 0 || sending ? 0.6 : 1,
+            }}
+          >
+            {sending ? "Ajout..." : `Ajouter (${selected.size})`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 export default function ConvInfoPage() {
   const navigate = useNavigate()
