@@ -36,3 +36,9 @@ npm run build
 ```
 
 Les éventuels avertissements ESLint restants ne sont pas des erreurs bloquantes. Ils sont volontairement séparés de cette correction afin de ne pas modifier inutilement du code déjà fonctionnel.
+
+## Cache persistant des aperçus — 22 juillet 2026
+
+Les aperçus texte et PDF ne sont plus relus systématiquement depuis le réseau. Une migration IndexedDB vers la version 3 ajoute le magasin `previewMedia`. Au premier affichage, le fichier est téléchargé puis conservé sous forme de `Blob` (limite de 30 Mo par fichier) ; les affichages suivants utilisent ce cache en priorité. La clé retire le paramètre d'authentification temporaire `token`, afin qu'un renouvellement de session ne provoque pas un nouveau téléchargement. Les données sont incluses dans le nettoyage global des données locales.
+
+Cette correction couvre notamment `.txt`, `.csv`, `.env`, `.md`, `.json`, `.yaml`, `.yml`, `.xml` et les fichiers de code reconnus par l'écran de discussion, ainsi que les PDF. Les fichiers dépassant 30 Mo restent lisibles depuis le réseau mais ne sont pas conservés localement, pour protéger l'espace de stockage du téléphone.

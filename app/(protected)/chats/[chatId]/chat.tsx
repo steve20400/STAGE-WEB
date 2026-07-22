@@ -35,6 +35,7 @@ import {
   resolveMediaUrl,
   uploadMedia,
 } from "../../../../src/services/media-service"
+import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
 import {
   publishTyping,
   subscribeToConversation,
@@ -84,11 +85,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
   useEffect(() => {
     if (isText && url) {
       setLoadingText(true)
-      fetch(url)
-        .then((r) => {
-          if (!r.ok) throw new Error("Chargement échoué")
-          return r.text()
-        })
+      loadPreviewBlob(url).then((blob) => blob.text())
         .then((t) => {
           setTextContent(t.slice(0, 50000))
           setLoadingText(false)
@@ -184,7 +181,7 @@ function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
       try {
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
         pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.mjs", import.meta.url).toString()
-        const bytes = await fetch(url).then((r) => { if (!r.ok) throw new Error(); return r.arrayBuffer() })
+        const bytes = await loadPreviewBlob(url).then((blob) => blob.arrayBuffer())
         task = pdfjs.getDocument({ data: bytes })
         const pdf = await task.promise
         if (cancelled || !host.current) return
@@ -586,8 +583,7 @@ function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
   useEffect(() => {
     if (!url) return
     setLoading(true)
-    fetch(url)
-      .then((r) => (r.ok ? r.text() : ""))
+    loadPreviewBlob(url).then((blob) => blob.text())
       .then((t) => {
         setText(t.slice(0, 800))
         setLoading(false)

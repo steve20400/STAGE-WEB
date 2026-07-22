@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'alanya_messaging_client_db';
-const DB_VERSION = 2; // Incrémenté pour la migration avec Appareil + users
+const DB_VERSION = 3; // Incrémenté pour la migration avec Appareil + users
 
 export const initIndexedDB = () => {
     return openDB(DB_NAME, DB_VERSION, {
@@ -68,6 +68,13 @@ export const initIndexedDB = () => {
                 });
                 outboxStore.createIndex('conversationId', 'conversationId');
                 outboxStore.createIndex('createdAt', 'createdAt');
+            }
+
+            // Fichiers nécessaires aux aperçus (texte/PDF) : conservés localement
+            // pour éviter les rechargements à chaque ouverture de conversation.
+            if (!db.objectStoreNames.contains('previewMedia')) {
+                const previewStore = db.createObjectStore('previewMedia', { keyPath: 'key' });
+                previewStore.createIndex('cachedAt', 'cachedAt');
             }
 
             // ═══════════════════════════════════════════════════

@@ -152,7 +152,7 @@ export const getCallLogsByUser = async (alanyaID) => {
 
 export const clearAllData = async () => {
     const db = await initIndexedDB();
-    const stores = ['users', 'Appareil', 'conversations', 'messages', 'outboxQueue', 'callLogs'];
+    const stores = ['users', 'Appareil', 'conversations', 'messages', 'outboxQueue', 'callLogs', 'previewMedia'];
     const tx = db.transaction(stores, 'readwrite');
     await Promise.all([
         ...stores.map((s) => tx.objectStore(s).clear()),
