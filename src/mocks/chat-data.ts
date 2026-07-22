@@ -27,6 +27,7 @@ export interface ChatInfoMock {
   online: boolean
   isGroup: boolean
   members?: string[]
+  membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string }>
   typing?: boolean
 }
 

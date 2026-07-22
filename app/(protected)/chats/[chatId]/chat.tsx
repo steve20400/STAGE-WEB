@@ -1550,7 +1550,7 @@ export default function ChatRoomPage() {
               // Resoudre le nom de l'envoyeur pour les groupes
               const resolvedName = !isMe && chat?.isGroup
                 ? (() => {
-                    const backendMember = chat.membersInfo?.find((m) => m.id === msg.senderId)
+                    const backendMember = chat.membersInfo?.find((m: { id: string; pseudo?: string | null; publicNumber?: string }) => m.id === msg.senderId)
                     if (backendMember?.pseudo) return backendMember.pseudo
                     if (backendMember?.publicNumber) return backendMember.publicNumber
                     return contacts.find((c) => c.id === msg.senderId)?.name ?? msg.senderId.slice(0, 8)
