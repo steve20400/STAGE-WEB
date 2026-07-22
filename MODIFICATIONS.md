@@ -96,3 +96,23 @@ Le bouton existait (`Ajouter un membre`, style dashed, couleur `text-muted`) mai
 - Les conventions du dépôt sont respectées (`fr-FR`, variables CSS, composants fonctionnels, types TypeScript, `resolveMediaUrl` pour les médias)
 - Aucune modification du backend (`backend-alanya`) n'est requise
 - Le code reste compilable dans l'écosystème Vite + TypeScript du projet
+
+---
+
+## Résolution du problème de déploiement Vercel (22 juil. 2026)
+
+### Fichiers corrigés
+- `src/mocks/chat-data.ts` (type `ChatInfoMock`)
+- `app/(protected)/chats/[chatId]/chat.tsx` (type implicite `any` sur paramètre `m`)
+
+### Pourquoi le déploiement échouait
+Le build TypeScript (`tsc -b`) échouait avec deux erreurs dans `chat.tsx` :
+1. `Property 'membersInfo' does not exist on type 'ChatInfoMock'` — le type `ChatInfoMock` ne contenait pas le champ `membersInfo`, alors que le composant `chat.tsx` utilisait `chat.membersInfo?.find(...)`.
+2. `Parameter 'm' implicitly has an 'any' type` — le paramètre de `find()` n'avait pas de type explicite.
+
+### Correction apportée
+- Ajout de `membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string }>` au type `ChatInfoMock` dans `src/mocks/chat-data.ts`.
+- Type explicite `(m: { id: string; pseudo?: string | null; publicNumber?: string })` sur le `find()` dans `chat.tsx`.
+
+### Résultat
+Le build (`npm run build`) passe (`tsc -b` + `vite build` terminé sans erreur). Le push (`git push`) a envoyé le commit `c4d9754` au dépôt `https://github.com/steve20400/STAGE-WEB.git`. Vercel peut maintenant déployer normalement depuis le dépôt mis à jour.
