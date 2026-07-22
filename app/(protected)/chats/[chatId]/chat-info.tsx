@@ -607,33 +607,36 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                   style={{
                     width: "100%",
                     marginTop: 10,
-                    background: "var(--bg-elevated)",
-                    border: "1px dashed var(--border-default)",
+                    background: "var(--accent)",
+                    border: "none",
                     borderRadius: 9,
-                    padding: "9px",
-                    fontSize: 12,
-                    color: "var(--text-muted)",
+                    padding: "10px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "var(--accent-text)",
                     cursor: "pointer",
                     fontFamily: "'DM Sans', sans-serif",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: 7,
+                    gap: 8,
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
                     transition: "all .15s",
                   }}
                   onMouseEnter={(event) => {
-                    event.currentTarget.style.borderColor = "var(--accent-border)"
-                    event.currentTarget.style.color = "var(--accent)"
+                    event.currentTarget.style.opacity = "0.92"
+                    event.currentTarget.style.transform = "translateY(-1px)"
                   }}
                   onMouseLeave={(event) => {
-                    event.currentTarget.style.borderColor = "var(--border-default)"
-                    event.currentTarget.style.color = "var(--text-muted)"
+                    event.currentTarget.style.opacity = "1"
+                    event.currentTarget.style.transform = "translateY(0)"
                   }}
                   onClick={() => setShowAddMember(true)}
+                  aria-label="Ajouter un ou plusieurs membres au groupe"
                 >
                   <svg
-                    width="13"
-                    height="13"
+                    width="16"
+                    height="16"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -643,7 +646,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
-                  Ajouter un membre
+                  Ajouter un ou plusieurs membres au groupe
                 </button>
               )}
             </div>
@@ -826,12 +829,16 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
   const colorName = COLOR_NAMES[(conv.colorIdx ?? 0) % COLOR_NAMES.length]
 
   if (conv.isGroup) {
-    const members: Member[] = (conv.members ?? []).map((memberId, index) => {
-      const contact = contacts.find((c) => c.id === memberId)
+    // Utilise membersInfo (backend) pour avoir les vrais IDs + pseudo, puis fetchContacts pour avatar
+    const backendMembers = (conv.membersInfo ?? (conv.members ?? []).map((m: string) => ({ id: m, pseudo: null, publicNumber: "" })))
+    const members: Member[] = (Array.isArray(backendMembers) ? backendMembers : []).map((m: any, index: number) => {
+      const memberId = typeof m === "string" ? m : m.id ?? m
+      const pseudoName = typeof m === "object" ? (m.pseudo || m.publicNumber || null) : null
+      const contact = contacts.find((c) => c.id === memberId || c.phone === (m?.publicNumber ?? ""))
       return {
         id: memberId,
-        name: contact?.name ?? `Membre ${index + 1}`,
-        initials: contact?.initials ?? memberId.slice(0, 2).toUpperCase(),
+        name: contact?.name ?? pseudoName ?? `Membre ${index + 1}`,
+        initials: contact?.initials ?? (pseudoName ? pseudoName.slice(0, 2).toUpperCase() : (typeof memberId === "string" ? memberId.slice(0, 2).toUpperCase() : "??")),
         color: contact?.color ?? COLOR_NAMES[index % COLOR_NAMES.length],
         role: index === 0 ? "admin" : "member",
         online: contact?.online ?? false,
