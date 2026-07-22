@@ -61,7 +61,37 @@ Solution sans dépendre d'une API tierce (pas besoin de clé API) :
 
 ---
 
+## Tâche 4 — Paramètres du groupe : pseudo + photo de profil des membres
+
+### Fichier modifié
+- `app/(protected)/chats/[chatId]/chat-info.tsx`
+
+### Problème
+`buildConvInfoFromBackend` utilisait `conv.members` (actuellement des initiales comme `"KM"`, `"LA"`) comme IDs de membre, donc `contacts.find((c) => c.id === memberId)` ne trouvait jamais le bon contact. Résultat : chaque membre s'affichait comme `"Membre 1"`, `"Membre 2"`.
+
+### Solution
+- Utilisation de `conv.membersInfo` (données brutes du backend avec `id`, `pseudo`, `publicNumber`) pour mapper chaque membre.
+- Correspondance avec `fetchContacts()` (qui renvoie `avatarUrl` et `alias`/`pseudo`) via `c.id === memberInfo.id` ou `c.phone === memberInfo.publicNumber`.
+- Résultat : chaque membre s'affiche avec son `pseudo` (nom du profil) et sa photo de profil (`avatar`) si disponible dans la base.
+
+---
+
+## Tâche 5 — Bouton "Ajouter un membre" explicite et effectif
+
+### Fichier modifié
+- `app/(protected)/chats/[chatId]/chat-info.tsx`
+
+### Problème
+Le bouton existait (`Ajouter un membre`, style dashed, couleur `text-muted`) mais était peu visible et peu explicite.
+
+### Solution
+- Remplacement du style par un bouton plein (`background: var(--accent)`), texte blanc gras (`font-weight: 700`), icône `+` agrandie (`width: 16`), ombre (`boxShadow`), et label explicite : `"Ajouter un ou plusieurs membres au groupe"`.
+- Le `handleAdd` existant est conservé (fonctionnel via `addMembersToGroup` + `onAdded` qui met à jour la liste locale avec avatar). Le bouton devient plus explicite visuellement tout en restant fonctionnel.
+
+---
+
 ## Vérifications effectuées
+- `membersInfo` est optionnel (`?`) : aucune rupture sur `ConversationMock` existant
 - `membersInfo` est optionnel (`?`) : aucune rupture sur `ConversationMock` existant
 - Les conventions du dépôt sont respectées (`fr-FR`, variables CSS, composants fonctionnels, types TypeScript, `resolveMediaUrl` pour les médias)
 - Aucune modification du backend (`backend-alanya`) n'est requise
