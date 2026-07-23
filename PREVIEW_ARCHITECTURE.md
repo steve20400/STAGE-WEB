@@ -65,3 +65,7 @@ Chaque `MessageBubble` est maintenant entouré par `MessageErrorBoundary`. Si un
 ## Performance PDF et fluidité du fil
 
 Un aperçu PDF dans le fil ne rend désormais que la première page. C'est l'aperçu utile sans créer des dizaines de canvas pour plusieurs PDF ouverts en même temps. La visionneuse PDF ouverte rend jusqu'à 30 pages, dans son panneau dédié. Le visionneur texte compact limite aussi son affichage à 80 lignes. Ces limites évitent les ralentissements de scroll et les erreurs de mémoire sur mobile/PC tout en conservant le contenu complet dans la visionneuse dédiée.
+
+## Correction PDF : isolation DOM React / PDF.js
+
+PDF.js ajoute des canvas impérativement via le DOM. Le texte React « Chargement du PDF » était auparavant dans le même conteneur que ces canvas. `replaceChildren()` supprimait donc un nœud appartenant à React ; lors du rendu suivant, React tentait de le supprimer une seconde fois et levait une erreur DOM. Le conteneur canvas PDF.js est maintenant un enfant dédié et vide côté React. Les messages d'état React sont dans un autre enfant. Cela élimine l'erreur qui remplaçait un PDF correctement rendu par « Aperçu indisponible » quelques instants plus tard.

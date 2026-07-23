@@ -221,8 +221,12 @@ function PdfViewer({ url, isMe, full = false }: { url: string; isMe: boolean; fu
     }
     void render(); return () => { cancelled = true; task?.destroy?.() }
   }, [url, full])
-  return <div ref={host} style={{ minHeight: 120, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: 10 }}>
-    {state}{errorMessage && <div style={{ padding: 10, color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</div>}
+  // Le host canvas est volontairement distinct du texte React : PDF.js manipule
+  // ses enfants avec replaceChildren(), React ne doit donc jamais les gérer.
+  return <div style={{ minHeight: 120, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: 10 }}>
+    {state && <div style={{ padding: 10 }}>{state}</div>}
+    {errorMessage && <div style={{ padding: 10, color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</div>}
+    <div ref={host} />
   </div>
 }
 
