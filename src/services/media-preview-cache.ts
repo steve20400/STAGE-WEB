@@ -23,6 +23,17 @@ function cacheKey(url: string): string {
   }
 }
 
+/** Route le fetch de preview par le proxy same-origin Vercel quand l'URL est un média backend. */
+function previewRequestUrl(url: string): string {
+  try {
+    const parsed = new URL(url, window.location.origin)
+    const match = parsed.pathname.match(/\/api\/media\/([a-zA-Z0-9-]+)$/)
+    return match ? `/api/media-proxy/${match[1]}` : url
+  } catch {
+    return url
+  }
+}
+
 /**
  * Lit d'abord IndexedDB, puis le réseau seulement une fois. Les blobs sont
  * utilisables hors connexion tant que l'utilisateur n'a pas vidé ses données.
@@ -48,8 +59,8 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
   // Le backend accepte le Bearer et aussi ?token=. Le header est indispensable
   // lorsqu'un navigateur/mobile retire ou ne transmet pas le paramètre après une redirection.
   const token = loadSessionToken()
-  const response = await fetch(url, {
-    credentials: "omit",
+  const response = await fetch(previewRequestUrl(url), {
+    credentials: "same-origin",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
   if (!response.ok) throw new Error(`Chargement échoué (${response.status})`)
