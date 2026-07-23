@@ -5,6 +5,7 @@ import { AuthProvider } from "./components/auth-provider"
 import { ProtectedRoute, PublicOnlyRoute } from "./components/route-guards"
 import { ThemeProvider } from "./components/theme-provider"
 import { ToastProvider } from "./components/toast"
+import { AppErrorBoundary } from "./components/app-error-boundary"
 import "./styles/globals.css"
 import LoginPage from "../app/(auth)/login/login"
 import ChatRoomPage from "../app/(protected)/chats/[chatId]/chat"
@@ -27,8 +28,9 @@ import StatusPage from "../app/(protected)/status/status"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <ToastProvider>
+    <AppErrorBoundary>
+      <ThemeProvider>
+        <ToastProvider>
         <BrowserRouter>
           <AuthProvider>
             <Routes>
@@ -218,7 +220,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             </Routes>
           </AuthProvider>
         </BrowserRouter>
-      </ToastProvider>
-    </ThemeProvider>
+        </ToastProvider>
+      </ThemeProvider>
+    </AppErrorBoundary>
   </React.StrictMode>
 )
