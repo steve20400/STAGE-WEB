@@ -678,6 +678,7 @@ function MessageBubble({
 }) {
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const messageMenuRef = useRef<HTMLDivElement>(null)
   const [dragX, setDragX] = useState(0)
   const [viewingDoc, setViewingDoc] = useState<{ url: string; name?: string; mime?: string } | null>(null)
   const [downloading, setDownloading] = useState(false)
@@ -723,6 +724,16 @@ function MessageBubble({
     if (Math.abs(dragX) >= SWIPE_REPLY_THRESHOLD) onReply(msg)
     setDragX(0)
   }
+
+  // Même comportement que Telegram : ferme le menu d'actions dès que l'on tape/click ailleurs.
+  useEffect(() => {
+    if (!menuOpen) return
+    const closeOutside = (event: PointerEvent) => {
+      if (messageMenuRef.current && !messageMenuRef.current.contains(event.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener("pointerdown", closeOutside)
+    return () => document.removeEventListener("pointerdown", closeOutside)
+  }, [menuOpen])
 
   const openExpandedPreview = () => {
     if (mediaSrc) setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })
@@ -832,7 +843,7 @@ function MessageBubble({
 
         {/* Menu actions */}
         {hovered && !msg.isDeleted && (
-          <div style={{ position: "relative", flexShrink: 0 }}>
+          <div ref={messageMenuRef} style={{ position: "relative", flexShrink: 0 }}>
             <button
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Actions du message"

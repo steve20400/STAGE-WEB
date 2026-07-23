@@ -98,3 +98,7 @@ Les icônes superposées directement sur les previews ont été retirées afin d
 ### Ouverture rapide par double interaction
 
 Sur un aperçu documentaire, un **double-clic** PC ou un **double-tap** tactile (deux taps en moins de 320 ms) ouvre également `DocumentViewer`. Le geste est limité aux previews qui possèdent un média ; il ne remplace pas le menu `⋮ → Agrandir`, qui reste l'action explicite accessible.
+
+### Menus contextuels et pièce jointe
+
+Le menu d'actions `⋮` d'un message utilise un écouteur `pointerdown` : dès qu'un clic ou un tap survient hors de sa fenêtre, il se ferme. Le sélecteur de pièce jointe applique le même comportement, tout en s'ouvrant explicitement par clic/tap sur le trombone (et par survol sur ordinateur, conformément au comportement demandé précédemment).
