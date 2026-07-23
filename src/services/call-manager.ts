@@ -577,7 +577,12 @@ async function handleServerEvent(event: CallServerEvent) {
     }
 
     if (callState === "joined" || callState === "accepted") {
-      if (userId === me) return // echo de notre propre "joined"
+      // Un autre appareil connecté au même compte a décroché : il faut arrêter
+      // la sonnerie locale, mais surtout ne jamais terminer l'appel serveur.
+      if (userId === me) {
+        if (callId === state.incoming?.callId) setState({ incoming: null })
+        return
+      }
       if (callId === state.activeCallId || callId === state.incoming?.callId) {
         await onPeerJoined(userId ?? "", displayName)
       }
@@ -778,6 +783,14 @@ export async function acceptIncomingCall(): Promise<string | null> {
   await flushBufferedSignals(incoming.callId)
 
   return incoming.callId
+}
+
+/** Ferme seulement la sonnerie/overlay de CET appareil (timeout ou autre appareil a décroché).
+    Aucun endpoint reject/end n'est appelé : l'appel déjà accepté reste vivant. */
+export function dismissIncomingCallLocally(): void {
+  if (!state.incoming) return
+  signalBuffer.delete(state.incoming.callId)
+  setState({ incoming: null })
 }
 
 /** Refuse l'appel entrant courant. */

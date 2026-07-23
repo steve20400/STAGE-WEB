@@ -12,6 +12,8 @@ interface IncomingCallOverlayProps {
   type: "audio" | "video"
   onAccept: () => void
   onDecline: () => void
+  /** Expiration locale : ne refuse pas l'appel pour les autres appareils du compte. */
+  onTimeout: () => void
 }
 
 export default function IncomingCallOverlay({
@@ -19,6 +21,7 @@ export default function IncomingCallOverlay({
   type,
   onAccept,
   onDecline,
+  onTimeout,
 }: IncomingCallOverlayProps) {
   const [remaining, setRemaining] = useState(30)
 
@@ -27,7 +30,7 @@ export default function IncomingCallOverlay({
       setRemaining((prev) => {
         if (prev <= 1) {
           window.clearInterval(intervalId)
-          onDecline()
+          onTimeout()
           return 0
         }
         return prev - 1
@@ -35,7 +38,7 @@ export default function IncomingCallOverlay({
     }, 1000)
 
     return () => window.clearInterval(intervalId)
-  }, [onDecline])
+  }, [onTimeout])
 
   return (
     <>

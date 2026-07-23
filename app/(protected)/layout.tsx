@@ -4,7 +4,7 @@ import { useAuth } from "../../src/components/auth-provider"
 import { ThemeToggle } from "../../src/components/theme-toggle"
 import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
-import { acceptIncomingCall, rejectIncomingCall } from "../../src/services/call-manager"
+import { acceptIncomingCall, dismissIncomingCallLocally, rejectIncomingCall } from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
 import { avatarDisplaySrc } from "../../src/lib/avatar"
 const alanyaLogo = "/alanya-logo.jpeg"
@@ -417,6 +417,9 @@ function GlobalIncomingCall() {
       }}
       onDecline={() => {
         void rejectIncomingCall()
+      }}
+      onTimeout={() => {
+        dismissIncomingCallLocally()
       }}
     />
   )
