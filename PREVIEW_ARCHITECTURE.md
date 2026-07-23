@@ -94,3 +94,7 @@ Le proxy B2 est le correctif essentiel au problème `Failed to fetch` : les redi
 ### Accès unique à la visionneuse agrandie
 
 Les icônes superposées directement sur les previews ont été retirées afin de préserver la lisibilité et le design des cartes médias. L'unique action d'agrandissement est désormais **Agrandir**, présente dans le menu contextuel `⋮` du message, avec Répondre, Copier et Transférer. Cette action ouvre `DocumentViewer` avec l'URL, le nom et le type MIME du média. Elle est proposée uniquement lorsqu'un média est attaché au message.
+
+### Ouverture rapide par double interaction
+
+Sur un aperçu documentaire, un **double-clic** PC ou un **double-tap** tactile (deux taps en moins de 320 ms) ouvre également `DocumentViewer`. Le geste est limité aux previews qui possèdent un média ; il ne remplace pas le menu `⋮ → Agrandir`, qui reste l'action explicite accessible.

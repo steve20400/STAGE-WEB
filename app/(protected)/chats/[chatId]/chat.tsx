@@ -681,6 +681,7 @@ function MessageBubble({
   const [dragX, setDragX] = useState(0)
   const [viewingDoc, setViewingDoc] = useState<{ url: string; name?: string; mime?: string } | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const lastPreviewTapRef = useRef(0)
   const dragStart = useRef<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false })
 
   // Apercu du message cite : snapshot backend en priorite, sinon lookup local.
@@ -721,6 +722,21 @@ function MessageBubble({
     dragStart.current.active = false
     if (Math.abs(dragX) >= SWIPE_REPLY_THRESHOLD) onReply(msg)
     setDragX(0)
+  }
+
+  const openExpandedPreview = () => {
+    if (mediaSrc) setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })
+  }
+  const onPreviewPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch") return
+    const now = Date.now()
+    if (now - lastPreviewTapRef.current < 320) {
+      event.preventDefault()
+      openExpandedPreview()
+      lastPreviewTapRef.current = 0
+    } else {
+      lastPreviewTapRef.current = now
+    }
   }
 
   const menuItem = (label: string, onClick: () => void, danger = false) => (
@@ -850,7 +866,7 @@ function MessageBubble({
               >
                 {menuItem("Repondre", () => onReply(msg))}
                 {msg.content ? menuItem("Copier", () => onCopy(msg)) : null}
-                {canExpandMedia ? menuItem("Agrandir", () => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })) : null}
+                {canExpandMedia ? menuItem("Agrandir", openExpandedPreview) : null}
                 {menuItem("Transferer", () => onForward(msg))}
                 {menuItem("Supprimer pour moi", () => onDelete(msg, "me"), true)}
                 {isMe
@@ -1110,7 +1126,12 @@ function MessageBubble({
 
                   return (
                     <>
-                      <div style={{ position: "relative" }}>
+                      <div
+                        style={{ position: "relative", cursor: canExpandMedia ? "zoom-in" : undefined }}
+                        onDoubleClick={() => { if (canExpandMedia) openExpandedPreview() }}
+                        onPointerUp={canExpandMedia ? onPreviewPointerUp : undefined}
+                        title={canExpandMedia ? "Double-cliquez ou tapez deux fois pour agrandir" : undefined}
+                      >
                         {filePreview}
                       </div>
                       <a
