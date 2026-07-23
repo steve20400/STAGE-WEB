@@ -90,6 +90,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
   const ext = (name ?? "").split(".").pop()?.toLowerCase() ?? ""
   const isImage = mime?.startsWith("image/") || ["jpg","jpeg","png","gif","webp","bmp"].map((e)=>e.toLowerCase()).includes(ext)
   const isVideo = mime?.startsWith("video/") || ["mp4","mov","avi","mkv","webm"].map((e)=>e.toLowerCase()).includes(ext)
+  const isAudio = mime?.startsWith("audio/") || ["mp3","aac","acc","wav","ogg","m4a","flac","webm"].includes(ext)
   const isText = mime?.startsWith("text/") || ["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].map((e)=>e.toLowerCase()).includes(ext)
   const isPdf = mime === "application/pdf" || ext === "pdf"
   const isDoc = ["doc","docx"].includes(ext) || (mime ?? "").includes("word")
@@ -158,6 +159,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
           {!officeEmbedUrl && isVideo && (
             <video src={url} controls preload="metadata" style={{ width: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
           )}
+          {!officeEmbedUrl && isAudio && <audio src={url} controls preload="metadata" style={{ width: "100%", marginTop: 12 }} />}
           {!officeEmbedUrl && isPdf && <PdfViewer url={url} isMe={isMe} full />}
           {!officeEmbedUrl && isText && (
             <>
@@ -175,7 +177,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
               )}
             </>
           )}
-          {!officeEmbedUrl && !isImage && !isVideo && !isPdf && !isText && (
+          {!officeEmbedUrl && !isImage && !isVideo && !isAudio && !isPdf && !isText && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "50vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={isMe ? "rgba(255,255,255,0.4)" : "var(--text-muted)"} strokeWidth="1.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
               <div style={{ fontSize: 13, opacity: 0.8 }}>{name ?? "Fichier"}</div>
@@ -639,14 +641,18 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
   </div>
 }
 
-function VideoPreview({ src, name, size, durationMs }: { src: string; name?: string; size?: string; durationMs?: number }) {
+function PreviewExpandButton({ onClick }: { onClick: () => void }) {
+  return <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick() }} aria-label="Agrandir l’aperçu" title="Agrandir" style={{ position: "absolute", bottom: 8, right: 8, width: 32, height: 32, display: "grid", placeItems: "center", border: "1px solid #ffffff42", borderRadius: 9, padding: 0, cursor: "pointer", background: "#1f2937df", color: "#fff", fontSize: 18, lineHeight: 1, boxShadow: "0 2px 8px #0007", zIndex: 2 }}>⛶</button>
+}
+
+function VideoPreview({ src, name, size, durationMs, onExpand }: { src: string; name?: string; size?: string; durationMs?: number; onExpand?: () => void }) {
   const [failed, setFailed] = useState(false)
   if (failed) return <div style={{ marginBottom: 6, padding: "10px 12px", borderRadius: 9, background: "#00000012", fontSize: 11 }}>
     <div style={{ fontWeight: 600 }}>{name ?? "Vidéo"}</div>
     <div style={{ opacity: 0.72, marginTop: 3 }}>{size ?? "Taille inconnue"} · {formatAudioDuration(durationMs)}</div>
     <div style={{ opacity: 0.72, marginTop: 4 }}>Aperçu indisponible — le fichier reste téléchargeable.</div>
   </div>
-  return <video src={src} controls preload="metadata" onError={() => setFailed(true)} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block", marginBottom: 6 }} />
+  return <div style={{ position: "relative" }}><video src={src} controls preload="metadata" onError={() => setFailed(true)} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block", marginBottom: 6 }} />{onExpand && <PreviewExpandButton onClick={onExpand} />}</div>
 }
 
 function MessageBubble({
@@ -694,6 +700,7 @@ function MessageBubble({
 
   const mediaSrc = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
   const isVideoFile = (msg.mediaMime ?? "").startsWith("video/")
+  const canExpandMedia = Boolean(mediaSrc) && !msg.isDeleted
 
   // --- Swipe-to-reply (pointeur / tactile) ---
   const onPointerDown = (e: React.PointerEvent) => {
@@ -847,6 +854,7 @@ function MessageBubble({
               >
                 {menuItem("Repondre", () => onReply(msg))}
                 {msg.content ? menuItem("Copier", () => onCopy(msg)) : null}
+                {canExpandMedia ? menuItem("Agrandir", () => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })) : null}
                 {menuItem("Transferer", () => onForward(msg))}
                 {menuItem("Supprimer pour moi", () => onDelete(msg, "me"), true)}
                 {isMe
@@ -965,23 +973,16 @@ function MessageBubble({
             ) : (
               <>
                 {msg.type === "image" && mediaSrc && (
-                  <img
-                    src={mediaSrc}
-                    alt={msg.fileName ?? "image"}
-                    onClick={() => onOpenImage(mediaSrc, msg.fileName)}
-                    style={{
-                      maxWidth: 280,
-                      maxHeight: 320,
-                      borderRadius: 12,
-                      display: "block",
-                      cursor: "zoom-in",
-                    }}
-                  />
+                  <div style={{ position: "relative", display: "inline-block" }}>
+                    <img src={mediaSrc} alt={msg.fileName ?? "image"} onClick={() => onOpenImage(mediaSrc, msg.fileName)} style={{ maxWidth: 280, maxHeight: 320, borderRadius: 12, display: "block", cursor: "zoom-in" }} />
+                    <PreviewExpandButton onClick={() => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })} />
+                  </div>
                 )}
 
                 {msg.type === "audio" && mediaSrc && (
-                  <div>
+                  <div style={{ position: "relative" }}>
                     <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
+                    <PreviewExpandButton onClick={() => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })} />
                     {/* Les fichiers audio importés restent identifiables, contrairement aux vocaux. */}
                     {msg.fileName && <div style={{ marginTop: 5, fontSize: 10, opacity: 0.76, display: "flex", gap: 7, flexWrap: "wrap" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170, whiteSpace: "nowrap" }}>{msg.fileName}</span>
@@ -992,11 +993,11 @@ function MessageBubble({
                 )}
 
                 {msg.type === "video" && mediaSrc && (
-                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} />
+                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} onExpand={() => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })} />
                 )}
 
                 {msg.type === "file" && mediaSrc && isVideoFile && (
-                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} />
+                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} onExpand={() => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })} />
                 )}
 
                 {msg.type === "file" && (!mediaSrc || !isVideoFile) && (() => {
@@ -1114,19 +1115,19 @@ function MessageBubble({
                       </a>
                     )
                   })()
-                  const canExpandDocument = Boolean(mediaSrc) && (ext === "pdf" || mime.startsWith("text/") || ["txt", "csv", "env", "properties", "md", "html", "htm", "tsx", "ts", "js", "css", "json", "yaml", "yml", "xml", "py", "java", "cpp", "h", "php", "doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext) || mime.includes("word") || mime.includes("spreadsheet") || mime.includes("presentation"))
+
                   return (
                     <>
                       <div style={{ position: "relative" }}>
                         {filePreview}
-                        {canExpandDocument && (
+                        {canExpandMedia && (
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime }) }}
                             aria-label="Agrandir l’aperçu du document"
                             title="Agrandir le document"
-                            style={{ position: "absolute", top: 8, right: 8, border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", background: isMe ? "#00000075" : "#1f2937df", color: "#fff", fontSize: 11, fontWeight: 600, boxShadow: "0 1px 4px #0005" }}
+                            style={{ position: "absolute", bottom: 8, right: 8, width: 32, height: 32, display: "grid", placeItems: "center", border: `1px solid ${isMe ? "#ffffff42" : "#ffffff33"}`, borderRadius: 9, padding: 0, cursor: "pointer", background: isMe ? "#00000075" : "#1f2937df", color: "#fff", fontSize: 18, lineHeight: 1, boxShadow: "0 2px 8px #0007" }}
                           >
-                            ⛶ Agrandir
+                            ⛶
                           </button>
                         )}
                       </div>
