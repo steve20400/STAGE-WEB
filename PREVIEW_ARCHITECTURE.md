@@ -106,3 +106,7 @@ Le menu d'actions `⋮` d'un message utilise un écouteur `pointerdown` : dès q
 ### Audio et composeur
 
 Le menu `⋮` d'un message audio contient l'action **Télécharger l’audio**. Elle crée un lien temporaire vers l'URL média avec `download=1`, pour demander au backend un téléchargement forcé tout en gardant les contrôles d'accès. Le texte d'aide sous le composeur a été retiré et la zone de saisie garde son ancrage au bas (`bottom`) du panneau de conversation, sans espace d'information supplémentaire.
+
+## Renouvellement des URL média
+
+Les éléments HTML (`img`, `video`, `audio`, iframe Office) portent le token Alanya dans leur URL et ne peuvent pas utiliser directement `apiRequest`. À l'ouverture d'une discussion, `refreshMediaSession()` tente un renouvellement JWT. Une rotation de token émet l'événement `alanya:media-token-refreshed`; le fil de discussion se re-rend alors et reconstruit toutes les URLs média avec le token actuel. Le lecteur texte/PDF, qui utilise `fetch`, rejoue aussi une lecture une fois après un `401`. Cette couche est indépendante de PDF.js, d'IndexedDB et du proxy B2 : elle ne les remplace ni ne les désactive.

@@ -85,6 +85,9 @@ export async function tryRefreshTokens(): Promise<boolean> {
         if (!pair.accessToken || !pair.refreshToken) return false
         saveSessionToken(pair.accessToken)
         saveRefreshToken(pair.refreshToken)
+        // Les balises img/video/iframe ne passent pas par apiRequest : prévient
+        // l'interface pour qu'elle reconstruise leurs URLs avec le nouveau token.
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("alanya:media-token-refreshed"))
         return true
       } catch {
         return false
@@ -95,6 +98,11 @@ export async function tryRefreshTokens(): Promise<boolean> {
   }
 
   return refreshPromise
+}
+
+/** Renouvelle explicitement le jeton avant de charger les médias navigateur. */
+export async function refreshMediaSession(): Promise<boolean> {
+  return tryRefreshTokens()
 }
 
 async function rawRequest(path: string, options: ApiRequestOptions) {

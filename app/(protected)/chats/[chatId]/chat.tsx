@@ -8,6 +8,7 @@ import {
   type MessageStatus,
 } from "../../../../src/mocks/chat-data"
 import { loadContacts } from "../../../../src/data/contacts"
+import { refreshMediaSession } from "../../../../src/lib/api-client"
 import {
   ensureDirectConversation,
   ensureGroupConversation,
@@ -1309,6 +1310,7 @@ export default function ChatRoomPage() {
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
+  const [mediaTokenVersion, setMediaTokenVersion] = useState(0)
   // Visionneuse d'image plein ecran
   const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null)
   // Message en cours de transfert (ouvre le selecteur de conversations)
@@ -1342,6 +1344,16 @@ export default function ChatRoomPage() {
     document.addEventListener("pointerdown", closeOutside)
     return () => document.removeEventListener("pointerdown", closeOutside)
   }, [showAttach])
+
+  // Les médias HTML utilisent le token placé dans l'URL ; re-rend leur src dès
+  // qu'un refresh JWT se produit, et tente un refresh au montage de la discussion.
+  useEffect(() => {
+    const onRefresh = () => setMediaTokenVersion((version) => version + 1)
+    window.addEventListener("alanya:media-token-refreshed", onRefresh)
+    void refreshMediaSession()
+    return () => window.removeEventListener("alanya:media-token-refreshed", onRefresh)
+  }, [chatId])
+  void mediaTokenVersion
 
   const refreshMessages = useCallback(async () => {
     await fetchMessagesCacheFirst(
