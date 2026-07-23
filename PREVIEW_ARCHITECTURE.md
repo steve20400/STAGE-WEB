@@ -69,3 +69,24 @@ Un aperçu PDF dans le fil ne rend désormais que la première page. C'est l'ape
 ## Correction PDF : isolation DOM React / PDF.js
 
 PDF.js ajoute des canvas impérativement via le DOM. Le texte React « Chargement du PDF » était auparavant dans le même conteneur que ces canvas. `replaceChildren()` supprimait donc un nœud appartenant à React ; lors du rendu suivant, React tentait de le supprimer une seconde fois et levait une erreur DOM. Le conteneur canvas PDF.js est maintenant un enfant dédié et vide côté React. Les messages d'état React sont dans un autre enfant. Cela élimine l'erreur qui remplaçait un PDF correctement rendu par « Aperçu indisponible » quelques instants plus tard.
+
+## Agrandissement des aperçus et positions GPS
+
+Chaque aperçu de document reconnu dans le fil (PDF, texte/code, CSV, Word, Excel, PowerPoint) comporte maintenant le bouton **⛶ Agrandir**. Il ouvre `DocumentViewer`, le panneau plein écran intégré d'Alanya, sans téléchargement externe imposé. Les PDF utilisent PDF.js dans ce panneau ; les textes sont lus dans un lecteur monospace ; les formats Office restent affichés par Office Online dans le panneau.
+
+Les coordonnées GPS sont maintenant affichées une seule fois, sous la mini-carte OpenStreetMap. Elles sont arrondies à **six chiffres après la virgule** (`lat.toFixed(6)`, `lng.toFixed(6)`). Le texte du message est nettoyé de la paire latitude/longitude déjà représentée par la carte, afin d'éviter le doublon placé au-dessus.
+
+## Technologies utilisées par format
+
+- **React 18 + TypeScript** : composants, état et isolation d'erreur par message ;
+- **Vite** : construction du frontend ;
+- **Vercel Serverless Function** : `api/media-proxy/[id].js`, proxy same-origin ;
+- **Fetch + Bearer JWT Alanya** : autorisation des lectures de médias ;
+- **Backblaze B2** : stockage effectif, atteint indirectement par le backend puis le proxy ;
+- **IndexedDB + idb** : cache local des blobs validés (`previewMedia`) ;
+- **PDF.js (`pdfjs-dist`)** : rendu canvas des PDF ;
+- **Office Online Viewer** : rendu `.doc/.docx`, `.xls/.xlsx`, `.ppt/.pptx` ;
+- **HTML5 `<img>`, `<audio>`, `<video>`** : médias visuels et sonores ;
+- **OpenStreetMap embed** : mini-carte des positions partagées.
+
+Le proxy B2 est le correctif essentiel au problème `Failed to fetch` : les redirections B2 sont suivies côté serveur Vercel, où CORS ne bloque pas, puis le navigateur reçoit le contenu depuis le domaine Alanya/Vercel. Une réponse B2 réelle de quota ou `AccessDenied` reste volontairement visible comme erreur, car le proxy ne contourne jamais les droits ni le quota du stockage.

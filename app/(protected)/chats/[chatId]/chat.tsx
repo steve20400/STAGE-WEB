@@ -286,6 +286,11 @@ function extractGpsCoords(text: string): { lat: number; lng: number } | null {
   return null
 }
 
+/** Les coordonnées sont affichées sous la carte : on évite de les répéter au-dessus. */
+function removeGpsCoordinates(text: string): string {
+  return text.replace(GPS_REGEX, "").replace(/\s{2,}/g, " ").trim()
+}
+
 /** Couleurs distinctes pour les noms d'envoyeurs en groupe. */
 const SENDER_NAME_COLORS = ["#E8B84B", "#60a5fa", "#a78bfa", "#34d399", "#f87171", "#fb923c", "#38bdf8", "#c084fc"]
 function senderNameColor(id: string): string {
@@ -411,7 +416,7 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" />
           </svg>
-          {lat.toFixed(5)}, {lng.toFixed(5)}
+          {lat.toFixed(6)}, {lng.toFixed(6)}
         </div>
       </a>
     </div>
@@ -1109,9 +1114,22 @@ function MessageBubble({
                       </a>
                     )
                   })()
+                  const canExpandDocument = Boolean(mediaSrc) && (ext === "pdf" || mime.startsWith("text/") || ["txt", "csv", "env", "properties", "md", "html", "htm", "tsx", "ts", "js", "css", "json", "yaml", "yml", "xml", "py", "java", "cpp", "h", "php", "doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext) || mime.includes("word") || mime.includes("spreadsheet") || mime.includes("presentation"))
                   return (
                     <>
-                      {filePreview}
+                      <div style={{ position: "relative" }}>
+                        {filePreview}
+                        {canExpandDocument && (
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime }) }}
+                            aria-label="Agrandir l’aperçu du document"
+                            title="Agrandir le document"
+                            style={{ position: "absolute", top: 8, right: 8, border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer", background: isMe ? "#00000075" : "#1f2937df", color: "#fff", fontSize: 11, fontWeight: 600, boxShadow: "0 1px 4px #0005" }}
+                          >
+                            ⛶ Agrandir
+                          </button>
+                        )}
+                      </div>
                       <a
                         href={msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"}
                         target="_blank"
@@ -1155,7 +1173,7 @@ function MessageBubble({
                         : undefined
                     }
                   >
-                    <RichText text={msg.content} isMe={isMe} />
+                    <RichText text={extractGpsCoords(msg.content) ? removeGpsCoordinates(msg.content) : msg.content} isMe={isMe} />
                     {(() => {
                       const gps = extractGpsCoords(msg.content)
                       return gps ? <GpsPreview lat={gps.lat} lng={gps.lng} isMe={isMe} /> : null
