@@ -158,7 +158,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
           {!officeEmbedUrl && isVideo && (
             <video src={url} controls preload="metadata" style={{ width: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
           )}
-          {!officeEmbedUrl && isPdf && <PdfViewer url={url} isMe={isMe} />}
+          {!officeEmbedUrl && isPdf && <PdfViewer url={url} isMe={isMe} full />}
           {!officeEmbedUrl && isText && (
             <>
               {loadingText ? (
@@ -189,7 +189,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
 }
 
 /** Lecteur PDF rendu par PDF.js : ne dépend pas du lecteur PDF du téléphone. */
-function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
+function PdfViewer({ url, isMe, full = false }: { url: string; isMe: boolean; full?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const [state, setState] = useState("Chargement du PDF…")
   const [errorMessage, setErrorMessage] = useState("")
@@ -209,7 +209,7 @@ function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
         if (cancelled || !host.current) return
         host.current.replaceChildren()
         // Premier rendu léger : les pages suivantes sont construites sans relancer le téléchargement.
-        for (let pageNo = 1; pageNo <= Math.min(pdf.numPages, 100); pageNo++) {
+        for (let pageNo = 1; pageNo <= Math.min(pdf.numPages, full ? 30 : 1); pageNo++) {
           const page = await pdf.getPage(pageNo); const viewport = page.getViewport({ scale: 1.25 })
           const canvas = document.createElement("canvas"); canvas.width = viewport.width; canvas.height = viewport.height
           canvas.style.cssText = "display:block;width:100%;height:auto;margin:0 auto 12px;background:white;border-radius:6px"
@@ -220,7 +220,7 @@ function PdfViewer({ url, isMe }: { url: string; isMe: boolean }) {
       } catch (err: unknown) { if (!cancelled) { setState(""); setErrorMessage(err instanceof Error ? err.message : "Le PDF ne peut pas être chargé.") } }
     }
     void render(); return () => { cancelled = true; task?.destroy?.() }
-  }, [url])
+  }, [url, full])
   return <div ref={host} style={{ minHeight: 120, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: 10 }}>
     {state}{errorMessage && <div style={{ padding: 10, color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</div>}
   </div>
@@ -615,7 +615,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
 
   const copy = () => { void navigator.clipboard?.writeText(text) }
   const rows = useMemo(() => isCsv ? text.split(/\r?\n/).filter(Boolean).slice(0, 30).map((row) => row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((cell) => cell.replace(/^"|"$/g, "").trim())) : [], [isCsv, text])
-  const visibleLines = useMemo(() => text.split(/\r?\n/).filter((line) => !query || line.toLowerCase().includes(query.toLowerCase())).slice(0, 300), [text, query])
+  const visibleLines = useMemo(() => text.split(/\r?\n/).filter((line) => !query || line.toLowerCase().includes(query.toLowerCase())).slice(0, 80), [text, query])
   const tone = isMe ? "#ffffff" : "var(--text-primary)"
 
   return <div style={{ width: "100%", borderRadius: 8, border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`, background: isMe ? "#00000018" : "#10151d", marginBottom: 6, overflow: "hidden", color: tone }}>

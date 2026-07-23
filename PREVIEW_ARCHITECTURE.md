@@ -61,3 +61,7 @@ Le proxy peut résoudre CORS, mais ne peut pas contourner une réponse B2 réell
 ## Isolation des erreurs de preview
 
 Chaque `MessageBubble` est maintenant entouré par `MessageErrorBoundary`. Si un navigateur particulier, un fichier corrompu ou une donnée historique imprévue provoque une exception dans un preview, seule cette carte est remplacée par un repli indiquant nom et taille. La discussion, les autres fichiers et toute l'application restent utilisables. Le dernier diagnostic technique est enregistré localement sous `alanya_last_preview_error` pour faciliter le débogage, sans l'envoyer à un tiers.
+
+## Performance PDF et fluidité du fil
+
+Un aperçu PDF dans le fil ne rend désormais que la première page. C'est l'aperçu utile sans créer des dizaines de canvas pour plusieurs PDF ouverts en même temps. La visionneuse PDF ouverte rend jusqu'à 30 pages, dans son panneau dédié. Le visionneur texte compact limite aussi son affichage à 80 lignes. Ces limites évitent les ralentissements de scroll et les erreurs de mémoire sur mobile/PC tout en conservant le contenu complet dans la visionneuse dédiée.
