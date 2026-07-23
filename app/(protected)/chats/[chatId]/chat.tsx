@@ -641,18 +641,14 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
   </div>
 }
 
-function PreviewExpandButton({ onClick }: { onClick: () => void }) {
-  return <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick() }} aria-label="Agrandir l’aperçu" title="Agrandir" style={{ position: "absolute", bottom: 8, right: 8, width: 32, height: 32, display: "grid", placeItems: "center", border: "1px solid #ffffff42", borderRadius: 9, padding: 0, cursor: "pointer", background: "#1f2937df", color: "#fff", fontSize: 18, lineHeight: 1, boxShadow: "0 2px 8px #0007", zIndex: 2 }}>⛶</button>
-}
-
-function VideoPreview({ src, name, size, durationMs, onExpand }: { src: string; name?: string; size?: string; durationMs?: number; onExpand?: () => void }) {
+function VideoPreview({ src, name, size, durationMs }: { src: string; name?: string; size?: string; durationMs?: number }) {
   const [failed, setFailed] = useState(false)
   if (failed) return <div style={{ marginBottom: 6, padding: "10px 12px", borderRadius: 9, background: "#00000012", fontSize: 11 }}>
     <div style={{ fontWeight: 600 }}>{name ?? "Vidéo"}</div>
     <div style={{ opacity: 0.72, marginTop: 3 }}>{size ?? "Taille inconnue"} · {formatAudioDuration(durationMs)}</div>
     <div style={{ opacity: 0.72, marginTop: 4 }}>Aperçu indisponible — le fichier reste téléchargeable.</div>
   </div>
-  return <div style={{ position: "relative" }}><video src={src} controls preload="metadata" onError={() => setFailed(true)} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block", marginBottom: 6 }} />{onExpand && <PreviewExpandButton onClick={onExpand} />}</div>
+  return <video src={src} controls preload="metadata" onError={() => setFailed(true)} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block", marginBottom: 6 }} />
 }
 
 function MessageBubble({
@@ -973,16 +969,12 @@ function MessageBubble({
             ) : (
               <>
                 {msg.type === "image" && mediaSrc && (
-                  <div style={{ position: "relative", display: "inline-block" }}>
-                    <img src={mediaSrc} alt={msg.fileName ?? "image"} onClick={() => onOpenImage(mediaSrc, msg.fileName)} style={{ maxWidth: 280, maxHeight: 320, borderRadius: 12, display: "block", cursor: "zoom-in" }} />
-                    <PreviewExpandButton onClick={() => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })} />
-                  </div>
+                  <img src={mediaSrc} alt={msg.fileName ?? "image"} onClick={() => onOpenImage(mediaSrc, msg.fileName)} style={{ maxWidth: 280, maxHeight: 320, borderRadius: 12, display: "block", cursor: "zoom-in" }} />
                 )}
 
                 {msg.type === "audio" && mediaSrc && (
-                  <div style={{ position: "relative" }}>
+                  <div>
                     <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
-                    <PreviewExpandButton onClick={() => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })} />
                     {/* Les fichiers audio importés restent identifiables, contrairement aux vocaux. */}
                     {msg.fileName && <div style={{ marginTop: 5, fontSize: 10, opacity: 0.76, display: "flex", gap: 7, flexWrap: "wrap" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170, whiteSpace: "nowrap" }}>{msg.fileName}</span>
@@ -993,11 +985,11 @@ function MessageBubble({
                 )}
 
                 {msg.type === "video" && mediaSrc && (
-                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} onExpand={() => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })} />
+                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} />
                 )}
 
                 {msg.type === "file" && mediaSrc && isVideoFile && (
-                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} onExpand={() => setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })} />
+                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} />
                 )}
 
                 {msg.type === "file" && (!mediaSrc || !isVideoFile) && (() => {
@@ -1120,16 +1112,6 @@ function MessageBubble({
                     <>
                       <div style={{ position: "relative" }}>
                         {filePreview}
-                        {canExpandMedia && (
-                          <button
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime }) }}
-                            aria-label="Agrandir l’aperçu du document"
-                            title="Agrandir le document"
-                            style={{ position: "absolute", bottom: 8, right: 8, width: 32, height: 32, display: "grid", placeItems: "center", border: `1px solid ${isMe ? "#ffffff42" : "#ffffff33"}`, borderRadius: 9, padding: 0, cursor: "pointer", background: isMe ? "#00000075" : "#1f2937df", color: "#fff", fontSize: 18, lineHeight: 1, boxShadow: "0 2px 8px #0007" }}
-                          >
-                            ⛶
-                          </button>
-                        )}
                       </div>
                       <a
                         href={msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"}

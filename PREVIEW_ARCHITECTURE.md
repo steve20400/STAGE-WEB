@@ -90,3 +90,7 @@ Les coordonnées GPS sont maintenant affichées une seule fois, sous la mini-car
 - **OpenStreetMap embed** : mini-carte des positions partagées.
 
 Le proxy B2 est le correctif essentiel au problème `Failed to fetch` : les redirections B2 sont suivies côté serveur Vercel, où CORS ne bloque pas, puis le navigateur reçoit le contenu depuis le domaine Alanya/Vercel. Une réponse B2 réelle de quota ou `AccessDenied` reste volontairement visible comme erreur, car le proxy ne contourne jamais les droits ni le quota du stockage.
+
+### Accès unique à la visionneuse agrandie
+
+Les icônes superposées directement sur les previews ont été retirées afin de préserver la lisibilité et le design des cartes médias. L'unique action d'agrandissement est désormais **Agrandir**, présente dans le menu contextuel `⋮` du message, avec Répondre, Copier et Transférer. Cette action ouvre `DocumentViewer` avec l'URL, le nom et le type MIME du média. Elle est proposée uniquement lorsqu'un média est attaché au message.
