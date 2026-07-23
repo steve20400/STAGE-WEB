@@ -72,7 +72,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
   const ext = (name ?? "").split(".").pop()?.toLowerCase() ?? ""
   const isImage = mime?.startsWith("image/") || ["jpg","jpeg","png","gif","webp","bmp"].map((e)=>e.toLowerCase()).includes(ext)
   const isVideo = mime?.startsWith("video/") || ["mp4","mov","avi","mkv","webm"].map((e)=>e.toLowerCase()).includes(ext)
-  const isText = mime?.startsWith("text/") || ["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].map((e)=>e.toLowerCase()).includes(ext)
+  const isText = mime?.startsWith("text/") || ["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].map((e)=>e.toLowerCase()).includes(ext)
   const isPdf = mime === "application/pdf" || ext === "pdf"
   const isDoc = ["doc","docx"].includes(ext) || (mime ?? "").includes("word")
   const isSpreadsheet = ["xls","xlsx","ods","numbers"].includes(ext) || (mime ?? "").includes("spreadsheet") || (mime ?? "").includes("excel")
@@ -284,7 +284,7 @@ function fileTypeInfo(filename?: string, mime?: string): { color: string; label:
   if (["txt","csv","log","md","tex","latex","bib","sty"].includes(ext)) return { color: "#6b7280", label: "TXT" }
   if (["tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro"].includes(ext)) return { color: "#f59e0b", label: "CODE" }
   if (["css","scss","sass","less","styl","postcss"].includes(ext)) return { color: "#6366f1", label: "CSS" }
-  if (["json","yaml","yml","xml","toml","ini","cfg","env","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].includes(ext)) return { color: "#10b981", label: "CODE" }
+  if (["json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].includes(ext)) return { color: "#10b981", label: "CODE" }
   if (m.startsWith("audio/")) return { color: "#22c55e", label: "AUDIO" }
   if (m.startsWith("video/")) return { color: "#8b5cf6", label: "VIDEO" }
   if (m.startsWith("image/")) return { color: "#ec4899", label: "IMG" }
@@ -576,26 +576,41 @@ const SWIPE_REPLY_THRESHOLD = 56
 
 
 /** Composant de preview natif pour fichiers texte/code. */
-function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
+function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name?: string }) {
   const [text, setText] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
+  const [query, setQuery] = useState("")
+  const ext = name?.split(".").pop()?.toLowerCase() ?? "txt"
+  const isCsv = ext === "csv"
   useEffect(() => {
     let cancelled = false
     setLoading(true); setErrorMessage(""); setText("")
     void loadPreviewBlob(url).then((blob) => blob.text()).then((content) => {
-      if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(content.slice(0, 1000))) throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
-      if (!cancelled) { setText(content.slice(0, 800)); setLoading(false) }
+      if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(content.slice(0, 1000))) throw new Error("Stockage indisponible : quota de téléchargement atteint.")
+      if (!cancelled) { setText(content.slice(0, 50000)); setLoading(false) }
     }).catch((err: unknown) => {
       if (!cancelled) { setErrorMessage(err instanceof Error ? err.message : "Le document ne peut pas être chargé."); setLoading(false) }
     })
     return () => { cancelled = true }
   }, [url])
-  return <div style={{ width: "100%", minHeight: 58, maxHeight: 160, overflow: "auto", borderRadius: 8, border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`, background: isMe ? "#ffffff08" : "#f8f9fb", padding: 10, fontFamily: "'Fira Code', monospace", fontSize: 12, lineHeight: 1.45, color: isMe ? "rgba(255,255,255,0.92)" : "#1f2937", whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: 6 }}>
-    {text ? <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</pre> : loading ? "Chargement de l’aperçu…" : <span style={{ fontFamily: "inherit", color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage || "Aperçu non disponible"}</span>}
+
+  const copy = () => { void navigator.clipboard?.writeText(text) }
+  const rows = useMemo(() => isCsv ? text.split(/\r?\n/).filter(Boolean).slice(0, 30).map((row) => row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((cell) => cell.replace(/^"|"$/g, "").trim())) : [], [isCsv, text])
+  const visibleLines = useMemo(() => text.split(/\r?\n/).filter((line) => !query || line.toLowerCase().includes(query.toLowerCase())).slice(0, 300), [text, query])
+  const tone = isMe ? "#ffffff" : "var(--text-primary)"
+
+  return <div style={{ width: "100%", borderRadius: 8, border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`, background: isMe ? "#00000018" : "#10151d", marginBottom: 6, overflow: "hidden", color: tone }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 8px", background: isMe ? "#00000018" : "#171d27" }}>
+      <span style={{ fontFamily: "monospace", fontSize: 10, opacity: .75, fontWeight: 700 }}>{ext.toUpperCase()}</span>
+      <input aria-label="Rechercher dans le document" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher" style={{ minWidth: 0, flex: 1, border: "none", borderRadius: 4, padding: "4px 6px", background: "#ffffff14", color: tone, fontSize: 10, outline: "none" }} />
+      <button onClick={copy} title="Copier le contenu" style={{ border: "none", borderRadius: 4, cursor: "pointer", padding: "4px 6px", background: "#ffffff18", color: tone, fontSize: 10 }}>Copier</button>
+    </div>
+    {loading ? <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11 }}>Chargement de l’aperçu…</div> : errorMessage ? <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11, color: "#ffb4a2" }}>{errorMessage}</div> : isCsv ? (
+      <div style={{ overflow: "auto", maxHeight: 180 }}><table style={{ borderCollapse: "collapse", width: "100%", fontSize: 10 }}><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ border: "1px solid #ffffff18", padding: "4px 6px", whiteSpace: "nowrap" }}>{cell}</td>)}</tr>)}</tbody></table>{text.split(/\r?\n/).filter(Boolean).length > 30 && <div style={{ padding: 6, fontSize: 10, opacity: .65 }}>30 premières lignes affichées</div>}</div>
+    ) : <div style={{ maxHeight: 180, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11, lineHeight: 1.48, padding: "6px 0" }}>{visibleLines.map((line, index) => <div key={index} style={{ display: "flex", paddingRight: 8, background: query && line.toLowerCase().includes(query.toLowerCase()) ? "#fbbf241f" : undefined }}><span style={{ width: 32, flexShrink: 0, textAlign: "right", paddingRight: 8, userSelect: "none", opacity: .42 }}>{index + 1}</span><code style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", color: line.trimStart().startsWith("#") ? "#8be9fd" : line.includes(":") ? "#f8c878" : tone }}>{line}</code></div>)}</div>}
   </div>
 }
-
 
 function VideoPreview({ src, name, size, durationMs }: { src: string; name?: string; size?: string; durationMs?: number }) {
   const [failed, setFailed] = useState(false)
@@ -967,7 +982,7 @@ function MessageBubble({
                     // Pour les images, PDF, CSV, DOC avec URL : on affiche le preview natif
                     const isImageFile = mediaSrc && (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext))
                     const isPdfFile = mediaSrc && (ext === "pdf" || mime === "application/pdf")
-                    const isTextOrCodeFile = mediaSrc && (["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].includes(ext) || mime.startsWith("text/"))
+                    const isTextOrCodeFile = mediaSrc && (["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].includes(ext) || mime.startsWith("text/"))
                     const isDocFile = mediaSrc && (["doc","docx"].includes(ext) || mime.includes("word")) && !mediaSrc.startsWith("blob:")
                     const isSpreadsheetFile = mediaSrc && (["xls","xlsx","ods","numbers"].includes(ext) || mime.includes("spreadsheet") || mime.includes("excel")) && !mediaSrc.startsWith("blob:")
                     const isPresentationFile = mediaSrc && (["ppt","pptx"].includes(ext) || mime.includes("presentation")) && !mediaSrc.startsWith("blob:")
@@ -1007,7 +1022,7 @@ function MessageBubble({
                       )
                     }
                     if (isTextOrCodeFile) {
-                      return <TextFilePreview url={mediaSrc} isMe={isMe} />
+                      return <TextFilePreview url={mediaSrc} isMe={isMe} name={msg.fileName} />
                     }
 
                     // Fallback : carte d'aperçu avec info, bouton Ouvrir/Télécharger, et cercle de chargement
