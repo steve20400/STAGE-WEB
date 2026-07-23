@@ -402,7 +402,7 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
  */
 function CallEventChip({ call }: { call: CallRecord }) {
   const isOutgoing = call.direction === "out"
-  const outcome = call.status === "missed" ? "Appel manqué" : call.status === "no_answer" ? "Sans réponse" : call.status === "declined" ? "Appel rejeté" : call.status === "busy" ? "Occupé" : ""
+  const outcome = call.status === "missed" || call.status === "no_answer" ? "Appel manqué" : call.status === "declined" ? "Appel rejeté" : call.status === "busy" ? "Occupé" : ""
   const failed = Boolean(outcome)
 
   const label = `${call.type === "video" ? "Appel vidéo" : "Appel vocal"}${outcome ? ` — ${outcome}` : ""}`
@@ -594,6 +594,17 @@ function TextFilePreview({ url, isMe }: { url: string; isMe: boolean }) {
   return <div style={{ width: "100%", minHeight: 58, maxHeight: 160, overflow: "auto", borderRadius: 8, border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`, background: isMe ? "#ffffff08" : "#f8f9fb", padding: 10, fontFamily: "'Fira Code', monospace", fontSize: 12, lineHeight: 1.45, color: isMe ? "rgba(255,255,255,0.92)" : "#1f2937", whiteSpace: "pre-wrap", wordBreak: "break-word", marginBottom: 6 }}>
     {text ? <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</pre> : loading ? "Chargement de l’aperçu…" : <span style={{ fontFamily: "inherit", color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage || "Aperçu non disponible"}</span>}
   </div>
+}
+
+
+function VideoPreview({ src, name, size, durationMs }: { src: string; name?: string; size?: string; durationMs?: number }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <div style={{ marginBottom: 6, padding: "10px 12px", borderRadius: 9, background: "#00000012", fontSize: 11 }}>
+    <div style={{ fontWeight: 600 }}>{name ?? "Vidéo"}</div>
+    <div style={{ opacity: 0.72, marginTop: 3 }}>{size ?? "Taille inconnue"} · {formatAudioDuration(durationMs)}</div>
+    <div style={{ opacity: 0.72, marginTop: 4 }}>Aperçu indisponible — le fichier reste téléchargeable.</div>
+  </div>
+  return <video src={src} controls preload="metadata" onError={() => setFailed(true)} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block", marginBottom: 6 }} />
 }
 
 function MessageBubble({
@@ -939,23 +950,11 @@ function MessageBubble({
                 )}
 
                 {msg.type === "video" && mediaSrc && (
-                  <div style={{ marginBottom: 6 }}>
-                    <video
-                      src={mediaSrc}
-                      controls
-                      preload="metadata"
-                      style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block" }}
-                    />
-                  </div>
+                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} />
                 )}
 
                 {msg.type === "file" && mediaSrc && isVideoFile && (
-                  <video
-                    src={mediaSrc}
-                    controls
-                    preload="metadata"
-                    style={{ maxWidth: 300, maxHeight: 260, borderRadius: 10, display: "block" }}
-                  />
+                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} />
                 )}
 
                 {msg.type === "file" && (!mediaSrc || !isVideoFile) && (() => {

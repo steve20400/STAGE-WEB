@@ -21,3 +21,13 @@ Le destinataire envoie l'état WebSocket `ringing` dès qu'il reçoit l'appel en
 - **Appel terminé** : appel normalement décroché puis clos (`ENDED`).
 
 Le backend actuel ne persiste pas `BUSY` comme statut d'historique distinct. Le frontend peut donc l'indiquer au moment de l'échec, mais ne peut pas l'ajouter durablement à l'historique sans une évolution backend, qui n'a pas été faite.
+
+## Règle de fin confirmée
+
+- Un appel clos sans `answeredAt` est affiché en rouge comme **Appel manqué** dans le fil de discussion.
+- Un appel `REJECTED` est affiché en rouge comme **Appel rejeté**.
+- Un appel avec `answeredAt` est conservé comme événement normal : **Appel vocal** ou **Appel vidéo**, durée incluse, vert chez l'appelant et bleu chez le destinataire.
+
+## Repli média
+
+Les requêtes de preview utilisent le jeton de session dans l'en-tête `Authorization: Bearer`. Si un lecteur vidéo ne peut pas décoder ou charger un média, la carte affiche le nom, la taille et la durée du fichier, sans masquer le message ni forcer un téléchargement.

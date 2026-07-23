@@ -73,8 +73,10 @@ function mapStatus(c: BackendCall): CallStatus {
   if (c.status === "REJECTED") return "declined"
   // MISSED est produit quand le destinataire laisse sonner/termine avant réponse.
   // Côté appelant, le même événement se présente comme « Sans réponse ».
-  if (c.status === "MISSED") return c.isOutgoing ? "no_answer" : "missed"
-  if (c.status === "RINGING") return c.isOutgoing ? "no_answer" : "missed"
+  if (c.status === "MISSED" || c.status === "RINGING") return c.isOutgoing ? "no_answer" : "missed"
+  // Le backend clôt un appel annulé avant réponse en ENDED ; answeredAt permet
+  // de le distinguer d'un appel réellement décroché, sans changement backend.
+  if (c.status === "ENDED" && !c.answeredAt) return c.isOutgoing ? "no_answer" : "missed"
   return "ended"
 }
 
