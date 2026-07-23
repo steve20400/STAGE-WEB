@@ -11,17 +11,13 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" })
   const id = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id
   if (!id || !/^[a-zA-Z0-9-]+$/.test(id)) return res.status(400).json({ error: "Invalid media id" })
-  // Les balises img/video/audio et Office Online ne peuvent pas fournir un header.
-  // Le backend accepte officiellement ?token= pour ce cas : on le relaie intact.
-  const token = Array.isArray(req.query.token) ? req.query.token[0] : req.query.token
   const authorization = req.headers.authorization
-  if (!authorization && !token) return res.status(401).json({ error: "Authorization required" })
+  if (!authorization) return res.status(401).json({ error: "Authorization required" })
 
   try {
     // redirect: follow est essentiel : B2 est lu côté Vercel, pas par le navigateur.
-    const query = token ? `?token=${encodeURIComponent(token)}${req.query.download === "1" ? "&download=1" : ""}` : (req.query.download === "1" ? "?download=1" : "")
-    const upstream = await fetch(`${BACKEND_URL}/api/media/${encodeURIComponent(id)}${query}`, {
-      headers: authorization ? { Authorization: authorization } : undefined, redirect: "follow",
+    const upstream = await fetch(`${BACKEND_URL}/api/media/${encodeURIComponent(id)}`, {
+      headers: { Authorization: authorization }, redirect: "follow",
     })
     if (!upstream.ok) {
       const detail = await upstream.text().catch(() => "")

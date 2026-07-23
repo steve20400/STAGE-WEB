@@ -1,6 +1,5 @@
 import { initIndexedDB } from "../indexedDB/schema"
 import { loadSessionToken } from "../data/session-auth"
-import { refreshMediaSession } from "../lib/api-client"
 
 /** Taille maximale volontaire pour éviter de remplir le stockage du téléphone. */
 const MAX_CACHED_PREVIEW_BYTES = 30 * 1024 * 1024
@@ -60,15 +59,10 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
   // Le backend accepte le Bearer et aussi ?token=. Le header est indispensable
   // lorsqu'un navigateur/mobile retire ou ne transmet pas le paramètre après une redirection.
   const token = loadSessionToken()
-  let response = await fetch(previewRequestUrl(url), {
+  const response = await fetch(previewRequestUrl(url), {
     credentials: "same-origin",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   })
-  // Une preview peut être le premier accès après expiration : renouveler puis rejouer une fois.
-  if (response.status === 401 && await refreshMediaSession()) {
-    const renewed = loadSessionToken()
-    response = await fetch(previewRequestUrl(url), { credentials: "same-origin", headers: renewed ? { Authorization: `Bearer ${renewed}` } : undefined })
-  }
   if (!response.ok) throw new Error(`Chargement échoué (${response.status})`)
   const blob = await response.blob()
   if (blob.size <= MAX_CACHED_PREVIEW_BYTES) {

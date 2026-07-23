@@ -38,17 +38,8 @@ export function resolveMediaUrl(relativeUrl: string, options?: { download?: bool
   if (!relativeUrl) return ""
   // Ignorer les URLs locales générées côté client (blob:, data:)
   if (/^(blob:|data:)/.test(relativeUrl)) return relativeUrl
-  const token = loadSessionToken() ?? ""
-  const mediaId = relativeUrl.match(/\/api\/media\/([a-zA-Z0-9-]+)/)?.[1]
-  // Les médias HTML (avatars, image, vidéo, audio et Office) passent par le
-  // proxy Vercel. Il relaie exactement le token prévu par l'API média et suit B2.
-  if (import.meta.env.PROD && mediaId) {
-    const origin = typeof window !== "undefined" ? window.location.origin : ""
-    const query = new URLSearchParams({ token })
-    if (options?.download) query.set("download", "1")
-    return `${origin}/api/media-proxy/${mediaId}?${query.toString()}`
-  }
   const base = /^https?:\/\//.test(relativeUrl) ? relativeUrl : `${API_BASE_URL}${relativeUrl}`
+  const token = loadSessionToken() ?? ""
   const sep = base.includes("?") ? "&" : "?"
   const download = options?.download ? "&download=1" : ""
   return `${base}${sep}token=${encodeURIComponent(token)}${download}`
