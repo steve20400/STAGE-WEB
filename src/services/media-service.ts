@@ -38,8 +38,18 @@ export function resolveMediaUrl(relativeUrl: string, options?: { download?: bool
   if (!relativeUrl) return ""
   // Ignorer les URLs locales générées côté client (blob:, data:)
   if (/^(blob:|data:)/.test(relativeUrl)) return relativeUrl
-  const base = /^https?:\/\//.test(relativeUrl) ? relativeUrl : `${API_BASE_URL}${relativeUrl}`
   const token = loadSessionToken() ?? ""
+  // En production Vercel, tous les binaires /api/media passent par notre proxy
+  // same-origin. Cela couvre aussi <img>, avatars et Office Online, qui ne
+  // peuvent pas envoyer eux-mêmes un header Authorization après une redirection B2.
+  const mediaId = relativeUrl.match(/\/api\/media\/([a-zA-Z0-9-]+)/)?.[1]
+  if (import.meta.env.PROD && mediaId) {
+    const query = new URLSearchParams({ token })
+    if (options?.download) query.set("download", "1")
+    const origin = typeof window !== "undefined" ? window.location.origin : ""
+    return `${origin}/api/media-proxy/${mediaId}?${query.toString()}`
+  }
+  const base = /^https?:\/\//.test(relativeUrl) ? relativeUrl : `${API_BASE_URL}${relativeUrl}`
   const sep = base.includes("?") ? "&" : "?"
   const download = options?.download ? "&download=1" : ""
   return `${base}${sep}token=${encodeURIComponent(token)}${download}`

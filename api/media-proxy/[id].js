@@ -11,12 +11,17 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" })
   const id = Array.isArray(req.query.id) ? req.query.id[0] : req.query.id
   if (!id || !/^[a-zA-Z0-9-]+$/.test(id)) return res.status(400).json({ error: "Invalid media id" })
-  const authorization = req.headers.authorization
+  // Les balises img/video et Office Online ne peuvent pas ajouter un header.
+  // Elles transmettent donc le token déjà signé dans l'URL same-origin ; les fetch
+  // applicatifs continuent à utiliser Authorization.
+  const token = Array.isArray(req.query.token) ? req.query.token[0] : req.query.token
+  const authorization = req.headers.authorization || (token ? `Bearer ${token}` : "")
   if (!authorization) return res.status(401).json({ error: "Authorization required" })
 
   try {
     // redirect: follow est essentiel : B2 est lu côté Vercel, pas par le navigateur.
-    const upstream = await fetch(`${BACKEND_URL}/api/media/${encodeURIComponent(id)}`, {
+    const forceDownload = req.query.download === "1" ? "?download=1" : ""
+    const upstream = await fetch(`${BACKEND_URL}/api/media/${encodeURIComponent(id)}${forceDownload}`, {
       headers: { Authorization: authorization }, redirect: "follow",
     })
     if (!upstream.ok) {
