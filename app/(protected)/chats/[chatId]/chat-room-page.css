@@ -236,7 +236,7 @@
 
 /* zone de saisie */
 .room-input-wrap {
-  padding: 12px 16px 16px;
+  padding: 12px 16px 0;
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
   background: var(--bg-base);

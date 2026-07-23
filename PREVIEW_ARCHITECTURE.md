@@ -102,3 +102,7 @@ Sur un aperçu documentaire, un **double-clic** PC ou un **double-tap** tactile 
 ### Menus contextuels et pièce jointe
 
 Le menu d'actions `⋮` d'un message utilise un écouteur `pointerdown` : dès qu'un clic ou un tap survient hors de sa fenêtre, il se ferme. Le sélecteur de pièce jointe applique le même comportement, tout en s'ouvrant explicitement par clic/tap sur le trombone (et par survol sur ordinateur, conformément au comportement demandé précédemment).
+
+### Audio et composeur
+
+Le menu `⋮` d'un message audio contient l'action **Télécharger l’audio**. Elle crée un lien temporaire vers l'URL média avec `download=1`, pour demander au backend un téléchargement forcé tout en gardant les contrôles d'accès. Le texte d'aide sous le composeur a été retiré et la zone de saisie garde son ancrage au bas (`bottom`) du panneau de conversation, sans espace d'information supplémentaire.

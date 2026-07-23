@@ -738,6 +738,17 @@ function MessageBubble({
   const openExpandedPreview = () => {
     if (mediaSrc) setViewingDoc({ url: mediaSrc, name: msg.fileName, mime: msg.mediaMime })
   }
+  const downloadAudio = () => {
+    if (!mediaSrc) return
+    const link = document.createElement("a")
+    link.href = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : mediaSrc
+    link.download = msg.fileName ?? "audio"
+    link.rel = "noreferrer"
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
   const onPreviewPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch") return
     const now = Date.now()
@@ -878,6 +889,7 @@ function MessageBubble({
                 {menuItem("Repondre", () => onReply(msg))}
                 {msg.content ? menuItem("Copier", () => onCopy(msg)) : null}
                 {canExpandMedia ? menuItem("Agrandir", openExpandedPreview) : null}
+                {msg.type === "audio" && mediaSrc ? menuItem("Télécharger l’audio", downloadAudio) : null}
                 {menuItem("Transferer", () => onForward(msg))}
                 {menuItem("Supprimer pour moi", () => onDelete(msg, "me"), true)}
                 {isMe
@@ -2347,9 +2359,7 @@ export default function ChatRoomPage() {
             </>
           )}
         </div>
-        <div className="input-hint">
-          Entree pour envoyer - Shift+Entree pour sauter une ligne - Max 2 Go par fichier
-        </div>
+
       </div>
 
       {/* Visionneuse d'image plein ecran */}
