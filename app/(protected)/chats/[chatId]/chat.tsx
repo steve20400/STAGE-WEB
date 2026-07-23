@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import type { PDFDocumentLoadingTask } from "pdfjs-dist"
-import { Navigate, useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   CHAT_COLORS,
   type ChatMessageMock,
@@ -1251,6 +1251,11 @@ export default function ChatRoomPage() {
   const [recordSec, setRecordSec] = useState(0)
 
   const bottomRef = useRef<HTMLDivElement>(null)
+  const messagesBodyRef = useRef<HTMLDivElement>(null)
+  // Evite que les refresh/previews renvoient l'utilisateur en bas pendant sa lecture.
+  const isNearBottomRef = useRef(true)
+  const lastMessageIdRef = useRef<string | null>(null)
+  const initialScrollDoneRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const attachRef = useRef<HTMLDivElement>(null)
@@ -1437,10 +1442,32 @@ export default function ChatRoomPage() {
     )
   }, [chat, messages])
 
-  // Scroll en bas a chaque nouveau message
+  // Scroll intelligent : le chargement des previews ou la synchronisation ne doit
+  // jamais déplacer quelqu'un qui consulte les anciens messages.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (messages.length === 0) return
+    const newestId = messages[messages.length - 1]?.id ?? null
+    if (!initialScrollDoneRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "auto" })
+      initialScrollDoneRef.current = true
+    } else if (newestId !== lastMessageIdRef.current && isNearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+    lastMessageIdRef.current = newestId
   }, [messages])
+
+  // Chaque conversation possède son propre chargement initial.
+  useEffect(() => {
+    initialScrollDoneRef.current = false
+    lastMessageIdRef.current = null
+    isNearBottomRef.current = true
+  }, [chatId])
+
+  const handleMessagesScroll = () => {
+    const body = messagesBodyRef.current
+    if (!body) return
+    isNearBottomRef.current = body.scrollHeight - body.scrollTop - body.clientHeight < 100
+  }
 
   // Reevalue la presence toutes les 30 s (pour faire expirer le "En ligne").
   useEffect(() => {
@@ -1757,7 +1784,9 @@ export default function ChatRoomPage() {
   }
 
   if (!chat) {
-    return <Navigate to="/chats" replace />
+    // Ne pas rediriger brutalement après un échec réseau temporaire : cela faisait
+    // « disparaître » la discussion quelques secondes après son ouverture.
+    return <div className="room-root" style={{ padding: 24, color: "var(--text-muted)" }}>Conversation temporairement indisponible. Vérifiez la connexion puis revenez à la liste des discussions.</div>
   }
 
   const color = CHAT_COLORS[chat.colorIdx % CHAT_COLORS.length]
@@ -1883,7 +1912,7 @@ export default function ChatRoomPage() {
         </div>
       </div>
 
-      <div className="room-body">
+      <div ref={messagesBodyRef} className="room-body" onScroll={handleMessagesScroll}>
         {grouped.map(({ date, items }) => (
           <div key={date}>
             <div className="date-sep">
