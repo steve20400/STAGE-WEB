@@ -243,7 +243,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
 
                   <div className="ncm-meta">
                     <div className="ncm-name">{contact.name}</div>
-                    <div className="ncm-phone">{contact.phone}</div>
+                    <div className="ncm-phone">{formatAlanyaNumber(contact.phone)}</div>
                   </div>
 
                   {mode === "group" && (

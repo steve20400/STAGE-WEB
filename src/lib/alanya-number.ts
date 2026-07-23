@@ -13,7 +13,7 @@
 export const ALANYA_NUMBER_LENGTHS = [6, 8] as const
 
 /** Longueur maximale a autoriser dans les champs de saisie. */
-export const ALANYA_NUMBER_MAX_LENGTH = 8
+export const ALANYA_NUMBER_MAX_LENGTH = 10
 
 /** Retire tout caractere non numerique (espaces, tirets colles au copier-coller). */
 export function normalizeAlanyaNumber(value: string): string {
@@ -27,20 +27,22 @@ export function isValidAlanyaNumber(value: string): boolean {
 }
 
 /**
- * Formate un numero pour l'affichage/saisie, avec des tirets :
- * - 6 chiffres  -> groupes de 3 : "123-456"
- * - 7-8 chiffres -> groupes de 2 : "12-34-56-78"
- * Les chiffres au-dela de 8 sont ignores. Utilise pendant la frappe.
+ * Formate un numéro Alanya avec des espaces, pendant la saisie et à l'affichage.
+ * 1-3: 123 | 4: 12 34 | 5: 12 34 5 | 6: 123 456 | 7: 123 456 7
+ * 8: 12 34 56 78 | 9: 123 456 789 | 10: 1 234 567 890.
  */
 export function formatAlanyaNumber(value: string): string {
   const digits = normalizeAlanyaNumber(value).slice(0, ALANYA_NUMBER_MAX_LENGTH)
-  const groupSize = digits.length <= 6 ? 3 : 2
-  const groups: string[] = []
-  for (let i = 0; i < digits.length; i += groupSize) {
-    groups.push(digits.slice(i, i + groupSize))
-  }
-  return groups.join("-")
+  const length = digits.length
+  if (length <= 3) return digits
+  if (length === 4) return `${digits.slice(0, 2)} ${digits.slice(2)}`
+  if (length === 5) return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4)}`
+  if (length === 6) return `${digits.slice(0, 3)} ${digits.slice(3)}`
+  if (length === 7) return `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
+  if (length === 8) return digits.match(/.{1,2}/g)?.join(" ") ?? digits
+  if (length === 9) return digits.match(/.{1,3}/g)?.join(" ") ?? digits
+  return `${digits.slice(0, 1)} ${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`
 }
 
 /** Longueur max d'un numero formate (8 chiffres + 3 tirets). */
-export const ALANYA_NUMBER_FORMATTED_MAX_LENGTH = 11
+export const ALANYA_NUMBER_FORMATTED_MAX_LENGTH = 13
