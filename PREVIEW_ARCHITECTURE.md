@@ -57,3 +57,7 @@ Le proxy peut résoudre CORS, mais ne peut pas contourner une réponse B2 réell
 
 - Le fil ne scroll plus automatiquement lors du chargement des previews ni lors des synchronisations périodiques ; il ne descend que pour le chargement initial ou pour un nouveau message lorsque l'utilisateur est déjà près du bas.
 - `AppErrorBoundary` entoure l'application. Une exception imprévue dans un preview, WebRTC ou un composant ne peut plus laisser un écran entièrement blanc : une page de récupération avec bouton de rechargement est affichée. Les messages restent stockés côté serveur/cache local.
+
+## Isolation des erreurs de preview
+
+Chaque `MessageBubble` est maintenant entouré par `MessageErrorBoundary`. Si un navigateur particulier, un fichier corrompu ou une donnée historique imprévue provoque une exception dans un preview, seule cette carte est remplacée par un repli indiquant nom et taille. La discussion, les autres fichiers et toute l'application restent utilisables. Le dernier diagnostic technique est enregistré localement sous `alanya_last_preview_error` pour faciliter le débogage, sans l'envoyer à un tiers.

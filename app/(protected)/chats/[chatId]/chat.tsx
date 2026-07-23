@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { Component, useState, useRef, useEffect, useCallback, useMemo, type ErrorInfo, type ReactNode } from "react"
 import type { PDFDocumentLoadingTask } from "pdfjs-dist"
 import { useNavigate, useParams } from "react-router-dom"
 import {
@@ -51,6 +51,24 @@ import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./chat-room-page.css"
 
 type Message = ChatMessageMock
+
+/** Une carte média défectueuse ne doit jamais faire tomber toute la discussion. */
+class MessageErrorBoundary extends Component<{ children: ReactNode; name?: string; size?: string }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    try { localStorage.setItem("alanya_last_preview_error", `${new Date().toISOString()} | ${error.message} | ${info.componentStack?.slice(0, 500) ?? ""}`) } catch { /* stockage facultatif */ }
+    console.error("[Alanya preview] erreur isolée", error)
+  }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return <div style={{ margin: "6px 0", padding: "10px 12px", borderRadius: 9, border: "1px solid var(--border-subtle)", background: "var(--bg-elevated)", fontSize: 11, color: "var(--text-secondary)" }}>
+      <div style={{ fontWeight: 700 }}>{this.props.name ?? "Fichier"}</div>
+      {this.props.size && <div style={{ marginTop: 2 }}>{this.props.size}</div>}
+      <div style={{ marginTop: 5 }}>Aperçu indisponible pour ce fichier. Les autres messages restent accessibles.</div>
+    </div>
+  }
+}
 
 // Realtime : WebSocket natif du backend Alanya (evenements { type: "message" | "typing" | "read" })
 
@@ -1938,6 +1956,7 @@ export default function ChatRoomPage() {
                   })()
                 : undefined
               return (
+                <MessageErrorBoundary key={msg.id} name={msg.fileName ?? msg.content} size={msg.fileSize}>
                 <MessageBubble
                   key={msg.id}
                   msg={msg}
@@ -1952,6 +1971,7 @@ export default function ChatRoomPage() {
                   isGroup={chat?.isGroup}
                   senderName={resolvedName}
                 />
+                </MessageErrorBoundary>
               )
             })}
           </div>
