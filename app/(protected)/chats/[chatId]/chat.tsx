@@ -1242,27 +1242,6 @@ function MessageBubble({
   </>)
 }
 
-
-/** Album visuel : regroupe les images/vidéos consécutives d'un même envoi. */
-function MediaAlbum({ messages, isMe, onOpen }: { messages: Message[]; isMe: boolean; onOpen: (url: string, name?: string, mime?: string) => void }) {
-  return <div style={{ display: "flex", justifyContent: isMe ? "flex-end" : "flex-start", margin: "3px 0" }}>
-    <div style={{ maxWidth: "min(82vw, 520px)", padding: 5, borderRadius: 14, background: isMe ? "var(--accent)" : "var(--bg-elevated)", border: `1px solid ${isMe ? "#ffffff22" : "var(--border-subtle)"}` }}>
-      <div style={{ display: "flex", overflowX: "auto", gap: 5, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch", paddingBottom: 2 }}>
-        {messages.map((message) => {
-          const src = message.mediaUrl ? resolveMediaUrl(message.mediaUrl) : ""
-          const video = message.type === "video" || message.mediaMime?.startsWith("video/")
-          return <button key={message.id} onClick={() => src && onOpen(src, message.fileName, message.mediaMime)} aria-label={`Ouvrir ${message.fileName ?? "média"}`} style={{ position: "relative", border: "none", padding: 0, cursor: "pointer", width: 190, height: 180, flex: "0 0 auto", borderRadius: 10, overflow: "hidden", background: "#111", scrollSnapAlign: "start" }}>
-            {video ? <video src={src} muted preload="metadata" playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <img src={src} alt={message.fileName ?? "image"} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-            {video && <span style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#fff", fontSize: 30, textShadow: "0 2px 8px #000" }}>▶</span>}
-            <span style={{ position: "absolute", right: 6, bottom: 6, padding: "3px 6px", borderRadius: 6, background: "#0000009a", color: "#fff", fontSize: 10 }}>{message.fileName ?? (video ? "Vidéo" : "Image")}</span>
-          </button>
-        })}
-      </div>
-      <div style={{ color: isMe ? "rgba(255,255,255,.8)" : "var(--text-muted)", fontSize: 10, padding: "4px 5px 0" }}>{messages.length} fichiers · Faites glisser horizontalement</div>
-    </div>
-  </div>
-}
-
 export default function ChatRoomPage() {
   const params = useParams()
   const navigate = useNavigate()
@@ -1331,7 +1310,7 @@ export default function ChatRoomPage() {
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
   // Visionneuse d'image plein ecran
-  const [lightbox, setLightbox] = useState<{ url: string; name?: string; mime?: string } | null>(null)
+  const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null)
   // Message en cours de transfert (ouvre le selecteur de conversations)
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   // Enregistrement vocal en cours
@@ -1848,24 +1827,9 @@ export default function ChatRoomPage() {
   // Fil unifie : messages + evenements d'appel (facon WhatsApp), tries par date.
   type TimelineItem =
     | { kind: "msg"; ts: Date; msg: Message }
-    | { kind: "album"; ts: Date; messages: Message[] }
     | { kind: "call"; ts: Date; call: CallRecord }
-  const sortedMessages = [...messages].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
-  const visualMedia = (message: Message) => message.type === "image" || message.type === "video" || message.mediaMime?.startsWith("image/") || message.mediaMime?.startsWith("video/")
-  const messageTimeline: TimelineItem[] = []
-  for (let index = 0; index < sortedMessages.length;) {
-    const first = sortedMessages[index]
-    if (!visualMedia(first)) { messageTimeline.push({ kind: "msg", ts: first.timestamp, msg: first }); index++; continue }
-    const batch = [first]
-    let next = index + 1
-    // Les envois multiples créent des messages backend séparés : même expéditeur + 8 s = un album.
-    while (next < sortedMessages.length && visualMedia(sortedMessages[next]) && sortedMessages[next].senderId === first.senderId && sortedMessages[next].timestamp.getTime() - first.timestamp.getTime() <= 8000) { batch.push(sortedMessages[next]); next++ }
-    if (batch.length > 1) messageTimeline.push({ kind: "album", ts: first.timestamp, messages: batch })
-    else messageTimeline.push({ kind: "msg", ts: first.timestamp, msg: first })
-    index = next
-  }
   const timeline: TimelineItem[] = [
-    ...messageTimeline,
+    ...messages.map((msg): TimelineItem => ({ kind: "msg", ts: msg.timestamp, msg })),
     ...callEvents.map((call): TimelineItem => ({ kind: "call", ts: call.ts, call })),
   ].sort((a, b) => a.ts.getTime() - b.ts.getTime())
 
@@ -2027,10 +1991,6 @@ export default function ChatRoomPage() {
             {items.map((item) => {
               if (item.kind === "call") {
                 return <CallEventChip key={`call-${item.call.id}`} call={item.call} />
-              }
-              if (item.kind === "album") {
-                const albumIsMe = item.messages[0]?.senderId === "me"
-                return <MediaAlbum key={`album-${item.messages.map((m) => m.id).join("-")}`} messages={item.messages} isMe={albumIsMe} onOpen={(url, name, mime) => setLightbox({ url, name, mime })} />
               }
               const msg = item.msg
               const isMe = msg.senderId === "me"
@@ -2418,11 +2378,18 @@ export default function ChatRoomPage() {
             cursor: "zoom-out",
           }}
         >
-          {lightbox.mime?.startsWith("video/") ? (
-            <video src={lightbox.url} controls autoPlay playsInline onClick={(e) => e.stopPropagation()} style={{ maxWidth: "92vw", maxHeight: "88vh", borderRadius: 8, boxShadow: "0 24px 80px #000000a0", cursor: "default" }} />
-          ) : (
-            <img src={lightbox.url} alt={lightbox.name ?? "image"} onClick={(e) => e.stopPropagation()} style={{ maxWidth: "92vw", maxHeight: "88vh", borderRadius: 8, boxShadow: "0 24px 80px #000000a0", cursor: "default" }} />
-          )}
+          <img
+            src={lightbox.url}
+            alt={lightbox.name ?? "image"}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "92vw",
+              maxHeight: "88vh",
+              borderRadius: 8,
+              boxShadow: "0 24px 80px #000000a0",
+              cursor: "default",
+            }}
+          />
           <div style={{ position: "absolute", top: 16, right: 16, display: "flex", gap: 10 }}>
             <a
               href={lightbox.url.includes("?") ? `${lightbox.url}&download=1` : lightbox.url}
