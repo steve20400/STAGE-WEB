@@ -1008,7 +1008,7 @@ function MessageBubble({
             ) : (
               <>
                 {msg.type === "image" && mediaSrc && (
-                  <img src={mediaSrc} alt={msg.fileName ?? "image"} onClick={() => onOpenImage(mediaSrc, msg.fileName)} style={{ maxWidth: 280, maxHeight: 320, borderRadius: 12, display: "block", cursor: "zoom-in" }} />
+                  <img src={mediaSrc} alt={msg.fileName ?? "image"} onClick={() => onOpenImage(mediaSrc, msg.fileName)} style={{ width: "100%", maxWidth: 280, height: "auto", maxHeight: 320, objectFit: "contain", boxSizing: "border-box", borderRadius: 12, display: "block", cursor: "zoom-in" }} />
                 )}
 
                 {msg.type === "audio" && mediaSrc && (
