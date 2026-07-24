@@ -1,5 +1,4 @@
 ﻿import { useEffect, useMemo, useState } from "react"
-import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { CONTACT_COLORS } from "../../../src/data/contacts"
 import { useContacts } from "../../../src/hooks/use-contacts"
@@ -146,7 +145,7 @@ export default function NewCallPage() {
 
               <div className="call-info">
                 <div className="call-name">{contact.name}</div>
-                <div className="call-detail">{formatAlanyaNumber(contact.phone)}</div>
+                <div className="call-detail">{contact.phone}</div>
               </div>
 
               <div className="call-right">
