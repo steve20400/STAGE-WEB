@@ -13,6 +13,7 @@ import {
   saveSessionUser,
   type SessionUser,
 } from "../data/session-user"
+import { registerCurrentDevice } from "../services/device-session-service"
 import { clearSessionToken } from "../data/session-auth"
 import {
   deletePrototypeAccount,
@@ -71,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (restoredUser) {
         saveSessionUser(restoredUser)
         setUser(restoredUser)
+        void registerCurrentDevice().catch(() => undefined)
       } else {
         clearSessionToken()
         clearSessionUser()
@@ -91,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const nextUser = storeAuthenticatedSession(await loginWithPassword(payload))
     saveSessionUser(nextUser)
     setUser(nextUser)
+    void registerCurrentDevice().catch(() => undefined)
     setIsReady(true)
     return nextUser
   }, [])
@@ -99,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const nextUser = storeAuthenticatedSession(await completeRegistration(draft, otp))
     saveSessionUser(nextUser)
     setUser(nextUser)
+    void registerCurrentDevice().catch(() => undefined)
     setIsReady(true)
     return nextUser
   }, [])
