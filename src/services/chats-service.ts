@@ -226,6 +226,10 @@ export async function addMembersToGroup(
 ): Promise<void> {
   await apiRequest<void>(`/api/conversations/${convId}/members`, {
     method: "POST",
-    body: { memberNumbers },
+    body: { publicNumbers: memberNumbers },
   })
 }
+
+export async function removeGroupMember(convId:string,userId:string){ return apiRequest(`/api/conversations/${convId}/members?userId=${encodeURIComponent(userId)}`,{method:"DELETE"}) }
+export async function setGroupMemberRole(convId:string,userId:string,role:"ADMIN"|"MEMBER"){ return apiRequest(`/api/conversations/${convId}/members`,{method:"PATCH",body:{userId,role}}) }
+export async function leaveGroup(convId:string){ return apiRequest(`/api/conversations/${convId}/leave`,{method:"POST"}) }

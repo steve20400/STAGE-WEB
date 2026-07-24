@@ -5,7 +5,7 @@ import { loadContacts } from "../../../../src/data/contacts"
 import { loadLocalConversations } from "../../../../src/data/local-conversations"
 import { findLocalGroup } from "../../../../src/data/local-groups"
 import { fetchContacts } from "../../../../src/services/contacts-service"
-import { fetchConversationById, addMembersToGroup } from "../../../../src/services/chats-service"
+import { fetchConversationById, addMembersToGroup, leaveGroup as leaveGroupApi, removeGroupMember, setGroupMemberRole } from "../../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 
@@ -137,9 +137,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
       confirmLabel: "Exclure",
       tone: "danger",
       onConfirm: () => {
-        setMembers((prev) => prev.filter((entry) => entry.id !== id))
-        warning(`${member.name} retire du groupe`)
-        // TODO : DELETE /api/chats/:convId/members/:memberId
+        void removeGroupMember(conv.id, id).then(() => { setMembers((prev) => prev.filter((entry) => entry.id !== id)); warning(`${member.name} retire du groupe`) }).catch(() => warning("Retrait impossible"))
       },
     })
   }
@@ -151,9 +149,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
       confirmLabel: "Quitter",
       tone: "warning",
       onConfirm: () => {
-        // TODO : POST /api/chats/:convId/leave
-        success("Vous avez quitte le groupe")
-        navigate("/chats")
+        void leaveGroupApi(conv.id).then(() => { success("Vous avez quitte le groupe"); navigate("/chats") }).catch(() => warning("Impossible de quitter le groupe"))
       },
     })
   }
@@ -173,9 +169,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   }
 
   const promoteAdmin = (id: string) => {
-    setMembers((prev) =>
-      prev.map((member) => (member.id === id ? { ...member, role: "admin" } : member))
-    )
+    void setGroupMemberRole(conv.id, id, "ADMIN").then(() => setMembers((prev) => prev.map((member) => member.id === id ? { ...member, role: "admin" } : member))).catch(() => warning("Promotion impossible"))
     const member = members.find((entry) => entry.id === id)
     if (!member) return
     info(`${member.name} est maintenant administrateur`)
