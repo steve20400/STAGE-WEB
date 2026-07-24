@@ -51,7 +51,7 @@ dans un `.env.local`.
 # Backend Next.js (local : http://localhost:3000)
 VITE_API_BASE_URL=https://backend-alanya.vercel.app
 # Serveur WebSocket (local : ws://localhost:3001)
-VITE_WS_URL=wss://alanya-ws.onrender.com
+VITE_WS_URL=wss://alanya-ws.d-bria00.workers.dev
 VITE_DATA_MODE=api
 ```
 

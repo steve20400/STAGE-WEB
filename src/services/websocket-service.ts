@@ -76,7 +76,7 @@ const pendingSends: string[] = []
 
 /* ----------------- Robustesse de la connexion -----------------
  * Deux pieges en production :
- * 1. le serveur WS (Render gratuit) s'endort apres ~15 min sans trafic HTTP,
+ * 1. le serveur WebSocket Cloudflare Workers s'endort apres ~15 min sans trafic HTTP,
  *    ce qui tue toutes les connexions ;
  * 2. les NAT/proxies coupent silencieusement les WebSocket inactifs : le
  *    navigateur croit etre connecte mais ne recoit plus rien (messages plus
