@@ -325,6 +325,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
 // LAYOUT PROTEGE
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const call = useCallState()
   const [mobileOpen, setMobileOpen] = useState(false)
   // Navigation repliee par defaut (plus de place pour les discussions).
   const [collapsed, setCollapsed] = useState(() => {
@@ -345,7 +346,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className={`layout-root ${collapsed ? "nav-collapsed" : ""}`}>
+    <div className={`layout-root ${collapsed ? "nav-collapsed" : ""} ${call.activeCallId && call.displayMode === "compact" ? "call-compact" : ""}`}>
       <div className="layout-sidebar-static">
         <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       </div>
