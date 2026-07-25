@@ -1156,14 +1156,9 @@ export default function ConvInfoPage() {
 
   return (
     <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        background: "var(--bg-base)",
-        justifyContent: "center",
-      }}
+      style={{ display: "flex", minHeight: embedded ? "100%" : "100vh", background: "var(--bg-base)", justifyContent: "center", width: "100%" }}
     >
-      <ConvInfoPanel info={convInfo} onClose={() => navigate(-1)} />
+      <ConvInfoPanel info={convInfo} onClose={() => embedded ? onEmbeddedClose?.() : navigate(-1)} />
     </div>
   )
 }

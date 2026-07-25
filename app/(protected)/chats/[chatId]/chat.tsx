@@ -48,6 +48,7 @@ import { getMyUserId } from "../../../../src/data/session-user"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { fetchCallsForConversation, type CallRecord } from "../../../../src/services/calls-service"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
+import ChatInfoPage from "./chat-info"
 import "./chat-room-page.css"
 
 type Message = ChatMessageMock
@@ -1317,6 +1318,7 @@ export default function ChatRoomPage() {
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
+  const [infoPanelOpen, setInfoPanelOpen] = useState(false)
   // Visionneuse d'image plein ecran
   const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null)
   // Message en cours de transfert (ouvre le selecteur de conversations)
@@ -1931,17 +1933,14 @@ export default function ChatRoomPage() {
             title="Appel audio"
             onClick={() => startCallFromChat("audio")}
           >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
+            {infoPanelOpen ? <span style={{ fontSize: 21, lineHeight: 1 }}>×</span> : <svg width="15" height="15" viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.8"
               strokeLinecap="round"
             >
               <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-            </svg>
+            </svg>}
           </button>
           {/* Appel video */}
           <button
@@ -1968,9 +1967,9 @@ export default function ChatRoomPage() {
             className="action-btn"
             aria-label="Infos conversation"
             title="Infos"
-            onClick={() => navigate(`/chats/${chatId}/info`)}
+            onClick={() => { if (window.matchMedia("(min-width: 901px)").matches) setInfoPanelOpen((open) => !open); else navigate(`/chats/${chatId}/info`) }}
           >
-            <svg
+            {infoPanelOpen ? <span style={{ fontSize: 21, lineHeight: 1 }}>×</span> : <svg
               width="15"
               height="15"
               viewBox="0 0 24 24"
@@ -1982,7 +1981,7 @@ export default function ChatRoomPage() {
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="16" x2="12" y2="12" />
               <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
+            </svg>}
           </button>
         </div>
       </div>
@@ -2369,6 +2368,8 @@ export default function ChatRoomPage() {
         </div>
 
       </div>
+
+      {infoPanelOpen && <aside className="chat-info-drawer"><ChatInfoPage embedded onEmbeddedClose={() => setInfoPanelOpen(false)} /></aside>}
 
       {/* Visionneuse d'image plein ecran */}
       {lightbox && (
