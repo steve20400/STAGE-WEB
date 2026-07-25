@@ -54,6 +54,7 @@ function mapType(type?: string): MessageType {
   if (t === "IMAGE") return "image"
   if (t === "AUDIO") return "audio"
   if (t === "FILE" || t === "VIDEO") return "file"
+  if (t === "SYSTEM") return "system"
   return "text"
 }
 
@@ -68,6 +69,7 @@ function toBackendType(type: MessageType): string {
   if (type === "image") return "IMAGE"
   if (type === "audio") return "AUDIO"
   if (type === "file") return "FILE"
+  if (type === "system") return "SYSTEM"
   return "TEXT"
 }
 

@@ -1,5 +1,5 @@
 export type MessageStatus = "sending" | "sent" | "delivered" | "read"
-export type MessageType = "text" | "file" | "image" | "audio" | "video"
+export type MessageType = "text" | "file" | "image" | "audio" | "video" | "system"
 
 export interface ConversationMock {
   id: string

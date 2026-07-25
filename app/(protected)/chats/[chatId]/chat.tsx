@@ -786,6 +786,14 @@ function MessageBubble({
     </button>
   )
 
+  if (msg.type === "system") {
+    return <div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
+      <div style={{ maxWidth: "82%", padding: "6px 12px", borderRadius: 14, background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)", textAlign: "center", fontSize: 11, lineHeight: 1.35 }}>
+        {msg.content}
+      </div>
+    </div>
+  }
+
   return (<>
     <div
       style={{
