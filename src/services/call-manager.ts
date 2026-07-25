@@ -858,14 +858,22 @@ export function toggleMicrophone(): boolean {
 /** Bascule entre les caméras disponibles et remplace la piste chez tous les pairs WebRTC. */
 export async function switchCamera(): Promise<boolean> {
   if (!localStream) return false
-  const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput")
-  if (devices.length < 2) return false
   const current = localStream.getVideoTracks()[0]
-  const currentId = current?.getSettings().deviceId
-  const next = devices.find((d) => d.deviceId !== currentId) ?? devices[0]
-  const replacement = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: next.deviceId } }, audio: false })
-  const nextTrack = replacement.getVideoTracks()[0]
-  if (!nextTrack) return false
+  const currentFacing = current?.getSettings().facingMode
+  const targetFacing = currentFacing === "environment" ? "user" : "environment"
+  let replacement: MediaStream | null = null
+  // Android Chrome reconnaît généralement facingMode même lorsque les labels/deviceId
+  // sont masqués. On l'essaie d'abord, puis on retombe sur les appareils physiques.
+  try { replacement = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: targetFacing } }, audio: false }) } catch { /* fallback */ }
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  const cameras = devices.filter((device) => device.kind === "videoinput")
+  const candidate = cameras.find((device) => device.deviceId !== current?.getSettings().deviceId)
+  if ((!replacement || replacement.getVideoTracks()[0]?.getSettings().deviceId === current?.getSettings().deviceId) && candidate) {
+    replacement?.getTracks().forEach((track) => track.stop())
+    try { replacement = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: candidate.deviceId } }, audio: false }) } catch { return false }
+  }
+  const nextTrack = replacement?.getVideoTracks()[0]
+  if (!nextTrack || nextTrack.getSettings().deviceId === current?.getSettings().deviceId) { replacement?.getTracks().forEach((track) => track.stop()); return false }
   current?.stop()
   if (current) localStream.removeTrack(current)
   localStream.addTrack(nextTrack)
