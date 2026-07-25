@@ -7,6 +7,7 @@ import {
   toggleCamera,
   toggleMicrophone,
   switchCamera,
+  minimizeActiveCall,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
 import "./call-room-page.css"
@@ -457,7 +458,7 @@ export default function CallRoomPage() {
               {call.activeConvId && (
                 <button
                   className="ctrl-btn"
-                  onClick={() => navigate(`/chats/${call.activeConvId}`)}
+                  onClick={() => { minimizeActiveCall(); navigate(`/chats/${call.activeConvId}`) }}
                   aria-label="Ouvrir le chat"
                 >
                   <div className="ctrl-btn-icon ctrl-on">

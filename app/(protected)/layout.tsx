@@ -2,6 +2,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../src/components/auth-provider"
 import { ThemeToggle } from "../../src/components/theme-toggle"
+import { ActiveCallFloating } from "../../src/components/active-call-floating"
 import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
 import { acceptIncomingCall, dismissIncomingCallLocally, rejectIncomingCall } from "../../src/services/call-manager"
@@ -383,6 +384,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Overlay global d'appel entrant (WebSocket incoming_call) */}
+      <ActiveCallFloating />
       <GlobalIncomingCall />
     </div>
   )

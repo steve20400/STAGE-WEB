@@ -65,6 +65,7 @@ export interface CallManagerState {
   /** Rempli quand l'appel se termine (par nous ou a distance). */
   endedAt: number | null
   error: string | null
+  displayMode: "full" | "compact"
 }
 
 interface WebrtcSignal {
@@ -251,6 +252,7 @@ function initialState(): CallManagerState {
     camOn: true,
     endedAt: null,
     error: null,
+    displayMode: "full",
   }
 }
 
@@ -893,6 +895,10 @@ export function toggleCamera(): boolean {
 }
 
 /** Efface le marqueur "appel termine" (apres l'ecran de fin). */
+/** Affichage persistant pendant navigation chat/application. Ne touche jamais aux flux WebRTC. */
+export function minimizeActiveCall(): void { if (state.activeCallId) setState({ displayMode: "compact" }) }
+export function restoreActiveCall(): void { if (state.activeCallId) setState({ displayMode: "full" }) }
+
 export function acknowledgeCallEnded() {
   if (state.endedAt !== null || state.error !== null) {
     setState({ endedAt: null, error: null })
