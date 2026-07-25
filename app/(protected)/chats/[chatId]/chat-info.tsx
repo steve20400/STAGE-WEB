@@ -5,8 +5,9 @@ import { loadContacts } from "../../../../src/data/contacts"
 import { loadLocalConversations } from "../../../../src/data/local-conversations"
 import { findLocalGroup } from "../../../../src/data/local-groups"
 import { fetchContacts } from "../../../../src/services/contacts-service"
-import { fetchConversationById, addMembersToGroup, leaveGroup as leaveGroupApi, removeGroupMember, setGroupMemberRole } from "../../../../src/services/chats-service"
+import { fetchConversationById, addMembersToGroup, deleteGroupConversation, leaveGroup as leaveGroupApi, removeGroupMember, setGroupMemberRole } from "../../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
+import { getMyUserId } from "../../../../src/data/session-user"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 
 type BackendGroupMember = string | { id?: string; pseudo?: string | null; publicNumber?: string | null }
@@ -125,7 +126,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const [showAddMember, setShowAddMember] = useState(false)
 
   const color = COLORS[conv.color]
-  const isAdmin = members.find((member) => member.id === "me")?.role === "admin"
+  const isAdmin = members.find((member) => member.id === getMyUserId())?.role === "admin"
 
   const removeMember = (id: string) => {
     const member = members.find((entry) => entry.id === id)
@@ -161,9 +162,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
       confirmLabel: conv.isGroup ? "Supprimer le groupe" : "Supprimer",
       tone: "danger",
       onConfirm: () => {
-        // TODO : DELETE /api/chats/:convId
-        warning("Conversation supprimee")
-        navigate("/chats")
+        void deleteGroupConversation(conv.id).then(() => { warning("Groupe supprimé"); navigate("/chats") }).catch(() => warning("Suppression impossible"))
       },
     })
   }
