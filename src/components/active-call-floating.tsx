@@ -13,10 +13,11 @@ export function ActiveCallFloating() {
   if(!call.activeCallId || call.displayMode!=="compact") return null
   const videoCall=call.callType==="video"
   const restore=()=>{restoreActiveCall();nav(`/calls/${call.activeCallId}?type=${call.callType}`)}
-  return <div className="active-call-floating" style={{transform:`translate(${pos.x}px,${pos.y}px)`}} onPointerDown={e=>{drag.current={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y,on:true};e.currentTarget.setPointerCapture(e.pointerId)}} onPointerMove={e=>{const d=drag.current;if(d.on)setPos({x:d.ox+e.clientX-d.x,y:d.oy+e.clientY-d.y})}} onPointerUp={()=>drag.current.on=false}>
+  const mobile=typeof window!=="undefined" && window.matchMedia("(max-width: 900px)").matches
+  return <div className="active-call-floating" style={mobile?{transform:`translate(${pos.x}px,${pos.y}px)`}:undefined} onPointerDown={e=>{if(!mobile)return;drag.current={x:e.clientX,y:e.clientY,ox:pos.x,oy:pos.y,on:true};e.currentTarget.setPointerCapture(e.pointerId)}} onPointerMove={e=>{if(!mobile)return;const d=drag.current;if(d.on)setPos({x:d.ox+e.clientX-d.x,y:d.oy+e.clientY-d.y})}} onPointerUp={()=>drag.current.on=false}>
     <div className="active-call-content" onClick={()=>setControls(v=>!v)}>
       {videoCall&&remote?<video ref={video} autoPlay playsInline/>:<div className="active-call-audio"><b>{call.peerName||"Appel"}</b><span>Appel en cours</span></div>}
-      {controls&&<div className="active-call-controls" onPointerDown={e=>e.stopPropagation()}><button onClick={restore}>Plein écran</button><button onClick={()=>toggleMicrophone()}>{call.micOn?"Muet":"Micro"}</button><button className="end" onClick={()=>void hangUp()}>Raccrocher</button></div>}
+      {controls&&<div className="active-call-controls" onPointerDown={e=>e.stopPropagation()}><button onClick={restore}>Retour appel</button><button onClick={()=>toggleMicrophone()}>{call.micOn?"Muet":"Micro"}</button><button className="end" onClick={()=>void hangUp()}>Raccrocher</button></div>}
     </div>
   </div>
 }
