@@ -835,7 +835,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
         name: contact?.name ?? pseudoName ?? `Membre ${index + 1}`,
         initials: contact?.initials ?? (pseudoName ? pseudoName.slice(0, 2).toUpperCase() : (typeof memberId === "string" ? memberId.slice(0, 2).toUpperCase() : "??")),
         color: contact?.color ?? COLOR_NAMES[index % COLOR_NAMES.length],
-        role: typeof m === "string" ? (index === 0 ? "admin" : "member") : (m.role === "ADMIN" ? "admin" : "member"),
+        role: index === 0 ? "admin" : "member",
         online: contact?.online ?? false,
         avatar: contact?.avatar ?? null,
       }
@@ -901,7 +901,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
           name: contact?.name ?? `Membre ${index + 1}`,
           initials: contact?.initials ?? memberId.slice(0, 2).toUpperCase(),
           color: contact?.color ?? colorNames[index % colorNames.length],
-          role: typeof m === "string" ? (index === 0 ? "admin" : "member") : (m.role === "ADMIN" ? "admin" : "member"),
+          role: index === 0 ? "admin" : "member",
           online: contact?.online ?? false,
           avatar: contact?.avatar ?? null,
         }
