@@ -1084,7 +1084,7 @@ function AddMemberDialog({
 }
 
 
-export default function ConvInfoPage() {
+export default function ConvInfoPage({ embedded = false, onEmbeddedClose }: { embedded?: boolean; onEmbeddedClose?: () => void } = {}) {
   const navigate = useNavigate()
   const { chatId } = useParams<{ chatId: string }>()
   const [convInfo, setConvInfo] = useState<ConvInfo | null>(null)
