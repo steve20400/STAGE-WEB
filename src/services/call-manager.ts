@@ -213,6 +213,11 @@ class PeerSession {
     }
   }
 
+  async replaceVideoTrack(track: MediaStreamTrack) {
+    const sender = this.pc?.getSenders().find((item) => item.track?.kind === "video")
+    await sender?.replaceTrack(track)
+  }
+
   close() {
     this.remoteStream = null
     this.pc?.close()
@@ -848,6 +853,25 @@ export function toggleMicrophone(): boolean {
   })
   setState({ micOn: next })
   return next
+}
+
+/** Bascule entre les caméras disponibles et remplace la piste chez tous les pairs WebRTC. */
+export async function switchCamera(): Promise<boolean> {
+  if (!localStream) return false
+  const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput")
+  if (devices.length < 2) return false
+  const current = localStream.getVideoTracks()[0]
+  const currentId = current?.getSettings().deviceId
+  const next = devices.find((d) => d.deviceId !== currentId) ?? devices[0]
+  const replacement = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: next.deviceId } }, audio: false })
+  const nextTrack = replacement.getVideoTracks()[0]
+  if (!nextTrack) return false
+  current?.stop()
+  if (current) localStream.removeTrack(current)
+  localStream.addTrack(nextTrack)
+  await Promise.all([...peers.values()].map((peer) => peer.replaceVideoTrack(nextTrack)))
+  setState({ localStream })
+  return true
 }
 
 /** Coupe/retablit la camera (pistes video locales). */

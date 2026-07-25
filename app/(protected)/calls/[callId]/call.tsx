@@ -6,6 +6,7 @@ import {
   hangUp as hangUpCall,
   toggleCamera,
   toggleMicrophone,
+  switchCamera,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
 import "./call-room-page.css"
@@ -49,11 +50,14 @@ export default function CallRoomPage() {
   const [speakerOn, setSpeakerOn] = useState(true)
   const [controlsVisible, setControlsVisible] = useState(true)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
+  const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
+  const pipDrag = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({ x: 0, y: 0, ox: 0, oy: 0, active: false })
 
   const liveTimerRef = useRef<number | null>(null)
   const showControlsTimerRef = useRef<number | null>(null)
   const leaveTimerRef = useRef<number | null>(null)
   const localVideoRef = useRef<HTMLVideoElement | null>(null)
+  const localFullVideoRef = useRef<HTMLVideoElement | null>(null)
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map())
 
@@ -89,9 +93,8 @@ export default function CallRoomPage() {
 
   // Branche le flux local sur l'apercu video (PiP)
   useEffect(() => {
-    if (localVideoRef.current && call.localStream) {
-      localVideoRef.current.srcObject = call.localStream
-    }
+    if (localVideoRef.current && call.localStream) localVideoRef.current.srcObject = call.localStream
+    if (localFullVideoRef.current && call.localStream) localFullVideoRef.current.srcObject = call.localStream
   }, [call.localStream, callState, call.camOn])
 
   // Branche le premier flux distant sur la grande video
@@ -174,6 +177,8 @@ export default function CallRoomPage() {
         <div className="bg-layer">
           {showRemoteVideo ? (
             <video ref={remoteVideoRef} className="bg-video" autoPlay playsInline muted />
+          ) : isVideo && callState === "ringing" && call.localStream ? (
+            <video ref={localFullVideoRef} className="bg-video" autoPlay playsInline muted style={{ transform: "scaleX(-1)" }} />
           ) : (
             <div className="bg-audio-pattern" />
           )}
@@ -290,8 +295,8 @@ export default function CallRoomPage() {
           )}
 
           {/* Apercu de sa propre camera : visible aussi pendant la sonnerie */}
-          {isVideo && callState !== "ended" && call.localStream && (
-            <div className="local-video-pip">
+          {isVideo && callState === "active" && call.localStream && (
+            <div className="local-video-pip" style={{ transform: `translate(${pipPos.x}px, ${pipPos.y}px)`, touchAction: "none", cursor: "grab" }} onPointerDown={(e) => { pipDrag.current = { x: e.clientX, y: e.clientY, ox: pipPos.x, oy: pipPos.y, active: true }; e.currentTarget.setPointerCapture(e.pointerId) }} onPointerMove={(e) => { const d=pipDrag.current; if(d.active) setPipPos({x:d.ox+e.clientX-d.x,y:d.oy+e.clientY-d.y}) }} onPointerUp={() => { pipDrag.current.active=false }}>
               {call.camOn ? (
                 <video
                   ref={localVideoRef}
@@ -402,6 +407,12 @@ export default function CallRoomPage() {
                     )}
                   </div>
                   <span className="ctrl-btn-label">{call.camOn ? "Camera" : "Camera off"}</span>
+                </button>
+              )}
+
+              {isVideo && (
+                <button className="ctrl-btn" onClick={() => void switchCamera()} aria-label="Changer de caméra">
+                  <div className="ctrl-btn-icon ctrl-on">↻</div><span className="ctrl-btn-label">Retourner</span>
                 </button>
               )}
 
