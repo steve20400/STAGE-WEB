@@ -374,3 +374,5 @@ textarea.room-textarea::placeholder {
 .chat-info-drawer .cip-page{min-height:100%!important}
 @keyframes infoSlide{from{transform:translateX(100%)}to{transform:translateX(0)}}
 @media(max-width:900px){.chat-info-drawer{display:none}}
+
+@media (min-width:901px){.room-root.info-panel-open{padding-right:min(420px,42vw);transition:padding-right .22s ease}.room-root.info-panel-open .chat-info-drawer{right:0}}

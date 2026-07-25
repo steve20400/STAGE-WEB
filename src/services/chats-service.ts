@@ -30,7 +30,7 @@ interface BackendConversation {
   isGroup: boolean
   title: string | null
   avatarUrl?: string | null
-  members?: Array<{ id: string; pseudo: string | null; publicNumber: string }>
+  members?: Array<{ id: string; pseudo: string | null; publicNumber: string; role?: string }>
   lastMessage?: {
     id: string
     content: string | null

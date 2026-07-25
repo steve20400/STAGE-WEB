@@ -1869,7 +1869,7 @@ export default function ChatRoomPage() {
   const color = CHAT_COLORS[chat.colorIdx % CHAT_COLORS.length]
 
   return (
-    <div className="room-root">
+    <div className={`room-root ${infoPanelOpen ? "info-panel-open" : ""}`}>
       <div className="room-top">
         <button className="back-btn" onClick={() => navigate("/chats")} aria-label="Retour">
           <svg
