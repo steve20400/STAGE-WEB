@@ -26,7 +26,12 @@
   --overlay: rgba(20, 12, 7, 0.82);
 
   font-family: "DM Sans", sans-serif;
-  height: 100vh;
+  /* 100% (et non 100vh) : l'ecran d'appel est rendu DANS le layout protege,
+     qui porte deja la hauteur de la fenetre. Avec 100vh il debordait sous la
+     barre superieure et la video sortait de son cadre. */
+  height: 100%;
+  flex: 1;
+  min-height: 0;
   background: #4a2c1a; /* chocolat mobile */
   color: var(--text-primary);
   display: flex;
@@ -46,6 +51,18 @@
   height: 100%;
   object-fit: cover;
   filter: brightness(0.45) blur(1px);
+}
+
+/* Video distante reelle : posee sur le fond flou, en "contain" pour garder son
+   ratio. Elle ne sort jamais du cadre, quel que soit le format de la camera
+   d'en face ou la taille de la fenetre (plein ecran compris). */
+.call-room-root .stage-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: transparent;
 }
 .call-room-root .bg-audio-pattern {
   width: 100%;
@@ -163,6 +180,16 @@
   font-weight: 800;
   position: relative;
   z-index: 1;
+}
+
+/* Photo de profil du correspondant : occupe tout le disque de l'avatar, les
+   anneaux de pulsation restent visibles autour. */
+.call-room-root .contact-avatar-photo {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .call-room-root .pulse-ring {
