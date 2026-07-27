@@ -605,6 +605,9 @@ function AudioPlayer({
 
 const SWIPE_REPLY_THRESHOLD = 56
 
+/** Survol prolonge avant de reveler les actions d'un message (pas de saut au passage de souris). */
+const ACTIONS_HOVER_DELAY_MS = 2000
+
 
 /** Composant de preview natif pour fichiers texte/code. */
 function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name?: string }) {
@@ -662,9 +665,10 @@ function MessageBubble({
   onDelete,
   onForward,
   onCopy,
-  chatColor,
   isGroup,
   senderName,
+  quoteAuthor,
+  onJumpToMessage,
 }: {
   msg: Message
   isMe: boolean
@@ -674,11 +678,18 @@ function MessageBubble({
   onDelete: (m: Message, scope: "me" | "everyone") => void
   onForward: (m: Message) => void
   onCopy: (m: Message) => void
-  chatColor: { bg: string; text: string }
   isGroup?: boolean
   senderName?: string
+  /** Nom de l'auteur du message cite, affiche en tete du bloc de citation. */
+  quoteAuthor?: string
+  onJumpToMessage?: (messageId: string) => void
 }) {
-  const [hovered, setHovered] = useState(false)
+  // Les actions n'apparaissent pas au survol immediat : le bouton surgissait
+  // dans la rangee et decalait la bulle a chaque passage de souris. Il est
+  // desormais hors du flux (position absolue) et se revele en fondu, soit au
+  // clic sur le message, soit apres un survol prolonge.
+  const [actionsVisible, setActionsVisible] = useState(false)
+  const hoverRevealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const messageMenuRef = useRef<HTMLDivElement>(null)
   const [dragX, setDragX] = useState(0)
@@ -686,6 +697,10 @@ function MessageBubble({
   const [downloading, setDownloading] = useState(false)
   const lastPreviewTapRef = useRef(0)
   const dragStart = useRef<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false })
+
+  // Identifiant servant a colorer la citation (meme palette que les noms en groupe),
+  // pour que la barre laterale rappelle l'auteur du message cite.
+  const quotedAuthorKey = msg.replySnapshot?.senderId ?? replyMsg?.senderId ?? msg.senderId
 
   // Apercu du message cite : snapshot backend en priorite, sinon lookup local.
   const quote = msg.replySnapshot
@@ -726,6 +741,28 @@ function MessageBubble({
     if (Math.abs(dragX) >= SWIPE_REPLY_THRESHOLD) onReply(msg)
     setDragX(0)
   }
+
+  const cancelHoverReveal = () => {
+    if (hoverRevealTimer.current) {
+      clearTimeout(hoverRevealTimer.current)
+      hoverRevealTimer.current = null
+    }
+  }
+
+  /** Survol prolonge : on ne revele qu'au bout du delai, pour ne rien faire bouger au passage. */
+  const scheduleHoverReveal = () => {
+    if (msg.isDeleted || actionsVisible) return
+    cancelHoverReveal()
+    hoverRevealTimer.current = setTimeout(() => setActionsVisible(true), ACTIONS_HOVER_DELAY_MS)
+  }
+
+  const hideActions = () => {
+    cancelHoverReveal()
+    setActionsVisible(false)
+    setMenuOpen(false)
+  }
+
+  useEffect(() => cancelHoverReveal, [])
 
   // Même comportement que Telegram : ferme le menu d'actions dès que l'on tape/click ailleurs.
   useEffect(() => {
@@ -804,11 +841,8 @@ function MessageBubble({
         alignItems: isMe ? "flex-end" : "flex-start",
         marginBottom: 2,
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false)
-        setMenuOpen(false)
-      }}
+      onMouseEnter={scheduleHoverReveal}
+      onMouseLeave={hideActions}
     >
       <div
         style={{
@@ -829,9 +863,18 @@ function MessageBubble({
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onClick={() => {
+          // Second declencheur demande : un clic sur le message revele les actions
+          // tout de suite, sans attendre le survol prolonge.
+          if (msg.isDeleted) return
+          cancelHoverReveal()
+          setActionsVisible(true)
+        }}
         onContextMenu={(e) => {
           if (msg.isDeleted) return
           e.preventDefault()
+          cancelHoverReveal()
+          setActionsVisible(true)
           setMenuOpen((v) => !v)
         }}
       >
@@ -862,21 +905,40 @@ function MessageBubble({
           </div>
         )}
 
-        {/* Menu actions */}
-        {hovered && !msg.isDeleted && (
-          <div ref={messageMenuRef} style={{ position: "relative", flexShrink: 0 }}>
+        {/* Menu actions — hors du flux : son apparition ne pousse jamais la bulle. */}
+        {!msg.isDeleted && (
+          <div
+            ref={messageMenuRef}
+            style={{
+              position: "absolute",
+              [isMe ? "left" : "right"]: -32,
+              top: "50%",
+              opacity: actionsVisible || menuOpen ? 1 : 0,
+              transform: `translateY(-50%) scale(${actionsVisible || menuOpen ? 1 : 0.85})`,
+              pointerEvents: actionsVisible || menuOpen ? "auto" : "none",
+              transition: "opacity .18s ease, transform .18s ease",
+              zIndex: 20,
+            }}
+          >
             <button
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setMenuOpen((v) => !v)
+              }}
               aria-label="Actions du message"
+              aria-hidden={!actionsVisible && !menuOpen}
+              tabIndex={actionsVisible || menuOpen ? 0 : -1}
               style={{
-                background: "var(--border-subtle)",
+                background: "var(--bg-elevated)",
                 border: "1px solid var(--border-default)",
-                borderRadius: 6,
+                borderRadius: 8,
                 padding: "4px 7px",
                 color: "var(--text-secondary)",
                 fontSize: 12,
                 cursor: "pointer",
                 lineHeight: 1,
+                boxShadow: "0 2px 8px #00000024",
+                transition: "background .15s ease, color .15s ease",
               }}
             >
               ⋮
@@ -928,23 +990,84 @@ function MessageBubble({
               {senderName}
             </div>
           )}
-          {/* Citation */}
-          {quote && !msg.isDeleted && (
+          {/* Bulle */}
+          <div
+            data-message-id={msg.id}
+            style={{
+              background: isMe ? "var(--bubble-me-bg)" : "var(--bubble-them-bg)",
+              color: isMe ? "var(--bubble-me-text)" : "var(--bubble-them-text)",
+              border: isMe ? "none" : "1px solid var(--bubble-them-border)",
+              boxShadow: "0 1px 1px rgba(0, 0, 0, 0.06)",
+              padding: msg.type === "image" && mediaSrc ? 4 : "6px 9px 5px",
+              borderRadius: isMe ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+              fontSize: 13.5,
+              lineHeight: 1.4,
+              wordBreak: "break-word",
+              // flow-root : contient l'heure flottante facon WhatsApp
+              display: "flow-root",
+              transition: "box-shadow .3s ease",
+            }}
+          >
+            {/* Citation — DANS la bulle, comme sur WhatsApp : le message cite et la
+                reponse forment un seul bloc, relies par la barre laterale coloree. */}
+            {quote && !msg.isDeleted && (
             <div
+              onClick={(event) => {
+                const originId = msg.replyTo
+                if (!originId || !onJumpToMessage) return
+                event.stopPropagation()
+                onJumpToMessage(originId)
+              }}
+              role={msg.replyTo && onJumpToMessage ? "button" : undefined}
+              title={msg.replyTo && onJumpToMessage ? "Aller au message d'origine" : undefined}
               style={{
-                background: isMe ? "var(--accent-dim)" : "var(--border-subtle)",
-                borderLeft: `3px solid ${isMe ? "var(--accent)" : chatColor.text}`,
-                borderRadius: "0 6px 6px 0",
-                padding: "6px 10px",
-                fontSize: 11,
-                color: "var(--text-secondary)",
-                marginBottom: 2,
-                maxWidth: "100%",
+                display: "flex",
+                borderRadius: 6,
                 overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                background: isMe ? "rgba(0, 0, 0, 0.14)" : "var(--border-subtle)",
+                marginBottom: 5,
+                cursor: msg.replyTo && onJumpToMessage ? "pointer" : "default",
+                maxWidth: "100%",
               }}
             >
+              <span
+                aria-hidden
+                style={{
+                  width: 4,
+                  flexShrink: 0,
+                  background: isMe ? "var(--bubble-me-text)" : senderNameColor(quotedAuthorKey),
+                  opacity: isMe ? 0.7 : 1,
+                }}
+              />
+              <div style={{ padding: "5px 9px", minWidth: 0, flex: 1 }}>
+                {quoteAuthor && (
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      lineHeight: 1.3,
+                      marginBottom: 1,
+                      color: isMe ? "var(--bubble-me-text)" : senderNameColor(quotedAuthorKey),
+                      opacity: isMe ? 0.92 : 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {quoteAuthor}
+                  </div>
+                )}
+                <div
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.35,
+                    color: "inherit",
+                    opacity: 0.75,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
               {replyMsg ? (() => {
                 if (replyMsg.type === "image" && replyMsg.mediaUrl) {
                   const src = resolveMediaUrl(replyMsg.mediaUrl)
@@ -992,25 +1115,11 @@ function MessageBubble({
                 }
                 return <span>{quote.content}</span>
               })() : <span>{quote.content}</span>}
+                </div>
+              </div>
             </div>
-          )}
+            )}
 
-          {/* Bulle */}
-          <div
-            style={{
-              background: isMe ? "var(--bubble-me-bg)" : "var(--bubble-them-bg)",
-              color: isMe ? "var(--bubble-me-text)" : "var(--bubble-them-text)",
-              border: isMe ? "none" : "1px solid var(--bubble-them-border)",
-              boxShadow: "0 1px 1px rgba(0, 0, 0, 0.06)",
-              padding: msg.type === "image" && mediaSrc ? 4 : "6px 9px 5px",
-              borderRadius: isMe ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-              fontSize: 13.5,
-              lineHeight: 1.4,
-              wordBreak: "break-word",
-              // flow-root : contient l'heure flottante facon WhatsApp
-              display: "flow-root",
-            }}
-          >
             {msg.isDeleted ? (
               <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: 12 }}>
                 Ce message a ete supprime
@@ -1868,6 +1977,26 @@ export default function ChatRoomPage() {
     ...callEvents.map((call): TimelineItem => ({ kind: "call", ts: call.ts, call })),
   ].sort((a, b) => a.ts.getTime() - b.ts.getTime())
 
+  /** Nom affichable d'un expediteur : membre du groupe, contact, sinon debut d'UUID. */
+  const resolveSenderName = (senderId: string): string => {
+    if (senderId === "me") return "Vous"
+    const backendMember = chat?.membersInfo?.find(
+      (m: { id: string; pseudo?: string | null; publicNumber?: string }) => m.id === senderId
+    )
+    if (backendMember?.pseudo) return backendMember.pseudo
+    if (backendMember?.publicNumber) return backendMember.publicNumber
+    return contacts.find((c) => c.id === senderId)?.name ?? chat?.name ?? senderId.slice(0, 8)
+  }
+
+  /** Remonte au message d'origine d'une citation et le met brievement en evidence. */
+  const jumpToMessage = (messageId: string) => {
+    const target = messagesBodyRef.current?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
+    if (!target) return
+    target.scrollIntoView({ behavior: "smooth", block: "center" })
+    target.classList.add("msg-highlight")
+    window.setTimeout(() => target.classList.remove("msg-highlight"), 1400)
+  }
+
   // Grouper par date
   const grouped = timeline.reduce<{ date: string; items: TimelineItem[] }[]>((acc, item) => {
     const dateStr = formatDateSeparator(item.ts)
@@ -1982,14 +2111,10 @@ export default function ChatRoomPage() {
               const isMe = msg.senderId === "me"
               const reply = msg.replyTo ? messages.find((m) => m.id === msg.replyTo) : undefined
               // Resoudre le nom de l'envoyeur pour les groupes
-              const resolvedName = !isMe && chat?.isGroup
-                ? (() => {
-                    const backendMember = chat.membersInfo?.find((m: { id: string; pseudo?: string | null; publicNumber?: string }) => m.id === msg.senderId)
-                    if (backendMember?.pseudo) return backendMember.pseudo
-                    if (backendMember?.publicNumber) return backendMember.publicNumber
-                    return contacts.find((c) => c.id === msg.senderId)?.name ?? msg.senderId.slice(0, 8)
-                  })()
-                : undefined
+              const resolvedName = !isMe && chat?.isGroup ? resolveSenderName(msg.senderId) : undefined
+              // Auteur du message cite : affiche en tete du bloc de citation.
+              const quotedSenderId = msg.replySnapshot?.senderId ?? reply?.senderId
+              const quoteAuthor = quotedSenderId ? resolveSenderName(quotedSenderId) : undefined
               return (
                 <MessageErrorBoundary key={msg.id} name={msg.fileName ?? msg.content} size={msg.fileSize}>
                 <MessageBubble
@@ -2002,9 +2127,10 @@ export default function ChatRoomPage() {
                   onDelete={handleDelete}
                   onForward={setForwardMsg}
                   onCopy={handleCopy}
-                  chatColor={color}
                   isGroup={chat?.isGroup}
                   senderName={resolvedName}
+                  quoteAuthor={quoteAuthor}
+                  onJumpToMessage={jumpToMessage}
                 />
                 </MessageErrorBoundary>
               )

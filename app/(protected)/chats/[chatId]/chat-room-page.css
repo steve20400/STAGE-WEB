@@ -370,6 +370,14 @@ textarea.room-textarea::placeholder {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Clic sur une citation : le message d'origine est brievement souligne, ce qui
+   rend visible le lien entre la reponse et le message cite. */
+.room-body [data-message-id].msg-highlight {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 1px 1px rgba(0, 0, 0, 0.06);
+}
 .chat-info-drawer{position:absolute;top:0;right:0;bottom:0;width:min(420px,42vw);z-index:80;background:var(--bg-base);border-left:1px solid var(--border-subtle);box-shadow:-16px 0 36px #0003;overflow:auto;animation:infoSlide .22s ease-out}
 .chat-info-drawer .cip-page{min-height:100%!important}
 @keyframes infoSlide{from{transform:translateX(100%)}to{transform:translateX(0)}}
