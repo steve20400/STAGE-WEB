@@ -10,6 +10,7 @@ import {
   minimizeActiveCall,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
+import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./call-room-page.css"
 
 type CallScreenState = "ringing" | "active" | "ended"
@@ -46,6 +47,9 @@ export default function CallRoomPage() {
   const isVideo = call.callType === "video"
   const peerName = call.peerName || "Contact"
   const peerInitials = toInitials(peerName)
+  // Photo du correspondant : le destinataire appele quand on appelle, l'appelant
+  // quand on recoit. Le call-manager remplit peerAvatarUrl dans les deux sens.
+  const peerAvatar = avatarDisplaySrc(call.peerAvatarUrl)
 
   const [elapsed, setElapsed] = useState(0)
   const [speakerOn, setSpeakerOn] = useState(true)
@@ -262,7 +266,11 @@ export default function CallRoomPage() {
                       <div className="pulse-ring" style={{ color: "var(--accent)" }} />
                     </>
                   )}
-                  {peerInitials}
+                  {peerAvatar ? (
+                    <img className="contact-avatar-photo" src={peerAvatar} alt="" />
+                  ) : (
+                    peerInitials
+                  )}
                 </div>
               </div>
 
