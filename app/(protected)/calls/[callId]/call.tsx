@@ -10,7 +10,6 @@ import {
   minimizeActiveCall,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
-import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./call-room-page.css"
 
 type CallScreenState = "ringing" | "active" | "ended"
@@ -47,7 +46,6 @@ export default function CallRoomPage() {
   const isVideo = call.callType === "video"
   const peerName = call.peerName || "Contact"
   const peerInitials = toInitials(peerName)
-  const peerAvatar = avatarDisplaySrc(call.peerAvatarUrl)
 
   const [elapsed, setElapsed] = useState(0)
   const [speakerOn, setSpeakerOn] = useState(true)
@@ -55,9 +53,6 @@ export default function CallRoomPage() {
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
   const pipDrag = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({ x: 0, y: 0, ox: 0, oy: 0, active: false })
-
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const rootRef = useRef<HTMLDivElement | null>(null)
 
   const liveTimerRef = useRef<number | null>(null)
   const showControlsTimerRef = useRef<number | null>(null)
@@ -144,31 +139,6 @@ export default function CallRoomPage() {
     void hangUpCall()
   }, [])
 
-  /**
-   * Plein ecran par bouton dedie (API Fullscreen) : l'ecran d'appel occupe
-   * l'ecran sans deborder du layout, et l'etat suit aussi une sortie faite
-   * par l'utilisateur (touche Echap).
-   */
-  const toggleFullscreen = useCallback(() => {
-    const root = rootRef.current
-    if (!root) return
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => undefined)
-    } else {
-      void root.requestFullscreen().catch(() => undefined)
-    }
-  }, [])
-
-  useEffect(() => {
-    const sync = () => setIsFullscreen(document.fullscreenElement === rootRef.current)
-    document.addEventListener("fullscreenchange", sync)
-    return () => {
-      document.removeEventListener("fullscreenchange", sync)
-      // Quitter l'ecran d'appel ne doit pas laisser le navigateur en plein ecran.
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
-    }
-  }, [])
-
   const stateLabel: Record<CallScreenState, string> = {
     // Les trois états demandés sont fondés sur les évènements réels de signalisation.
     ringing: call.progress === "ringing" ? "En train de sonner" : "Sonnerie",
@@ -187,12 +157,7 @@ export default function CallRoomPage() {
 
   return (
     <>
-      <div
-        ref={rootRef}
-        className="call-room-root"
-        onMouseMove={resetHideTimer}
-        onClick={resetHideTimer}
-      >
+      <div className="call-room-root" onMouseMove={resetHideTimer} onClick={resetHideTimer}>
         {/* Sorties audio des participants distants (aussi utilisees en appel video coupe) */}
         {remoteStreamEntries.map(([peerId, stream]) => (
           <audio
@@ -212,22 +177,7 @@ export default function CallRoomPage() {
 
         <div className="bg-layer">
           {showRemoteVideo ? (
-            /* Deux couches : un fond flou en "cover" qui remplit le cadre, et la
-               video reelle en "contain" par-dessus — elle garde son ratio et ne
-               deborde donc jamais, y compris en plein ecran. */
-            <>
-              <video ref={remoteVideoRef} className="bg-video" autoPlay playsInline muted />
-              <video
-                className="stage-video"
-                autoPlay
-                playsInline
-                muted
-                ref={(el) => {
-                  const stream = remoteStreamEntries[0]?.[1]
-                  if (el && stream && el.srcObject !== stream) el.srcObject = stream
-                }}
-              />
-            </>
+            <video ref={remoteVideoRef} className="bg-video" autoPlay playsInline muted />
           ) : isVideo && callState === "ringing" && call.localStream ? (
             <video ref={localFullVideoRef} className="bg-video" autoPlay playsInline muted style={{ transform: "scaleX(-1)" }} />
           ) : (
@@ -312,12 +262,7 @@ export default function CallRoomPage() {
                       <div className="pulse-ring" style={{ color: "var(--accent)" }} />
                     </>
                   )}
-                  {/* Photo reelle si le correspondant en a une ; initiales sinon. */}
-                  {peerAvatar ? (
-                    <img className="contact-avatar-photo" src={peerAvatar} alt="" />
-                  ) : (
-                    peerInitials
-                  )}
+                  {peerInitials}
                 </div>
               </div>
 
@@ -508,33 +453,6 @@ export default function CallRoomPage() {
                   )}
                 </div>
                 <span className="ctrl-btn-label">{speakerOn ? "Son" : "Muet"}</span>
-              </button>
-
-              <button
-                className="ctrl-btn"
-                onClick={toggleFullscreen}
-                aria-pressed={isFullscreen}
-                aria-label={isFullscreen ? "Quitter le plein ecran" : "Passer en plein ecran"}
-              >
-                <div className="ctrl-btn-icon ctrl-on">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    {isFullscreen ? (
-                      <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3M3 16h3a2 2 0 012 2v3m8 0v-3a2 2 0 012-2h3" />
-                    ) : (
-                      <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3m8 0h3a2 2 0 002-2v-3" />
-                    )}
-                  </svg>
-                </div>
-                <span className="ctrl-btn-label">{isFullscreen ? "Reduire" : "Plein ecran"}</span>
               </button>
 
               {call.activeConvId && (

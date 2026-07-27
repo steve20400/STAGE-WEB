@@ -5,8 +5,6 @@ interface IncomingCaller {
   name: string
   initials: string
   color: { bg: string; fg: string }
-  /** Photo de profil prete a afficher ; initiales utilisees si absente. */
-  avatar?: string | null
 }
 
 interface IncomingCallOverlayProps {
@@ -85,14 +83,6 @@ export default function IncomingCallOverlay({
           font-weight: 800;
           font-size: 28px;
           position: relative;
-        }
-
-        .ical-avatar-photo {
-          width: 100%;
-          height: 100%;
-          border-radius: 50%;
-          object-fit: cover;
-          display: block;
         }
 
         .ical-ring {
@@ -191,11 +181,7 @@ export default function IncomingCallOverlay({
               <div className="ical-ring" style={{ color: caller.color.fg }} />
               <div className="ical-ring" style={{ color: caller.color.fg }} />
               <div className="ical-ring" style={{ color: caller.color.fg }} />
-              {caller.avatar ? (
-                <img className="ical-avatar-photo" src={caller.avatar} alt="" />
-              ) : (
-                caller.initials
-              )}
+              {caller.initials}
             </div>
           </div>
 

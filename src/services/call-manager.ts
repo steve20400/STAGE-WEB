@@ -36,8 +36,6 @@ export interface IncomingCallInfo {
   callType: CallType
   callerId: string
   callerName: string
-  /** Photo de profil de l'appelant (URL /api/media/... ou absolue), si definie. */
-  callerAvatarUrl: string | null
   isGroup: boolean
   groupName: string | null
   memberCount: number
@@ -51,8 +49,6 @@ export interface CallManagerState {
   activeCallId: string | null
   activeConvId: string | null
   peerName: string
-  /** Photo du correspondant (appel direct) : affichee a la place des initiales. */
-  peerAvatarUrl: string | null
   callType: CallType
   role: CallRole
   /** Etat affichable sans modifier l'interface : Sonnerie, En train de sonner, Appel en cours. */
@@ -244,7 +240,6 @@ function initialState(): CallManagerState {
     activeCallId: null,
     activeConvId: null,
     peerName: "",
-    peerAvatarUrl: null,
     callType: "audio",
     role: null,
     progress: null,
@@ -540,7 +535,6 @@ async function handleServerEvent(event: CallServerEvent) {
         callType: event.callType === "VIDEO" ? "video" : "audio",
         callerId: String(event.callerId ?? ""),
         callerName: String(event.callerName ?? "Appel"),
-        callerAvatarUrl: (event.callerAvatarUrl as string | null) ?? null,
         isGroup: Boolean(event.isGroup),
         groupName: (event.groupName as string | null) ?? null,
         memberCount: Number(event.memberCount ?? 2),
@@ -707,8 +701,6 @@ export async function startOutgoingCall(
     activeCallId: started.id,
     activeConvId: convId,
     peerName: started.isGroup ? (started.groupName ?? title) : title,
-    // Appel direct : la photo du destinataire vient de POST /api/calls.
-    peerAvatarUrl: started.isGroup ? null : (started.callees?.[0]?.avatarUrl ?? null),
     callType: type,
     role: "outgoing",
     progress: "ringtone",
@@ -766,7 +758,6 @@ export async function acceptIncomingCall(): Promise<string | null> {
     activeCallId: incoming.callId,
     activeConvId: incoming.convId,
     peerName: incoming.isGroup ? (incoming.groupName ?? incoming.callerName) : incoming.callerName,
-    peerAvatarUrl: incoming.isGroup ? null : incoming.callerAvatarUrl,
     callType: incoming.callType,
     role: "ongoing",
     progress: "ongoing",

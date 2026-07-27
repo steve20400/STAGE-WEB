@@ -143,12 +143,7 @@ export interface StartedCall {
   groupName: string | null
   memberCount: number
   callerName: string
-  callees: Array<{
-    userId: string
-    pseudo: string | null
-    publicNumber: string
-    avatarUrl?: string | null
-  }>
+  callees: Array<{ userId: string; pseudo: string | null; publicNumber: string }>
 }
 
 /** POST /api/calls — cree l'appel (statut RINGING) dans une conversation existante. */
