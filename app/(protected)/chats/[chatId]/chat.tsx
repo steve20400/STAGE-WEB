@@ -606,7 +606,10 @@ function AudioPlayer({
 const SWIPE_REPLY_THRESHOLD = 56
 
 /** Survol prolonge avant de reveler les actions d'un message (pas de saut au passage de souris). */
-const ACTIONS_HOVER_DELAY_MS = 2000
+const ACTIONS_HOVER_DELAY_MS = 800
+
+/** Duree du flash du message d'origine quand on clique une citation (cf. .msg-highlight). */
+const MSG_FLASH_MS = 900
 
 
 /** Composant de preview natif pour fichiers texte/code. */
@@ -686,9 +689,11 @@ function MessageBubble({
 }) {
   // Les actions n'apparaissent pas au survol immediat : le bouton surgissait
   // dans la rangee et decalait la bulle a chaque passage de souris. Il est
-  // desormais hors du flux (position absolue) et se revele en fondu, soit au
-  // clic sur le message, soit apres un survol prolonge.
-  const [actionsVisible, setActionsVisible] = useState(false)
+  // desormais hors du flux (position absolue) et se revele soit au clic sur le
+  // message — immediatement, sans transition — soit apres un survol prolonge,
+  // en fondu.
+  const [actionsReveal, setActionsReveal] = useState<"instant" | "fade" | null>(null)
+  const actionsVisible = actionsReveal !== null
   const hoverRevealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const messageMenuRef = useRef<HTMLDivElement>(null)
@@ -712,6 +717,10 @@ function MessageBubble({
     : replyMsg
       ? { content: replyMsg.content || "[media]" }
       : undefined
+
+  // Pendant un glisser-pour-repondre, la fleche occupe la meme place que le
+  // bouton d'actions : on masque ce dernier le temps du geste.
+  const actionsShown = (actionsVisible || menuOpen) && dragX === 0
 
   const mediaSrc = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
   const isVideoFile = (msg.mediaMime ?? "").startsWith("video/")
@@ -753,12 +762,19 @@ function MessageBubble({
   const scheduleHoverReveal = () => {
     if (msg.isDeleted || actionsVisible) return
     cancelHoverReveal()
-    hoverRevealTimer.current = setTimeout(() => setActionsVisible(true), ACTIONS_HOVER_DELAY_MS)
+    hoverRevealTimer.current = setTimeout(() => setActionsReveal("fade"), ACTIONS_HOVER_DELAY_MS)
+  }
+
+  /** Clic / clic droit : affichage immediat, sans fondu. */
+  const revealActionsNow = () => {
+    if (msg.isDeleted) return
+    cancelHoverReveal()
+    setActionsReveal("instant")
   }
 
   const hideActions = () => {
     cancelHoverReveal()
-    setActionsVisible(false)
+    setActionsReveal(null)
     setMenuOpen(false)
   }
 
@@ -863,18 +879,11 @@ function MessageBubble({
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onClick={() => {
-          // Second declencheur demande : un clic sur le message revele les actions
-          // tout de suite, sans attendre le survol prolonge.
-          if (msg.isDeleted) return
-          cancelHoverReveal()
-          setActionsVisible(true)
-        }}
+        onClick={revealActionsNow}
         onContextMenu={(e) => {
           if (msg.isDeleted) return
           e.preventDefault()
-          cancelHoverReveal()
-          setActionsVisible(true)
+          revealActionsNow()
           setMenuOpen((v) => !v)
         }}
       >
@@ -911,12 +920,15 @@ function MessageBubble({
             ref={messageMenuRef}
             style={{
               position: "absolute",
-              [isMe ? "left" : "right"]: -32,
+              // Cote exterieur de la bulle (a l'oppose du centre du fil), comme avant.
+              [isMe ? "right" : "left"]: -32,
               top: "50%",
-              opacity: actionsVisible || menuOpen ? 1 : 0,
-              transform: `translateY(-50%) scale(${actionsVisible || menuOpen ? 1 : 0.85})`,
-              pointerEvents: actionsVisible || menuOpen ? "auto" : "none",
-              transition: "opacity .18s ease, transform .18s ease",
+              opacity: actionsShown ? 1 : 0,
+              transform: `translateY(-50%) scale(${actionsShown ? 1 : 0.85})`,
+              pointerEvents: actionsShown ? "auto" : "none",
+              // Clic : apparition instantanee. Survol prolonge : fondu doux.
+              transition:
+                actionsReveal === "instant" ? "none" : "opacity .18s ease, transform .18s ease",
               zIndex: 20,
             }}
           >
@@ -926,8 +938,8 @@ function MessageBubble({
                 setMenuOpen((v) => !v)
               }}
               aria-label="Actions du message"
-              aria-hidden={!actionsVisible && !menuOpen}
-              tabIndex={actionsVisible || menuOpen ? 0 : -1}
+              aria-hidden={!actionsShown}
+              tabIndex={actionsShown ? 0 : -1}
               style={{
                 background: "var(--bg-elevated)",
                 border: "1px solid var(--border-default)",
@@ -1005,7 +1017,6 @@ function MessageBubble({
               wordBreak: "break-word",
               // flow-root : contient l'heure flottante facon WhatsApp
               display: "flow-root",
-              transition: "box-shadow .3s ease",
             }}
           >
             {/* Citation — DANS la bulle, comme sur WhatsApp : le message cite et la
@@ -1988,13 +1999,24 @@ export default function ChatRoomPage() {
     return contacts.find((c) => c.id === senderId)?.name ?? chat?.name ?? senderId.slice(0, 8)
   }
 
-  /** Remonte au message d'origine d'une citation et le met brievement en evidence. */
+  /**
+   * Remonte au message d'origine d'une citation et le fait briller brievement,
+   * comme WhatsApp. Le flash est relance a chaque clic (on retire la classe puis
+   * on force un reflow, sinon l'animation ne rejoue pas).
+   */
   const jumpToMessage = (messageId: string) => {
-    const target = messagesBodyRef.current?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
-    if (!target) return
+    const target = messagesBodyRef.current?.querySelector<HTMLElement>(
+      `[data-message-id="${messageId}"]`
+    )
+    if (!target) {
+      error("Message introuvable", "Il est trop ancien pour etre affiche ici.")
+      return
+    }
     target.scrollIntoView({ behavior: "smooth", block: "center" })
+    target.classList.remove("msg-highlight")
+    void target.offsetWidth
     target.classList.add("msg-highlight")
-    window.setTimeout(() => target.classList.remove("msg-highlight"), 1400)
+    window.setTimeout(() => target.classList.remove("msg-highlight"), MSG_FLASH_MS)
   }
 
   // Grouper par date

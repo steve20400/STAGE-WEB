@@ -371,12 +371,38 @@ textarea.room-textarea::placeholder {
   to { transform: rotate(360deg); }
 }
 
-/* Clic sur une citation : le message d'origine est brievement souligne, ce qui
-   rend visible le lien entre la reponse et le message cite. */
+/* Clic sur une citation : le message d'origine brille brievement (~0,9 s, comme
+   sur WhatsApp) puis retrouve son apparence normale. */
+@keyframes msgFlash {
+  0% {
+    box-shadow:
+      0 0 0 3px var(--accent),
+      0 0 22px 5px color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  55% {
+    box-shadow:
+      0 0 0 3px var(--accent),
+      0 0 22px 5px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
+  }
+}
+
 .room-body [data-message-id].msg-highlight {
-  box-shadow:
-    0 0 0 2px var(--accent),
-    0 1px 1px rgba(0, 0, 0, 0.06);
+  animation: msgFlash 0.9s ease-out;
+}
+
+/* Mouvement reduit : pas de clignotement, un simple contour le temps du delai.
+   !important est necessaire : la bulle porte un box-shadow en style inline, que
+   l'animation surpasse naturellement mais pas une regle de feuille de style. */
+@media (prefers-reduced-motion: reduce) {
+  .room-body [data-message-id].msg-highlight {
+    animation: none;
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 1px 1px rgba(0, 0, 0, 0.06) !important;
+  }
 }
 .chat-info-drawer{position:absolute;top:0;right:0;bottom:0;width:min(420px,42vw);z-index:80;background:var(--bg-base);border-left:1px solid var(--border-subtle);box-shadow:-16px 0 36px #0003;overflow:auto;animation:infoSlide .22s ease-out}
 .chat-info-drawer .cip-page{min-height:100%!important}
