@@ -371,26 +371,46 @@ textarea.room-textarea::placeholder {
   to { transform: rotate(360deg); }
 }
 
-/* Clic sur une citation : le message d'origine brille brievement (~0,9 s, comme
-   sur WhatsApp) puis retrouve son apparence normale. */
+/* Clic sur une citation : le message d'origine s'illumine puis revient a son
+   apparence normale. Le halo monte et redescend en ease-in-out (pas de coupure
+   brutale), avec une aureole large et floue autour de la bulle et une infime
+   respiration d'echelle — le tout sur 1,2 s. */
 @keyframes msgFlash {
   0% {
     box-shadow:
-      0 0 0 3px var(--accent),
-      0 0 22px 5px color-mix(in srgb, var(--accent) 60%, transparent);
+      0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent),
+      0 1px 1px rgba(0, 0, 0, 0.06);
+    transform: scale(1);
   }
-  55% {
+  35% {
     box-shadow:
-      0 0 0 3px var(--accent),
-      0 0 22px 5px color-mix(in srgb, var(--accent) 45%, transparent);
+      0 0 0 3px color-mix(in srgb, var(--accent) 85%, transparent),
+      0 0 34px 12px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 1px 1px rgba(0, 0, 0, 0.06);
+    transform: scale(1.022);
+  }
+  60% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--accent) 80%, transparent),
+      0 0 34px 12px color-mix(in srgb, var(--accent) 48%, transparent),
+      0 1px 1px rgba(0, 0, 0, 0.06);
+    transform: scale(1.018);
   }
   100% {
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent),
+      0 1px 1px rgba(0, 0, 0, 0.06);
+    transform: scale(1);
   }
 }
 
 .room-body [data-message-id].msg-highlight {
-  animation: msgFlash 0.9s ease-out;
+  animation: msgFlash 1.2s ease-in-out;
+  /* Le halo doit passer au-dessus des bulles voisines pendant l'animation. */
+  position: relative;
+  z-index: 3;
 }
 
 /* Mouvement reduit : pas de clignotement, un simple contour le temps du delai.

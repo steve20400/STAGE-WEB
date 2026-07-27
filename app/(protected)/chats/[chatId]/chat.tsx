@@ -608,8 +608,17 @@ const SWIPE_REPLY_THRESHOLD = 56
 /** Survol prolonge avant de reveler les actions d'un message (pas de saut au passage de souris). */
 const ACTIONS_HOVER_DELAY_MS = 800
 
+/** Sursis avant de masquer les actions quand la souris quitte le message. */
+const ACTIONS_HIDE_GRACE_MS = 320
+
+/** Largeur reservee a droite/gauche de la bulle pour accueillir le bouton d'actions. */
+const ACTIONS_GUTTER = 34
+
+/** Hauteur approximative du menu deroulant, pour decider s'il s'ouvre vers le haut. */
+const ACTIONS_MENU_HEIGHT = 240
+
 /** Duree du flash du message d'origine quand on clique une citation (cf. .msg-highlight). */
-const MSG_FLASH_MS = 900
+const MSG_FLASH_MS = 1200
 
 
 /** Composant de preview natif pour fichiers texte/code. */
@@ -695,6 +704,9 @@ function MessageBubble({
   const [actionsReveal, setActionsReveal] = useState<"instant" | "fade" | null>(null)
   const actionsVisible = actionsReveal !== null
   const hoverRevealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Le menu deroulant s'ouvre vers le haut sauf s'il n'y a pas la place. */
+  const [menuAbove, setMenuAbove] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const messageMenuRef = useRef<HTMLDivElement>(null)
   const [dragX, setDragX] = useState(0)
@@ -758,8 +770,16 @@ function MessageBubble({
     }
   }
 
+  const cancelHide = () => {
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current)
+      hideTimer.current = null
+    }
+  }
+
   /** Survol prolonge : on ne revele qu'au bout du delai, pour ne rien faire bouger au passage. */
   const scheduleHoverReveal = () => {
+    cancelHide()
     if (msg.isDeleted || actionsVisible) return
     cancelHoverReveal()
     hoverRevealTimer.current = setTimeout(() => setActionsReveal("fade"), ACTIONS_HOVER_DELAY_MS)
@@ -769,22 +789,51 @@ function MessageBubble({
   const revealActionsNow = () => {
     if (msg.isDeleted) return
     cancelHoverReveal()
+    cancelHide()
     setActionsReveal("instant")
   }
 
-  const hideActions = () => {
+  /**
+   * Sortie du message : on laisse un court sursis avant de masquer, sinon le
+   * bouton disparait pendant que la souris se deplace vers lui — impossible a
+   * cliquer. Tant que le menu deroulant est ouvert, on ne masque jamais.
+   */
+  const scheduleHide = () => {
     cancelHoverReveal()
-    setActionsReveal(null)
-    setMenuOpen(false)
+    if (menuOpen) return
+    cancelHide()
+    hideTimer.current = setTimeout(() => setActionsReveal(null), ACTIONS_HIDE_GRACE_MS)
   }
 
-  useEffect(() => cancelHoverReveal, [])
+  useEffect(
+    () => () => {
+      cancelHoverReveal()
+      cancelHide()
+    },
+    []
+  )
+
+  // Positionnement intelligent : le menu s'ouvre vers le bas quand il n'y a pas
+  // la place au-dessus (message tout en haut du fil), pour ne jamais sortir de
+  // la zone de lecture.
+  useEffect(() => {
+    if (!menuOpen) return
+    const anchor = messageMenuRef.current
+    if (!anchor) return
+    const limit = anchor.closest(".room-body")?.getBoundingClientRect().top ?? 0
+    setMenuAbove(anchor.getBoundingClientRect().top - ACTIONS_MENU_HEIGHT > limit)
+  }, [menuOpen])
 
   // Même comportement que Telegram : ferme le menu d'actions dès que l'on tape/click ailleurs.
   useEffect(() => {
     if (!menuOpen) return
     const closeOutside = (event: PointerEvent) => {
-      if (messageMenuRef.current && !messageMenuRef.current.contains(event.target as Node)) setMenuOpen(false)
+      if (messageMenuRef.current && !messageMenuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false)
+        // La souris est peut-etre deja loin du message : sans ca, le bouton
+        // resterait affiche faute d'un futur mouseleave.
+        hideTimer.current = setTimeout(() => setActionsReveal(null), ACTIONS_HIDE_GRACE_MS)
+      }
     }
     document.addEventListener("pointerdown", closeOutside)
     return () => document.removeEventListener("pointerdown", closeOutside)
@@ -858,7 +907,7 @@ function MessageBubble({
         marginBottom: 2,
       }}
       onMouseEnter={scheduleHoverReveal}
-      onMouseLeave={hideActions}
+      onMouseLeave={scheduleHide}
     >
       <div
         style={{
@@ -871,7 +920,13 @@ function MessageBubble({
           // a sa largeur minimale (une lettre par ligne).
           maxWidth: "min(78%, 560px)",
           transform: dragX ? `translateX(${dragX}px)` : undefined,
-          transition: dragStart.current.active ? "none" : "transform 0.18s ease",
+          // Le message s'ecarte du bord pour laisser la place au bouton d'actions :
+          // celui-ci reste ainsi TOUJOURS dans le cadre, jamais hors de l'ecran.
+          marginRight: isMe && actionsShown ? ACTIONS_GUTTER : 0,
+          marginLeft: !isMe && actionsShown ? ACTIONS_GUTTER : 0,
+          transition: dragStart.current.active
+            ? "none"
+            : "transform 0.18s ease, margin 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
           touchAction: "pan-y",
           position: "relative",
         }}
@@ -918,10 +973,13 @@ function MessageBubble({
         {!msg.isDeleted && (
           <div
             ref={messageMenuRef}
+            onMouseEnter={cancelHide}
+            onMouseLeave={scheduleHide}
             style={{
               position: "absolute",
-              // Cote exterieur de la bulle (a l'oppose du centre du fil), comme avant.
-              [isMe ? "right" : "left"]: -32,
+              // Cote exterieur de la bulle. La gouttiere ouverte par la marge du
+              // message ci-dessus garantit qu'il reste dans le cadre.
+              [isMe ? "right" : "left"]: -ACTIONS_GUTTER,
               top: "50%",
               opacity: actionsShown ? 1 : 0,
               transform: `translateY(-50%) scale(${actionsShown ? 1 : 0.85})`,
@@ -959,7 +1017,7 @@ function MessageBubble({
               <div
                 style={{
                   position: "absolute",
-                  bottom: "110%",
+                  ...(menuAbove ? { bottom: "110%" } : { top: "110%" }),
                   [isMe ? "right" : "left"]: 0,
                   background: "var(--bg-elevated)",
                   border: "1px solid var(--border-subtle)",
