@@ -40,6 +40,7 @@ import {
   publishTyping,
   subscribeToConversation,
   subscribeToMessageDeleted,
+  subscribeToPresence,
   subscribeToStatus,
   subscribeToTyping,
   subscribeToWsConnected,
@@ -1312,8 +1313,11 @@ export default function ChatRoomPage() {
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   // typing de l'interlocuteur (recu via WebSocket)
   const [isTyping, setIsTyping] = useState(false)
-  // Presence deduite de l'activite reelle (message recu, frappe, lecture) :
-  // le backend ne diffuse pas de presence, on ne peut donc jamais affirmer "hors ligne".
+  // Presence : le serveur temps reel diffuse { type: "presence" } et
+  // GET /api/conversations porte deja isOnline. On garde le repli deduit de
+  // l'activite reelle (message recu, frappe, lecture) quand le pair masque sa
+  // presence ou que l'evenement n'est pas encore arrive.
+  const [peerPresence, setPeerPresence] = useState<boolean | null>(null)
   const [lastPeerActivity, setLastPeerActivity] = useState<number | null>(null)
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
@@ -1408,6 +1412,16 @@ export default function ChatRoomPage() {
 
     // Temps reel : abonnement aux nouveaux messages de la conversation
     const myId = getMyUserId()
+    // Correspondant d'une conversation directe : sert a filtrer les evenements
+    // de presence, qui sont diffuses toutes conversations confondues.
+    const peerUserId = chat?.isGroup
+      ? null
+      : (chat?.membersInfo?.find((member) => member.id !== myId)?.id ?? null)
+    // isOnline vient de GET /api/conversations. On ne seme que le "en ligne" :
+    // un false peut aussi signifier "presence masquee", auquel cas le repli sur
+    // l'activite reelle reste plus juste.
+    if (!chat?.isGroup && chat?.online) setPeerPresence(true)
+
     const unsubscribeMessages = subscribeToConversation(chatId, (message) => {
       if (cancelled) return
       const incoming = toFrontMessage(message, myId)
@@ -1447,6 +1461,14 @@ export default function ChatRoomPage() {
       setMessages((prev) =>
         prev.map((m) => (m.senderId === "me" && m.status !== "read" ? { ...m, status: "read" } : m))
       )
+    })
+
+    // Abonnement a la presence du correspondant (conversation directe).
+    const unsubscribePresence = subscribeToPresence((event) => {
+      if (cancelled) return
+      if (event.userId !== peerUserId) return
+      setPeerPresence(event.isOnline)
+      if (event.isOnline) setLastPeerActivity(Date.now())
     })
 
     // Abonnement aux suppressions de messages (pour moi / pour tous)
@@ -1495,6 +1517,7 @@ export default function ChatRoomPage() {
       unsubscribeMessages()
       unsubscribeTyping()
       unsubscribeStatus()
+      unsubscribePresence()
       unsubscribeDeleted()
       unsubscribeConnected()
       clearInterval(pollId)
@@ -1553,9 +1576,11 @@ export default function ChatRoomPage() {
     return () => clearInterval(id)
   }, [lastPeerActivity])
 
-  // "En ligne" si activite reelle (message, frappe, lecture) dans les 2 dernieres minutes.
+  // Presence du serveur si on l'a recue ; sinon "En ligne" sur activite reelle
+  // (message, frappe, lecture) dans les 2 dernieres minutes.
   void presenceTick
-  const peerOnline = lastPeerActivity !== null && Date.now() - lastPeerActivity < 2 * 60 * 1000
+  const peerOnline =
+    peerPresence ?? (lastPeerActivity !== null && Date.now() - lastPeerActivity < 2 * 60 * 1000)
 
   // Envoi d'un message — POST /api/chats/{chatId}/messages
   const sendMessage = useCallback(async () => {
@@ -1913,8 +1938,8 @@ export default function ChatRoomPage() {
                   : "var(--text-muted)",
             }}
           >
-            {/* Le backend ne diffuse pas de presence : on affiche "En ligne" sur
-                activite recente, et rien (plutot qu'un faux "Hors ligne") sinon. */}
+            {/* Presence du serveur temps reel, avec repli sur l'activite recente
+                si elle est masquee ; rien (plutot qu'un faux "Hors ligne") sinon. */}
             {isTyping
               ? "en train d'ecrire..."
               : chat.isGroup

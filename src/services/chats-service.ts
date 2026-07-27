@@ -1,7 +1,7 @@
 import { loadLocalConversations } from "../data/local-conversations"
 import { loadLocalGroups, toConversationMock } from "../data/local-groups"
 import { type ConversationMock, type MessageType } from "../mocks/chat-data"
-import { toInitials } from "../data/session-user"
+import { getMyUserId, toInitials } from "../data/session-user"
 import { apiRequest } from "../lib/api-client"
 import {
   cacheConversations,
@@ -30,7 +30,15 @@ interface BackendConversation {
   isGroup: boolean
   title: string | null
   avatarUrl?: string | null
-  members?: Array<{ id: string; pseudo: string | null; publicNumber: string; role?: string }>
+  members?: Array<{
+    id: string
+    pseudo: string | null
+    publicNumber: string
+    role?: string
+    /** 1 = en ligne. Masque a 0 par le backend si le pair cache sa presence. */
+    isOnline?: number
+    lastSeen?: string | null
+  }>
   lastMessage?: {
     id: string
     content: string | null
@@ -68,6 +76,11 @@ function pickColorIdx(id: string): number {
 
 function toFrontConversation(c: BackendConversation): ConversationMock {
   const name = c.title ?? "Conversation"
+  // GET /api/conversations renvoie isOnline pour chaque membre (deja masque a 0
+  // par le backend si le pair a choisi de cacher sa presence).
+  const myId = getMyUserId()
+  const peer = c.isGroup ? undefined : c.members?.find((m) => m.id !== myId)
+
   return {
     id: c.id,
     name,
@@ -77,7 +90,7 @@ function toFrontConversation(c: BackendConversation): ConversationMock {
     lastMessageType: mapLastMessageType(c.lastMessage?.type),
     time: formatTime(c.updatedAt ?? c.lastMessage?.createdAt),
     unread: c.unread ?? 0,
-    online: false, // pas d'info de presence via REST sur ce backend
+    online: peer?.isOnline === 1,
     isGroup: Boolean(c.isGroup),
     members: c.members?.map((m) => toInitials(m.pseudo ?? m.publicNumber)),
     membersInfo: c.members,

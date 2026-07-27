@@ -411,6 +411,25 @@ export function publishTyping(conversationId: string, isTyping: boolean) {
   sendRaw({ type: "typing", convId: conversationId, isTyping })
 }
 
+export interface PresenceEvent {
+  userId: string
+  isOnline: boolean
+}
+
+/**
+ * S'abonne aux changements de presence. Le serveur temps reel diffuse
+ * { type: "presence", userId, isOnline } a la connexion/deconnexion d'un
+ * contact, et envoie un instantane des contacts en ligne a l'ouverture.
+ */
+export function subscribeToPresence(handler: (event: PresenceEvent) => void): () => void {
+  return addListener((event) => {
+    if (event.type !== "presence") return
+    const userId = String(event.userId ?? "")
+    if (!userId) return
+    handler({ userId, isOnline: Number(event.isOnline) === 1 || event.isOnline === true })
+  })
+}
+
 export interface StatusEvent {
   /** UUID de l'utilisateur qui a lu la conversation. */
   readBy: string

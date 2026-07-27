@@ -4,6 +4,7 @@ import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data
 import { fetchChatConversations, fetchChatConversationsCacheFirst } from "../../../src/services/chats-service"
 import {
   subscribeToAllMessages,
+  subscribeToPresence,
   subscribeToWsConnected,
 } from "../../../src/services/websocket-service"
 import { useAuth } from "../../../src/components/auth-provider"
@@ -56,6 +57,20 @@ export default function ChatsPage() {
     // Et on se resynchronise apres chaque (re)connexion du WebSocket.
     const unsubscribeConnected = subscribeToWsConnected(scheduleRefresh)
 
+    // Presence : le pastille verte suit les connexions/deconnexions sans
+    // recharger toute la liste.
+    const unsubscribePresence = subscribeToPresence((event) => {
+      if (cancelled) return
+      setConversations((prev) =>
+        prev.map((conversation) =>
+          !conversation.isGroup &&
+          conversation.membersInfo?.some((member) => member.id === event.userId)
+            ? { ...conversation, online: event.isOnline }
+            : conversation
+        )
+      )
+    })
+
     // Filet de securite : un expediteur au WebSocket degrade (4G) envoie en
     // REST sans diffusion -> on resynchronise la liste toutes les 20 s.
     const pollId = setInterval(() => {
@@ -66,6 +81,7 @@ export default function ChatsPage() {
       cancelled = true
       unsubscribeMessages()
       unsubscribeConnected()
+      unsubscribePresence()
       clearInterval(pollId)
       if (refreshTimer.current) clearTimeout(refreshTimer.current)
     }
