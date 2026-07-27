@@ -1,3 +1,4 @@
+import { API_BASE_URL } from "../config/runtime"
 import {
   clearSessionToken,
   loadRefreshToken,
@@ -21,8 +22,6 @@ export class ApiError extends Error {
 interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: BodyInit | object | null
 }
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "")
 
 function buildUrl(path: string) {
   if (/^https?:\/\//.test(path)) return path

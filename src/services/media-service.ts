@@ -1,7 +1,6 @@
 import { apiRequest } from "../lib/api-client"
+import { API_BASE_URL } from "../config/runtime"
 import { loadSessionToken } from "../data/session-auth"
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "")
 
 export interface UploadedMedia {
   id: string

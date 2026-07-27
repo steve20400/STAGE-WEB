@@ -7,8 +7,8 @@ import { type SessionUser } from "../../../src/data/session-user"
 import { isTurnConfigured } from "../../../src/services/calls-service"
 import TurnTester from "../../../src/components/turn-tester"
 import RealtimeStatus from "../../../src/components/realtime-status"
-import { updateProfileApi } from "../../../src/services/auth-api"
-import { fileToAvatarDataUrl } from "../../../src/lib/avatar"
+import { changePasswordApi, updateProfileApi } from "../../../src/services/auth-api"
+import { fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 
 type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
 
@@ -712,20 +712,29 @@ export default function SettingsPage() {
       return toastError("Message trop long", "Maximum 100 caracteres.")
     setSaving(true)
     try {
+      // Une photo fraichement choisie est encore une data-URL locale : le
+      // backend ne l'accepte pas, il faut la televerser et enregistrer son
+      // URL /api/media/{id}.
+      const avatarUrl = draft.avatar?.startsWith("data:")
+        ? await uploadAvatarDataUrl(draft.avatar)
+        : (draft.avatar ?? null)
+
       // Persistance reelle cote backend : c'est ce qui rend le profil (photo
       // comprise) visible par les autres et le fait survivre aux reconnexions.
       const saved = await updateProfileApi({
         pseudo: draft.name.trim(),
         statusMsg: draft.statusMsg || null,
-        avatarUrl: draft.avatar ?? null,
+        avatarUrl,
       })
-      setProfile(draft)
+      const nextAvatar = saved.avatarUrl ?? avatarUrl
+      setDraft((prev) => ({ ...prev, avatar: nextAvatar }))
+      setProfile({ ...draft, avatar: nextAvatar })
       updateUser({
         name: saved.pseudo ?? draft.name.trim(),
         phone: draft.phone,
         email: draft.email,
         statusMsg: saved.statusMsg ?? draft.statusMsg,
-        avatar: saved.avatarUrl ?? draft.avatar,
+        avatar: nextAvatar,
       })
       success("Profil mis a jour", "Vos informations ont bien ete enregistrees.")
     } catch (err) {
@@ -745,7 +754,7 @@ export default function SettingsPage() {
     if (!file.type.startsWith("image/"))
       return toastError("Format invalide", "Choisissez une image (JPEG, PNG, WebP).")
     try {
-      // Miniature compacte : le backend limite avatarUrl a ~2 Ko.
+      // Apercu local : la miniature n'est televersee qu'a l'enregistrement.
       const dataUrl = await fileToAvatarDataUrl(file)
       setDraft((prev) => ({ ...prev, avatar: dataUrl }))
       info("Avatar selectionne", "Cliquez sur 'Sauvegarder' pour confirmer.")
@@ -757,6 +766,8 @@ export default function SettingsPage() {
 
   const changePassword = async () => {
     if (!security.currentPwd) return toastError("Mot de passe actuel requis")
+    if (security.newPwd.length < 8)
+      return toastError("Mot de passe trop court", "Le backend exige au moins 8 caracteres.")
     if (pwdStrength.score < 2)
       return toastError("Mot de passe trop faible", "Choisissez un mot de passe plus securise.")
     if (security.newPwd !== security.confirmPwd)
@@ -765,12 +776,12 @@ export default function SettingsPage() {
       return toastError("Mot de passe identique", "Choisissez un mot de passe different.")
     setSaving(true)
     try {
-      // TODO : POST /api/auth/change-password
-      await new Promise((r) => setTimeout(r, 1000))
+      await changePasswordApi(security.currentPwd, security.newPwd)
       setSecurity({ currentPwd: "", newPwd: "", confirmPwd: "" })
       success("Mot de passe modifie", "Votre nouveau mot de passe est actif.")
-    } catch {
-      toastError("Erreur", "Mot de passe actuel incorrect.")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Mot de passe actuel incorrect."
+      toastError("Erreur", message)
     } finally {
       setSaving(false)
     }
@@ -794,8 +805,18 @@ export default function SettingsPage() {
       'Tapez "SUPPRIMER" pour confirmer la suppression definitive de votre compte.'
     )
     if (confirm1 !== "SUPPRIMER") return toastError("Suppression annulee")
-    await removeAccount()
-    warning("Compte supprime", "Vos donnees seront effacees dans 30 jours.")
+
+    // Le backend (DELETE /api/account) exige le mot de passe pour confirmer.
+    const password = window.prompt("Saisissez votre mot de passe pour confirmer la suppression.")
+    if (!password) return toastError("Suppression annulee")
+
+    try {
+      await removeAccount(password)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Suppression impossible."
+      return toastError("Suppression refusee", message)
+    }
+    warning("Compte supprime", "Votre compte et vos donnees ont ete effaces.")
     navigate("/welcome", { replace: true })
   }
 

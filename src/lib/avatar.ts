@@ -1,34 +1,27 @@
-import { resolveMediaUrl } from "../services/media-service"
+import { resolveMediaUrl, uploadMedia } from "../services/media-service"
 
 /**
- * Avatars : le backend stocke avatarUrl (max 2048 caracteres, format URL).
- * On encode donc la photo en miniature JPEG data-URL qui tient dans cette
- * limite : lisible par tous les clients (web et mobile) sans aucun probleme
- * de droits d'acces, et persistee en base -> survit aux reconnexions.
+ * Avatars : le backend stocke avatarUrl et n'accepte que deux formes
+ * (updateProfileSchema) — une URL absolue http(s) ou une URL de media
+ * `/api/media/{id}`. Une data-URL est donc REFUSEE (422). On genere une
+ * miniature carree, on la televerse via POST /api/media, puis on enregistre
+ * son URL relative : le backend autorise explicitement la lecture d'un media
+ * utilise comme avatar par n'importe quel utilisateur authentifie, donc la
+ * photo est bien visible par les contacts (web et mobile).
  */
 
-const AVATAR_URL_MAX_CHARS = 2000 // marge sous la limite backend (2048)
+/** Cote de la miniature carree enregistree comme avatar. */
+const AVATAR_SIZE = 256
+const AVATAR_QUALITY = 0.82
 
-/**
- * Reduit une image en miniature carree et la compresse jusqu'a tenir dans
- * la limite. Essaie plusieurs tailles/qualites decroissantes.
- */
+/** Miniature data-URL, utilisee pour l'apercu immediat avant enregistrement. */
 export async function fileToAvatarDataUrl(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file)
 
-  const attempts: Array<{ size: number; quality: number }> = [
-    { size: 96, quality: 0.7 },
-    { size: 80, quality: 0.6 },
-    { size: 64, quality: 0.55 },
-    { size: 56, quality: 0.5 },
-    { size: 48, quality: 0.45 },
-    { size: 40, quality: 0.4 },
-  ]
-
-  for (const { size, quality } of attempts) {
+  try {
     const canvas = document.createElement("canvas")
-    canvas.width = size
-    canvas.height = size
+    canvas.width = AVATAR_SIZE
+    canvas.height = AVATAR_SIZE
     const ctx = canvas.getContext("2d")
     if (!ctx) throw new Error("Canvas indisponible dans ce navigateur.")
 
@@ -36,22 +29,27 @@ export async function fileToAvatarDataUrl(file: File): Promise<string> {
     const side = Math.min(bitmap.width, bitmap.height)
     const sx = (bitmap.width - side) / 2
     const sy = (bitmap.height - side) / 2
-    ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, size, size)
+    ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
 
-    const dataUrl = canvas.toDataURL("image/jpeg", quality)
-    if (dataUrl.length <= AVATAR_URL_MAX_CHARS) {
-      bitmap.close()
-      return dataUrl
-    }
+    return canvas.toDataURL("image/jpeg", AVATAR_QUALITY)
+  } finally {
+    bitmap.close()
   }
+}
 
-  bitmap.close()
-  throw new Error("Image trop complexe : choisissez une photo plus simple.")
+/**
+ * Televerse une miniature d'avatar (data-URL produite ci-dessus) et renvoie
+ * l'URL relative `/api/media/{id}` a enregistrer dans le profil.
+ */
+export async function uploadAvatarDataUrl(dataUrl: string): Promise<string> {
+  const blob = await (await fetch(dataUrl)).blob()
+  const media = await uploadMedia(blob, "avatar.jpg")
+  return media.url
 }
 
 /**
  * URL affichable pour un avatar quel que soit son format :
- * - data-URL (miniature) -> telle quelle ;
+ * - data-URL (apercu local avant enregistrement) -> telle quelle ;
  * - URL absolue http(s) -> telle quelle ;
  * - URL relative backend (/api/media/...) -> completee avec le token.
  */

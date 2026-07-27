@@ -1,3 +1,4 @@
+import { WS_URL } from "../config/runtime"
 import { loadSessionToken } from "../data/session-auth"
 import { tryRefreshTokens } from "../lib/api-client"
 
@@ -8,21 +9,6 @@ import { tryRefreshTokens } from "../lib/api-client"
  * - envoi des messages de chat via { type: "send", tempId } (le POST REST
  *   ne declenche PAS de diffusion temps reel sur ce backend).
  */
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "")
-
-function defaultWsUrl() {
-  // Par defaut : meme hote que l'API, port 3001 (WS_PORT du backend).
-  try {
-    const url = new URL(API_BASE_URL || "http://localhost:3000")
-    const scheme = url.protocol === "https:" ? "wss:" : "ws:"
-    return `${scheme}//${url.hostname}:3001`
-  } catch {
-    return "ws://localhost:3001"
-  }
-}
-
-const WS_URL = (import.meta.env.VITE_WS_URL ?? defaultWsUrl()).replace(/\/$/, "")
 
 /* ----------------- Types des evenements serveur ----------------- */
 

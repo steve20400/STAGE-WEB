@@ -11,6 +11,8 @@ import {
 import {
   cacheMessages,
   cacheMessage,
+  dequeueOffline,
+  getOfflineQueue,
   loadCachedMessages,
   removeMessageFromCache,
   enqueueOffline,
@@ -196,6 +198,55 @@ interface SendOptions {
   mediaId?: string
 }
 
+interface DeliveryPayload {
+  content?: string
+  msgType: string
+  tempId: string
+  mediaId?: string
+  replyToId?: string
+}
+
+/**
+ * Achemine un message : d'abord le WebSocket ({ type: "send" }), car c'est lui
+ * qui declenche la diffusion temps reel aux autres participants sur ce backend ;
+ * a defaut, le POST REST (persistance sans broadcast).
+ */
+async function deliverMessage(
+  chatId: string,
+  payload: DeliveryPayload
+): Promise<BackendMessage | WsMessagePayload> {
+  try {
+    return await sendMessageOverSocket(chatId, payload)
+  } catch {
+    return await apiRequest<BackendMessage>(`/api/conversations/${chatId}/messages`, {
+      method: "POST",
+      body: {
+        content: payload.content,
+        type: payload.msgType,
+        mediaId: payload.mediaId,
+        replyToId: payload.replyToId,
+      },
+    })
+  }
+}
+
+/** Persiste en IndexedDB un message confirme par le backend. */
+function cacheDeliveredMessage(message: BackendMessage | WsMessagePayload): void {
+  void cacheMessage({
+    id: message.id,
+    conversationId: message.convId,
+    senderId: message.senderId,
+    content: message.content,
+    type: message.type,
+    status: message.status,
+    createdAt: message.createdAt ? new Date(message.createdAt).getTime() : Date.now(),
+    replyToId: message.replyToId,
+    replyTo: message.replyTo,
+    deletedAt: (message as BackendMessage).deletedAt ?? null,
+    media: message.media,
+  })
+}
+
 /**
  * Envoie un message. On privilegie le WebSocket ({ type: "send" }) car c'est lui
  * qui declenche la diffusion temps reel aux autres participants sur ce backend ;
@@ -242,54 +293,71 @@ export async function sendChatMessage(
     }
   }
 
+  const message = await deliverMessage(chatId, {
+    content: content || undefined,
+    msgType,
+    tempId,
+    mediaId: options.mediaId,
+    replyToId: options.replyToId,
+  })
+  cacheDeliveredMessage(message)
+  return toFrontMessage(message, myId)
+}
+
+/** Un seul drain a la fois : "online" et le montage peuvent se declencher ensemble. */
+let draining = false
+
+/**
+ * Renvoie les messages ecrits hors ligne (outbox IndexedDB). Sans ce drain, la
+ * file d'attente grossit sans jamais partir : le message reste affiche comme
+ * « en cours d'envoi » indefiniment. Retourne le nombre de messages envoyes.
+ */
+export async function drainOfflineOutbox(): Promise<number> {
+  if (draining || !navigator.onLine) return 0
+  draining = true
+  let sent = 0
+
   try {
-    const message = await sendMessageOverSocket(chatId, {
-      content: content || undefined,
-      msgType,
-      tempId,
-      mediaId: options.mediaId,
-      replyToId: options.replyToId,
-    })
-    // Persiste le message confirmé en cache
-    void cacheMessage({
-      id: message.id,
-      conversationId: message.convId,
-      senderId: message.senderId,
-      content: message.content,
-      type: message.type,
-      status: message.status,
-      createdAt: message.createdAt ? new Date(message.createdAt).getTime() : Date.now(),
-      replyToId: message.replyToId,
-      replyTo: message.replyTo,
-      media: message.media,
-    })
-    return toFrontMessage(message, myId)
+    const pending = await getOfflineQueue()
+    // Ordre chronologique : les messages doivent arriver dans l'ordre d'ecriture.
+    pending.sort((a, b) => Number(a.createdAt ?? 0) - Number(b.createdAt ?? 0))
+
+    for (const item of pending) {
+      const chatId = typeof item.conversationId === "string" ? item.conversationId : ""
+      const tempId = typeof item.tempId === "string" ? item.tempId : ""
+      if (!tempId) continue
+      if (!chatId) {
+        // Entree corrompue : inutile de bloquer la file dessus.
+        await dequeueOffline(tempId)
+        continue
+      }
+
+      try {
+        const message = await deliverMessage(chatId, {
+          content: typeof item.content === "string" ? item.content : undefined,
+          msgType: typeof item.type === "string" ? item.type : "TEXT",
+          tempId,
+          mediaId: typeof item.mediaId === "string" ? item.mediaId : undefined,
+          replyToId: typeof item.replyToId === "string" ? item.replyToId : undefined,
+        })
+        cacheDeliveredMessage(message)
+      } catch {
+        // Reseau encore instable : on reprendra au prochain retour en ligne.
+        break
+      }
+
+      await dequeueOffline(tempId)
+      // Retire le message optimiste : il est remplace par celui du backend.
+      await removeMessageFromCache(tempId)
+      sent += 1
+    }
   } catch {
-    const response = await apiRequest<BackendMessage>(`/api/conversations/${chatId}/messages`, {
-      method: "POST",
-      body: {
-        content: content || undefined,
-        type: msgType,
-        mediaId: options.mediaId,
-        replyToId: options.replyToId,
-      },
-    })
-    // Persiste le message confirmé en cache
-    void cacheMessage({
-      id: response.id,
-      conversationId: response.convId,
-      senderId: response.senderId,
-      content: response.content,
-      type: response.type,
-      status: response.status,
-      createdAt: response.createdAt ? new Date(response.createdAt).getTime() : Date.now(),
-      replyToId: response.replyToId,
-      replyTo: response.replyTo,
-      deletedAt: response.deletedAt,
-      media: response.media,
-    })
-    return toFrontMessage(response, myId)
+    // IndexedDB indisponible : rien a renvoyer.
+  } finally {
+    draining = false
   }
+
+  return sent
 }
 
 /**

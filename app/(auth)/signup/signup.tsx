@@ -128,7 +128,8 @@ export default function SignUpPage() {
   const submitStep1 = (event: React.FormEvent) => {
     event.preventDefault()
     setError("")
-    if (!form.name.trim()) return setError("Le nom est requis.")
+    // Le backend impose un pseudo d'au moins 2 caracteres (setupSchema).
+    if (form.name.trim().length < 2) return setError("Le nom doit faire au moins 2 caracteres.")
     if (!form.email.trim()) return setError("L'adresse email est requise.")
     if (!validEmail(form.email)) return setError("Adresse email invalide.")
 
@@ -144,6 +145,9 @@ export default function SignUpPage() {
     event.preventDefault()
     setError("")
 
+    // Le backend (POST /api/auth/setup) refuse tout mot de passe de moins de
+    // 8 caracteres : autant le dire ici plutot qu'apres la saisie du code OTP.
+    if (form.password.length < 8) return setError("Le mot de passe doit faire au moins 8 caracteres.")
     if (strength.score < 2) return setError("Mot de passe trop faible.")
     if (!match) return setError("Les mots de passe ne correspondent pas.")
 

@@ -23,14 +23,23 @@ function cacheKey(url: string): string {
   }
 }
 
-/** Route le fetch de preview par le proxy same-origin Vercel quand l'URL est un média backend. */
-function previewRequestUrl(url: string): string {
+/**
+ * Le proxy same-origin `api/media-proxy` est une fonction serverless du dépôt
+ * front : elle n'existe que sur Vercel. En développement (`npm run dev`) ou sur
+ * un autre hébergeur, elle répond 404 — on retombe alors sur l'URL backend
+ * directe. Le résultat de la première tentative est mémorisé pour ne pas
+ * multiplier les allers-retours inutiles.
+ */
+let mediaProxyAvailable: boolean | null = null
+
+/** URL du proxy pour un média backend, ou null si l'URL n'en est pas un. */
+function mediaProxyUrl(url: string): string | null {
   try {
     const parsed = new URL(url, window.location.origin)
     const match = parsed.pathname.match(/\/api\/media\/([a-zA-Z0-9-]+)$/)
-    return match ? `/api/media-proxy/${match[1]}` : url
+    return match ? `/api/media-proxy/${match[1]}` : null
   } catch {
-    return url
+    return null
   }
 }
 
@@ -59,10 +68,31 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
   // Le backend accepte le Bearer et aussi ?token=. Le header est indispensable
   // lorsqu'un navigateur/mobile retire ou ne transmet pas le paramètre après une redirection.
   const token = loadSessionToken()
-  const response = await fetch(previewRequestUrl(url), {
-    credentials: "same-origin",
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  })
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+
+  let response: Response | null = null
+  const proxied = mediaProxyAvailable === false ? null : mediaProxyUrl(url)
+  if (proxied) {
+    try {
+      const proxyResponse = await fetch(proxied, { credentials: "same-origin", headers })
+      if (proxyResponse.ok) {
+        mediaProxyAvailable = true
+        response = proxyResponse
+      } else if (proxyResponse.status === 404 || proxyResponse.status === 405) {
+        // Pas de proxy sur cet hébergement : on n'y reviendra plus.
+        mediaProxyAvailable = false
+      } else {
+        // 401/403/502… : erreur réelle, inutile de réessayer en direct.
+        response = proxyResponse
+      }
+    } catch {
+      mediaProxyAvailable = false
+    }
+  }
+
+  if (!response) {
+    response = await fetch(url, { credentials: "same-origin", headers })
+  }
   if (!response.ok) throw new Error(`Chargement échoué (${response.status})`)
   const blob = await response.blob()
   if (blob.size <= MAX_CACHED_PREVIEW_BYTES) {

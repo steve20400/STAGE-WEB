@@ -5,7 +5,7 @@
  * Le backend reste l'unique autorité : son Bearer token et ses règles d'accès sont
  * transmis sans modification.
  */
-const BACKEND_URL = (process.env.VITE_API_BASE_URL || "https://backend-alanya.vercel.app").replace(/\/$/, "")
+const BACKEND_URL = (process.env.VITE_API_BASE_URL || "https://alanyavox.com").replace(/\/$/, "")
 
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" })

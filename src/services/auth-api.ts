@@ -249,15 +249,28 @@ export async function logoutAllSessions() {
   await logoutCurrentSession()
 }
 
-/** Pas d'endpoint de suppression de compte sur ce backend : on nettoie localement. */
-export async function deleteCurrentAccount() {
-  try {
-    await apiRequest<void>("/api/me", { method: "DELETE" })
-  } catch (error) {
-    if (!shouldUsePrototypeFallback(error)) throw error
-  } finally {
-    clearSessionToken()
-  }
+/**
+ * DELETE /api/account — supprime definitivement le compte. Le backend exige le
+ * mot de passe dans le corps de la requete pour confirmer l'identite. Le jeton
+ * local n'est efface que si la suppression a reellement abouti.
+ */
+export async function deleteCurrentAccount(password: string) {
+  await apiRequest<{ message?: string }>("/api/account", {
+    method: "DELETE",
+    body: { password },
+  })
+  clearSessionToken()
+}
+
+/**
+ * POST /api/account/password — change le mot de passe (verifie l'ancien cote
+ * backend). Le nouveau doit faire au moins 8 caracteres et differer de l'actuel.
+ */
+export async function changePasswordApi(currentPassword: string, newPassword: string) {
+  await apiRequest<{ message?: string }>("/api/account/password", {
+    method: "POST",
+    body: { currentPassword, newPassword },
+  })
 }
 
 export function storeAuthenticatedSession(session: AuthSession) {

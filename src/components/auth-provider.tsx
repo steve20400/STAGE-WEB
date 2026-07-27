@@ -13,8 +13,8 @@ import {
   saveSessionUser,
   type SessionUser,
 } from "../data/session-user"
-import { registerCurrentDevice } from "../services/device-session-service"
 import { clearSessionToken } from "../data/session-auth"
+import { drainOfflineOutbox } from "../services/messages-service"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -41,7 +41,7 @@ interface AuthContextValue {
   logout: () => Promise<void>
   logoutEverywhere: () => Promise<void>
   updateUser: (user: SessionUser) => void
-  deleteAccount: () => Promise<void>
+  deleteAccount: (password: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -72,7 +72,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (restoredUser) {
         saveSessionUser(restoredUser)
         setUser(restoredUser)
-        void registerCurrentDevice().catch(() => undefined)
       } else {
         clearSessionToken()
         clearSessionUser()
@@ -89,11 +88,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Renvoie les messages ecrits hors ligne des qu'une session est active et que
+  // le reseau revient (au montage aussi : le navigateur a pu etre ferme entre-temps).
+  useEffect(() => {
+    if (!user) return
+
+    const drain = () => void drainOfflineOutbox()
+
+    drain()
+    window.addEventListener("online", drain)
+
+    return () => window.removeEventListener("online", drain)
+  }, [user])
+
   const login = useCallback(async (payload: LoginPayload) => {
     const nextUser = storeAuthenticatedSession(await loginWithPassword(payload))
     saveSessionUser(nextUser)
     setUser(nextUser)
-    void registerCurrentDevice().catch(() => undefined)
     setIsReady(true)
     return nextUser
   }, [])
@@ -102,7 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const nextUser = storeAuthenticatedSession(await completeRegistration(draft, otp))
     saveSessionUser(nextUser)
     setUser(nextUser)
-    void registerCurrentDevice().catch(() => undefined)
     setIsReady(true)
     return nextUser
   }, [])
@@ -140,22 +150,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsReady(true)
   }, [])
 
-  const deleteAccount = useCallback(async () => {
-    const currentUser = user
-    try {
-      const { unregisterPush } = await import("../services/push-service")
-      await unregisterPush()
-    } catch (e) {
-      console.error("[Auth] Failed to unregister push during deleteAccount:", e)
-    }
-    await deleteCurrentAccount()
-    if (currentUser) {
-      deletePrototypeAccount(currentUser.phone)
-    }
-    clearSessionUser()
-    setUser(null)
-    setIsReady(true)
-  }, [user])
+  const deleteAccount = useCallback(
+    async (password: string) => {
+      const currentUser = user
+      try {
+        const { unregisterPush } = await import("../services/push-service")
+        await unregisterPush()
+      } catch (e) {
+        console.error("[Auth] Failed to unregister push during deleteAccount:", e)
+      }
+      // Laisse remonter l'erreur : un mot de passe refuse ne doit pas passer
+      // pour une suppression reussie.
+      await deleteCurrentAccount(password)
+      if (currentUser) {
+        deletePrototypeAccount(currentUser.phone)
+      }
+      clearSessionUser()
+      setUser(null)
+      setIsReady(true)
+    },
+    [user]
+  )
 
   const value = useMemo<AuthContextValue>(
     () => ({
