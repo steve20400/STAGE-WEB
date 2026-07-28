@@ -480,7 +480,10 @@
   right: 20px;
   bottom: 20px;
   width: min(300px, 82vw);
+  height: 250px;
   z-index: 9000;
+  display: flex;
+  flex-direction: column;
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid var(--border-default);
@@ -494,7 +497,8 @@
 
 .active-call-content {
   position: relative;
-  height: 210px;
+  flex: 1;
+  min-height: 0;
 }
 .active-call-content video {
   width: 100%;
@@ -559,15 +563,15 @@
   display: block;
 }
 
+/* Barre de commandes : dans le flux, donc toujours visible et sans recouvrir
+   la photo ni le flux video. */
 .active-call-controls {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
   gap: 6px;
   padding: 10px;
+  flex-shrink: 0;
   background: #000000b3;
+  border-top: 1px solid #ffffff1a;
 }
 .active-call-controls button {
   flex: 1;

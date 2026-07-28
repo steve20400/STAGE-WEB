@@ -238,6 +238,38 @@ class PeerSession {
 
 const RING_TIMEOUT_MS = 60_000
 
+/**
+ * Photo du correspondant retrouvee cote client, a partir de la conversation
+ * liee a l'appel.
+ *
+ * Le backend ne joint l'avatar aux evenements d'appel (callerAvatarUrl,
+ * callees[].avatarUrl) que depuis son dernier commit : tant que le serveur
+ * deploye est anterieur, ces champs arrivent vides. GET /api/conversations
+ * porte en revanche l'avatar de l'interlocuteur d'une conversation directe
+ * depuis longtemps — on s'en sert comme source de secours pour que la photo
+ * s'affiche dans tous les cas.
+ */
+async function conversationAvatar(convId: string | null): Promise<string | null> {
+  if (!convId) return null
+  try {
+    const { fetchChatConversations } = await import("./chats-service")
+    const conversations = await fetchChatConversations()
+    const conversation = conversations.find((c) => c.id === convId)
+    return conversation && !conversation.isGroup ? (conversation.avatar ?? null) : null
+  } catch {
+    return null
+  }
+}
+
+/** Complete peerAvatarUrl si l'appel courant n'en a pas recu du backend. */
+async function backfillPeerAvatar(callId: string, convId: string | null) {
+  if (state.peerAvatarUrl) return
+  const avatar = await conversationAvatar(convId)
+  if (avatar && state.activeCallId === callId && !state.peerAvatarUrl) {
+    setState({ peerAvatarUrl: avatar })
+  }
+}
+
 function initialState(): CallManagerState {
   return {
     incoming: null,
@@ -533,14 +565,18 @@ async function handleServerEvent(event: CallServerEvent) {
     if (!callId) return
     // Deja en appel : on laisse sonner cote serveur sans interrompre l'appel courant.
     if (state.activeCallId || state.incoming) return
+
+    const convId = (event.convId as string | null) ?? null
+    const callerAvatarUrl = (event.callerAvatarUrl as string | null) ?? null
+
     setState({
       incoming: {
         callId,
-        convId: (event.convId as string | null) ?? null,
+        convId,
         callType: event.callType === "VIDEO" ? "video" : "audio",
         callerId: String(event.callerId ?? ""),
         callerName: String(event.callerName ?? "Appel"),
-        callerAvatarUrl: (event.callerAvatarUrl as string | null) ?? null,
+        callerAvatarUrl,
         isGroup: Boolean(event.isGroup),
         groupName: (event.groupName as string | null) ?? null,
         memberCount: Number(event.memberCount ?? 2),
@@ -551,6 +587,17 @@ async function handleServerEvent(event: CallServerEvent) {
     // Le destinataire a effectivement l'application ouverte : l'appelant peut
     // passer de « Sonnerie » à « En train de sonner ».
     sendCallState(callId, "ringing", myUserId() ?? undefined, myDisplayName())
+
+    // Photo de l'appelant absente de l'evenement (backend anterieur au commit
+    // qui la propage) : on la retrouve via la conversation liee.
+    if (!callerAvatarUrl) {
+      void conversationAvatar(convId).then((avatar) => {
+        if (!avatar) return
+        const current: IncomingCallInfo | null = state.incoming
+        if (!current || current.callId !== callId || current.callerAvatarUrl) return
+        setState({ incoming: { ...current, callerAvatarUrl: avatar } })
+      })
+    }
     return
   }
 
@@ -719,6 +766,8 @@ export async function startOutgoingCall(
     error: null,
   })
 
+  void backfillPeerAvatar(started.id, convId)
+
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {
       void hangUp()
@@ -778,6 +827,8 @@ export async function acceptIncomingCall(): Promise<string | null> {
     endedAt: null,
     error: null,
   })
+
+  void backfillPeerAvatar(incoming.callId, incoming.convId)
 
   sendCallState(incoming.callId, "joined", me, myDisplayName())
 

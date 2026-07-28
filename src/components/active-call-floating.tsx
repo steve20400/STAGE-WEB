@@ -18,7 +18,6 @@ export function ActiveCallFloating() {
   const navigate = useNavigate()
   const localVideo = useRef<HTMLVideoElement>(null)
 
-  const [controls, setControls] = useState(false)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const [pip, setPip] = useState({ x: 0, y: 0 })
   const drag = useRef({ x: 0, y: 0, ox: 0, oy: 0, on: false })
@@ -75,7 +74,7 @@ export function ActiveCallFloating() {
         />
       ))}
 
-      <div className="active-call-content" onClick={() => setControls((v) => !v)}>
+      <div className="active-call-content">
         {showRemoteVideo ? (
           <>
             <video
@@ -120,36 +119,24 @@ export function ActiveCallFloating() {
             <span>{call.callType === "video" ? "Appel video" : "Appel en cours"}</span>
           </div>
         )}
+      </div>
 
-        {controls && (
-          <div className="active-call-controls" onPointerDown={(e) => e.stopPropagation()}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                restore()
-              }}
-            >
-              Retour appel
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleMicrophone()
-              }}
-            >
-              {call.micOn ? "Muet" : "Micro"}
-            </button>
-            <button
-              className="end"
-              onClick={(e) => {
-                e.stopPropagation()
-                void hangUp()
-              }}
-            >
-              Raccrocher
-            </button>
-          </div>
-        )}
+      {/* Commandes toujours visibles : elles n'apparaissaient qu'apres un clic
+          sur la fenetre, ce qui les rendait introuvables. */}
+      <div className="active-call-controls" onPointerDown={(e) => e.stopPropagation()}>
+        <button onClick={restore} title="Revenir a l'ecran d'appel">
+          Retour appel
+        </button>
+        <button
+          onClick={() => toggleMicrophone()}
+          aria-pressed={!call.micOn}
+          title={call.micOn ? "Couper le micro" : "Reactiver le micro"}
+        >
+          {call.micOn ? "Muet" : "Micro"}
+        </button>
+        <button className="end" onClick={() => void hangUp()} title="Raccrocher">
+          Raccrocher
+        </button>
       </div>
     </div>
   )
