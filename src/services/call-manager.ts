@@ -650,7 +650,12 @@ async function handleServerEvent(event: CallServerEvent) {
     }
 
     if (callState === "left" || callState === "declined") {
-      if (userId === me) return
+      // Notre identifiant : soit notre propre depart, soit un autre appareil du
+      // meme compte qui vient de refuser pendant que l'on sonne ici.
+      if (userId === me) {
+        if (callId === state.incoming?.callId) setState({ incoming: null })
+        return
+      }
       if (callId === state.activeCallId && userId) {
         removePeer(userId)
         // Appel direct : si l'autre part, l'appel est fini pour nous aussi.
@@ -662,7 +667,14 @@ async function handleServerEvent(event: CallServerEvent) {
     }
 
     if (callState === "rejected" || callState === "ended") {
-      if (fromUserId === me) return // echo de notre propre raccrochage
+      if (fromUserId === me) {
+        // Echo de notre propre raccrochage — sauf si un autre appareil du meme
+        // compte a refuse l'appel qui sonne encore ici.
+        if (callId === state.incoming?.callId && callId !== state.activeCallId) {
+          setState({ incoming: null })
+        }
+        return
+      }
       const isOurCall =
         callId === state.activeCallId ||
         callId === state.incoming?.callId ||
