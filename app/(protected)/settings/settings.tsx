@@ -8,6 +8,13 @@ import { isTurnConfigured } from "../../../src/services/calls-service"
 import TurnTester from "../../../src/components/turn-tester"
 import RealtimeStatus from "../../../src/components/realtime-status"
 import { changePasswordApi, updateProfileApi } from "../../../src/services/auth-api"
+import {
+  type Appareil,
+  TYPE_DEVICE,
+  deconnecterAppareil,
+  estAppareilCourant,
+  fetchAppareils,
+} from "../../../src/services/appareils-service"
 import { fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 
 type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
@@ -639,6 +646,41 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
   )
 }
 
+/** Ligne de la carte « Sessions actives ». */
+interface SessionAffichee {
+  appareilId: number
+  device: string
+  /** Systeme d exploitation. Le referentiel ne stocke ni IP ni localisation :
+   *  on affiche donc le systeme plutot qu une ville inventee. */
+  location: string
+  current: boolean
+  ts: string
+  isMobile: boolean
+}
+
+/** Derniere activite en clair : « Maintenant », « Il y a 3 h », puis la date. */
+function derniereActivite(iso: string | null): string {
+  if (!iso) return "Jamais connecte"
+  const date = new Date(iso)
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60000)
+  if (minutes < 2) return "Maintenant"
+  if (minutes < 60) return `Il y a ${minutes} min`
+  if (minutes < 24 * 60) return `Il y a ${Math.floor(minutes / 60)} h`
+  if (minutes < 7 * 24 * 60) return `Il y a ${Math.floor(minutes / 1440)} j`
+  return date.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+}
+
+function versSession(a: Appareil): SessionAffichee {
+  return {
+    appareilId: a.appareilId,
+    device: a.libelle,
+    location: a.system ?? "",
+    current: estAppareilCourant(a),
+    ts: derniereActivite(a.lastLogin),
+    isMobile: a.typeDevice === TYPE_DEVICE.android || a.typeDevice === TYPE_DEVICE.ios,
+  }
+}
+
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { deleteAccount: removeAccount, logoutEverywhere, updateUser, user } = useAuth()
@@ -646,6 +688,42 @@ export default function SettingsPage() {
 
   const [section, setSection] = useState<SettingsSection>("profile")
   const [saving, setSaving] = useState(false)
+  // Appareils du compte, charges depuis l'API. `null` = chargement en cours.
+  const [sessions, setSessions] = useState<SessionAffichee[] | null>(null)
+
+  // Charge les appareils quand la section Securite s affiche : inutile de
+  // solliciter l API tant que l utilisateur reste sur son profil.
+  useEffect(() => {
+    if (section !== "security") return
+    let annule = false
+    void (async () => {
+      try {
+        const liste = await fetchAppareils()
+        if (annule) return
+        // Les appareils deconnectes a distance restent en base pour
+        // l historique, mais n ont pas leur place dans « sessions actives ».
+        setSessions(liste.filter((a) => !a.revoked).map(versSession))
+      } catch {
+        if (!annule) setSessions([])
+      }
+    })()
+    return () => {
+      annule = true
+    }
+  }, [section])
+
+  const deconnecterSession = useCallback(
+    async (appareilId: number, libelle: string) => {
+      try {
+        await deconnecterAppareil(appareilId)
+        setSessions((prev) => (prev ?? []).filter((s) => s.appareilId !== appareilId))
+        warning("Session fermee", `${libelle} a ete deconnecte.`)
+      } catch {
+        toastError("Deconnexion impossible", "Reessaie dans un instant.")
+      }
+    },
+    [warning, toastError],
+  )
   const [profile, setProfile] = useState<Profile>(() => getInitialProfile(user))
   const [draft, setDraft] = useState<Profile>(() => getInitialProfile(user))
   const [security, setSecurity] = useState<SecurityForm>({
@@ -1437,35 +1515,29 @@ export default function SettingsPage() {
 
               <div className="s-card">
                 <div className="s-card-title">Sessions actives</div>
-                {[
-                  {
-                    device: "Chrome  -  Windows 11",
-                    location: "Yaounde, CM",
-                    current: true,
-                    ts: "Maintenant",
-                  },
-                  {
-                    device: "Firefox  -  Ubuntu 22",
-                    location: "Yaounde, CM",
-                    current: false,
-                    ts: "Il y a 2 h",
-                  },
-                  {
-                    device: "Alanya Mobile  -  Android 13",
-                    location: "Douala, CM",
-                    current: false,
-                    ts: "Hier 20:14",
-                  },
-                ].map((s, i) => (
+                {sessions === null && (
+                  <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
+                    Chargement…
+                  </div>
+                )}
+                {sessions !== null && sessions.length === 0 && (
+                  <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
+                    Aucun appareil enregistre pour le moment.
+                  </div>
+                )}
+                {(sessions ?? []).map((s, i) => (
                   <div
                     className="session-row"
-                    key={i}
+                    key={s.appareilId}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
                       padding: "12px 0",
-                      borderBottom: i < 2 ? "1px solid var(--border-subtle)" : "none",
+                      borderBottom:
+                        i < (sessions ?? []).length - 1
+                          ? "1px solid var(--border-subtle)"
+                          : "none",
                       gap: 12,
                     }}
                   >
@@ -1500,7 +1572,7 @@ export default function SettingsPage() {
                           strokeWidth="1.8"
                           strokeLinecap="round"
                         >
-                          {s.device.includes("Mobile") ? (
+                          {s.isMobile ? (
                             <>
                               <rect x="5" y="2" width="14" height="20" rx="2" />
                               <line x1="12" y1="18" x2="12.01" y2="18" />
@@ -1543,15 +1615,14 @@ export default function SettingsPage() {
                           )}
                         </div>
                         <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                          {s.location} - {s.ts}
+                          {s.location ? `${s.location} - ` : ""}
+                          {s.ts}
                         </div>
                       </div>
                     </div>
                     {!s.current && (
                       <button
-                        onClick={() => {
-                          warning("Session fermee", `${s.device} a ete deconnecte.`)
-                        }}
+                        onClick={() => void deconnecterSession(s.appareilId, s.device)}
                         style={{
                           background: "var(--danger-dim)",
                           border: "1px solid var(--danger-border)",
