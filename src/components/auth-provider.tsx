@@ -15,6 +15,7 @@ import {
 } from "../data/session-user"
 import { clearSessionToken } from "../data/session-auth"
 import { drainOfflineOutbox } from "../services/messages-service"
+import { enregistrerAppareilCourant } from "../services/appareils-service"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -99,6 +100,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener("online", drain)
 
     return () => window.removeEventListener("online", drain)
+  }, [user])
+
+  // Inscrit ce navigateur au registre des appareils du compte, et le signale
+  // vivant a chaque retour en ligne. L'appel est idempotent cote serveur : il
+  // met a jour la ligne existante au lieu d'en creer une seconde.
+  useEffect(() => {
+    if (!user) return
+
+    const signaler = () => void enregistrerAppareilCourant()
+
+    signaler()
+    window.addEventListener("online", signaler)
+
+    return () => window.removeEventListener("online", signaler)
   }, [user])
 
   const login = useCallback(async (payload: LoginPayload) => {
