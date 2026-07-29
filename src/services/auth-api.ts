@@ -1,3 +1,4 @@
+import { getOrCreateWebDeviceId } from "./appareils-service"
 import { loadSessionUser, type SessionUser } from "../data/session-user"
 import {
   clearSessionToken,
@@ -100,7 +101,10 @@ export async function loginWithPassword(payload: LoginPayload) {
   try {
     const response = await apiRequest<AuthTokensResponse>("/api/auth/login", {
       method: "POST",
-      body: { identifier, password: payload.password },
+      // deviceId rattache la session a ce navigateur : c'est ce qui permet de
+      // la revoquer depuis « Sessions actives ». Sans lui, le serveur sait a
+      // quel compte appartient le jeton, pas depuis quel appareil il vient.
+      body: { identifier, password: payload.password, deviceId: getOrCreateWebDeviceId() },
     })
 
     return {
@@ -206,7 +210,11 @@ export async function completeRegistration(draft: RegistrationDraft, otp: string
     const setupResponse = await apiRequest<AuthTokensResponse>("/api/auth/setup", {
       method: "POST",
       headers: { Authorization: `Bearer ${verifyResponse.setupToken}` },
-      body: { pseudo: draft.name.trim(), password: draft.password },
+      body: {
+        pseudo: draft.name.trim(),
+        password: draft.password,
+        deviceId: getOrCreateWebDeviceId(),
+      },
     })
 
     const withNumber: SessionUser = {
