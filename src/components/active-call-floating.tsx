@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
 import { hangUp, restoreActiveCall, toggleMicrophone } from "../services/call-manager"
@@ -16,19 +16,11 @@ import { avatarDisplaySrc } from "../lib/avatar"
 export function ActiveCallFloating() {
   const call = useCallState()
   const navigate = useNavigate()
-  const localVideo = useRef<HTMLVideoElement>(null)
-
   const [pos, setPos] = useState({ x: 0, y: 0 })
-  const [pip, setPip] = useState({ x: 0, y: 0 })
   const drag = useRef({ x: 0, y: 0, ox: 0, oy: 0, on: false })
-  const pipDrag = useRef({ x: 0, y: 0, ox: 0, oy: 0, on: false })
 
   const remoteEntries = Object.entries(call.remoteStreams)
   const remote = remoteEntries[0]?.[1]
-
-  useEffect(() => {
-    if (localVideo.current && call.localStream) localVideo.current.srcObject = call.localStream
-  }, [call.localStream])
 
   if (!call.activeCallId || call.displayMode !== "compact") return null
 
@@ -87,28 +79,6 @@ export function ActiveCallFloating() {
               autoPlay
               playsInline
             />
-            {call.localStream && call.camOn && (
-              <video
-                className="active-call-local-pip"
-                ref={localVideo}
-                style={{ transform: `translate(${pip.x}px, ${pip.y}px) scaleX(-1)` }}
-                onPointerDown={(e) => {
-                  pipDrag.current = { x: e.clientX, y: e.clientY, ox: pip.x, oy: pip.y, on: true }
-                  e.currentTarget.setPointerCapture(e.pointerId)
-                  e.stopPropagation()
-                }}
-                onPointerMove={(e) => {
-                  const d = pipDrag.current
-                  if (d.on) setPip({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y })
-                }}
-                onPointerUp={() => {
-                  pipDrag.current.on = false
-                }}
-                autoPlay
-                playsInline
-                muted
-              />
-            )}
           </>
         ) : (
           <div className="active-call-audio">

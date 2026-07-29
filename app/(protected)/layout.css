@@ -596,17 +596,4 @@
 }
 
 /* Apercu de sa propre camera, deplacable dans la fenetre. */
-.active-call-local-pip {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 92px;
-  height: 68px;
-  border: 2px solid #ffffff80;
-  border-radius: 10px;
-  object-fit: cover;
-  box-shadow: 0 4px 14px #0009;
-  z-index: 3;
-  touch-action: none;
-  cursor: grab;
-}
+
