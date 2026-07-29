@@ -103,7 +103,7 @@ export default function ChatsPage() {
   return (
     <div className="chats-root">
       <div className="ch-header">
-        {/* Carte profil : nom + numero Alanya, comme en tete de liste sur mobile */}
+        {/* Carte profil : nom + ID Alanya, comme en tete de liste sur mobile */}
         <div
           onClick={() => navigate("/settings")}
           style={{
@@ -159,7 +159,7 @@ export default function ChatsPage() {
               {sessionUser?.name ?? "Mon profil"}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              Numero Alanya :{" "}
+              ID Alanya :{" "}
               <strong style={{ color: "var(--accent)" }}>
                 {sessionUser?.phone ? formatAlanyaNumber(sessionUser.phone) : "—"}
               </strong>

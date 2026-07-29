@@ -202,8 +202,9 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
     status: "En ligne",
   }
 
-  async function handleLogout() {
-    await logout()
+  function handleLogout() {
+    // Navigation immédiate : le nettoyage Push/API continue sans bloquer l'interface.
+    void logout()
     navigate("/login", { replace: true })
   }
 

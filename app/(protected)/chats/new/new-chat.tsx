@@ -49,7 +49,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
     const contact = contacts.find((c) => c.id === contactId)
     if (!contact) return
     try {
-      // Le backend identifie les gens par leur numero Alanya (6 ou 8 chiffres).
+      // Le backend identifie les gens par leur ID Alanya (6 ou 8 chiffres).
       const conversation = await createPrivateChat(contact.phone)
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
@@ -84,7 +84,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
     const phone = normalizePhone(newPhone).replace(/\D/g, "")
 
     if (!isValidAlanyaNumber(phone)) {
-      error("Numero invalide", "Utilisez le numero Alanya (6 ou 8 chiffres) du contact.")
+      error("Numero invalide", "Utilisez le ID Alanya (6 ou 8 chiffres) du contact.")
       return
     }
 
@@ -198,7 +198,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
             {showAdd && (
               <div className="ncm-add-box">
                 <input
-                  placeholder="Numero Alanya (ex. 12-34-56-78)"
+                  placeholder="ID Alanya (ex. 12 34 56 78)"
                   value={formatAlanyaNumber(newPhone)}
                   onChange={(event) => setNewPhone(formatAlanyaNumber(event.target.value))}
                   inputMode="numeric"

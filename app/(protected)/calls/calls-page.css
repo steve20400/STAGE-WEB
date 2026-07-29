@@ -348,3 +348,6 @@
     flex-wrap: wrap;
   }
 }
+
+/* Les listes Contacts/Appels doivent défiler dans le panneau principal. */
+.layout-main .calls-root{height:100%;min-height:0;overflow-y:auto;overscroll-behavior:contain}
