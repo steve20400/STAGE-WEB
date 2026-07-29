@@ -15,6 +15,12 @@ import {
   estAppareilCourant,
   fetchAppareils,
 } from "../../../src/services/appareils-service"
+import {
+  type LoginAccess,
+  estRenseigne,
+  fetchLoginHistory,
+  quand,
+} from "../../../src/services/user-access-service"
 import { fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 
 type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
@@ -690,6 +696,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   // Appareils du compte, charges depuis l'API. `null` = chargement en cours.
   const [sessions, setSessions] = useState<SessionAffichee[] | null>(null)
+  // Journal des connexions. `null` = chargement en cours.
+  const [historique, setHistorique] = useState<LoginAccess[] | null>(null)
 
   // Charge les appareils quand la section Securite s affiche : inutile de
   // solliciter l API tant que l utilisateur reste sur son profil.
@@ -703,8 +711,11 @@ export default function SettingsPage() {
         // Les appareils deconnectes a distance restent en base pour
         // l historique, mais n ont pas leur place dans « sessions actives ».
         setSessions(liste.filter((a) => !a.revoked).map(versSession))
+        const journal = await fetchLoginHistory()
+        if (!annule) setHistorique(journal)
       } catch {
         if (!annule) setSessions([])
+        if (!annule) setHistorique([])
       }
     })()
     return () => {
@@ -1647,6 +1658,76 @@ export default function SettingsPage() {
                     )}
                   </div>
                 ))}
+              </div>
+
+              <div className="s-card">
+                <div className="s-card-title">Historique de connexion</div>
+                <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 10 }}>
+                  Chaque ouverture de session est enregistree. Une connexion que
+                  tu ne reconnais pas ? Change ton mot de passe et deconnecte
+                  l appareil concerne.
+                </div>
+
+                {historique === null && (
+                  <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
+                    Chargement…
+                  </div>
+                )}
+                {historique !== null && historique.length === 0 && (
+                  <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
+                    Aucune connexion enregistree pour le moment.
+                  </div>
+                )}
+                {(historique ?? []).map((a, i) => {
+                  const details = [a.device, a.osSystem, a.ipAdress].filter(estRenseigne)
+                  return (
+                    <div
+                      key={a.idLogin}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 0",
+                        borderBottom:
+                          i < (historique ?? []).length - 1
+                            ? "1px solid var(--border-subtle)"
+                            : "none",
+                        gap: 12,
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: "var(--text-primary)",
+                            marginBottom: 2,
+                          }}
+                        >
+                          {quand(a.dateLogin)}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
+                          {details.length > 0 ? details.join(" - ") : "Origine inconnue"}
+                        </div>
+                      </div>
+                      {i === 0 && (
+                        <span
+                          style={{
+                            flex: "none",
+                            fontSize: 9,
+                            background: "var(--accent-dim)",
+                            color: "var(--accent-text)",
+                            padding: "2px 7px",
+                            borderRadius: 4,
+                            fontWeight: 600,
+                          }}
+                        >
+                          La plus recente
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
 
               <div className="s-card">
