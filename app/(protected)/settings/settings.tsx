@@ -21,6 +21,7 @@ import {
   fetchLoginHistory,
   quand,
 } from "../../../src/services/user-access-service"
+import { sendSessionRevoked } from "../../../src/services/websocket-service"
 import { fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 
 type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
@@ -655,6 +656,8 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
 /** Ligne de la carte « Sessions actives ». */
 interface SessionAffichee {
   appareilId: number
+  /** Identifiant de l appareil : sert a annoncer sa revocation aux autres sessions. */
+  cookiesWebId: string | null
   device: string
   /** Systeme d exploitation. Le referentiel ne stocke ni IP ni localisation :
    *  on affiche donc le systeme plutot qu une ville inventee. */
@@ -679,6 +682,7 @@ function derniereActivite(iso: string | null): string {
 function versSession(a: Appareil): SessionAffichee {
   return {
     appareilId: a.appareilId,
+    cookiesWebId: a.cookiesWebId,
     device: a.libelle,
     location: a.system ?? "",
     current: estAppareilCourant(a),
@@ -724,10 +728,14 @@ export default function SettingsPage() {
   }, [section])
 
   const deconnecterSession = useCallback(
-    async (appareilId: number, libelle: string) => {
+    async (appareilId: number, libelle: string, cookiesWebId: string | null) => {
       try {
         await deconnecterAppareil(appareilId)
         setSessions((prev) => (prev ?? []).filter((s) => s.appareilId !== appareilId))
+        // Coupe l acces sans attendre l expiration du jeton (15 min) : les
+        // autres sessions du compte recoivent l annonce et celle qui se
+        // reconnait se deconnecte immediatement.
+        if (cookiesWebId) sendSessionRevoked(cookiesWebId)
         warning("Session fermee", `${libelle} a ete deconnecte.`)
       } catch {
         toastError("Deconnexion impossible", "Reessaie dans un instant.")
@@ -1633,7 +1641,9 @@ export default function SettingsPage() {
                     </div>
                     {!s.current && (
                       <button
-                        onClick={() => void deconnecterSession(s.appareilId, s.device)}
+                        onClick={() =>
+                          void deconnecterSession(s.appareilId, s.device, s.cookiesWebId)
+                        }
                         style={{
                           background: "var(--danger-dim)",
                           border: "1px solid var(--danger-border)",

@@ -15,7 +15,11 @@ import {
 } from "../data/session-user"
 import { clearSessionToken } from "../data/session-auth"
 import { drainOfflineOutbox } from "../services/messages-service"
-import { enregistrerAppareilCourant } from "../services/appareils-service"
+import {
+  enregistrerAppareilCourant,
+  getOrCreateWebDeviceId,
+} from "../services/appareils-service"
+import { subscribeToSessionRevoked } from "../services/websocket-service"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -144,6 +148,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setIsReady(true)
   }, [])
+
+  // Deconnexion a distance : une autre session du compte a revoque un appareil.
+  // Chaque client compare l'identifiant recu au sien ; seul le vise s'efface.
+  //
+  // Place APRES `logout` : le tableau de dependances est evalue au rendu, donc
+  // referencer la fonction plus haut leverait une erreur de zone morte.
+  //
+  // La revocation en base reste la garantie de fond — cet evenement evite
+  // simplement d'attendre l'expiration du jeton d'acces (15 min).
+  useEffect(() => {
+    if (!user) return
+
+    return subscribeToSessionRevoked((deviceId) => {
+      if (deviceId !== getOrCreateWebDeviceId()) return
+      void logout()
+    })
+  }, [user, logout])
 
   const logoutEverywhere = useCallback(async () => {
     try {

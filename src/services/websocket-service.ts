@@ -430,6 +430,30 @@ export function subscribeToPresence(handler: (event: PresenceEvent) => void): ()
   })
 }
 
+/**
+ * Annonce aux autres sessions du compte qu'un appareil vient d'etre deconnecte.
+ *
+ * C'est le client qui relaie, et non l'API : celle-ci tourne dans un process
+ * distinct du serveur temps reel, sans canal entre eux. Le serveur rediffuse
+ * uniquement aux sockets du meme compte — on ne peut donc deconnecter que ses
+ * propres appareils.
+ */
+export function sendSessionRevoked(deviceId: string) {
+  sendRaw({ type: "session_revoked", deviceId })
+}
+
+/**
+ * S'abonne a la revocation d'une session. Le handler recoit l'identifiant de
+ * l'appareil vise : a chaque client de le comparer au sien.
+ */
+export function subscribeToSessionRevoked(handler: (deviceId: string) => void): () => void {
+  return addListener((event) => {
+    if (event.type !== "session_revoked") return
+    const deviceId = String(event.deviceId ?? "")
+    if (deviceId) handler(deviceId)
+  })
+}
+
 export interface StatusEvent {
   /** UUID de l'utilisateur qui a lu la conversation. */
   readBy: string
