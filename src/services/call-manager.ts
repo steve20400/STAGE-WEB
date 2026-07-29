@@ -62,6 +62,9 @@ export interface CallManagerState {
   remoteStreams: Record<string, MediaStream>
   micOn: boolean
   camOn: boolean
+  /** Sortie audio distante active. Porte par le manager, et non par l'ecran
+   *  d'appel, pour survivre au passage en mini-fenetre. */
+  speakerOn: boolean
   /** Rempli quand l'appel se termine (par nous ou a distance). */
   endedAt: number | null
   error: string | null
@@ -250,6 +253,7 @@ function initialState(): CallManagerState {
     remoteStreams: {},
     micOn: true,
     camOn: true,
+    speakerOn: true,
     endedAt: null,
     error: null,
     displayMode: "full",
@@ -869,13 +873,22 @@ export async function switchCamera(): Promise<boolean> {
   try { replacement = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: targetFacing } }, audio: false }) } catch { /* fallback */ }
   const devices = await navigator.mediaDevices.enumerateDevices()
   const cameras = devices.filter((device) => device.kind === "videoinput")
-  const candidate = cameras.find((device) => device.deviceId !== current?.getSettings().deviceId)
+  // Rotation circulaire sur la liste : `find` renvoyait la premiere camera
+  // differente de l'actuelle, donc avec trois objectifs ou plus le bouton
+  // faisait l'aller-retour entre les deux premiers et le troisieme restait
+  // inatteignable. `currentIndex` a -1 (camera absente de la liste) retombe
+  // naturellement sur la premiere.
+  const currentIndex = cameras.findIndex((device) => device.deviceId === current?.getSettings().deviceId)
+  const candidate = cameras.length > 1 ? cameras[(currentIndex + 1) % cameras.length] : undefined
   if ((!replacement || replacement.getVideoTracks()[0]?.getSettings().deviceId === current?.getSettings().deviceId) && candidate) {
     replacement?.getTracks().forEach((track) => track.stop())
     try { replacement = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: candidate.deviceId } }, audio: false }) } catch { return false }
   }
   const nextTrack = replacement?.getVideoTracks()[0]
   if (!nextTrack || nextTrack.getSettings().deviceId === current?.getSettings().deviceId) { replacement?.getTracks().forEach((track) => track.stop()); return false }
+  // getUserMedia rend toujours une piste activee : sans cette ligne, changer de
+  // camera alors qu'elle est coupee la rallumerait chez le correspondant.
+  nextTrack.enabled = state.camOn
   current?.stop()
   if (current) localStream.removeTrack(current)
   localStream.addTrack(nextTrack)
@@ -891,6 +904,14 @@ export function toggleCamera(): boolean {
     track.enabled = next
   })
   setState({ camOn: next })
+  return next
+}
+
+/** Coupe/retablit la sortie audio distante. Les elements <audio> des ecrans
+ *  d'appel s'y abonnent, ce qui conserve le reglage en mini-fenetre. */
+export function toggleSpeaker(): boolean {
+  const next = !state.speakerOn
+  setState({ speakerOn: next })
   return next
 }
 

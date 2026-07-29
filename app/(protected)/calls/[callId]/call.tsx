@@ -7,6 +7,7 @@ import {
   toggleCamera,
   toggleMicrophone,
   switchCamera,
+  toggleSpeaker,
   minimizeActiveCall,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
@@ -48,7 +49,7 @@ export default function CallRoomPage() {
   const peerInitials = toInitials(peerName)
 
   const [elapsed, setElapsed] = useState(0)
-  const [speakerOn, setSpeakerOn] = useState(true)
+  const speakerOn = call.speakerOn
   const [controlsVisible, setControlsVisible] = useState(true)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
@@ -419,7 +420,7 @@ export default function CallRoomPage() {
 
               <button
                 className="ctrl-btn"
-                onClick={() => setSpeakerOn((value) => !value)}
+                onClick={() => toggleSpeaker()}
                 aria-label="Haut-parleur"
               >
                 <div className={`ctrl-btn-icon ${speakerOn ? "ctrl-on" : "ctrl-off"}`}>

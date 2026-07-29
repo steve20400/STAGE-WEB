@@ -477,5 +477,3 @@
 }
 /* Mobile : seul scénario flottant/déplaçable, taille moyenne et vidéo distante visible. */
 @media(max-width:900px){.active-call-floating{width:min(72vw,280px);height:190px;right:12px;top:72px;border-radius:14px}.active-call-content{height:100%}.active-call-content video{width:100%;height:100%;object-fit:cover;background:#080b10}.active-call-audio{background:linear-gradient(145deg,#1c2633,#0b1018)}}
-.active-call-local-pip{position:absolute!important;right:12px;bottom:58px;width:120px!important;height:90px!important;border:2px solid #ffffff80;border-radius:10px;object-fit:cover!important;transform:scaleX(-1);box-shadow:0 4px 14px #0009;z-index:3}
-@media(max-width:900px){.active-call-local-pip{display:none}}
