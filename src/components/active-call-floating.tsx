@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
+import { useHasLiveVideo } from "../hooks/use-remote-video"
 import { hangUp, restoreActiveCall, toggleMicrophone } from "../services/call-manager"
 import { toInitials } from "../data/session-user"
 import { avatarDisplaySrc } from "../lib/avatar"
@@ -12,27 +13,30 @@ import { avatarDisplaySrc } from "../lib/avatar"
  * Une seule presentation, identique sur grand et petit ecran : une carte
  * flottante deplacable. En audio, elle reprend le fond motif des discussions
  * avec la photo et le pseudo de l'interlocuteur ; en video, le flux distant.
+ *
+ * Reduite, la fenetre n'affiche QUE la camera du correspondant plus les trois
+ * commandes. L'apercu de sa propre camera (PIP) est volontairement absent : il
+ * se superposait au flux distant et apparaissait comme un rectangle noir.
+ * L'apercu local reste disponible sur l'ecran d'appel plein format.
  */
 export function ActiveCallFloating() {
   const call = useCallState()
   const navigate = useNavigate()
-  const localVideo = useRef<HTMLVideoElement>(null)
 
   const [pos, setPos] = useState({ x: 0, y: 0 })
-  const [pip, setPip] = useState({ x: 0, y: 0 })
   const drag = useRef({ x: 0, y: 0, ox: 0, oy: 0, on: false })
-  const pipDrag = useRef({ x: 0, y: 0, ox: 0, oy: 0, on: false })
 
   const remoteEntries = Object.entries(call.remoteStreams)
   const remote = remoteEntries[0]?.[1]
-
-  useEffect(() => {
-    if (localVideo.current && call.localStream) localVideo.current.srcObject = call.localStream
-  }, [call.localStream])
+  // Hook appele avant tout retour anticipe : l'ordre des hooks doit rester stable.
+  const remoteHasVideo = useHasLiveVideo(remote)
 
   if (!call.activeCallId || call.displayMode !== "compact") return null
 
-  const showRemoteVideo = call.callType === "video" && Boolean(remote)
+  // Video affichee seulement si une image arrive vraiment. Sinon (audio seul,
+  // piste video pas encore recue, camera du correspondant coupee) on montre sa
+  // photo : c'est ce qui remplace l'ancien rectangle noir.
+  const showRemoteVideo = call.callType === "video" && remoteHasVideo
   const peerName = call.peerName || "Appel"
   const peerAvatar = avatarDisplaySrc(call.peerAvatarUrl)
 
@@ -76,47 +80,30 @@ export function ActiveCallFloating() {
 
       <div className="active-call-content">
         {showRemoteVideo ? (
-          <>
-            <video
-              ref={(el) => {
-                if (el && remote && el.srcObject !== remote) {
-                  el.srcObject = remote
-                  void el.play().catch(() => undefined)
-                }
-              }}
-              autoPlay
-              playsInline
-            />
-            {call.localStream && call.camOn && (
-              <video
-                className="active-call-local-pip"
-                ref={localVideo}
-                style={{ transform: `translate(${pip.x}px, ${pip.y}px) scaleX(-1)` }}
-                onPointerDown={(e) => {
-                  pipDrag.current = { x: e.clientX, y: e.clientY, ox: pip.x, oy: pip.y, on: true }
-                  e.currentTarget.setPointerCapture(e.pointerId)
-                  e.stopPropagation()
-                }}
-                onPointerMove={(e) => {
-                  const d = pipDrag.current
-                  if (d.on) setPip({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y })
-                }}
-                onPointerUp={() => {
-                  pipDrag.current.on = false
-                }}
-                autoPlay
-                playsInline
-                muted
-              />
-            )}
-          </>
+          <video
+            ref={(el) => {
+              if (el && remote && el.srcObject !== remote) {
+                el.srcObject = remote
+                void el.play().catch(() => undefined)
+              }
+            }}
+            autoPlay
+            playsInline
+            muted
+          />
         ) : (
           <div className="active-call-audio">
             <div className="active-call-avatar">
               {peerAvatar ? <img src={peerAvatar} alt="" /> : toInitials(peerName)}
             </div>
             <b>{peerName}</b>
-            <span>{call.callType === "video" ? "Appel video" : "Appel en cours"}</span>
+            <span>
+              {call.callType !== "video"
+                ? "Appel en cours"
+                : remote
+                  ? "Camera desactivee"
+                  : "Connexion…"}
+            </span>
           </div>
         )}
       </div>

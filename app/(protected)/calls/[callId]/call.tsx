@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useCallState } from "../../../../src/hooks/use-call"
+import { useHasLiveVideo } from "../../../../src/hooks/use-remote-video"
 import {
   acknowledgeCallEnded,
   hangUp as hangUpCall,
@@ -37,6 +38,8 @@ export default function CallRoomPage() {
     [call.remoteStreams]
   )
   const hasRemote = remoteStreamEntries.length > 0
+  // Vrai uniquement si le flux distant transporte une image (voir le hook).
+  const remoteHasVideo = useHasLiveVideo(remoteStreamEntries[0]?.[1])
 
   const callState: CallScreenState = !isOurCall
     ? "ended"
@@ -45,6 +48,10 @@ export default function CallRoomPage() {
       : "active"
 
   const isVideo = call.callType === "video"
+  // Sans image distante on retombe sur le fond motif + photo du correspondant,
+  // au lieu d'un grand rectangle noir. Declare ici (et non plus bas) pour servir
+  // de dependance aux effets qui branchent les flux.
+  const showRemoteVideo = isVideo && callState === "active" && hasRemote && remoteHasVideo
   const peerName = call.peerName || "Contact"
   const peerInitials = toInitials(peerName)
   // Photo du correspondant : le destinataire appele quand on appelle, l'appelant
@@ -102,19 +109,22 @@ export default function CallRoomPage() {
     if (localFullVideoRef.current && call.localStream) localFullVideoRef.current.srcObject = call.localStream
   }, [call.localStream, callState, call.camOn])
 
-  // Branche le premier flux distant sur la grande video
+  // Branche le premier flux distant sur la grande video. `showRemoteVideo` est
+  // dans les dependances : l'element <video> n'est monte que lorsqu'il passe a
+  // vrai, il faut donc rebrancher le flux a ce moment-la.
   useEffect(() => {
     if (remoteVideoRef.current && remoteStreamEntries.length > 0) {
       remoteVideoRef.current.srcObject = remoteStreamEntries[0][1]
     }
-  }, [remoteStreamEntries, callState])
+  }, [remoteStreamEntries, callState, showRemoteVideo])
 
-  // Volume des sorties audio distantes (haut-parleur on/off)
+  // Volume des sorties audio distantes (haut-parleur on/off). Le son passe
+  // uniquement par les <audio> : la grande <video> reste muette en permanence,
+  // sinon le meme flux serait joue deux fois (effet d'echo).
   useEffect(() => {
     for (const audio of remoteAudioRefs.current.values()) {
       audio.muted = !speakerOn
     }
-    if (remoteVideoRef.current) remoteVideoRef.current.muted = !speakerOn
   }, [speakerOn, remoteStreamEntries])
 
   const resetHideTimer = useCallback(() => {
@@ -157,8 +167,6 @@ export default function CallRoomPage() {
         ? "var(--danger)"
         : "var(--accent)"
 
-  const showRemoteVideo = isVideo && callState === "active" && hasRemote
-
   return (
     <>
       <div className="call-room-root" onMouseMove={resetHideTimer} onClick={resetHideTimer}>
@@ -169,7 +177,12 @@ export default function CallRoomPage() {
             autoPlay
             ref={(el) => {
               if (el) {
-                if (el.srcObject !== stream) el.srcObject = stream
+                if (el.srcObject !== stream) {
+                  el.srcObject = stream
+                  // autoPlay seul peut etre refuse par le navigateur : on force
+                  // la lecture, le clic d'appel/decroche fait office de geste.
+                  void el.play().catch(() => undefined)
+                }
                 el.muted = !speakerOn
                 remoteAudioRefs.current.set(peerId, el)
               } else {
