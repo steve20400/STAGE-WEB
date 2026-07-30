@@ -94,7 +94,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
   const isImage = mime?.startsWith("image/") || ["jpg","jpeg","png","gif","webp","bmp"].map((e)=>e.toLowerCase()).includes(ext)
   const isVideo = mime?.startsWith("video/") || ["mp4","mov","avi","mkv","webm"].map((e)=>e.toLowerCase()).includes(ext)
   const isAudio = mime?.startsWith("audio/") || ["mp3","aac","acc","wav","ogg","m4a","flac","webm"].includes(ext)
-  const isText = mime?.startsWith("text/") || ["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].map((e)=>e.toLowerCase()).includes(ext)
+  const isText = mime?.startsWith("text/") || TEXT_PREVIEW_EXTENSIONS.includes(ext)
   const isPdf = mime === "application/pdf" || ext === "pdf"
   const isDoc = ["doc","docx"].includes(ext) || (mime ?? "").includes("word")
   const isSpreadsheet = ["xls","xlsx","ods","numbers"].includes(ext) || (mime ?? "").includes("spreadsheet") || (mime ?? "").includes("excel")
@@ -331,6 +331,10 @@ function senderNameColor(id: string): string {
   for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0
   return SENDER_NAME_COLORS[Math.abs(h) % SENDER_NAME_COLORS.length]
 }
+
+/** Extensions lues comme du texte source par le visionneur integre.
+ *  Un .html n'est jamais execute : il est affiche tel quel. */
+const TEXT_PREVIEW_EXTENSIONS = ["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"]
 
 /** Icone + couleur par extension de fichier. */
 function fileTypeInfo(filename?: string, mime?: string): { color: string; label: string } {
@@ -780,6 +784,162 @@ function VideoPreview({ src, name, size, durationMs }: { src: string; name?: str
     <div style={{ opacity: 0.72, marginTop: 4 }}>Aperçu indisponible — le fichier reste téléchargeable.</div>
   </div>
   return <video src={src} controls preload="metadata" onError={() => setFailed(true)} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block", marginBottom: 6 }} />
+}
+
+/** Fichier choisi par l'utilisateur, en attente de confirmation d'envoi. */
+interface PendingMedia {
+  file: File
+  /** URL blob: locale, uniquement pour l'apercu avant envoi. */
+  url: string
+  kind: "image" | "audio" | "video" | "file"
+  mime: string
+  durationMs?: number
+  caption: string
+}
+
+/** Apercu plein contenu d'un fichier local, avant tout envoi. */
+function PendingMediaPreview({ item }: { item: PendingMedia }) {
+  const name = item.file.name
+  const ext = name.split(".").pop()?.toLowerCase() ?? ""
+  const isPdf = item.mime === "application/pdf" || ext === "pdf"
+  const isText = item.mime.startsWith("text/") || TEXT_PREVIEW_EXTENSIONS.includes(ext)
+  const frame = { maxWidth: "100%", maxHeight: "58vh", borderRadius: 12, display: "block", margin: "0 auto" } as const
+
+  if (item.kind === "image") return <img src={item.url} alt={name} style={{ ...frame, objectFit: "contain" }} />
+  if (item.kind === "video") return <video src={item.url} controls preload="metadata" style={frame} />
+  if (item.kind === "audio") return <audio src={item.url} controls preload="metadata" style={{ width: "100%" }} />
+  if (isPdf) return <div style={{ maxHeight: "58vh", overflow: "auto", borderRadius: 12 }}><PdfViewer url={item.url} isMe={false} full /></div>
+  if (isText) return <TextFilePreview url={item.url} isMe={false} name={name} />
+
+  // Formats binaires sans rendu local : on confirme au moins de quel fichier il s'agit.
+  const fti = fileTypeInfo(name, item.mime)
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: 18, borderRadius: 12, background: "#ffffff10", border: "1px solid #ffffff1f" }}>
+      <div style={{ width: 54, height: 54, borderRadius: 12, background: `${fti.color}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: fti.color }}>{fti.label}</span>
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
+          {(item.file.size / 1024 / 1024).toFixed(1)} Mo — ce format n'a pas d'apercu dans le navigateur.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Confirmation avant envoi, facon WhatsApp : le fichier s'ouvre en grand, on
+ * peut lui joindre une legende, et rien ne part tant qu'on n'a pas valide.
+ * Plusieurs fichiers se parcourent dans la bande de vignettes du bas ; chacun
+ * garde sa propre legende.
+ */
+function MediaComposer({
+  items,
+  index,
+  onIndexChange,
+  onCaptionChange,
+  onRemove,
+  onCancel,
+  onSend,
+}: {
+  items: PendingMedia[]
+  index: number
+  onIndexChange: (index: number) => void
+  onCaptionChange: (index: number, caption: string) => void
+  onRemove: (index: number) => void
+  onCancel: () => void
+  onSend: () => void
+}) {
+  const current = items[index]
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel()
+      if (event.key === "ArrowRight") onIndexChange(Math.min(index + 1, items.length - 1))
+      if (event.key === "ArrowLeft") onIndexChange(Math.max(index - 1, 0))
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [index, items.length, onCancel, onIndexChange])
+
+  if (!current) return null
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9600, background: "#000000ee", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", color: "#fff", flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {current.file.name}
+          {items.length > 1 && <span style={{ opacity: 0.6, fontWeight: 400 }}> — {index + 1}/{items.length}</span>}
+        </span>
+        <button onClick={onCancel} aria-label="Annuler l'envoi" style={{ background: "none", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>✕</button>
+      </div>
+
+      <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px" }}>
+        <div style={{ width: "min(100%, 820px)" }}>
+          <PendingMediaPreview item={current} />
+        </div>
+      </div>
+
+      {items.length > 1 && (
+        <div style={{ display: "flex", gap: 8, padding: "10px 18px", overflowX: "auto", flexShrink: 0 }}>
+          {items.map((item, i) => (
+            <div key={item.url} style={{ position: "relative", flexShrink: 0 }}>
+              <button
+                onClick={() => onIndexChange(i)}
+                aria-label={`Voir ${item.file.name}`}
+                aria-current={i === index}
+                style={{
+                  width: 52, height: 52, borderRadius: 8, cursor: "pointer", padding: 0, overflow: "hidden",
+                  border: i === index ? "2px solid var(--accent)" : "2px solid transparent",
+                  background: "#ffffff14",
+                }}
+              >
+                {item.kind === "image" ? (
+                  <img src={item.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                ) : item.kind === "video" ? (
+                  <video src={`${item.url}#t=0.1`} preload="metadata" muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                ) : (
+                  <span style={{ fontSize: 8, fontWeight: 800, color: fileTypeInfo(item.file.name, item.mime).color }}>
+                    {fileTypeInfo(item.file.name, item.mime).label}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => onRemove(i)}
+                aria-label={`Retirer ${item.file.name}`}
+                style={{ position: "absolute", top: -5, right: -5, width: 18, height: 18, borderRadius: "50%", border: "none", background: "#000000cc", color: "#fff", fontSize: 11, lineHeight: 1, cursor: "pointer" }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, padding: "12px 18px 18px", flexShrink: 0 }}>
+        <textarea
+          value={current.caption}
+          onChange={(e) => onCaptionChange(index, e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() } }}
+          placeholder="Ajouter une legende..."
+          rows={1}
+          style={{
+            flex: 1, minWidth: 0, resize: "none", maxHeight: 96,
+            padding: "11px 14px", borderRadius: 20, border: "1px solid #ffffff25",
+            background: "#ffffff12", color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none",
+          }}
+        />
+        <button
+          onClick={onSend}
+          aria-label="Envoyer"
+          style={{ width: 44, height: 44, borderRadius: "50%", border: "none", background: "var(--accent)", color: "var(--accent-text)", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+        </button>
+      </div>
+    </div>
+  )
 }
 
 /** Un message cite merite une vignette des lors qu'il porte un fichier. */
@@ -1359,7 +1519,7 @@ function MessageBubble({
                     // Pour les images, PDF, CSV, DOC avec URL : on affiche le preview natif
                     const isImageFile = mediaSrc && (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext))
                     const isPdfFile = mediaSrc && (ext === "pdf" || mime === "application/pdf")
-                    const isTextOrCodeFile = mediaSrc && (["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].includes(ext) || mime.startsWith("text/"))
+                    const isTextOrCodeFile = mediaSrc && (TEXT_PREVIEW_EXTENSIONS.includes(ext) || mime.startsWith("text/"))
                     const isDocFile = mediaSrc && (["doc","docx"].includes(ext) || mime.includes("word")) && !mediaSrc.startsWith("blob:")
                     const isSpreadsheetFile = mediaSrc && (["xls","xlsx","ods","numbers"].includes(ext) || mime.includes("spreadsheet") || mime.includes("excel")) && !mediaSrc.startsWith("blob:")
                     const isPresentationFile = mediaSrc && (["ppt","pptx"].includes(ext) || mime.includes("presentation")) && !mediaSrc.startsWith("blob:")
@@ -1635,6 +1795,9 @@ export default function ChatRoomPage() {
   const [infoPanelOpen, setInfoPanelOpen] = useState(false)
   // Visionneuse d'image plein ecran
   const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null)
+  /** Fichiers choisis mais pas encore envoyes : l'ecran de confirmation les porte. */
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([])
+  const [pendingIndex, setPendingIndex] = useState(0)
   // Message en cours de transfert (ouvre le selecteur de conversations)
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   // Enregistrement vocal en cours
@@ -1964,14 +2127,16 @@ export default function ChatRoomPage() {
       filename: string,
       mime: string,
       msgType: "image" | "audio" | "file" | "video",
-      durationMs?: number
+      durationMs?: number,
+      /** Legende saisie a l'ecran de confirmation : elle voyage dans le meme message. */
+      caption = ""
     ) => {
       const tempId = `tmp-${Date.now()}`
       const localUrl = URL.createObjectURL(file)
       const optimistic: Message = {
         id: tempId,
         senderId: "me",
-        content: "",
+        content: caption,
         type: msgType,
         status: "sending",
         timestamp: new Date(),
@@ -1985,7 +2150,7 @@ export default function ChatRoomPage() {
 
       try {
         const media = await uploadMedia(file, filename, durationMs)
-        const saved = await sendChatMessage(chatId, "", msgType, {
+        const saved = await sendChatMessage(chatId, caption, msgType, {
           mediaId: media.id,
           replyToId: replyTo?.id,
         })
@@ -2002,6 +2167,7 @@ export default function ChatRoomPage() {
             mediaMime: saved.mediaMime || optMsg?.mediaMime,
             fileName: saved.fileName || optMsg?.fileName,
             fileSize: saved.fileSize || optMsg?.fileSize,
+            content: saved.content || caption,
             durationMs: saved.durationMs ?? optMsg?.durationMs,
             type: saved.mediaMime?.startsWith("video/") ? "video" : saved.type,
           } : m)
@@ -2048,6 +2214,7 @@ export default function ChatRoomPage() {
 
   // Selection de fichier (photo, document, audio) — supporte la selection multiple.
   // Certains téléphones ne renseignent pas File.type : l'extension est donc aussi reconnue.
+  // Rien ne part ici : les fichiers passent par l'ecran de confirmation.
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (!files || files.length === 0) return
@@ -2058,17 +2225,48 @@ export default function ChatRoomPage() {
       error("Fichier(s) trop volumineux", `${oversized.length} fichier(s) depassent 2 Go et seront ignores.`)
     }
     const valid = toSend.filter((f) => f.size <= 2000 * 1024 * 1024)
+    const prepared: PendingMedia[] = []
     for (const file of valid) {
-      const msgType = mediaKindFromFile(file)
+      const kind = mediaKindFromFile(file)
       const ext = file.name.split(".").pop()?.toLowerCase()
       // Certains gestionnaires Android annoncent .aac/.acc comme octet-stream.
       // On transmet le MIME attendu par le backend afin qu'il ne soit pas rejeté.
       const mime = (ext === "aac" || ext === "acc") ? "audio/aac" : (file.type || "application/octet-stream")
-      const durationMs = msgType === "audio" ? await readAudioDuration(file) : undefined
-      void sendMediaMessage(file, file.name, mime, msgType, durationMs)
+      const durationMs = kind === "audio" ? await readAudioDuration(file) : undefined
+      prepared.push({ file, url: URL.createObjectURL(file), kind, mime, durationMs, caption: "" })
+    }
+    if (prepared.length > 0) {
+      setPendingMedia(prepared)
+      setPendingIndex(0)
     }
     e.target.value = ""
   }
+
+  /** Libere les apercus locaux : ils ne servent qu'a l'ecran de confirmation. */
+  const closeMediaComposer = useCallback(() => {
+    setPendingMedia((prev) => {
+      prev.forEach((item) => { try { URL.revokeObjectURL(item.url) } catch { /* deja libere */ } })
+      return []
+    })
+    setPendingIndex(0)
+  }, [])
+
+  const removePendingMedia = useCallback((index: number) => {
+    setPendingMedia((prev) => {
+      const target = prev[index]
+      if (target) { try { URL.revokeObjectURL(target.url) } catch { /* deja libere */ } }
+      return prev.filter((_, i) => i !== index)
+    })
+    setPendingIndex((prev) => (index < prev || prev > 0 ? Math.max(0, prev - 1) : prev))
+  }, [])
+
+  /** Confirmation : chaque fichier part avec sa propre legende, dans l'ordre choisi. */
+  const sendPendingMedia = useCallback(() => {
+    pendingMedia.forEach((item) => {
+      void sendMediaMessage(item.file, item.file.name, item.mime, item.kind, item.durationMs, item.caption.trim())
+    })
+    closeMediaComposer()
+  }, [pendingMedia, sendMediaMessage, closeMediaComposer])
 
   // --- Vocaux (MediaRecorder), comme sur WhatsApp ---
   const startRecording = async () => {
@@ -2702,6 +2900,20 @@ export default function ChatRoomPage() {
       {infoPanelOpen && <aside className="chat-info-drawer"><ChatInfoPage embedded onEmbeddedClose={() => setInfoPanelOpen(false)} /></aside>}
 
       {/* Visionneuse d'image plein ecran */}
+      {pendingMedia.length > 0 && (
+        <MediaComposer
+          items={pendingMedia}
+          index={Math.min(pendingIndex, pendingMedia.length - 1)}
+          onIndexChange={setPendingIndex}
+          onCaptionChange={(index, caption) =>
+            setPendingMedia((prev) => prev.map((item, i) => (i === index ? { ...item, caption } : item)))
+          }
+          onRemove={removePendingMedia}
+          onCancel={closeMediaComposer}
+          onSend={sendPendingMedia}
+        />
+      )}
+
       {lightbox && (
         <div
           onClick={() => setLightbox(null)}
