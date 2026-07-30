@@ -357,3 +357,12 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* La zone Contacts/Appels occupe l'espace restant après la topbar et défile seule. */
+.layout-main > .calls-root {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
