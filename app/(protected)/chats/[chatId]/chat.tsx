@@ -1380,12 +1380,17 @@ function MessageBubble({
                   )
                 })()}
 
-                {msg.content && msg.type !== "file" && msg.type !== "audio" && (
+                {/* Legende du media : elle accompagne aussi les documents et les
+                    audios, sinon le texte saisi au moment de l'envoi serait perdu
+                    a l'affichage. */}
+                {msg.content && (
                   <span
                     style={
                       msg.type === "image"
                         ? { display: "block", padding: "6px 8px 4px" }
-                        : undefined
+                        : msg.type === "file" || msg.type === "audio" || msg.type === "video"
+                          ? { display: "block", marginTop: 5 }
+                          : undefined
                     }
                   >
                     <RichText text={extractGpsCoords(msg.content) ? removeGpsCoordinates(msg.content) : msg.content} isMe={isMe} />

@@ -32,15 +32,33 @@ function cacheKey(url: string): string {
  */
 let mediaProxyAvailable: boolean | null = null
 
-/** URL du proxy pour un média backend, ou null si l'URL n'en est pas un. */
+/**
+ * URL du proxy pour un média backend, ou null si l'URL n'en est pas un.
+ *
+ * Le chemin est prefixe par BASE_URL : sous un deploiement en sous-repertoire
+ * (`/webapp/`), un chemin absolu `/api/media-proxy/...` viserait la racine du
+ * domaine, ou le proxy n'est pas monte.
+ */
 function mediaProxyUrl(url: string): string | null {
   try {
     const parsed = new URL(url, window.location.origin)
     const match = parsed.pathname.match(/\/api\/media\/([a-zA-Z0-9-]+)$/)
-    return match ? `/api/media-proxy/${match[1]}` : null
+    if (!match) return null
+    // BASE_URL se termine toujours par "/" (garanti par vite.config.ts).
+    return `${import.meta.env.BASE_URL}api/media-proxy/${match[1]}`
   } catch {
     return null
   }
+}
+
+/**
+ * Un hebergement statique (Nginx, `vercel.json`) reecrit les routes inconnues
+ * vers `index.html`. Le proxy absent repond alors 200 avec du HTML au lieu de
+ * 404 : sans ce controle, cette page serait mise en cache et lue comme un PDF
+ * ou un CSV, transformant une erreur visible en corruption silencieuse.
+ */
+function isSpaFallback(response: Response): boolean {
+  return (response.headers.get("content-type") ?? "").toLowerCase().includes("text/html")
 }
 
 /**
@@ -75,7 +93,10 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
   if (proxied) {
     try {
       const proxyResponse = await fetch(proxied, { credentials: "same-origin", headers })
-      if (proxyResponse.ok) {
+      if (proxyResponse.ok && isSpaFallback(proxyResponse)) {
+        // 200 + text/html = reecriture SPA, pas le proxy. Aucun media n'est HTML.
+        mediaProxyAvailable = false
+      } else if (proxyResponse.ok) {
         mediaProxyAvailable = true
         response = proxyResponse
       } else if (proxyResponse.status === 404 || proxyResponse.status === 405) {
@@ -91,9 +112,19 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
   }
 
   if (!response) {
-    response = await fetch(url, { credentials: "same-origin", headers })
+    try {
+      response = await fetch(url, { credentials: "same-origin", headers })
+    } catch {
+      // Sans proxy same-origin, la redirection du backend vers Backblaze B2 est
+      // cross-origin : le navigateur bloque la lecture si B2 n'envoie pas les
+      // en-tetes CORS. C'est le cas typique quand `api/media-proxy` n'est pas
+      // deploye sur l'hebergement (voir MEDIA_PREVIEW_PROXY.md).
+      throw new Error("Aperçu indisponible : le fichier n'a pas pu être lu depuis le stockage.")
+    }
   }
   if (!response.ok) throw new Error(`Chargement échoué (${response.status})`)
+  // Pas de controle text/html ici : un .html envoye par un utilisateur est un
+  // media legitime, lu comme source par le visionneur texte.
   const blob = await response.blob()
   if (blob.size <= MAX_CACHED_PREVIEW_BYTES) {
     try {
