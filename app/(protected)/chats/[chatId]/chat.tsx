@@ -175,6 +175,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
               ) : (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "50vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
                   <span>Impossible de charger le contenu.</span>
+                  <a href={url} target="_blank" rel="noreferrer" style={{ color: isMe ? "#fff" : "var(--accent)", fontWeight: 600, textDecoration: "underline" }}>Ouvrir dans un nouvel onglet</a>
                 </div>
               )}
             </>
@@ -197,13 +198,25 @@ function PdfViewer({ url, isMe, full = false }: { url: string; isMe: boolean; fu
   const host = useRef<HTMLDivElement>(null)
   const [state, setState] = useState("Chargement du PDF…")
   const [errorMessage, setErrorMessage] = useState("")
+  // PDF.js a besoin des octets. Quand ils sont illisibles — le backend redirige
+  // vers Backblaze B2, qui n'envoie pas les en-tetes CORS, et le proxy
+  // same-origin n'est pas deploye sur cet hebergement — le lecteur PDF natif du
+  // navigateur, lui, suit la redirection sans restriction. On lui passe la main
+  // plutot que de n'afficher qu'une erreur.
+  const [nativeFallback, setNativeFallback] = useState(false)
   useEffect(() => {
     let cancelled = false
     let task: PDFDocumentLoadingTask | undefined
     const render = async () => {
+      setState("Chargement du PDF…"); setErrorMessage(""); setNativeFallback(false)
+      let blob: Blob
       try {
-        setState("Chargement du PDF…"); setErrorMessage("")
-        const blob = await loadPreviewBlob(url)
+        blob = await loadPreviewBlob(url)
+      } catch {
+        if (!cancelled) { setState(""); setNativeFallback(true) }
+        return
+      }
+      try {
         const sample = await blob.slice(0, 1000).text()
         if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(sample)) throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
@@ -225,6 +238,21 @@ function PdfViewer({ url, isMe, full = false }: { url: string; isMe: boolean; fu
     }
     void render(); return () => { cancelled = true; task?.destroy?.() }
   }, [url, full])
+
+  // Repli natif : le document reste consultable et defilable, sans PDF.js.
+  if (nativeFallback) {
+    return <div style={{ position: "relative" }}>
+      <iframe
+        src={url}
+        title="Apercu PDF"
+        style={{ width: "100%", height: full ? "70vh" : 220, border: "none", borderRadius: 8, background: "#fff", display: "block" }}
+      />
+      <a href={url} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 2px 0", fontSize: 10, color: isMe ? "rgba(255,255,255,0.85)" : "var(--text-secondary)" }}>
+        Ouvrir dans un nouvel onglet
+      </a>
+    </div>
+  }
+
   // Le host canvas est volontairement distinct du texte React : PDF.js manipule
   // ses enfants avec replaceChildren(), React ne doit donc jamais les gérer.
   return <div style={{ minHeight: 120, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: 10 }}>
@@ -652,7 +680,14 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
       <input aria-label="Rechercher dans le document" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher" style={{ minWidth: 0, flex: 1, border: "none", borderRadius: 4, padding: "4px 6px", background: "#ffffff14", color: tone, fontSize: 10, outline: "none" }} />
       <button onClick={copy} title="Copier le contenu" style={{ border: "none", borderRadius: 4, cursor: "pointer", padding: "4px 6px", background: "#ffffff18", color: tone, fontSize: 10 }}>Copier</button>
     </div>
-    {loading ? <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11 }}>Chargement de l’aperçu…</div> : errorMessage ? <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11, color: "#ffb4a2" }}>{errorMessage}</div> : isCsv ? (
+    {loading ? <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11 }}>Chargement de l’aperçu…</div> : errorMessage ? (
+      // Le visionneur a besoin du texte : sans les octets il n'a rien a rendre.
+      // On laisse au moins une porte de sortie vers le fichier lui-meme.
+      <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11, color: "#ffb4a2" }}>
+        {errorMessage}
+        <a href={url} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: 6, color: "inherit", opacity: 0.85 }}>Ouvrir dans un nouvel onglet</a>
+      </div>
+    ) : isCsv ? (
       <div style={{ overflow: "auto", maxHeight: 180 }}><table style={{ borderCollapse: "collapse", width: "100%", fontSize: 10 }}><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ border: "1px solid #ffffff18", padding: "4px 6px", whiteSpace: "nowrap" }}>{cell}</td>)}</tr>)}</tbody></table>{text.split(/\r?\n/).filter(Boolean).length > 30 && <div style={{ padding: 6, fontSize: 10, opacity: .65 }}>30 premières lignes affichées</div>}</div>
     ) : <div style={{ maxHeight: 180, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11, lineHeight: 1.48, padding: "6px 0" }}>{visibleLines.map((line, index) => <div key={index} style={{ display: "flex", paddingRight: 8, background: query && line.toLowerCase().includes(query.toLowerCase()) ? "#fbbf241f" : undefined }}><span style={{ width: 32, flexShrink: 0, textAlign: "right", paddingRight: 8, userSelect: "none", opacity: .42 }}>{index + 1}</span><code style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", color: line.trimStart().startsWith("#") ? "#8be9fd" : line.includes(":") ? "#f8c878" : tone }}>{line}</code></div>)}</div>}
   </div>

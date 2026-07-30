@@ -4,6 +4,27 @@ import { loadSessionToken } from "../data/session-auth"
 /** Taille maximale volontaire pour éviter de remplir le stockage du téléphone. */
 const MAX_CACHED_PREVIEW_BYTES = 30 * 1024 * 1024
 
+/**
+ * Budget total du cache d'aperçus. Sans plafond global, une utilisation
+ * intensive (messagerie d'entreprise, beaucoup de pièces jointes) remplit le
+ * quota du navigateur : les écritures échouent alors en silence, et c'est tout
+ * le stockage local de l'application qui devient fragile.
+ */
+const MAX_TOTAL_CACHE_BYTES = 150 * 1024 * 1024
+
+/** Sweep d'éviction déclenché tous les 20 Mo écrits, pas à chaque aperçu. */
+const EVICTION_CHECK_INTERVAL_BYTES = 20 * 1024 * 1024
+
+/**
+ * Tant que `api/media-proxy/<id>` n'était pas déployé, l'hébergement répondait
+ * `200` + `index.html` au lieu de `404`. Cette page a donc été enregistrée en
+ * cache à la place des PDF, CSV et fichiers texte. Le cache étant lu avant le
+ * réseau, ces entrées empoisonnées survivraient au correctif : on vide
+ * `previewMedia` une fois par navigateur. Changer la génération relance la purge.
+ */
+const PURGE_MARKER_KEY = "alanya_preview_cache_generation"
+const PURGE_GENERATION = "2026-07-spa-fallback"
+
 interface CachedPreview {
   key: string
   blob: Blob
@@ -61,6 +82,49 @@ function isSpaFallback(response: Response): boolean {
   return (response.headers.get("content-type") ?? "").toLowerCase().includes("text/html")
 }
 
+/** Une seule purge par session, même si dix aperçus se chargent en parallèle. */
+let purgeOnce: Promise<void> | null = null
+
+function purgePoisonedCache(): Promise<void> {
+  if (!purgeOnce) {
+    purgeOnce = (async () => {
+      try {
+        if (localStorage.getItem(PURGE_MARKER_KEY) === PURGE_GENERATION) return
+        const db = await initIndexedDB()
+        await db.clear("previewMedia")
+        localStorage.setItem(PURGE_MARKER_KEY, PURGE_GENERATION)
+      } catch {
+        // Sans stockage, il n'y a rien de périmé à purger.
+      }
+    })()
+  }
+  return purgeOnce
+}
+
+/** Octets écrits depuis le dernier sweep : évite de recompter à chaque aperçu. */
+let bytesSinceEviction = 0
+
+/**
+ * Retire les entrées les plus anciennes tant que le cache dépasse son budget.
+ * L'ordre suit `cachedAt`, l'index déjà présent dans le schéma.
+ */
+async function evictOldestIfNeeded(): Promise<void> {
+  if (bytesSinceEviction < EVICTION_CHECK_INTERVAL_BYTES) return
+  bytesSinceEviction = 0
+  try {
+    const db = await initIndexedDB()
+    const entries = (await db.getAllFromIndex("previewMedia", "cachedAt")) as CachedPreview[]
+    let total = entries.reduce((sum, entry) => sum + (entry.blob?.size ?? 0), 0)
+    for (const entry of entries) {
+      if (total <= MAX_TOTAL_CACHE_BYTES) break
+      await db.delete("previewMedia", entry.key)
+      total -= entry.blob?.size ?? 0
+    }
+  } catch {
+    // Le cache reste une optimisation : son entretien ne doit rien interrompre.
+  }
+}
+
 /**
  * Lit d'abord IndexedDB, puis le réseau seulement une fois. Les blobs sont
  * utilisables hors connexion tant que l'utilisateur n'a pas vidé ses données.
@@ -73,6 +137,7 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
   }
 
   const key = cacheKey(url)
+  await purgePoisonedCache()
   // IndexedDB peut être indisponible (navigation privée, quota, migration bloquée) :
   // le cache est une optimisation et ne doit jamais empêcher l'aperçu réseau.
   try {
@@ -130,6 +195,8 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
     try {
       const db = await initIndexedDB()
       await db.put("previewMedia", { key, blob, cachedAt: Date.now() } satisfies CachedPreview)
+      bytesSinceEviction += blob.size
+      await evictOldestIfNeeded()
     } catch {
       // Quota/IndexedDB indisponible : l'aperçu courant reste affichable.
     }
