@@ -118,8 +118,8 @@ export async function initPushNotifications(): Promise<void> {
       
       const options: NotificationOptions = {
         body,
-        icon: "/alanya-logo.jpeg",
-        badge: "/alanya-logo.jpeg",
+        icon: `${import.meta.env.BASE_URL}alanya-logo.jpeg`,
+        badge: `${import.meta.env.BASE_URL}alanya-logo.jpeg`,
         data: payload.data,
       };
 
