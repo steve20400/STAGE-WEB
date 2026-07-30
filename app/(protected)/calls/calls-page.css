@@ -348,3 +348,12 @@
     flex-wrap: wrap;
   }
 }
+
+/* Contacts et appels sont rendus dans layout-main (hauteur fixe) : le contenu
+   doit défiler localement pour rendre accessibles les longues listes. */
+.layout-main .calls-root {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
