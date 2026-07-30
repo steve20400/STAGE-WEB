@@ -119,9 +119,9 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
   }, [isText, url])
 
   const isPublicUrl = !(url ?? "").startsWith("blob:")
-  const officeEmbedUrl = isPublicUrl && (isDoc || isSpreadsheet || isPresentation)
-    ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`
-    : null
+  // Meme regle que dans le fil : rien ne part chez Microsoft sans accord.
+  const isOffice = isPublicUrl && (isDoc || isSpreadsheet || isPresentation)
+  const officeLabel = isDoc ? "Word" : isSpreadsheet ? "Excel" : "PowerPoint"
 
   return (
     <div
@@ -152,18 +152,18 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
 
         {/* Corps */}
         <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
-          {officeEmbedUrl && (
-            <iframe src={officeEmbedUrl} title={name ?? "Document"} style={{ width: "100%", height: "70vh", borderRadius: 10, border: "none" }} />
+          {isOffice && (
+            <OfficePreview url={url} name={name} label={officeLabel} isMe={isMe} height="70vh" />
           )}
-          {!officeEmbedUrl && isImage && (
+          {!isOffice && isImage && (
             <img src={url} alt={name ?? "image"} style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
           )}
-          {!officeEmbedUrl && isVideo && (
+          {!isOffice && isVideo && (
             <video src={url} controls preload="metadata" style={{ width: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
           )}
-          {!officeEmbedUrl && isAudio && <audio src={url} controls preload="metadata" style={{ width: "100%", marginTop: 12 }} />}
-          {!officeEmbedUrl && isPdf && <PdfViewer url={url} isMe={isMe} full />}
-          {!officeEmbedUrl && isText && (
+          {!isOffice && isAudio && <audio src={url} controls preload="metadata" style={{ width: "100%", marginTop: 12 }} />}
+          {!isOffice && isPdf && <PdfViewer url={url} isMe={isMe} full />}
+          {!isOffice && isText && (
             <>
               {loadingText ? (
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "65vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)" }}>
@@ -180,7 +180,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
               )}
             </>
           )}
-          {!officeEmbedUrl && !isImage && !isVideo && !isAudio && !isPdf && !isText && (
+          {!isOffice && !isImage && !isVideo && !isAudio && !isPdf && !isText && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "50vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={isMe ? "rgba(255,255,255,0.4)" : "var(--text-muted)"} strokeWidth="1.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
               <div style={{ fontSize: 13, opacity: 0.8 }}>{name ?? "Fichier"}</div>
@@ -690,6 +690,84 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
     ) : isCsv ? (
       <div style={{ overflow: "auto", maxHeight: 180 }}><table style={{ borderCollapse: "collapse", width: "100%", fontSize: 10 }}><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ border: "1px solid #ffffff18", padding: "4px 6px", whiteSpace: "nowrap" }}>{cell}</td>)}</tr>)}</tbody></table>{text.split(/\r?\n/).filter(Boolean).length > 30 && <div style={{ padding: 6, fontSize: 10, opacity: .65 }}>30 premières lignes affichées</div>}</div>
     ) : <div style={{ maxHeight: 180, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11, lineHeight: 1.48, padding: "6px 0" }}>{visibleLines.map((line, index) => <div key={index} style={{ display: "flex", paddingRight: 8, background: query && line.toLowerCase().includes(query.toLowerCase()) ? "#fbbf241f" : undefined }}><span style={{ width: 32, flexShrink: 0, textAlign: "right", paddingRight: 8, userSelect: "none", opacity: .42 }}>{index + 1}</span><code style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", color: line.trimStart().startsWith("#") ? "#8be9fd" : line.includes(":") ? "#f8c878" : tone }}>{line}</code></div>)}</div>}
+  </div>
+}
+
+/**
+ * Un apercu couteux ne se monte qu'a l'approche de l'ecran. Sans ce garde-fou,
+ * ouvrir une conversation instancie d'un coup les apercus des cent derniers
+ * messages : autant de telechargements complets, de documents PDF.js et de
+ * canvas, y compris pour des fichiers que personne ne regardera. La marge de
+ * 600 px fait charger l'apercu avant qu'il n'entre dans le champ, pour que la
+ * lecture reste continue au defilement.
+ */
+function LazyPreview({ minHeight, children }: { minHeight: number; children: ReactNode }) {
+  const [visible, setVisible] = useState(false)
+  const holder = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const node = holder.current
+    if (!node) return
+    // Navigateur sans IntersectionObserver : on affiche tout, comme avant.
+    if (typeof IntersectionObserver === "undefined") { setVisible(true); return }
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries.some((entry) => entry.isIntersecting)) { setVisible(true); observer.disconnect() } },
+      { rootMargin: "600px 0px" }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+  // La hauteur reservee evite que le fil ne sursaute quand l'apercu se monte.
+  return <div ref={holder} style={visible ? undefined : { minHeight }}>{visible ? children : null}</div>
+}
+
+/**
+ * Word, Excel et PowerPoint sont des formats binaires qu'aucun rendu local ne
+ * couvre ici : leur apercu passe par Office Online, donc par Microsoft. Or
+ * l'URL transmise porte le jeton de session Alanya (resolveMediaUrl en a besoin
+ * pour que le service puisse lire le document). L'apercu n'est donc plus
+ * automatique : il demande un accord explicite, pour qu'aucun jeton ne parte a
+ * l'insu de l'utilisateur a la simple ouverture d'une conversation.
+ */
+function OfficePreview({ url, name, label, isMe, height }: { url: string; name?: string; label: string; isMe: boolean; height: number | string }) {
+  const [accepted, setAccepted] = useState(false)
+
+  if (accepted) {
+    return <iframe
+      src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`}
+      title={name ?? label}
+      style={{ width: "100%", height, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }}
+      loading="lazy"
+    />
+  }
+
+  return <div style={{
+    marginBottom: 6, padding: "12px 14px", borderRadius: 10,
+    background: isMe ? "#ffffff20" : "#f5f6fa",
+    border: `1px solid ${isMe ? "#ffffff35" : "#dde1e7"}`,
+    color: isMe ? "#fff" : "var(--text-primary)",
+  }}>
+    <div style={{ fontSize: 12, fontWeight: 600 }}>Apercu {label} par Microsoft Office Online</div>
+    <div style={{ fontSize: 10, opacity: 0.8, marginTop: 4, lineHeight: 1.45 }}>
+      Ce format ne peut pas etre rendu dans Alanya. L'afficher transmet le document et le
+      jeton de votre session a Microsoft. Le telechargement, lui, reste entre vous et Alanya.
+    </div>
+    <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAccepted(true) }}
+        style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: isMe ? "#ffffff25" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}
+      >
+        Afficher l'apercu
+      </button>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`, background: "transparent", color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", fontSize: 10, fontWeight: 500, textDecoration: "none" }}
+      >
+        Telecharger
+      </a>
+    </div>
   </div>
 }
 
@@ -1282,29 +1360,26 @@ function MessageBubble({
                     }
                     if (isPdfFile) {
                       return (
-                        <div style={{ maxHeight: 220, overflow: "hidden", borderRadius: 10, marginBottom: 6 }}><PdfViewer url={mediaSrc} isMe={isMe} /></div>
+                        <LazyPreview minHeight={220}>
+                          <div style={{ maxHeight: 220, overflow: "hidden", borderRadius: 10, marginBottom: 6 }}><PdfViewer url={mediaSrc} isMe={isMe} /></div>
+                        </LazyPreview>
                       )
                     }
                     if (isDocFile) {
-                      const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(mediaSrc)}`
-                      return (
-                        <iframe src={viewerUrl} title={msg.fileName ?? "Document"} style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }} loading="lazy" />
-                      )
+                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="Word" isMe={isMe} height={200} />
                     }
                     if (isSpreadsheetFile) {
-                      const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(mediaSrc)}`
-                      return (
-                        <iframe src={viewerUrl} title={msg.fileName ?? "Tableur"} style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }} loading="lazy" />
-                      )
+                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="Excel" isMe={isMe} height={200} />
                     }
                     if (isPresentationFile) {
-                      const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(mediaSrc)}`
-                      return (
-                        <iframe src={viewerUrl} title={msg.fileName ?? "Presentation"} style={{ width: "100%", height: 200, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }} loading="lazy" />
-                      )
+                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="PowerPoint" isMe={isMe} height={200} />
                     }
                     if (isTextOrCodeFile) {
-                      return <TextFilePreview url={mediaSrc} isMe={isMe} name={msg.fileName} />
+                      return (
+                        <LazyPreview minHeight={180}>
+                          <TextFilePreview url={mediaSrc} isMe={isMe} name={msg.fileName} />
+                        </LazyPreview>
+                      )
                     }
 
                     // Fallback : carte d'aperçu avec info, bouton Ouvrir/Télécharger, et cercle de chargement
@@ -1900,10 +1975,7 @@ export default function ChatRoomPage() {
         setReplyTo(null)
         setMessages((prev) => {
           const alreadyReceived = prev.some((m) => m.id === saved.id)
-          // Révoquer l'URL locale du message optimiste
           const optMsg = prev.find((m) => m.id === tempId)
-          // Ne pas révoquer l'URL blob ici : selon le délai WebSocket, la réponse peut
-          // ne pas encore contenir media. Elle est libérée au rechargement de la page.
           if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
           return prev.map((m) => m.id === tempId ? {
             ...saved,
@@ -1917,6 +1989,13 @@ export default function ChatRoomPage() {
             type: saved.mediaMime?.startsWith("video/") ? "video" : saved.type,
           } : m)
         })
+        // Le blob local n'est plus affiche des que le media confirme prend sa
+        // place. Sans cette liberation, chaque fichier envoye restait retenu en
+        // memoire jusqu'au rechargement de la page. On ne libere que si le
+        // backend a bien renvoye une URL : sinon le blob porte encore l'apercu.
+        if (saved.mediaUrl) {
+          try { URL.revokeObjectURL(localUrl) } catch { /* deja libere */ }
+        }
       } catch (err) {
         setMessages((prev) => {
           const msg = prev.find((m) => m.id === tempId)
@@ -2077,6 +2156,10 @@ export default function ChatRoomPage() {
       })
   }
 
+  // Index des messages : le bloc de citation cherchait son origine avec un
+  // find() par message rendu, soit un cout quadratique sur un fil charge.
+  const messagesById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages])
+
   // Fil unifie : messages + evenements d'appel (facon WhatsApp), tries par date.
   type TimelineItem =
     | { kind: "msg"; ts: Date; msg: Message }
@@ -2229,7 +2312,7 @@ export default function ChatRoomPage() {
               }
               const msg = item.msg
               const isMe = msg.senderId === "me"
-              const reply = msg.replyTo ? messages.find((m) => m.id === msg.replyTo) : undefined
+              const reply = msg.replyTo ? messagesById.get(msg.replyTo) : undefined
               // Resoudre le nom de l'envoyeur pour les groupes
               const resolvedName = !isMe && chat?.isGroup ? resolveSenderName(msg.senderId) : undefined
               // Auteur du message cite : affiche en tete du bloc de citation.
