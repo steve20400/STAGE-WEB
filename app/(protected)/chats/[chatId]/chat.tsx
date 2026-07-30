@@ -733,7 +733,7 @@ function LazyPreview({ minHeight, children }: { minHeight: number; children: Rea
  * automatique : il demande un accord explicite, pour qu'aucun jeton ne parte a
  * l'insu de l'utilisateur a la simple ouverture d'une conversation.
  */
-function OfficePreview({ url, name, label, isMe, height }: { url: string; name?: string; label: string; isMe: boolean; height: number | string }) {
+function OfficePreview({ url, name, label, isMe, height, compact = false }: { url: string; name?: string; label: string; isMe: boolean; height: number | string; compact?: boolean }) {
   const [accepted, setAccepted] = useState(false)
 
   if (accepted) {
@@ -746,33 +746,37 @@ function OfficePreview({ url, name, label, isMe, height }: { url: string; name?:
   }
 
   return <div style={{
-    marginBottom: 6, padding: "12px 14px", borderRadius: 10,
-    background: isMe ? "#ffffff20" : "#f5f6fa",
-    border: `1px solid ${isMe ? "#ffffff35" : "#dde1e7"}`,
+    marginBottom: 6, padding: "9px 11px", borderRadius: 9,
+    background: isMe ? "#ffffff18" : "#f5f6fa",
+    border: `1px solid ${isMe ? "#ffffff2e" : "#dde1e7"}`,
     color: isMe ? "#fff" : "var(--text-primary)",
+    display: "flex", alignItems: "center", gap: 10,
   }}>
-    <div style={{ fontSize: 12, fontWeight: 600 }}>Apercu {label} par Microsoft Office Online</div>
-    <div style={{ fontSize: 10, opacity: 0.8, marginTop: 4, lineHeight: 1.45 }}>
-      Ce format ne peut pas etre rendu dans Alanya. L'afficher transmet le document et le
-      jeton de votre session a Microsoft. Le telechargement, lui, reste entre vous et Alanya.
+    <div style={{ minWidth: 0, flex: 1 }}>
+      <div style={{ fontSize: 11, fontWeight: 600 }}>Apercu {label}</div>
+      <div style={{ fontSize: 9.5, opacity: 0.78, marginTop: 2, lineHeight: 1.4 }}>
+        Non rendu par Alanya. L'afficher l'envoie a Microsoft Office Online, avec le jeton de votre session.
+      </div>
     </div>
-    <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-      <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAccepted(true) }}
-        style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: isMe ? "#ffffff25" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}
-      >
-        Afficher l'apercu
-      </button>
+    <button
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAccepted(true) }}
+      style={{ flexShrink: 0, padding: "5px 10px", borderRadius: 6, border: "none", background: isMe ? "#ffffff28" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}
+    >
+      Afficher
+    </button>
+    {/* Dans le fil, la ligne de fichier sous l'apercu porte deja le
+        telechargement : le repeter ici alourdissait la bulle pour rien. */}
+    {!compact && (
       <a
         href={url}
         target="_blank"
         rel="noreferrer"
         onClick={(e) => e.stopPropagation()}
-        style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`, background: "transparent", color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", fontSize: 10, fontWeight: 500, textDecoration: "none" }}
+        style={{ flexShrink: 0, padding: "5px 10px", borderRadius: 6, border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`, color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", fontSize: 10, fontWeight: 500, textDecoration: "none" }}
       >
         Telecharger
       </a>
-    </div>
+    )}
   </div>
 }
 
@@ -797,22 +801,36 @@ interface PendingMedia {
   caption: string
 }
 
-/** Apercu plein contenu d'un fichier local, avant tout envoi. */
-function PendingMediaPreview({ item }: { item: PendingMedia }) {
-  const name = item.file.name
+/** Ce dont un apercu plein contenu a besoin, qu'il vienne du disque ou du serveur. */
+interface PreviewSubject {
+  url: string
+  name?: string
+  mime: string
+  kind: "image" | "audio" | "video" | "file"
+  /** Ligne d'information sous les formats sans rendu possible (taille, duree...). */
+  note?: string
+}
+
+/**
+ * Apercu plein contenu, partage par l'ecran de confirmation d'envoi et par la
+ * galerie d'un lot recu. Les deux montrent la meme chose : seule la provenance
+ * de l'URL change (blob: local avant envoi, media backend apres).
+ */
+function FullMediaPreview({ subject }: { subject: PreviewSubject }) {
+  const name = subject.name ?? "Fichier"
   const ext = name.split(".").pop()?.toLowerCase() ?? ""
-  const isPdf = item.mime === "application/pdf" || ext === "pdf"
-  const isText = item.mime.startsWith("text/") || TEXT_PREVIEW_EXTENSIONS.includes(ext)
+  const isPdf = subject.mime === "application/pdf" || ext === "pdf"
+  const isText = subject.mime.startsWith("text/") || TEXT_PREVIEW_EXTENSIONS.includes(ext)
   const frame = { maxWidth: "100%", maxHeight: "58vh", borderRadius: 12, display: "block", margin: "0 auto" } as const
 
-  if (item.kind === "image") return <img src={item.url} alt={name} style={{ ...frame, objectFit: "contain" }} />
-  if (item.kind === "video") return <video src={item.url} controls preload="metadata" style={frame} />
-  if (item.kind === "audio") return <audio src={item.url} controls preload="metadata" style={{ width: "100%" }} />
-  if (isPdf) return <div style={{ maxHeight: "58vh", overflow: "auto", borderRadius: 12 }}><PdfViewer url={item.url} isMe={false} full /></div>
-  if (isText) return <TextFilePreview url={item.url} isMe={false} name={name} />
+  if (subject.kind === "image") return <img src={subject.url} alt={name} style={{ ...frame, objectFit: "contain" }} />
+  if (subject.kind === "video") return <video src={subject.url} controls preload="metadata" style={frame} />
+  if (subject.kind === "audio") return <audio src={subject.url} controls preload="metadata" style={{ width: "100%" }} />
+  if (isPdf) return <div style={{ maxHeight: "58vh", overflow: "auto", borderRadius: 12 }}><PdfViewer url={subject.url} isMe={false} full /></div>
+  if (isText) return <TextFilePreview url={subject.url} isMe={false} name={name} />
 
-  // Formats binaires sans rendu local : on confirme au moins de quel fichier il s'agit.
-  const fti = fileTypeInfo(name, item.mime)
+  // Formats binaires sans rendu local : on identifie au moins le fichier.
+  const fti = fileTypeInfo(name, subject.mime)
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: 18, borderRadius: 12, background: "#ffffff10", border: "1px solid #ffffff1f" }}>
       <div style={{ width: 54, height: 54, borderRadius: 12, background: `${fti.color}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -821,8 +839,116 @@ function PendingMediaPreview({ item }: { item: PendingMedia }) {
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
-          {(item.file.size / 1024 / 1024).toFixed(1)} Mo — ce format n'a pas d'apercu dans le navigateur.
+          {subject.note ? `${subject.note} — ` : ""}ce format n'a pas d'apercu dans le navigateur.
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** Un message porteur de media, vu comme sujet d'apercu. */
+function messageSubject(msg: Message): PreviewSubject {
+  return {
+    url: msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : "",
+    name: msg.fileName,
+    mime: msg.mediaMime ?? "",
+    kind: msg.type === "image" || msg.type === "video" || msg.type === "audio" ? msg.type : "file",
+    note: msg.fileSize,
+  }
+}
+
+/**
+ * Galerie d'un lot de medias : on passe de l'un a l'autre par defilement
+ * horizontal. L'accrochage CSS (scroll-snap) fait le travail nativement, donc
+ * le geste tactile reste celui du navigateur, sans gestionnaire maison.
+ */
+function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number; onClose: () => void }) {
+  const track = useRef<HTMLDivElement>(null)
+  const [current, setCurrent] = useState(index)
+
+  // Ouverture sur la tuile cliquee : positionnement direct, sans animation.
+  useEffect(() => {
+    const node = track.current
+    if (node) node.scrollTo({ left: node.clientWidth * index, behavior: "auto" })
+  }, [index])
+
+  /** Avance ou recule d'une vue entiere : l'accrochage CSS fait le reste. */
+  const step = useCallback((delta: number) => {
+    const node = track.current
+    if (node) node.scrollBy({ left: node.clientWidth * delta, behavior: "smooth" })
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose()
+      if (event.key === "ArrowRight") step(1)
+      if (event.key === "ArrowLeft") step(-1)
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [onClose, step])
+
+  const onScroll = () => {
+    const node = track.current
+    if (node && node.clientWidth > 0) setCurrent(Math.round(node.scrollLeft / node.clientWidth))
+  }
+
+  const position = Math.min(current, msgs.length - 1)
+  const shown = msgs[position]
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9550, background: "#000000ee", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", color: "#fff", flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {shown?.fileName ?? "Media"}
+          <span style={{ opacity: 0.6, fontWeight: 400 }}> — {position + 1}/{msgs.length}</span>
+        </span>
+        <span style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          {shown?.mediaUrl && (
+            <a href={resolveMediaUrl(shown.mediaUrl, { download: true })} target="_blank" rel="noreferrer" style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}>Telecharger</a>
+          )}
+          <button onClick={onClose} aria-label="Fermer" style={{ background: "none", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>✕</button>
+        </span>
+      </div>
+
+      <div style={{ flex: 1, position: "relative", display: "flex", minHeight: 0 }}>
+        <div
+          ref={track}
+          onScroll={onScroll}
+          style={{ flex: 1, display: "flex", overflowX: "auto", overflowY: "hidden", scrollSnapType: "x mandatory", scrollbarWidth: "none" }}
+        >
+          {msgs.map((item) => (
+            <div key={item.id} style={{ flex: "0 0 100%", scrollSnapAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px" }}>
+              <div style={{ width: "min(100%, 820px)" }}>
+                <FullMediaPreview subject={messageSubject(item)} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Sur mobile le lot se parcourt au doigt ; sur grand ecran il n'y a pas
+            de geste de balayage, d'ou ces deux fleches (masquees par la CSS
+            sous 901 px, ou elles recouvriraient le media). */}
+        {position > 0 && (
+          <button className="gallery-nav gallery-nav-prev" onClick={() => step(-1)} aria-label="Media precedent">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+        )}
+        {position < msgs.length - 1 && (
+          <button className="gallery-nav gallery-nav-next" onClick={() => step(1)} aria-label="Media suivant">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 7, justifyContent: "center", padding: "12px 18px 20px", flexShrink: 0 }}>
+        {msgs.map((item, i) => (
+          <span
+            key={item.id}
+            aria-hidden
+            style={{ width: 6, height: 6, borderRadius: "50%", background: i === position ? "#fff" : "#ffffff45" }}
+          />
+        ))}
       </div>
     </div>
   )
@@ -877,7 +1003,7 @@ function MediaComposer({
 
       <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px" }}>
         <div style={{ width: "min(100%, 820px)" }}>
-          <PendingMediaPreview item={current} />
+          <FullMediaPreview subject={{ url: current.url, name: current.file.name, mime: current.mime, kind: current.kind, note: `${(current.file.size / 1024 / 1024).toFixed(1)} Mo` }} />
         </div>
       </div>
 
@@ -967,7 +1093,7 @@ function quotedMediaLabel(msg: Message): string {
  * et interdirait d'en extraire l'image. Le PDF, lui, doit etre rendu ; quand
  * ses octets sont hors de portee, l'icone reste affichee.
  */
-function QuoteThumbnail({ msg }: { msg: Message }) {
+function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
   const src = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
   const mime = msg.mediaMime ?? ""
   const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
@@ -983,16 +1109,135 @@ function QuoteThumbnail({ msg }: { msg: Message }) {
     return () => { cancelled = true }
   }, [isPdf, src])
 
-  const box = { width: 32, height: 32, borderRadius: 5, flexShrink: 0, display: "block" } as const
+  const box = { width: size, height: size, borderRadius: size > 48 ? 8 : 5, flexShrink: 0, display: "block" } as const
 
   if (isImage && src) return <img src={src} alt="" style={{ ...box, objectFit: "cover" }} />
   if (isVideo && src) return <video src={videoPosterUrl(src)} preload="metadata" muted playsInline style={{ ...box, objectFit: "cover", background: "#000" }} />
   if (isPdf && pdfThumb) return <img src={pdfThumb} alt="" style={{ ...box, objectFit: "cover", background: "#fff" }} />
 
   const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
+
+  // En grand (tuile d'album), un aplat de couleur se lit mal a cote d'une vraie
+  // miniature : la tuile prend l'aspect d'une feuille, avec son icone, son type
+  // et son nom.
+  if (size > 48) {
+    return (
+      <div style={{ ...box, background: "#fbfbfd", border: `1px solid ${fti.color}40`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, overflow: "hidden", padding: 6, boxSizing: "border-box" }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+        <span style={{ fontSize: 9, fontWeight: 800, color: fti.color, letterSpacing: 0.5 }}>{fti.label}</span>
+        {msg.fileName && (
+          <span style={{ fontSize: 8, lineHeight: 1.25, color: "#4a5058", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {msg.fileName}
+          </span>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div style={{ ...box, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div style={{ ...box, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
       <span style={{ fontSize: 8, fontWeight: 800, color: fti.color, letterSpacing: 0.4 }}>{fti.label}</span>
+    </div>
+  )
+}
+
+/** Fil unifie : messages, lots de medias et evenements d'appel, tries par date. */
+type TimelineItem =
+  | { kind: "msg"; ts: Date; msg: Message }
+  | { kind: "album"; ts: Date; msgs: Message[] }
+  | { kind: "call"; ts: Date; call: CallRecord }
+
+/** Fenetre pendant laquelle des medias successifs sont consideres comme un meme envoi. */
+const ALBUM_WINDOW_MS = 60_000
+
+/**
+ * Un media regroupable. Le protocole ne transporte qu'un mediaId par message :
+ * un envoi multiple arrive donc en N messages, ici comme depuis le mobile. Le
+ * regroupement se fait a l'affichage, ce qui vaut aussi pour l'historique deja
+ * recu.
+ *
+ * Une legende ou une citation exclut le message du lot : elles ne survivraient
+ * pas a la mise en grille, et perdre du texte serait pire que ne pas grouper.
+ */
+function isAlbumCandidate(msg: Message): boolean {
+  return (
+    !msg.isDeleted &&
+    !msg.replyTo &&
+    !msg.content?.trim() &&
+    Boolean(msg.mediaUrl) &&
+    (msg.type === "image" || msg.type === "video" || msg.type === "file")
+  )
+}
+
+/** Fusionne les suites de medias d'un meme expediteur envoyes coup sur coup. */
+function groupMediaRuns(items: TimelineItem[]): TimelineItem[] {
+  const out: TimelineItem[] = []
+  let run: Message[] = []
+
+  const flush = () => {
+    // Un media isole reste une bulle ordinaire : une grille d'un seul element
+    // n'apporterait rien et retirerait son apercu au message.
+    if (run.length >= 2) out.push({ kind: "album", ts: run[0].timestamp, msgs: run })
+    else run.forEach((m) => out.push({ kind: "msg", ts: m.timestamp, msg: m }))
+    run = []
+  }
+
+  for (const item of items) {
+    if (item.kind === "msg" && isAlbumCandidate(item.msg)) {
+      const last = run[run.length - 1]
+      const sameSender = !last || last.senderId === item.msg.senderId
+      const closeEnough = !last || item.ts.getTime() - last.timestamp.getTime() <= ALBUM_WINDOW_MS
+      if (sameSender && closeEnough) {
+        run.push(item.msg)
+        continue
+      }
+      flush()
+      run.push(item.msg)
+      continue
+    }
+    flush()
+    out.push(item)
+  }
+  flush()
+  return out
+}
+
+/** Au-dela, la grille montre « +N » sur la derniere tuile plutot que de s'etendre. */
+const ALBUM_VISIBLE_TILES = 4
+
+/** Grille d'un lot de medias, facon WhatsApp : un seul cadre pour tout l'envoi. */
+function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: number) => void }) {
+  const visible = msgs.slice(0, ALBUM_VISIBLE_TILES)
+  const hidden = msgs.length - visible.length
+  // Deux tuiles tiennent cote a cote ; trois ou plus passent en carre.
+  const columns = visible.length === 2 ? 2 : visible.length === 3 ? 3 : 2
+  const tile = visible.length === 2 ? 108 : visible.length === 3 ? 88 : 108
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, ${tile}px)`, gap: 3, marginBottom: 6 }}>
+      {visible.map((item, index) => (
+        <button
+          key={item.id}
+          onClick={(e) => { e.stopPropagation(); onOpen(index) }}
+          aria-label={`Ouvrir ${item.fileName ?? "le media"} (${index + 1} sur ${msgs.length})`}
+          style={{ position: "relative", padding: 0, border: "none", background: "#00000018", borderRadius: 8, overflow: "hidden", cursor: "zoom-in", width: tile, height: tile }}
+        >
+          <QuoteThumbnail msg={item} size={tile} />
+          {(item.mediaMime ?? "").startsWith("video/") && (
+            <span aria-hidden style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="#ffffffe0" stroke="none"><polygon points="7 4 20 12 7 20 7 4" /></svg>
+            </span>
+          )}
+          {index === visible.length - 1 && hidden > 0 && (
+            <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#000000a8", color: "#fff", fontSize: 20, fontWeight: 700, pointerEvents: "none" }}>
+              +{hidden}
+            </span>
+          )}
+        </button>
+      ))}
     </div>
   )
 }
@@ -1010,6 +1255,8 @@ function MessageBubble({
   senderName,
   quoteAuthor,
   onJumpToMessage,
+  albumMsgs,
+  onOpenAlbum,
 }: {
   msg: Message
   isMe: boolean
@@ -1024,6 +1271,9 @@ function MessageBubble({
   /** Nom de l'auteur du message cite, affiche en tete du bloc de citation. */
   quoteAuthor?: string
   onJumpToMessage?: (messageId: string) => void
+  /** Lot de medias envoyes ensemble : la bulle affiche une grille au lieu d'un media. */
+  albumMsgs?: Message[]
+  onOpenAlbum?: (index: number) => void
 }) {
   // Les actions n'apparaissent pas au survol immediat : le bouton surgissait
   // dans la rangee et decalait la bulle a chaque passage de souris. Il est
@@ -1359,7 +1609,11 @@ function MessageBubble({
               >
                 {menuItem("Repondre", () => onReply(msg))}
                 {msg.content ? menuItem("Copier", () => onCopy(msg)) : null}
-                {canExpandMedia ? menuItem("Agrandir", openExpandedPreview) : null}
+                {/* Sur un lot, « Agrandir » ouvre la galerie : le menu porte sur la
+                    grille entiere, pas sur son premier fichier. */}
+                {albumMsgs && onOpenAlbum
+                  ? menuItem("Agrandir", () => onOpenAlbum(0))
+                  : canExpandMedia ? menuItem("Agrandir", openExpandedPreview) : null}
                 {msg.type === "audio" && mediaSrc ? menuItem("Télécharger l’audio", downloadAudio) : null}
                 {menuItem("Transferer", () => onForward(msg))}
                 {menuItem("Supprimer pour moi", () => onDelete(msg, "me"), true)}
@@ -1483,6 +1737,11 @@ function MessageBubble({
               <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: 12 }}>
                 Ce message a ete supprime
               </span>
+            ) : albumMsgs ? (
+              // Lot envoye d'un bloc : une seule grille, comme sur WhatsApp. Le
+              // reste de la bulle (menu, glisser-pour-repondre, heure, statut)
+              // reste celui d'un message ordinaire.
+              <MediaAlbumGrid msgs={albumMsgs} onOpen={onOpenAlbum ?? (() => {})} />
             ) : (
               <>
                 {msg.type === "image" && mediaSrc && (
@@ -1543,13 +1802,13 @@ function MessageBubble({
                       )
                     }
                     if (isDocFile) {
-                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="Word" isMe={isMe} height={200} />
+                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="Word" isMe={isMe} height={200} compact />
                     }
                     if (isSpreadsheetFile) {
-                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="Excel" isMe={isMe} height={200} />
+                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="Excel" isMe={isMe} height={200} compact />
                     }
                     if (isPresentationFile) {
-                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="PowerPoint" isMe={isMe} height={200} />
+                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="PowerPoint" isMe={isMe} height={200} compact />
                     }
                     if (isTextOrCodeFile) {
                       return (
@@ -1798,6 +2057,8 @@ export default function ChatRoomPage() {
   /** Fichiers choisis mais pas encore envoyes : l'ecran de confirmation les porte. */
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([])
   const [pendingIndex, setPendingIndex] = useState(0)
+  /** Lot de medias ouvert en galerie, avec la tuile par laquelle on y est entre. */
+  const [gallery, setGallery] = useState<{ msgs: Message[]; index: number } | null>(null)
   // Message en cours de transfert (ouvre le selecteur de conversations)
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   // Enregistrement vocal en cours
@@ -2376,13 +2637,12 @@ export default function ChatRoomPage() {
   const messagesById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages])
 
   // Fil unifie : messages + evenements d'appel (facon WhatsApp), tries par date.
-  type TimelineItem =
-    | { kind: "msg"; ts: Date; msg: Message }
-    | { kind: "call"; ts: Date; call: CallRecord }
-  const timeline: TimelineItem[] = [
-    ...messages.map((msg): TimelineItem => ({ kind: "msg", ts: msg.timestamp, msg })),
-    ...callEvents.map((call): TimelineItem => ({ kind: "call", ts: call.ts, call })),
-  ].sort((a, b) => a.ts.getTime() - b.ts.getTime())
+  const timeline: TimelineItem[] = groupMediaRuns(
+    [
+      ...messages.map((msg): TimelineItem => ({ kind: "msg", ts: msg.timestamp, msg })),
+      ...callEvents.map((call): TimelineItem => ({ kind: "call", ts: call.ts, call })),
+    ].sort((a, b) => a.ts.getTime() - b.ts.getTime())
+  )
 
   /** Nom affichable d'un expediteur : membre du groupe, contact, sinon debut d'UUID. */
   const resolveSenderName = (senderId: string): string => {
@@ -2524,6 +2784,31 @@ export default function ChatRoomPage() {
             {items.map((item) => {
               if (item.kind === "call") {
                 return <CallEventChip key={`call-${item.call.id}`} call={item.call} />
+              }
+              if (item.kind === "album") {
+                const lot = item.msgs
+                const head = lot[0]
+                const albumIsMe = head.senderId === "me"
+                // Les actions portent sur tout le lot : c'est ce que l'utilisateur
+                // voit, un seul envoi. Supprimer une tuile sur cinq n'aurait pas
+                // de sens face a une grille unique.
+                return (
+                  <MessageErrorBoundary key={`album-${head.id}`} name={`${lot.length} fichiers`}>
+                    <MessageBubble
+                      msg={head}
+                      isMe={albumIsMe}
+                      onReply={setReplyTo}
+                      onOpenImage={(url, name) => setLightbox({ url, name })}
+                      onDelete={(_, scope) => lot.forEach((m) => handleDelete(m, scope))}
+                      onForward={setForwardMsg}
+                      onCopy={handleCopy}
+                      isGroup={chat?.isGroup}
+                      senderName={!albumIsMe && chat?.isGroup ? resolveSenderName(head.senderId) : undefined}
+                      albumMsgs={lot}
+                      onOpenAlbum={(index) => setGallery({ msgs: lot, index })}
+                    />
+                  </MessageErrorBoundary>
+                )
               }
               const msg = item.msg
               const isMe = msg.senderId === "me"
@@ -2900,6 +3185,10 @@ export default function ChatRoomPage() {
       {infoPanelOpen && <aside className="chat-info-drawer"><ChatInfoPage embedded onEmbeddedClose={() => setInfoPanelOpen(false)} /></aside>}
 
       {/* Visionneuse d'image plein ecran */}
+      {gallery && (
+        <MediaGallery msgs={gallery.msgs} index={gallery.index} onClose={() => setGallery(null)} />
+      )}
+
       {pendingMedia.length > 0 && (
         <MediaComposer
           items={pendingMedia}

@@ -430,3 +430,42 @@ textarea.room-textarea::placeholder {
 @media(max-width:900px){.chat-info-drawer{display:none}}
 
 @media (min-width:901px){.room-root.info-panel-open{padding-right:min(420px,42vw);transition:padding-right .22s ease}.room-root.info-panel-open .chat-info-drawer{right:0}}
+
+/* Galerie d'un lot de medias. Sur mobile on passe d'un fichier a l'autre au
+   doigt ; un grand ecran n'a pas ce geste, d'ou les deux fleches. Elles restent
+   masquees en dessous de 901 px, ou elles recouvriraient le media affiche. */
+.gallery-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  transition: background 0.15s ease;
+}
+.gallery-nav:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.gallery-nav:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.gallery-nav-prev {
+  left: 16px;
+}
+.gallery-nav-next {
+  right: 16px;
+}
+@media (min-width: 901px) {
+  .gallery-nav {
+    display: flex;
+  }
+}
