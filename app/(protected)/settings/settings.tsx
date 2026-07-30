@@ -23,6 +23,7 @@ import {
 } from "../../../src/services/user-access-service"
 import { sendSessionRevoked } from "../../../src/services/websocket-service"
 import { fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
+import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 
 type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
 
@@ -52,7 +53,9 @@ function getInitialProfile(sessionUser: SessionUser | null): Profile {
   return {
     name: sessionUser?.name ?? "Utilisateur Alanya",
     email: sessionUser?.email ?? "",
-    phone: sessionUser?.phone ?? "+237 6 90 00 00 00",
+    // Pas de numero factice en repli : « Enregistrer » recopie draft.phone dans la
+    // session locale (updateUser), le faux numero devenait donc l'Alanya ID affiche.
+    phone: sessionUser?.phone ?? "",
     statusMsg: sessionUser?.statusMsg ?? "Disponible",
     avatar: sessionUser?.avatar ?? null,
   }
@@ -1431,11 +1434,14 @@ export default function SettingsPage() {
                     helper="Les nouveaux comptes exigent maintenant une adresse email verifiee."
                   />
                 )}
+                {/* C'est ici que le repertoire renvoie l'utilisateur chercher son
+                    identifiant : il doit y porter le meme nom qu'ailleurs, et etre
+                    groupe par paires comme dans les champs de saisie. */}
                 <Field
-                  label="Telephone"
-                  value={draft.phone}
+                  label="Alanya ID"
+                  value={draft.phone ? formatAlanyaNumber(draft.phone) : "—"}
                   disabled
-                  helper="Le numero est lie a votre compte et ne peut pas etre change."
+                  helper="Cet identifiant est lie a votre compte et ne peut pas etre change."
                 />
               </div>
             </>

@@ -25,7 +25,7 @@ function formatIdentifierInput(value: string) {
   return /^[\d\s-]+$/.test(value) ? formatAlanyaNumber(value).replace(/-/g, " ") : value
 }
 
-// Le backend accepte un email ou le ID Alanya (6 ou 8 chiffres).
+// Le backend accepte un email ou l'Alanya ID (6 ou 8 chiffres).
 function isValidIdentifier(value: string) {
   const normalized = normalizeIdentifier(value)
   return isValidAlanyaNumber(normalized) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
@@ -83,7 +83,7 @@ export default function LoginPage() {
             te <em>revoir.</em>
           </h1>
           <p className="left-sub">
-            Utilisez votre email ou votre ID Alanya et votre mot de passe pour reprendre vos
+            Utilisez votre email ou votre Alanya ID et votre mot de passe pour reprendre vos
             conversations.
           </p>
         </div>
@@ -139,7 +139,7 @@ export default function LoginPage() {
                 isNumberLikeIdentifier(phone) ? ALANYA_NUMBER_FORMATTED_MAX_LENGTH : undefined
               }
             />
-            <label htmlFor="phone">Email ou ID Alanya (6 ou 8 chiffres)</label>
+            <label htmlFor="phone">Email ou Alanya ID (6 ou 8 chiffres)</label>
           </div>
 
           <div className="field">

@@ -271,7 +271,7 @@ export default function SignUpPage() {
               <StepHeader
                 step={1}
                 title="Creer un compte."
-                subtitle="Votre nom et votre adresse email. Votre ID Alanya sera genere automatiquement."
+                subtitle="Votre nom et votre adresse email. Votre Alanya ID sera genere automatiquement."
               />
 
               <div className="field">

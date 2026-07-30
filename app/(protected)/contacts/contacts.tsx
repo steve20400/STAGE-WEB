@@ -17,7 +17,7 @@ import "../calls/calls-page.css"
 
 /**
  * Repertoire : liste des contacts + formulaire d'enregistrement d'un contact
- * par son ID Alanya (6 ou 8 chiffres) avec alias optionnel.
+ * par son Alanya ID (6 ou 8 chiffres) avec alias optionnel.
  */
 export default function ContactsPage() {
   const navigate = useNavigate()
@@ -47,7 +47,7 @@ export default function ContactsPage() {
     const number = normalizeAlanyaNumber(newNumber)
 
     if (contacts.some((contact) => contact.phone === number)) {
-      error("Contact existant", "Ce ID Alanya est deja dans votre repertoire.")
+      error("Contact existant", "Cet Alanya ID est deja dans votre repertoire.")
       return
     }
 
@@ -138,7 +138,7 @@ export default function ContactsPage() {
           >
             <input
               className="input-base"
-              placeholder="ID Alanya (ex. 12 34 56 78)"
+              placeholder="Alanya ID (ex. 12 34 56 78)"
               value={formatAlanyaNumber(newNumber)}
               onChange={(e) => setNewNumber(formatAlanyaNumber(e.target.value))}
               inputMode="numeric"
@@ -157,7 +157,7 @@ export default function ContactsPage() {
               {saving ? "Enregistrement..." : "Enregistrer"}
             </button>
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-              Le ID Alanya est affiche dans les parametres de chaque utilisateur.
+              L'Alanya ID est affiche dans les parametres de chaque utilisateur.
             </span>
           </form>
         )}
@@ -214,7 +214,7 @@ export default function ContactsPage() {
               <div className="call-info">
                 <div className="call-name">{contact.name}</div>
                 <div className="call-detail">
-                  ID Alanya : {formatAlanyaNumber(contact.phone)}
+                  Alanya ID : {formatAlanyaNumber(contact.phone)}
                 </div>
               </div>
 
