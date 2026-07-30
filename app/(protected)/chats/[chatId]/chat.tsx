@@ -36,6 +36,7 @@ import {
   uploadMedia,
 } from "../../../../src/services/media-service"
 import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
+import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media-thumbnail"
 import {
   publishTyping,
   subscribeToConversation,
@@ -781,6 +782,61 @@ function VideoPreview({ src, name, size, durationMs }: { src: string; name?: str
   return <video src={src} controls preload="metadata" onError={() => setFailed(true)} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block", marginBottom: 6 }} />
 }
 
+/** Un message cite merite une vignette des lors qu'il porte un fichier. */
+function hasQuotedMedia(msg: Message): boolean {
+  return Boolean(msg.mediaUrl) || msg.type === "image" || msg.type === "video" || msg.type === "audio" || msg.type === "file"
+}
+
+/** Libelle d'un media cite : sa legende si elle existe, sinon son nom, sinon son genre. */
+function quotedMediaLabel(msg: Message): string {
+  const caption = msg.content?.trim()
+  if (caption) return caption
+  if (msg.fileName) return msg.fileName
+  if (msg.type === "image") return "Photo"
+  if (msg.type === "video") return "Vidéo"
+  if (msg.type === "audio") return "Message vocal"
+  return "Fichier"
+}
+
+/**
+ * Vignette d'un media cite, facon WhatsApp : une vraie image des que le format
+ * le permet, l'icone typee du fichier sinon.
+ *
+ * La vidéo s'appuie sur le fragment `#t=` plutot que sur un canvas : la
+ * redirection vers Backblaze B2 est cross-origin, elle contaminerait le canvas
+ * et interdirait d'en extraire l'image. Le PDF, lui, doit etre rendu ; quand
+ * ses octets sont hors de portee, l'icone reste affichee.
+ */
+function QuoteThumbnail({ msg }: { msg: Message }) {
+  const src = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
+  const mime = msg.mediaMime ?? ""
+  const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
+  const isImage = msg.type === "image" || mime.startsWith("image/")
+  const isVideo = msg.type === "video" || mime.startsWith("video/")
+  const isPdf = mime === "application/pdf" || ext === "pdf"
+  const [pdfThumb, setPdfThumb] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isPdf || !src) return
+    let cancelled = false
+    void loadPdfThumbnail(src).then((dataUrl) => { if (!cancelled) setPdfThumb(dataUrl) })
+    return () => { cancelled = true }
+  }, [isPdf, src])
+
+  const box = { width: 32, height: 32, borderRadius: 5, flexShrink: 0, display: "block" } as const
+
+  if (isImage && src) return <img src={src} alt="" style={{ ...box, objectFit: "cover" }} />
+  if (isVideo && src) return <video src={videoPosterUrl(src)} preload="metadata" muted playsInline style={{ ...box, objectFit: "cover", background: "#000" }} />
+  if (isPdf && pdfThumb) return <img src={pdfThumb} alt="" style={{ ...box, objectFit: "cover", background: "#fff" }} />
+
+  const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
+  return (
+    <div style={{ ...box, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <span style={{ fontSize: 8, fontWeight: 800, color: fti.color, letterSpacing: 0.4 }}>{fti.label}</span>
+    </div>
+  )
+}
+
 function MessageBubble({
   msg,
   isMe,
@@ -1250,53 +1306,14 @@ function MessageBubble({
                     whiteSpace: "nowrap",
                   }}
                 >
-              {replyMsg ? (() => {
-                if (replyMsg.type === "image" && replyMsg.mediaUrl) {
-                  const src = resolveMediaUrl(replyMsg.mediaUrl)
-                  return (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <img src={src} alt={replyMsg.fileName ?? "image"} style={{ width: 30, height: 30, borderRadius: 5, objectFit: "cover", flexShrink: 0 }} />
-                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {replyMsg.fileName ?? "Image"}
-                      </span>
-                    </div>
-                  )
-                }
-                if (replyMsg.type === "video" && replyMsg.fileName) {
-                  const fti = fileTypeInfo(replyMsg.fileName, replyMsg.mediaMime)
-                  return (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 6, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round"><polygon points="6 3 20 12 6 21 6 3" /></svg>
-                      </div>
-                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Vidéo : {replyMsg.fileName}</span>
-                    </div>
-                  )
-                }
-                if (replyMsg.type === "audio" && replyMsg.fileName) {
-                  const fti = fileTypeInfo(replyMsg.fileName, replyMsg.mediaMime)
-                  return (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 6, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2" /></svg>
-                      </div>
-                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Audio : {replyMsg.fileName}</span>
-                    </div>
-                  )
-                }
-                if ((replyMsg.type === "file" || replyMsg.type === "video") && replyMsg.fileName) {
-                  const fti = fileTypeInfo(replyMsg.fileName, replyMsg.mediaMime)
-                  return (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 6, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <span style={{ fontSize: 8, fontWeight: 800, color: fti.color, letterSpacing: 0.5 }}>{fti.label}</span>
-                      </div>
-                      <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{replyMsg.fileName}</span>
-                    </div>
-                  )
-                }
-                return <span>{quote.content}</span>
-              })() : <span>{quote.content}</span>}
+              {replyMsg && hasQuotedMedia(replyMsg) ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <QuoteThumbnail msg={replyMsg} />
+                  <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {quotedMediaLabel(replyMsg)}
+                  </span>
+                </div>
+              ) : <span>{quote.content}</span>}
                 </div>
               </div>
             </div>
@@ -2372,9 +2389,14 @@ export default function ChatRoomPage() {
             <polyline points="9 17 4 12 9 7" />
             <path d="M20 18v-2a4 4 0 00-4-4H4" />
           </svg>
+          {/* Sur un media, content est vide : le bandeau restait blanc et on ne
+              savait plus a quoi on repondait. */}
+          {hasQuotedMedia(replyTo) && <QuoteThumbnail msg={replyTo} />}
           <div className="reply-bar-content">
             <div className="reply-bar-label">Repondre a</div>
-            <div className="reply-bar-txt">{replyTo.content}</div>
+            <div className="reply-bar-txt">
+              {hasQuotedMedia(replyTo) ? quotedMediaLabel(replyTo) : replyTo.content}
+            </div>
           </div>
           <button
             className="reply-cancel"
