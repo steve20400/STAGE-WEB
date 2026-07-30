@@ -37,6 +37,7 @@ import {
 } from "../../../../src/services/media-service"
 import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
 import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media-thumbnail"
+import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
 import {
   publishTyping,
   subscribeToConversation,
@@ -287,11 +288,23 @@ function PdfViewer({ url, isMe, full = false, fullHeight = "70vh" }: { url: stri
         if (!cancelled) { setState(""); setNativeFallback(true) }
         return
       }
+      let pdfjs: typeof import("pdfjs-dist/legacy/build/pdf.mjs")
       try {
         const sample = await blob.slice(0, 1000).text()
         if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(sample)) throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
-        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/legacy/build/pdf.worker.mjs", import.meta.url).toString()
+        pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
+        // Le worker indisponible ne dit rien du document : il est peut-etre
+        // parfaitement lisible. On passe la main au lecteur natif au lieu
+        // d'afficher une erreur sur un PDF valide.
+        await ensurePdfWorker(pdfjs)
+      } catch (err: unknown) {
+        if (cancelled) return
+        setState("")
+        if (err instanceof Error && /quota de téléchargement/.test(err.message)) setErrorMessage(err.message)
+        else setNativeFallback(true)
+        return
+      }
+      try {
         task = pdfjs.getDocument({ data: await blob.arrayBuffer() })
         const pdf = await task.promise
         if (cancelled || !host.current) return

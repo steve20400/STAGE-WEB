@@ -1,4 +1,5 @@
 import { loadPreviewBlob } from "./media-preview-cache"
+import { ensurePdfWorker } from "./pdf-worker"
 
 /**
  * Vignettes reelles pour les blocs de citation (repondre a un message).
@@ -46,10 +47,7 @@ export function loadPdfThumbnail(url: string): Promise<string | null> {
 async function renderPdfThumbnail(url: string): Promise<string | null> {
   const blob = await loadPreviewBlob(url)
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/legacy/build/pdf.worker.mjs",
-    import.meta.url
-  ).toString()
+  await ensurePdfWorker(pdfjs)
 
   const loadingTask = pdfjs.getDocument({ data: await blob.arrayBuffer() })
   try {
