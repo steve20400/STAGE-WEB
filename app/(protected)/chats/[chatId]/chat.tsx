@@ -1,4 +1,4 @@
-import { Component, useState, useRef, useEffect, useCallback, useMemo, type ErrorInfo, type ReactNode } from "react"
+import { Component, useState, useRef, useEffect, useCallback, useMemo, type ErrorInfo, type ReactNode, type RefObject } from "react"
 import type { PDFDocumentLoadingTask } from "pdfjs-dist"
 import { useNavigate, useParams } from "react-router-dom"
 import {
@@ -88,6 +88,64 @@ function formatDateSeparator(d: Date) {
   return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
 }
 
+/**
+ * Bascule « plein ecran » d'un visionneur. On demande le plein ecran natif quand
+ * le navigateur l'accorde — la barre du navigateur disparait, c'est la plus
+ * grande surface possible — et on retombe sinon sur un agrandissement a tout le
+ * viewport, qui donne l'essentiel du gain. Le retour redonne la taille d'origine.
+ */
+function useViewerFullscreen(host: RefObject<HTMLElement | null>) {
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    const node = host.current
+    // F11 et Echap sortent du plein ecran sans passer par notre bouton : on suit
+    // l'etat reel du document plutot que de le supposer.
+    const sync = () => { if (!document.fullscreenElement) setExpanded(false) }
+    document.addEventListener("fullscreenchange", sync)
+    return () => {
+      document.removeEventListener("fullscreenchange", sync)
+      // Fermeture du visionneur alors qu'il est en plein ecran : sans ca, la page
+      // resterait en plein ecran une fois le visionneur disparu.
+      if (document.fullscreenElement === node) void document.exitFullscreen().catch(() => { /* deja sorti */ })
+    }
+  }, [host])
+
+  const toggle = useCallback(() => {
+    if (expanded) {
+      setExpanded(false)
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => { /* deja sorti */ })
+      return
+    }
+    setExpanded(true)
+    const node = host.current
+    if (node?.requestFullscreen) void node.requestFullscreen().catch(() => { /* agrandissement CSS seul */ })
+  }, [expanded, host])
+
+  return { expanded, toggle }
+}
+
+/** Le bouton qui va avec, a poser dans la barre de titre d'un visionneur. */
+function ViewerFullscreenButton({ expanded, onToggle, color, style }: { expanded: boolean; onToggle: () => void; color: string; style?: React.CSSProperties }) {
+  return (
+    <button
+      onClick={(event) => { event.stopPropagation(); onToggle() }}
+      aria-label={expanded ? "Revenir a la taille initiale" : "Afficher en plein ecran"}
+      aria-pressed={expanded}
+      title={expanded ? "Taille initiale" : "Plein ecran"}
+      style={{ background: "none", border: "none", color, cursor: "pointer", display: "flex", alignItems: "center", padding: 0, ...style }}
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {expanded ? (
+          <><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></>
+        ) : (
+          <><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></>
+        )}
+      </svg>
+    </button>
+  )
+}
+
 /** Visionneuse intégrée pour documents (texte, code, PDF, image, vidéo, DOC, XLS, PPT). */
 function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?: string; mime?: string; isMe: boolean; onClose: () => void }) {
   const ext = (name ?? "").split(".").pop()?.toLowerCase() ?? ""
@@ -103,6 +161,12 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
   // Pour le texte/code : on lit le contenu via fetch et on affiche dans un textarea
   const [textContent, setTextContent] = useState<string | null>(null)
   const [loadingText, setLoadingText] = useState(false)
+
+  const host = useRef<HTMLDivElement>(null)
+  const { expanded, toggle } = useViewerFullscreen(host)
+  // En plein ecran, le corps prend tout ce que la barre de titre laisse.
+  const bodyHeight = expanded ? "calc(100vh - 84px)" : "70vh"
+  const textHeight = expanded ? "calc(100vh - 84px)" : "65vh"
 
   useEffect(() => {
     if (isText && url) {
@@ -126,20 +190,23 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
 
   return (
     <div
+      ref={host}
       onClick={onClose}
       style={{
         position: "fixed", inset: 0, zIndex: 9500,
         background: "#000000d9",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 24, flexDirection: "column",
+        padding: expanded ? 0 : 24, flexDirection: "column",
       }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "min(92vw, 960px)", maxHeight: "88vh",
+          width: expanded ? "100vw" : "min(92vw, 960px)",
+          height: expanded ? "100vh" : undefined,
+          maxHeight: expanded ? "100vh" : "88vh",
           background: isMe ? "#2a1f14" : "#0a0d12",
-          borderRadius: 16, border: `1px solid ${isMe ? "#ffffff18" : "#1a1f24"}`,
+          borderRadius: expanded ? 0 : 16, border: `1px solid ${isMe ? "#ffffff18" : "#1a1f24"}`,
           boxShadow: "0 32px 80px #000000b0",
           overflow: "hidden",
           display: "flex", flexDirection: "column",
@@ -148,33 +215,36 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
         {/* Barre de titre */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${isMe ? "#ffffff15" : "#1a1f24"}`, fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, fontSize: 15, color: isMe ? "#fff" : "var(--text-primary)" }}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name ?? "Fichier"}</span>
-          <button onClick={onClose} aria-label="Fermer" style={{ background: "none", border: "none", color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>✕</button>
+          <span style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+            <ViewerFullscreenButton expanded={expanded} onToggle={toggle} color={isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)"} />
+            <button onClick={onClose} aria-label="Fermer" style={{ background: "none", border: "none", color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>✕</button>
+          </span>
         </div>
 
         {/* Corps */}
         <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
           {isOffice && (
-            <OfficePreview url={url} name={name} label={officeLabel} isMe={isMe} height="70vh" />
+            <OfficePreview url={url} name={name} label={officeLabel} isMe={isMe} height={bodyHeight} />
           )}
           {!isOffice && isImage && (
-            <img src={url} alt={name ?? "image"} style={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
+            <img src={url} alt={name ?? "image"} style={{ maxWidth: "100%", maxHeight: bodyHeight, borderRadius: 10, display: "block", margin: "0 auto" }} />
           )}
           {!isOffice && isVideo && (
-            <video src={url} controls preload="metadata" style={{ width: "100%", maxHeight: "70vh", borderRadius: 10, display: "block", margin: "0 auto" }} />
+            <video src={url} controls preload="metadata" style={{ width: "100%", maxHeight: bodyHeight, borderRadius: 10, display: "block", margin: "0 auto" }} />
           )}
           {!isOffice && isAudio && <audio src={url} controls preload="metadata" style={{ width: "100%", marginTop: 12 }} />}
-          {!isOffice && isPdf && <PdfViewer url={url} isMe={isMe} full />}
+          {!isOffice && isPdf && <PdfViewer url={url} isMe={isMe} full fullHeight={bodyHeight} />}
           {!isOffice && isText && (
             <>
               {loadingText ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "65vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: textHeight, color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)" }}>
                   <span style={{ width: 20, height: 20, borderRadius: "50%", border: `3px solid ${isMe ? "rgba(255,255,255,0.2)" : "var(--border-subtle)"}`, borderTopColor: isMe ? "#fff" : "var(--accent)", animation: "spin 0.8s linear infinite", marginRight: 10 }} />
                   <span>Chargement du document...</span>
                 </div>
               ) : textContent !== null ? (
-                <textarea readOnly value={textContent} style={{ width: "100%", height: "65vh", background: "#0d1117", color: isMe ? "#f0f6fc" : "#c9d1d9", border: "1px solid #30363d", borderRadius: 8, padding: 12, fontFamily: "'Fira Code', monospace", fontSize: 13, lineHeight: 1.5, resize: "none" }} />
+                <textarea readOnly value={textContent} style={{ width: "100%", height: textHeight, background: "#0d1117", color: isMe ? "#f0f6fc" : "#c9d1d9", border: "1px solid #30363d", borderRadius: 8, padding: 12, fontFamily: "'Fira Code', monospace", fontSize: 13, lineHeight: 1.5, resize: "none" }} />
               ) : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "50vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: bodyHeight, color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
                   <span>Impossible de charger le contenu.</span>
                   <a href={url} target="_blank" rel="noreferrer" style={{ color: isMe ? "#fff" : "var(--accent)", fontWeight: 600, textDecoration: "underline" }}>Ouvrir dans un nouvel onglet</a>
                 </div>
@@ -182,7 +252,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
             </>
           )}
           {!isOffice && !isImage && !isVideo && !isAudio && !isPdf && !isText && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "50vh", color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: bodyHeight, color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={isMe ? "rgba(255,255,255,0.4)" : "var(--text-muted)"} strokeWidth="1.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
               <div style={{ fontSize: 13, opacity: 0.8 }}>{name ?? "Fichier"}</div>
               <a href={url} target="_blank" rel="noreferrer" style={{ color: isMe ? "#fff" : "var(--accent)", fontWeight: 600, textDecoration: "underline" }}>Télécharger / Ouvrir</a>
@@ -195,7 +265,7 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
 }
 
 /** Lecteur PDF rendu par PDF.js : ne dépend pas du lecteur PDF du téléphone. */
-function PdfViewer({ url, isMe, full = false }: { url: string; isMe: boolean; full?: boolean }) {
+function PdfViewer({ url, isMe, full = false, fullHeight = "70vh" }: { url: string; isMe: boolean; full?: boolean; fullHeight?: string }) {
   const host = useRef<HTMLDivElement>(null)
   const [state, setState] = useState("Chargement du PDF…")
   const [errorMessage, setErrorMessage] = useState("")
@@ -246,7 +316,7 @@ function PdfViewer({ url, isMe, full = false }: { url: string; isMe: boolean; fu
       <iframe
         src={url}
         title="Apercu PDF"
-        style={{ width: "100%", height: full ? "70vh" : 220, border: "none", borderRadius: 8, background: "#fff", display: "block" }}
+        style={{ width: "100%", height: full ? fullHeight : 220, border: "none", borderRadius: 8, background: "#fff", display: "block" }}
       />
       <a href={url} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 2px 0", fontSize: 10, color: isMe ? "rgba(255,255,255,0.85)" : "var(--text-secondary)" }}>
         Ouvrir dans un nouvel onglet
@@ -816,17 +886,17 @@ interface PreviewSubject {
  * galerie d'un lot recu. Les deux montrent la meme chose : seule la provenance
  * de l'URL change (blob: local avant envoi, media backend apres).
  */
-function FullMediaPreview({ subject }: { subject: PreviewSubject }) {
+function FullMediaPreview({ subject, maxHeight = "58vh" }: { subject: PreviewSubject; maxHeight?: string }) {
   const name = subject.name ?? "Fichier"
   const ext = name.split(".").pop()?.toLowerCase() ?? ""
   const isPdf = subject.mime === "application/pdf" || ext === "pdf"
   const isText = subject.mime.startsWith("text/") || TEXT_PREVIEW_EXTENSIONS.includes(ext)
-  const frame = { maxWidth: "100%", maxHeight: "58vh", borderRadius: 12, display: "block", margin: "0 auto" } as const
+  const frame = { maxWidth: "100%", maxHeight, borderRadius: 12, display: "block", margin: "0 auto" } as const
 
   if (subject.kind === "image") return <img src={subject.url} alt={name} style={{ ...frame, objectFit: "contain" }} />
   if (subject.kind === "video") return <video src={subject.url} controls preload="metadata" style={frame} />
   if (subject.kind === "audio") return <audio src={subject.url} controls preload="metadata" style={{ width: "100%" }} />
-  if (isPdf) return <div style={{ maxHeight: "58vh", overflow: "auto", borderRadius: 12 }}><PdfViewer url={subject.url} isMe={false} full /></div>
+  if (isPdf) return <div style={{ maxHeight, overflow: "auto", borderRadius: 12 }}><PdfViewer url={subject.url} isMe={false} full fullHeight={maxHeight} /></div>
   if (isText) return <TextFilePreview url={subject.url} isMe={false} name={name} />
 
   // Formats binaires sans rendu local : on identifie au moins le fichier.
@@ -864,7 +934,11 @@ function messageSubject(msg: Message): PreviewSubject {
  */
 function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number; onClose: () => void }) {
   const track = useRef<HTMLDivElement>(null)
+  const host = useRef<HTMLDivElement>(null)
   const [current, setCurrent] = useState(index)
+  const { expanded, toggle } = useViewerFullscreen(host)
+  // En plein ecran, le media prend tout ce que l'en-tete et les pastilles laissent.
+  const mediaHeight = expanded ? "calc(100vh - 92px)" : "58vh"
 
   // Ouverture sur la tuile cliquee : positionnement direct, sans animation.
   useEffect(() => {
@@ -880,7 +954,9 @@ function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose()
+      // En plein ecran natif, Echap rend d'abord la main au navigateur : la
+      // galerie ne se ferme qu'a la seconde pression.
+      if (event.key === "Escape" && !document.fullscreenElement) onClose()
       if (event.key === "ArrowRight") step(1)
       if (event.key === "ArrowLeft") step(-1)
     }
@@ -897,16 +973,17 @@ function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number
   const shown = msgs[position]
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9550, background: "#000000ee", display: "flex", flexDirection: "column" }}>
+    <div ref={host} style={{ position: "fixed", inset: 0, zIndex: 9550, background: "#000000ee", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", color: "#fff", flexShrink: 0 }}>
         <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {shown?.fileName ?? "Media"}
           <span style={{ opacity: 0.6, fontWeight: 400 }}> — {position + 1}/{msgs.length}</span>
         </span>
-        <span style={{ display: "flex", gap: 14, alignItems: "center" }}>
+        <span style={{ display: "flex", gap: 14, alignItems: "center", flexShrink: 0 }}>
           {shown?.mediaUrl && (
             <a href={resolveMediaUrl(shown.mediaUrl, { download: true })} target="_blank" rel="noreferrer" style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}>Telecharger</a>
           )}
+          <ViewerFullscreenButton expanded={expanded} onToggle={toggle} color="rgba(255,255,255,0.85)" />
           <button onClick={onClose} aria-label="Fermer" style={{ background: "none", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>✕</button>
         </span>
       </div>
@@ -918,9 +995,9 @@ function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number
           style={{ flex: 1, display: "flex", overflowX: "auto", overflowY: "hidden", scrollSnapType: "x mandatory", scrollbarWidth: "none" }}
         >
           {msgs.map((item) => (
-            <div key={item.id} style={{ flex: "0 0 100%", scrollSnapAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px" }}>
-              <div style={{ width: "min(100%, 820px)" }}>
-                <FullMediaPreview subject={messageSubject(item)} />
+            <div key={item.id} style={{ flex: "0 0 100%", scrollSnapAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", padding: expanded ? "0 8px" : "0 18px" }}>
+              <div style={{ width: expanded ? "100%" : "min(100%, 820px)" }}>
+                <FullMediaPreview subject={messageSubject(item)} maxHeight={mediaHeight} />
               </div>
             </div>
           ))}
@@ -949,6 +1026,76 @@ function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number
             style={{ width: 6, height: 6, borderRadius: "50%", background: i === position ? "#fff" : "#ffffff45" }}
           />
         ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Visionneuse d'une image seule, ouverte au clic sur une photo du fil. Elle porte
+ * la meme bascule plein ecran que les autres visionneurs.
+ */
+function ImageLightbox({ url, name, onClose }: { url: string; name?: string; onClose: () => void }) {
+  const host = useRef<HTMLDivElement>(null)
+  const { expanded, toggle } = useViewerFullscreen(host)
+  const chip = { background: "#ffffff20", borderRadius: 8, padding: "8px 10px" } as const
+
+  useEffect(() => {
+    // Comme dans la galerie : en plein ecran natif, Echap rend d'abord la main
+    // au navigateur, la seconde pression ferme la visionneuse.
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !document.fullscreenElement) onClose() }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [onClose])
+
+  return (
+    <div
+      ref={host}
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9000,
+        background: "#000000d9",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: expanded ? 0 : 24,
+        cursor: "zoom-out",
+      }}
+    >
+      <img
+        src={url}
+        alt={name ?? "image"}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: expanded ? "100vw" : "92vw",
+          maxHeight: expanded ? "100vh" : "88vh",
+          borderRadius: expanded ? 0 : 8,
+          boxShadow: expanded ? "none" : "0 24px 80px #000000a0",
+          cursor: "default",
+        }}
+      />
+      <div style={{ position: "absolute", top: 16, right: 16, display: "flex", gap: 10 }}>
+        <ViewerFullscreenButton expanded={expanded} onToggle={toggle} color="#fff" style={chip} />
+        <a
+          href={url.includes("?") ? `${url}&download=1` : url}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Telecharger l'image"
+          style={{ ...chip, border: "none", color: "#fff", display: "flex", alignItems: "center" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+          </svg>
+        </a>
+        <button onClick={onClose} aria-label="Fermer" style={{ ...chip, border: "none", color: "#fff", cursor: "pointer" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
     </div>
   )
@@ -3204,88 +3351,7 @@ export default function ChatRoomPage() {
       )}
 
       {lightbox && (
-        <div
-          onClick={() => setLightbox(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9000,
-            background: "#000000d9",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            cursor: "zoom-out",
-          }}
-        >
-          <img
-            src={lightbox.url}
-            alt={lightbox.name ?? "image"}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: "92vw",
-              maxHeight: "88vh",
-              borderRadius: 8,
-              boxShadow: "0 24px 80px #000000a0",
-              cursor: "default",
-            }}
-          />
-          <div style={{ position: "absolute", top: 16, right: 16, display: "flex", gap: 10 }}>
-            <a
-              href={lightbox.url.includes("?") ? `${lightbox.url}&download=1` : lightbox.url}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              aria-label="Telecharger l'image"
-              style={{
-                background: "#ffffff20",
-                border: "none",
-                borderRadius: 8,
-                padding: "8px 10px",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-              </svg>
-            </a>
-            <button
-              onClick={() => setLightbox(null)}
-              aria-label="Fermer"
-              style={{
-                background: "#ffffff20",
-                border: "none",
-                borderRadius: 8,
-                padding: "8px 10px",
-                color: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <ImageLightbox url={lightbox.url} name={lightbox.name} onClose={() => setLightbox(null)} />
       )}
 
       {/* Selecteur de conversations pour le transfert */}
