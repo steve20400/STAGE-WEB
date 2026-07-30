@@ -23,7 +23,7 @@ export default function WelcomePage() {
             </div>
             <a href="#features">Fonctionnalites</a>
             <Link to="/login" className="btn-nav">
-              Se connecter
+              Connexion
             </Link>
           </div>
         </nav>
@@ -52,7 +52,6 @@ export default function WelcomePage() {
             <div className="cta-row">
               <Link to="/signup" className="btn-primary">
                 Commencer gratuitement
-                <span style={{ fontSize: 18 }}>-&gt;</span>
               </Link>
               <a href="#features" className="btn-ghost">
                 Voir les fonctionnalites
