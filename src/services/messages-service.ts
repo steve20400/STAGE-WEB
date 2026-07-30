@@ -55,7 +55,10 @@ function mapType(type?: string): MessageType {
   const t = (type ?? "").toUpperCase()
   if (t === "IMAGE") return "image"
   if (t === "AUDIO") return "audio"
-  if (t === "FILE" || t === "VIDEO") return "file"
+  // VIDEO etait replie sur "file" : une video envoyee depuis le mobile
+  // s'affichait donc comme une piece jointe, sans lecteur.
+  if (t === "VIDEO") return "video"
+  if (t === "FILE") return "file"
   if (t === "SYSTEM") return "system"
   return "text"
 }
@@ -70,6 +73,11 @@ function mapStatus(status?: string): MessageStatus {
 function toBackendType(type: MessageType): string {
   if (type === "image") return "IMAGE"
   if (type === "audio") return "AUDIO"
+  // "video" manquait : il retombait sur le return final, donc une video
+  // partait etiquetee TEXT. Le mobile affichait alors « [TEXT] », et le
+  // serveur WebSocket rejetait meme le message en silence, car il refuse un
+  // TEXT sans contenu (ws-server.mjs, handleSend).
+  if (type === "video") return "VIDEO"
   if (type === "file") return "FILE"
   if (type === "system") return "SYSTEM"
   return "TEXT"
