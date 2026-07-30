@@ -8,7 +8,7 @@ import { useCallState } from "../../src/hooks/use-call"
 import { acceptIncomingCall, dismissIncomingCallLocally, rejectIncomingCall } from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
 import { avatarDisplaySrc } from "../../src/lib/avatar"
-const alanyaLogo = "/alanya-logo.jpeg"
+const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./layout.css"
 
 // TYPES

@@ -31,7 +31,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <AppErrorBoundary>
       <ThemeProvider>
         <ToastProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <AuthProvider>
             <Routes>
               <Route path="/" element={<WelcomePage />} />
