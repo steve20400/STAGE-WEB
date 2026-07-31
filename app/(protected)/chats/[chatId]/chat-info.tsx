@@ -5,13 +5,24 @@ import { loadContacts } from "../../../../src/data/contacts"
 import { loadLocalConversations } from "../../../../src/data/local-conversations"
 import { findLocalGroup } from "../../../../src/data/local-groups"
 import { fetchContacts } from "../../../../src/services/contacts-service"
-import { fetchConversationById, addMembersToGroup, deleteGroupConversation, leaveGroup as leaveGroupApi, removeGroupMember, setGroupMemberRole } from "../../../../src/services/chats-service"
+import {
+  fetchConversationById,
+  addMembersToGroup,
+  deleteGroupConversation,
+  leaveGroup as leaveGroupApi,
+  removeGroupMember,
+  setGroupMemberRole,
+} from "../../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { getMyUserId } from "../../../../src/data/session-user"
+import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
+import { useTranslation } from "../../../../src/i18n"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import { AvatarCircle } from "../../../../src/components/avatar-circle"
 
-type BackendGroupMember = string | { id?: string; pseudo?: string | null; publicNumber?: string | null; role?: string }
+type BackendGroupMember =
+  | string
+  | { id?: string; pseudo?: string | null; publicNumber?: string | null; role?: string }
 
 interface Member {
   id: string
@@ -21,6 +32,8 @@ interface Member {
   role: "admin" | "member"
   online: boolean
   avatar?: string | null
+  /** Alanya ID, affiche sous le nom : c'est par lui qu'on ajoute un contact. */
+  alanyaId?: string
 }
 
 interface SharedFile {
@@ -46,6 +59,8 @@ interface ConvInfo {
   files: SharedFile[]
   online?: boolean
   statusMsg?: string
+  /** Alanya ID de l'interlocuteur, pour une conversation a deux. */
+  alanyaId?: string
 }
 
 interface PendingAction {
@@ -124,6 +139,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
   const [tab, setTab] = useState<"membres" | "fichiers">("membres")
   const [muteNotifs, setMute] = useState(false)
+  const { t } = useTranslation()
   const [members, setMembers] = useState<Member[]>(conv.members)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -141,7 +157,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
       confirmLabel: "Exclure",
       tone: "danger",
       onConfirm: () => {
-        void removeGroupMember(conv.id, id).then(() => { setMembers((prev) => prev.filter((entry) => entry.id !== id)); warning(`${member.name} retire du groupe`) }).catch(() => warning("Retrait impossible"))
+        void removeGroupMember(conv.id, id)
+          .then(() => {
+            setMembers((prev) => prev.filter((entry) => entry.id !== id))
+            warning(`${member.name} retire du groupe`)
+          })
+          .catch(() => warning("Retrait impossible"))
       },
     })
   }
@@ -153,7 +174,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
       confirmLabel: "Quitter",
       tone: "warning",
       onConfirm: () => {
-        void leaveGroupApi(conv.id).then(() => { success("Vous avez quitte le groupe"); navigate("/chats") }).catch(() => warning("Impossible de quitter le groupe"))
+        void leaveGroupApi(conv.id)
+          .then(() => {
+            success("Vous avez quitte le groupe")
+            navigate("/chats")
+          })
+          .catch(() => warning("Impossible de quitter le groupe"))
       },
     })
   }
@@ -165,13 +191,24 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
       confirmLabel: conv.isGroup ? "Supprimer le groupe" : "Supprimer",
       tone: "danger",
       onConfirm: () => {
-        void deleteGroupConversation(conv.id).then(() => { warning("Groupe supprimé"); navigate("/chats") }).catch(() => warning("Suppression impossible"))
+        void deleteGroupConversation(conv.id)
+          .then(() => {
+            warning("Groupe supprimé")
+            navigate("/chats")
+          })
+          .catch(() => warning("Suppression impossible"))
       },
     })
   }
 
   const promoteAdmin = (id: string) => {
-    void setGroupMemberRole(conv.id, id, "ADMIN").then(() => setMembers((prev) => prev.map((member) => member.id === id ? { ...member, role: "admin" } : member))).catch(() => warning("Promotion impossible"))
+    void setGroupMemberRole(conv.id, id, "ADMIN")
+      .then(() =>
+        setMembers((prev) =>
+          prev.map((member) => (member.id === id ? { ...member, role: "admin" } : member))
+        )
+      )
+      .catch(() => warning("Promotion impossible"))
     const member = members.find((entry) => entry.id === id)
     if (!member) return
     info(`${member.name} est maintenant administrateur`)
@@ -244,6 +281,13 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
         }
         .cip-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 5px; }
         .cip-sub { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px; }
+        /* Alanya ID sous le pseudo. Selectionnable au doigt comme a la souris :
+           on le communique, donc on doit pouvoir le copier. */
+        .cip-alanya-id {
+          font-size: 12px; color: var(--text-muted); margin-bottom: 10px;
+          user-select: all; -webkit-user-select: all;
+        }
+        .cip-alanya-id strong { color: var(--text-secondary); font-weight: 600; letter-spacing: 0.4px; }
         .cip-actions { display: flex; justify-content: center; gap: 16px; }
         .ca-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
         .ca-icon {
@@ -283,6 +327,11 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
         .m-dot { position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--success); border: 2px solid var(--bg-surface); }
         .m-info { flex: 1; min-width: 0; }
         .m-name { font-size: 12px; font-weight: 500; color: var(--text-primary); display: flex; align-items: center; gap: 5px; }
+        /* Sous le nom du membre, discret : le nom reste l'information premiere. */
+        .m-alanya-id {
+          font-size: 10.5px; color: var(--text-faint); margin-top: 2px;
+          letter-spacing: 0.3px; user-select: all; -webkit-user-select: all;
+        }
         .m-role { font-size: 9px; background: var(--accent-dim); color: var(--accent); padding: 1px 6px; border-radius: 4px; font-weight: 600; }
         .m-role.me-badge { background: var(--info-dim); color: var(--info); }
         .m-actions { display: flex; gap: 3px; }
@@ -368,6 +417,15 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               {!conv.isGroup && conv.online && <div className="cip-av-dot" />}
             </AvatarCircle>
             <div className="cip-name">{conv.name}</div>
+            {/* L'Alanya ID vient juste sous le pseudo : c'est l'identifiant par
+                lequel on ajoute quelqu'un, et il n'etait visible que dans les
+                contacts. */}
+            {!conv.isGroup && conv.alanyaId && (
+              <div className="cip-alanya-id">
+                {t("alanya_number_label")}
+                <strong>{formatAlanyaNumber(conv.alanyaId)}</strong>
+              </div>
+            )}
             {conv.isGroup && (
               <div className="cip-sub">{conv.description ?? `${members.length} membres`}</div>
             )}
@@ -534,7 +592,11 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <div className="member-item" key={member.id}>
                       <div
                         className="m-av"
-                        style={{ background: memberColor.bg, color: memberColor.fg, overflow: "hidden" }}
+                        style={{
+                          background: memberColor.bg,
+                          color: memberColor.fg,
+                          overflow: "hidden",
+                        }}
                       >
                         <AvatarCircle avatar={member.avatar} initials={member.initials}>
                           {member.online && <div className="m-dot" />}
@@ -552,6 +614,11 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                             <span className="m-role me-badge">Vous</span>
                           )}
                         </div>
+                        {/* Sous le nom, pas a cote : c'est la disposition
+                            demandee, et elle reste lisible quand le nom est long. */}
+                        {member.alanyaId && (
+                          <div className="m-alanya-id">{formatAlanyaNumber(member.alanyaId)}</div>
+                        )}
                       </div>
                       {!isMe && isAdmin && (
                         <div className="m-actions">
@@ -825,20 +892,33 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
 
   if (conv.isGroup) {
     // Utilise membersInfo (backend) pour avoir les vrais IDs + pseudo, puis fetchContacts pour avatar
-    const backendMembers = (conv.membersInfo ?? (conv.members ?? []).map((m: string) => ({ id: m, pseudo: null, publicNumber: "" })))
-    const members: Member[] = ((Array.isArray(backendMembers) ? backendMembers : []) as BackendGroupMember[]).map((m, index: number) => {
-      const memberId = typeof m === "string" ? m : m.id ?? ""
-      const pseudoName = typeof m === "string" ? null : (m.pseudo || m.publicNumber || null)
+    const backendMembers =
+      conv.membersInfo ??
+      (conv.members ?? []).map((m: string) => ({ id: m, pseudo: null, publicNumber: "" }))
+    const members: Member[] = (
+      (Array.isArray(backendMembers) ? backendMembers : []) as BackendGroupMember[]
+    ).map((m, index: number) => {
+      const memberId = typeof m === "string" ? m : (m.id ?? "")
+      const pseudoName = typeof m === "string" ? null : m.pseudo || m.publicNumber || null
       const publicNumber = typeof m === "string" ? "" : (m.publicNumber ?? "")
       const contact = contacts.find((c) => c.id === memberId || c.phone === publicNumber)
       return {
         id: memberId,
         name: contact?.name ?? pseudoName ?? `Membre ${index + 1}`,
-        initials: contact?.initials ?? (pseudoName ? pseudoName.slice(0, 2).toUpperCase() : (typeof memberId === "string" ? memberId.slice(0, 2).toUpperCase() : "??")),
+        initials:
+          contact?.initials ??
+          (pseudoName
+            ? pseudoName.slice(0, 2).toUpperCase()
+            : typeof memberId === "string"
+              ? memberId.slice(0, 2).toUpperCase()
+              : "??"),
         color: contact?.color ?? COLOR_NAMES[index % COLOR_NAMES.length],
         role: index === 0 ? "admin" : "member",
         online: contact?.online ?? false,
         avatar: contact?.avatar ?? null,
+        // Le backend fournit publicNumber ; le repertoire local sert de repli
+        // quand la conversation ne porte que des identifiants.
+        alanyaId: publicNumber || contact?.phone || "",
       }
     })
 
@@ -856,6 +936,13 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
     }
   }
 
+  // L'Alanya ID de l'interlocuteur : celui des participants qui n'est pas moi.
+  // A defaut, le repertoire local, retrouve par le nom de la conversation.
+  const moi = getMyUserId()
+  const autre = (conv.membersInfo ?? []).find((membre) => membre.id !== moi)
+  const alanyaIdPair =
+    autre?.publicNumber || contacts.find((contact) => contact.name === conv.name)?.phone || ""
+
   return {
     id: conv.id,
     name: conv.name,
@@ -864,6 +951,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
     color: colorName,
     isGroup: false,
     online: conv.online,
+    alanyaId: alanyaIdPair,
     statusMsg: conv.online ? "En ligne" : "Statut inconnu",
     members: [
       {
@@ -874,6 +962,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
         color: colorName,
         role: "member",
         online: conv.online,
+        alanyaId: alanyaIdPair,
       },
     ],
     files: [],
@@ -909,6 +998,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
           role: index === 0 ? "admin" : "member",
           online: contact?.online ?? false,
           avatar: contact?.avatar ?? null,
+          alanyaId: contact?.phone ?? "",
         }
       }),
       files: [],
@@ -932,6 +1022,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
     color: contact.color,
     isGroup: false,
     online: contact.online,
+    alanyaId: contact.phone,
     statusMsg: contact.online ? "En ligne" : "Statut inconnu",
     members: [
       {
@@ -942,6 +1033,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
         color: contact.color,
         role: "member",
         online: contact.online,
+        alanyaId: contact.phone,
       },
     ],
     files: [],
@@ -961,7 +1053,16 @@ function AddMemberDialog({
   onClose: () => void
   onAdded: (newMembers: Member[]) => void
 }) {
-  const [allContacts, setAllContacts] = useState<Array<{ id: string; name: string; initials: string; color: string; avatar?: string | null; phone?: string }>>([])
+  const [allContacts, setAllContacts] = useState<
+    Array<{
+      id: string
+      name: string
+      initials: string
+      color: string
+      avatar?: string | null
+      phone?: string
+    }>
+  >([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -974,11 +1075,20 @@ function AddMemberDialog({
       setAllContacts(
         contacts
           .filter((c) => !existingMemberIds.includes(c.id))
-          .map((c) => ({ id: c.id, name: c.name, initials: c.initials, color: c.color, avatar: c.avatar, phone: c.phone }))
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            initials: c.initials,
+            color: c.color,
+            avatar: c.avatar,
+            phone: c.phone,
+          }))
       )
       setLoading(false)
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [existingMemberIds])
 
   const toggle = (id: string) => {
@@ -994,7 +1104,10 @@ function AddMemberDialog({
     if (selected.size === 0) return
     setSending(true)
     try {
-      const phones = allContacts.filter((c) => selected.has(c.id)).map((c) => c.phone).filter(Boolean) as string[]
+      const phones = allContacts
+        .filter((c) => selected.has(c.id))
+        .map((c) => c.phone)
+        .filter(Boolean) as string[]
       await addMembersToGroup(convId, phones)
       const newMembers: Member[] = allContacts
         .filter((c) => selected.has(c.id))
@@ -1031,13 +1144,28 @@ function AddMemberDialog({
         style={{ maxHeight: "80vh", display: "flex", flexDirection: "column", padding: 0 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ padding: "16px 18px", borderBottom: "1px solid var(--border-subtle)", fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 17, color: "var(--text-primary)" }}>
+        <div
+          style={{
+            padding: "16px 18px",
+            borderBottom: "1px solid var(--border-subtle)",
+            fontFamily: "'Bricolage Grotesque', sans-serif",
+            fontWeight: 800,
+            fontSize: 17,
+            color: "var(--text-primary)",
+          }}
+        >
           Ajouter des membres
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
-          {loading && <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>Chargement des contacts...</div>}
+          {loading && (
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
+              Chargement des contacts...
+            </div>
+          )}
           {!loading && allContacts.length === 0 && (
-            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>Aucun contact disponible a ajouter.</div>
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
+              Aucun contact disponible a ajouter.
+            </div>
           )}
           {allContacts.map((contact) => {
             const cc = colorMap[contact.color] ?? colorMap.amber
@@ -1045,30 +1173,77 @@ function AddMemberDialog({
               <label
                 key={contact.id}
                 style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
-                  borderRadius: 10, cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "9px 10px",
+                  borderRadius: 10,
+                  cursor: "pointer",
                   background: selected.has(contact.id) ? "var(--accent-dim)" : "transparent",
                 }}
               >
-                <input type="checkbox" checked={selected.has(contact.id)} onChange={() => toggle(contact.id)} />
-                <span style={{
-                  width: 32, height: 32, borderRadius: "50%", background: cc.bg, color: cc.fg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700, flexShrink: 0, overflow: "hidden",
-                }}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(contact.id)}
+                  onChange={() => toggle(contact.id)}
+                />
+                <span
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    background: cc.bg,
+                    color: cc.fg,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    overflow: "hidden",
+                  }}
+                >
                   {avatarDisplaySrc(contact.avatar) ? (
-                    <img src={avatarDisplaySrc(contact.avatar)!} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
-                  ) : contact.initials}
+                    <img
+                      src={avatarDisplaySrc(contact.avatar)!}
+                      alt=""
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        borderRadius: "50%",
+                      }}
+                    />
+                  ) : (
+                    contact.initials
+                  )}
                 </span>
                 <span style={{ color: "var(--text-primary)", fontSize: 13 }}>{contact.name}</span>
               </label>
             )
           })}
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: 14, borderTop: "1px solid var(--border-subtle)" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+            padding: 14,
+            borderTop: "1px solid var(--border-subtle)",
+          }}
+        >
           <button
             onClick={onClose}
-            style={{ background: "none", border: "1px solid var(--border-default)", borderRadius: 8, padding: "8px 14px", color: "var(--text-secondary)", fontSize: 12, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+            style={{
+              background: "none",
+              border: "1px solid var(--border-default)",
+              borderRadius: 8,
+              padding: "8px 14px",
+              color: "var(--text-secondary)",
+              fontSize: 12,
+              cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+            }}
           >
             Annuler
           </button>
@@ -1076,8 +1251,14 @@ function AddMemberDialog({
             disabled={selected.size === 0 || sending}
             onClick={() => void handleAdd()}
             style={{
-              background: "var(--accent)", border: "none", borderRadius: 8, padding: "8px 16px",
-              color: "var(--accent-text)", fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+              background: "var(--accent)",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 16px",
+              color: "var(--accent-text)",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: "'DM Sans', sans-serif",
               cursor: selected.size === 0 || sending ? "not-allowed" : "pointer",
               opacity: selected.size === 0 || sending ? 0.6 : 1,
             }}
@@ -1090,8 +1271,10 @@ function AddMemberDialog({
   )
 }
 
-
-export default function ConvInfoPage({ embedded = false, onEmbeddedClose }: { embedded?: boolean; onEmbeddedClose?: () => void } = {}) {
+export default function ConvInfoPage({
+  embedded = false,
+  onEmbeddedClose,
+}: { embedded?: boolean; onEmbeddedClose?: () => void } = {}) {
   const navigate = useNavigate()
   const { chatId } = useParams<{ chatId: string }>()
   const [convInfo, setConvInfo] = useState<ConvInfo | null>(null)
@@ -1163,9 +1346,18 @@ export default function ConvInfoPage({ embedded = false, onEmbeddedClose }: { em
 
   return (
     <div
-      style={{ display: "flex", minHeight: embedded ? "100%" : "100vh", background: "var(--bg-base)", justifyContent: "center", width: "100%" }}
+      style={{
+        display: "flex",
+        minHeight: embedded ? "100%" : "100vh",
+        background: "var(--bg-base)",
+        justifyContent: "center",
+        width: "100%",
+      }}
     >
-      <ConvInfoPanel info={convInfo} onClose={() => embedded ? onEmbeddedClose?.() : navigate(-1)} />
+      <ConvInfoPanel
+        info={convInfo}
+        onClose={() => (embedded ? onEmbeddedClose?.() : navigate(-1))}
+      />
     </div>
   )
 }
