@@ -147,7 +147,14 @@ export async function initPushNotifications(): Promise<void> {
   }
 }
 
-export async function unregisterPush(): Promise<void> {
+/**
+ * @param accessToken Jeton a utiliser explicitement. La deconnexion vide le
+ * stockage avant d'appeler cette fonction : sans ce parametre, la requete
+ * partirait sans en-tete d'autorisation et le jeton FCM resterait enregistre
+ * cote serveur, donc cet appareil continuerait de recevoir les notifications du
+ * compte quitte.
+ */
+export async function unregisterPush(accessToken?: string | null): Promise<void> {
   if (typeof window === "undefined") return;
 
   const msging = getFirebaseMessaging();
@@ -167,6 +174,7 @@ export async function unregisterPush(): Promise<void> {
       // 1. Suppression côté backend
       await apiRequest(`/api/push/register?token=${encodeURIComponent(token)}`, {
         method: "DELETE",
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
       console.log("[Push] Token deleted from backend.");
     }

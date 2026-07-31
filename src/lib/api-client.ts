@@ -23,6 +23,16 @@ interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: BodyInit | object | null
 }
 
+/**
+ * Plafond de duree d'une requete. Sans lui, aucun appel n'avait de fin : un
+ * serveur injoignable bloquait jusqu'au timeout TCP du navigateur, ce qui rendait
+ * notamment la deconnexion interminable.
+ */
+const REQUEST_TIMEOUT_MS = 20_000
+
+/** Un envoi de fichier dure legitimement plus longtemps qu'un appel d'API. */
+const UPLOAD_TIMEOUT_MS = 120_000
+
 function buildUrl(path: string) {
   if (/^https?:\/\//.test(path)) return path
   return `${API_BASE_URL}${path}`
@@ -118,8 +128,15 @@ async function rawRequest(path: string, options: ApiRequestOptions) {
       ...options,
       headers,
       body,
+      // Apres le spread, pour qu'un signal fourni par l'appelant garde la main.
+      signal:
+        options.signal ??
+        AbortSignal.timeout(body instanceof FormData ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS),
     })
   } catch (error) {
+    // Un depassement de delai arrive ici comme une panne reseau, donc en statut
+    // 0 : les appels facultatifs (revocation, desinscription push, repli
+    // prototype) le tolerent deja.
     throw new ApiError("Impossible de joindre le serveur.", 0, error)
   }
 }

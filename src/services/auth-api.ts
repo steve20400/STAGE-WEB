@@ -252,9 +252,37 @@ export async function logoutCurrentSession() {
   }
 }
 
+/**
+ * Revoque une session dont les jetons ont deja quitte le stockage local.
+ *
+ * La deconnexion vide l'etat local en premier — c'est ce qui la rend immediate et
+ * ce qui empeche le compte suivant de voir les donnees du precedent — donc
+ * l'appel de revocation ne peut plus relire les jetons : il les porte lui-meme.
+ * Sans en-tete explicite, `rawRequest` n'en ajouterait aucun et le serveur ne
+ * saurait pas quelle session revoquer.
+ */
+export async function revokeSession(tokens: {
+  accessToken: string | null
+  refreshToken: string | null
+}) {
+  if (!tokens.refreshToken) return
+  try {
+    await apiRequest<void>("/api/auth/logout", {
+      method: "POST",
+      body: { refreshToken: tokens.refreshToken },
+      headers: tokens.accessToken ? { Authorization: `Bearer ${tokens.accessToken}` } : undefined,
+    })
+  } catch (error) {
+    if (!shouldIgnoreMissingLogout(error)) throw error
+  }
+}
+
 /** Pas d'endpoint "logout partout" sur ce backend : on revoque la session courante. */
-export async function logoutAllSessions() {
-  await logoutCurrentSession()
+export async function logoutAllSessions(tokens: {
+  accessToken: string | null
+  refreshToken: string | null
+}) {
+  await revokeSession(tokens)
 }
 
 /**

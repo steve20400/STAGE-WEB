@@ -61,6 +61,14 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 const listeners = new Set<Listener>()
 const pendingSends: string[] = []
 
+/**
+ * Fermeture voulue par l'application (deconnexion). Tant qu'il est leve, aucune
+ * tentative de reconnexion ne part : ni le minuteur de `onclose`, ni le retour
+ * de visibilite, ni un envoi en attente. Un nouvel abonnement le rabaisse, ce
+ * qui rouvre naturellement le temps reel a la connexion suivante.
+ */
+let intentionalClose = false
+
 /* ----------------- Robustesse de la connexion -----------------
  * Deux pieges en production :
  * 1. le serveur WebSocket Cloudflare Workers s'endort apres ~15 min sans trafic HTTP,
@@ -162,6 +170,7 @@ interface PendingAck {
 const pendingAcks = new Map<string, PendingAck>()
 
 function connect() {
+  if (intentionalClose) return
   if (
     socket &&
     (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
@@ -316,6 +325,8 @@ function getMyUserIdFromToken(): string | null {
     // 4001 mais le navigateur ne transmet qu'un 1006 generique. Des que la
     // connexion echoue AVANT d'avoir ete ouverte, on rafraichit le token
     // (au plus une fois par minute) puis on retente aussitot.
+    if (intentionalClose) return
+
     const handshakeRejected = event.code === 4001 || !opened
     if (handshakeRejected && Date.now() - lastTokenRefreshAt > TOKEN_REFRESH_THROTTLE_MS) {
       lastTokenRefreshAt = Date.now()
@@ -350,6 +361,7 @@ function sendRaw(payload: object) {
 }
 
 function addListener(listener: Listener): () => void {
+  intentionalClose = false
   listeners.add(listener)
   registerLifecycleHandlers()
   startKeepAwake()
@@ -360,6 +372,49 @@ function addListener(listener: Listener): () => void {
 }
 
 /* ----------------- Public API ----------------- */
+
+/**
+ * Ferme le temps reel et interdit toute reconnexion automatique.
+ *
+ * Appelee a la deconnexion. Sans elle, la socket restait ouverte avec le jeton
+ * de l'ancien compte : apres une deconnexion suivie d'une connexion sur un autre
+ * compte dans le meme onglet, ce navigateur continuait de recevoir les messages
+ * et les appels du compte precedent. Le mobile, lui, coupe explicitement
+ * (`auth_controller.dart` : `_realtime?.disconnect()`).
+ */
+export function disconnectRealtime() {
+  intentionalClose = true
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+  if (connectWatchdog) {
+    clearTimeout(connectWatchdog)
+    connectWatchdog = null
+  }
+  if (readyWatchdog) {
+    clearTimeout(readyWatchdog)
+    readyWatchdog = null
+  }
+  if (pingTimer) {
+    clearInterval(pingTimer)
+    pingTimer = null
+  }
+  readyReceived = false
+
+  // Rien de l'ancienne session ne doit partir sur la prochaine connexion.
+  pendingSends.length = 0
+  for (const ack of pendingAcks.values()) {
+    clearTimeout(ack.timer)
+    ack.reject(new Error("Session fermee."))
+  }
+  pendingAcks.clear()
+
+  const closing = socket
+  socket = null
+  closing?.close(1000, "logout")
+}
 
 /** S'abonne aux nouveaux messages d'une conversation. Le handler recoit le message serialise. */
 export function subscribeToConversation(

@@ -13,13 +13,14 @@ import {
   saveSessionUser,
   type SessionUser,
 } from "../data/session-user"
-import { clearSessionToken } from "../data/session-auth"
+import { clearSessionToken, loadRefreshToken, loadSessionToken } from "../data/session-auth"
 import { drainOfflineOutbox } from "../services/messages-service"
 import {
   enregistrerAppareilCourant,
   getOrCreateWebDeviceId,
 } from "../services/appareils-service"
-import { subscribeToSessionRevoked } from "../services/websocket-service"
+import { disconnectRealtime, subscribeToSessionRevoked } from "../services/websocket-service"
+import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -30,7 +31,7 @@ import {
   deleteCurrentAccount,
   loginWithPassword,
   logoutAllSessions,
-  logoutCurrentSession,
+  revokeSession,
   type LoginPayload,
   type RegistrationDraft,
   restoreAuthenticatedUser,
@@ -50,6 +51,15 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+/**
+ * Identifiant stable du compte, pour le verrou des caches locaux. `id` est
+ * l'UUID backend ; `phone` (l'Alanya ID) sert de repli quand la session locale
+ * est incomplete.
+ */
+function accountKey(user: SessionUser) {
+  return user.id ?? user.phone
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
@@ -75,6 +85,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isMounted) return
 
       if (restoredUser) {
+        // Un onglet ferme sans se deconnecter, un plantage ou une session expiree
+        // laissent les caches en place : le verrou de proprietaire rattrape ces
+        // cas-la, que la purge de la deconnexion ne peut pas couvrir.
+        await claimLocalCaches(accountKey(restoredUser))
+        if (!isMounted) return
         saveSessionUser(restoredUser)
         setUser(restoredUser)
       } else {
@@ -122,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (payload: LoginPayload) => {
     const nextUser = storeAuthenticatedSession(await loginWithPassword(payload))
+    await claimLocalCaches(accountKey(nextUser))
     saveSessionUser(nextUser)
     setUser(nextUser)
     setIsReady(true)
@@ -130,24 +146,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (draft: RegistrationDraft, otp: string) => {
     const nextUser = storeAuthenticatedSession(await completeRegistration(draft, otp))
+    await claimLocalCaches(accountKey(nextUser))
     saveSessionUser(nextUser)
     setUser(nextUser)
     setIsReady(true)
     return nextUser
   }, [])
 
-  const logout = useCallback(async () => {
-    try {
-      const { unregisterPush } = await import("../services/push-service")
-      await unregisterPush()
-    } catch (e) {
-      console.error("[Auth] Failed to unregister push during logout:", e)
-    }
-    await logoutCurrentSession()
+  /**
+   * Quitte la session localement, et immediatement : temps reel coupe, jetons et
+   * profil effaces, caches du compte purges. Renvoie les jetons retires du
+   * stockage, dont les appels d'adieu au serveur ont besoin.
+   *
+   * L'ordre precedent attendait trois allers-retours reseau — desinscription
+   * push, puis revocation — AVANT de vider l'etat local : l'utilisateur restait
+   * visuellement connecte pendant tout ce temps, la socket continuait de
+   * recevoir, et rien ne bornait l'attente.
+   */
+  const leaveSessionLocally = useCallback(() => {
+    const tokens = { accessToken: loadSessionToken(), refreshToken: loadRefreshToken() }
+
+    disconnectRealtime()
+    clearSessionToken()
     clearSessionUser()
     setUser(null)
     setIsReady(true)
+
+    // Sans cette purge, le compte suivant qui se connecte dans ce navigateur voit
+    // les conversations, messages et contacts du precedent, servis par le chemin
+    // cache-first.
+    void purgeLocalAccountData()
+
+    return tokens
   }, [])
+
+  /**
+   * Appels d'adieu au serveur, lances sans etre attendus. Les deux sont deja
+   * traites comme facultatifs par le code : un echec reseau y est tolere, et le
+   * jeton finira de toute facon par expirer.
+   */
+  const notifyServerOfDeparture = useCallback(
+    (
+      tokens: { accessToken: string | null; refreshToken: string | null },
+      revoke: (tokens: { accessToken: string | null; refreshToken: string | null }) => Promise<void>
+    ) => {
+      void (async () => {
+        try {
+          const { unregisterPush } = await import("../services/push-service")
+          await unregisterPush(tokens.accessToken)
+        } catch (e) {
+          console.warn("[Auth] desinscription push impossible :", e)
+        }
+        try {
+          await revoke(tokens)
+        } catch (e) {
+          console.warn("[Auth] revocation de session impossible :", e)
+        }
+      })()
+    },
+    []
+  )
+
+  const logout = useCallback(async () => {
+    notifyServerOfDeparture(leaveSessionLocally(), revokeSession)
+  }, [leaveSessionLocally, notifyServerOfDeparture])
 
   // Deconnexion a distance : une autre session du compte a revoque un appareil.
   // Chaque client compare l'identifiant recu au sien ; seul le vise s'efface.
@@ -167,17 +229,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, logout])
 
   const logoutEverywhere = useCallback(async () => {
-    try {
-      const { unregisterPush } = await import("../services/push-service")
-      await unregisterPush()
-    } catch (e) {
-      console.error("[Auth] Failed to unregister push during logout:", e)
-    }
-    await logoutAllSessions()
-    clearSessionUser()
-    setUser(null)
-    setIsReady(true)
-  }, [])
+    notifyServerOfDeparture(leaveSessionLocally(), logoutAllSessions)
+  }, [leaveSessionLocally, notifyServerOfDeparture])
 
   const updateUser = useCallback((nextUser: SessionUser) => {
     saveSessionUser(nextUser)
@@ -191,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = user
       try {
         const { unregisterPush } = await import("../services/push-service")
-        await unregisterPush()
+        await unregisterPush(loadSessionToken())
       } catch (e) {
         console.error("[Auth] Failed to unregister push during deleteAccount:", e)
       }
@@ -201,11 +254,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (currentUser) {
         deletePrototypeAccount(currentUser.phone)
       }
-      clearSessionUser()
-      setUser(null)
-      setIsReady(true)
+      // Le compte n'existe plus : ses caches locaux ne doivent pas lui survivre.
+      leaveSessionLocally()
     },
-    [user]
+    [leaveSessionLocally, user]
   )
 
   const value = useMemo<AuthContextValue>(
