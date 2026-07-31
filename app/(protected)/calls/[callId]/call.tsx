@@ -13,6 +13,12 @@ import {
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
 import { useTranslation } from "../../../../src/i18n"
+import {
+  OUTPUT_LABELS,
+  OUTPUT_VOLUME,
+  defaultAudioOutput,
+  type AudioOutputMode,
+} from "../../../../src/services/audio-output"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./call-room-page.css"
 
@@ -81,7 +87,16 @@ export default function CallRoomPage() {
   const peerAvatar = avatarDisplaySrc(call.peerAvatarUrl)
 
   const [elapsed, setElapsed] = useState(0)
-  const [speakerOn, setSpeakerOn] = useState(true)
+  /**
+   * Sortie audio. Un appel video reste toujours au haut-parleur, sans bascule ;
+   * un appel audio part sur le mode choisi dans les reglages, l'ecoute a l'oreille
+   * par defaut. L'ancien etat etait un booleen initialise a `true` qui COUPAIT le
+   * son quand on le desactivait, et dont le libelle « Son / Muet » faisait doublon
+   * avec le bouton micro.
+   */
+  const [outputMode, setOutputMode] = useState<AudioOutputMode>(() =>
+    call.callType === "video" ? "speaker" : defaultAudioOutput()
+  )
   // Lecture refusee par le navigateur : sans cet etat, l'appel est muet et
   // l'utilisateur n'a aucune explication ni aucun moyen de reessayer.
   const [audioBlocked, setAudioBlocked] = useState(false)
@@ -156,10 +171,15 @@ export default function CallRoomPage() {
   // uniquement par les <audio> : la grande <video> reste muette en permanence,
   // sinon le meme flux serait joue deux fois (effet d'echo).
   useEffect(() => {
+    const volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[outputMode]
     for (const audio of remoteAudioRefs.current.values()) {
-      audio.muted = !speakerOn
+      // On regle le NIVEAU et non la coupure : couper le son distant faisait
+      // passer la bascule pour un second bouton « muet », alors qu'elle sert a
+      // choisir entre ecoute a l'oreille et haut-parleur.
+      audio.muted = false
+      audio.volume = volume
     }
-  }, [speakerOn, remoteStreamEntries])
+  }, [outputMode, isVideo, remoteStreamEntries])
 
   /**
    * Deblocage manuel du son. Certains navigateurs mobiles refusent la lecture
@@ -168,14 +188,13 @@ export default function CallRoomPage() {
   const unblockAudio = useCallback(() => {
     for (const audio of remoteAudioRefs.current.values()) {
       audio.muted = false
-      audio.volume = 1
+      audio.volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[outputMode]
       void audio
         .play()
         .then(() => setAudioBlocked(false))
         .catch(() => undefined)
     }
-    setSpeakerOn(true)
-  }, [])
+  }, [isVideo, outputMode])
 
   const resetHideTimer = useCallback(() => {
     setControlsVisible(true)
@@ -245,7 +264,8 @@ export default function CallRoomPage() {
                     .then(() => setAudioBlocked(false))
                     .catch(() => setAudioBlocked(true))
                 }
-                el.muted = !speakerOn
+                el.muted = false
+                el.volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[outputMode]
                 remoteAudioRefs.current.set(peerId, el)
               } else {
                 remoteAudioRefs.current.delete(peerId)
@@ -547,43 +567,57 @@ export default function CallRoomPage() {
                 </button>
               )}
 
-              <button
-                className="ctrl-btn"
-                onClick={() => setSpeakerOn((value) => !value)}
-                aria-label="Haut-parleur"
-              >
-                <div className={`ctrl-btn-icon ${speakerOn ? "ctrl-on" : "ctrl-off"}`}>
-                  {speakerOn ? (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    >
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                      <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" />
-                    </svg>
-                  ) : (
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    >
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                      <line x1="23" y1="9" x2="17" y2="15" />
-                      <line x1="17" y1="9" x2="23" y2="15" />
-                    </svg>
-                  )}
-                </div>
-                <span className="ctrl-btn-label">{speakerOn ? "Son" : "Muet"}</span>
-              </button>
+              {/* Uniquement sur les appels audio : un appel video reste au
+                  haut-parleur, sans bascule possible. */}
+              {!isVideo && (
+                <button
+                  className="ctrl-btn"
+                  onClick={() =>
+                    setOutputMode((mode) => (mode === "speaker" ? "earpiece" : "speaker"))
+                  }
+                  aria-label={OUTPUT_LABELS[outputMode]}
+                  aria-pressed={outputMode === "speaker"}
+                  title={
+                    outputMode === "speaker"
+                      ? "Passer en ecoute a l'oreille"
+                      : "Passer en haut-parleur"
+                  }
+                >
+                  <div
+                    className={`ctrl-btn-icon ${outputMode === "speaker" ? "ctrl-on" : "ctrl-off"}`}
+                  >
+                    {outputMode === "speaker" ? (
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      >
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" />
+                      </svg>
+                    ) : (
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      >
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <line x1="23" y1="9" x2="17" y2="15" />
+                        <line x1="17" y1="9" x2="23" y2="15" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="ctrl-btn-label">{OUTPUT_LABELS[outputMode]}</span>
+                </button>
+              )}
 
               {call.activeConvId && (
                 <button

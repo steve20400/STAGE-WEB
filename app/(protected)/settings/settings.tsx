@@ -35,6 +35,12 @@ import {
   stopRingtonePreview,
   type RingtoneEvent,
 } from "../../../src/services/ringtones"
+import {
+  OUTPUT_LABELS,
+  defaultAudioOutput,
+  setDefaultAudioOutput,
+  type AudioOutputMode,
+} from "../../../src/services/audio-output"
 import { changePasswordApi, updateProfileApi } from "../../../src/services/auth-api"
 import {
   type Appareil,
@@ -124,6 +130,7 @@ function RingtonePicker() {
   const [playing, setPlaying] = useState<string | null>(null)
   const [imported, setImported] = useState<CustomRingtone[]>(() => customRingtones())
   const [importing, setImporting] = useState(false)
+  const [sortieAudio, setSortieAudio] = useState<AudioOutputMode>(() => defaultAudioOutput())
   const fileInput = useRef<HTMLInputElement>(null)
   const { success, error: toastError } = useToast()
 
@@ -232,6 +239,32 @@ function RingtonePicker() {
           </div>
         </div>
       ))}
+      <div className="privacy-choice">
+        <div className="privacy-choice-head">
+          <div className="privacy-choice-label">Sortie audio des appels</div>
+          <div className="privacy-choice-desc">
+            Mode a la prise d'un appel audio. Un appel video reste toujours au haut-parleur.
+            L'ecoute a l'oreille correspond a un volume reduit : le navigateur ne choisit pas la
+            sortie physique, contrairement a l'application mobile.
+          </div>
+        </div>
+        <div className="privacy-choice-opts" role="group" aria-label="Sortie audio par defaut">
+          {(["earpiece", "speaker"] as AudioOutputMode[]).map((mode) => (
+            <button
+              key={mode}
+              className={`filter-btn ${sortieAudio === mode ? "on" : ""}`}
+              aria-pressed={sortieAudio === mode}
+              onClick={() => {
+                setDefaultAudioOutput(mode)
+                setSortieAudio(mode)
+              }}
+            >
+              {OUTPUT_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="ringtone-import">
         <input
           ref={fileInput}
