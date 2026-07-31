@@ -11,6 +11,7 @@ import {
   minimizeActiveCall,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
+import { useTranslation } from "../../../../src/i18n"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./call-room-page.css"
 
@@ -63,6 +64,7 @@ export default function CallRoomPage() {
   // Lecture refusee par le navigateur : sans cet etat, l'appel est muet et
   // l'utilisateur n'a aucune explication ni aucun moyen de reessayer.
   const [audioBlocked, setAudioBlocked] = useState(false)
+  const { t } = useTranslation()
   const [controlsVisible, setControlsVisible] = useState(true)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
@@ -174,9 +176,12 @@ export default function CallRoomPage() {
 
   const stateLabel: Record<CallScreenState, string> = {
     // Les trois états demandés sont fondés sur les évènements réels de signalisation.
-    ringing: call.progress === "ringing" ? "En train de sonner" : "Sonnerie",
-    active: call.progress === "ongoing" ? `Appel en cours — ${formatElapsed(elapsed)}` : formatElapsed(elapsed),
-    ended: "Appel termine",
+    ringing: call.progress === "ringing" ? t("call_ringing") : t("call_connecting"),
+    active:
+      call.progress === "ongoing"
+        ? `${t("call_ongoing")} — ${formatElapsed(elapsed)}`
+        : formatElapsed(elapsed),
+    ended: t("call_ended"),
   }
 
   const statusColor =

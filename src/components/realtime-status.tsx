@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { getRealtimeState, type RealtimeState } from "../services/websocket-service"
+import { useTranslation } from "../i18n"
 
 /**
  * Indicateur d'etat du temps reel (Parametres > A propos). Trois verdicts :
@@ -9,6 +10,7 @@ import { getRealtimeState, type RealtimeState } from "../services/websocket-serv
  */
 export default function RealtimeStatus() {
   const [state, setState] = useState<RealtimeState>(() => getRealtimeState())
+  const { t } = useTranslation()
 
   useEffect(() => {
     const id = setInterval(() => setState(getRealtimeState()), 2000)
@@ -16,13 +18,13 @@ export default function RealtimeStatus() {
   }, [])
 
   let color = "var(--danger)"
-  let label = "Deconnecte — reconnexion en cours..."
+  let label = t("realtime_lost")
   if (state.connected && state.ready) {
     color = "var(--success)"
-    label = "Connecte — temps reel operationnel"
+    label = t("realtime_connected")
   } else if (state.connected && !state.ready) {
     color = "#f59e0b"
-    label = "Connecte mais le serveur ne repond pas (panne cote serveur temps reel)"
+    label = `${t("realtime_connected")} — ${t("realtime_connecting")}`
   }
 
   const secondsAgo =

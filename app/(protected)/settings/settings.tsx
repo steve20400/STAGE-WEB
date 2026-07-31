@@ -8,6 +8,13 @@ import { isTurnConfigured } from "../../../src/services/calls-service"
 import TurnTester from "../../../src/components/turn-tester"
 import RealtimeStatus from "../../../src/components/realtime-status"
 import {
+  LANGUAGE_CODES,
+  LANGUAGE_NAMES,
+  traduire,
+  useTranslation,
+  type LanguageCode,
+} from "../../../src/i18n"
+import {
   LAST_SEEN_LABELS,
   PRIVACY_DEFAULTS,
   fetchPrivacy,
@@ -927,9 +934,10 @@ export default function SettingsPage() {
     }
   }
 
-  // Apparence
+  // Apparence. La langue vit dans le fournisseur d'internationalisation : elle
+  // pilote toute l'interface, pas seulement cet ecran.
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium")
-  const [language, setLanguage] = useState("fr")
+  const { language, setLanguage, t } = useTranslation()
 
   const fileRef = useRef<HTMLInputElement>(null)
   const isDirty = JSON.stringify(profile) !== JSON.stringify(draft)
@@ -2082,13 +2090,18 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="s-card">
-                <div className="s-card-title">Langue</div>
+                <div className="s-card-title">{t("language_settings")}</div>
+                <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+                  {t("language_description")}
+                </div>
                 <select
                   value={language}
                   onChange={(e) => {
-                    setLanguage(e.target.value)
-                    info("Langue modifiee")
+                    const code = e.target.value as LanguageCode
+                    setLanguage(code)
+                    info(traduire(code, "language_settings"), LANGUAGE_NAMES[code])
                   }}
+                  aria-label={t("language_settings")}
                   style={{
                     width: "100%",
                     background: "var(--bg-surface)",
@@ -2101,8 +2114,11 @@ export default function SettingsPage() {
                     outline: "none",
                   }}
                 >
-                  <option value="fr">Francais</option>
-                  <option value="en">English</option>
+                  {LANGUAGE_CODES.map((code) => (
+                    <option key={code} value={code}>
+                      {LANGUAGE_NAMES[code]}
+                    </option>
+                  ))}
                 </select>
               </div>
             </>

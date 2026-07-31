@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { AuthProvider } from "./components/auth-provider"
 import { ProtectedRoute, PublicOnlyRoute } from "./components/route-guards"
 import { ThemeProvider } from "./components/theme-provider"
+import { LanguageProvider } from "./i18n"
 import { ToastProvider } from "./components/toast"
 import { AppErrorBoundary } from "./components/app-error-boundary"
 import "./styles/globals.css"
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <ThemeProvider>
+        <LanguageProvider>
         <ToastProvider>
         <BrowserRouter basename={import.meta.env.BASE_URL}>
           <AuthProvider>
@@ -221,6 +223,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           </AuthProvider>
         </BrowserRouter>
         </ToastProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </AppErrorBoundary>
   </React.StrictMode>

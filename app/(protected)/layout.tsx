@@ -9,6 +9,7 @@ import { acceptIncomingCall, dismissIncomingCallLocally, rejectIncomingCall } fr
 import { toInitials } from "../../src/data/session-user"
 import { avatarDisplaySrc } from "../../src/lib/avatar"
 import { useDrawerSwipe } from "../../src/hooks/use-drawer-swipe"
+import { useTranslation, type Cle } from "../../src/i18n"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./layout.css"
 
@@ -172,12 +173,16 @@ const Icons = {
 // Les memes sections que la barre d'onglets du mobile :
 // Discussions / Statuts / Appels / IA. Les contacts s'ouvrent via le
 // bouton flottant orange de la liste des discussions (comme sur mobile).
-const NAV_ITEMS: NavItem[] = [
-  { href: "/chats", label: "Discussions", icon: <Icons.Chat /> },
-  { href: "/status", label: "Statuts", icon: <Icons.Status /> },
-  { href: "/calls", label: "Appels", icon: <Icons.Call /> },
-  { href: "/ai", label: "Assistant IA", icon: <Icons.Sparkle /> },
-  { href: "/contacts", label: "Contacts", icon: <Icons.Contacts /> },
+/**
+ * Les intitules sont des cles de traduction, resolues au rendu : la langue peut
+ * changer sans recharger la page, la table ne peut donc pas contenir de texte.
+ */
+const NAV_ITEMS: Array<Omit<NavItem, "label"> & { labelKey: Cle }> = [
+  { href: "/chats", labelKey: "chats", icon: <Icons.Chat /> },
+  { href: "/status", labelKey: "status", icon: <Icons.Status /> },
+  { href: "/calls", labelKey: "calls", icon: <Icons.Call /> },
+  { href: "/ai", labelKey: "assistant", icon: <Icons.Sparkle /> },
+  { href: "/contacts", labelKey: "contacts", icon: <Icons.Contacts /> },
 ]
 
 const UNREAD_COUNTS: Record<string, number> = {}
@@ -194,13 +199,14 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
   const location = useLocation()
   const navigate = useNavigate()
   const { logout, user: sessionUser } = useAuth()
+  const { t } = useTranslation()
   const pathname = location.pathname
 
   const user = {
     name: sessionUser?.name ?? "Utilisateur Alanya",
     email: sessionUser?.email ?? "",
     initials: toInitials(sessionUser?.name ?? "Utilisateur Alanya"),
-    status: "En ligne",
+    status: t("online"),
   }
 
   async function handleLogout() {
@@ -251,9 +257,10 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
       <nav className="sb-nav">
         <div className="sb-nav-section">Navigation</div>
 
-        {NAV_ITEMS.map(({ href, label, icon }) => {
+        {NAV_ITEMS.map(({ href, labelKey, icon }) => {
           const isActive = pathname.startsWith(href)
           const unreadCount = UNREAD_COUNTS[href]
+          const label = t(labelKey)
 
           return (
             <Link
@@ -276,10 +283,10 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           to="/settings"
           className={`sb-link ${pathname === "/settings" ? "active" : ""}`}
           onClick={onClose}
-          title="Parametres"
+          title={t("settings")}
         >
           <Icons.Settings />
-          <span className="sb-link-label">Parametres</span>
+          <span className="sb-link-label">{t("settings")}</span>
         </Link>
       </nav>
 
@@ -312,8 +319,8 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
               e.stopPropagation()
               handleLogout()
             }}
-            aria-label="Se deconnecter"
-            title="Se deconnecter"
+            aria-label={t("logout")}
+            title={t("logout")}
           >
             <Icons.Logout />
           </button>
