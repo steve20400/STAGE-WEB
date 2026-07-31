@@ -38,8 +38,12 @@ async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
   }
 
   const { apiKey, authDomain, projectId, messagingSenderId, appId } = firebaseConfig;
+  // Le chemin est construit a l'execution : Vite ne le reecrit pas, contrairement
+  // aux `href`/`src` du HTML et aux `url()` du CSS. Sous /webapp/, un chemin absolu
+  // viserait la racine du domaine, ou le fichier n'existe pas — la production
+  // repond 404 sur /firebase-messaging-sw.js et 200 sur /webapp/….
   const swUrl =
-    `/firebase-messaging-sw.js` +
+    `${import.meta.env.BASE_URL}firebase-messaging-sw.js` +
     `?apiKey=${encodeURIComponent(apiKey || "")}` +
     `&authDomain=${encodeURIComponent(authDomain || "")}` +
     `&projectId=${encodeURIComponent(projectId || "")}` +
@@ -48,7 +52,10 @@ async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
 
   try {
     const registration = await navigator.serviceWorker.register(swUrl, {
-      scope: "/",
+      // Une portee doit etre contenue dans le repertoire du script : depuis une
+      // page servie sous /webapp/, demander "/" est refuse par le navigateur, et
+      // l'enregistrement echouait donc silencieusement en production.
+      scope: import.meta.env.BASE_URL,
     });
     console.log("[Push] Service Worker registered successfully:", registration);
     return registration;
@@ -161,7 +168,7 @@ export async function unregisterPush(accessToken?: string | null): Promise<void>
   if (!msging) return;
 
   try {
-    const registration = await navigator.serviceWorker.getRegistration("/");
+    const registration = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
     if (!registration) return;
 
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;

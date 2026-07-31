@@ -210,7 +210,7 @@ function PushDiagnostic() {
     }
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.getRegistration("/").then((reg) => {
+      navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL).then((reg) => {
         if (reg) {
           setSwStatus(`Actif (Scope: ${reg.scope})`)
         } else {

@@ -40,5 +40,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Verifie que les actifs visent bien /webapp/
-        run: grep -q 'src="/webapp/assets/' dist/index.html
+      # Un chemin absolu oublie casse une fonction entiere en silence : c'est
+      # arrive aux sons de l'application et au service worker. Le controle vaut
+      # pour le paquet construit comme pour les chemins assembles a l'execution.
+      - name: Verifie l'hebergement sous /webapp/
+        run: npm run verify:webapp
