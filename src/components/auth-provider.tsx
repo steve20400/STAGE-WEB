@@ -10,6 +10,7 @@ import {
 import {
   clearSessionUser,
   loadSessionUser,
+  normalizePhoneNumber,
   saveSessionUser,
   type SessionUser,
 } from "../data/session-user"
@@ -53,12 +54,18 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 /**
- * Identifiant stable du compte, pour le verrou des caches locaux. `id` est
- * l'UUID backend ; `phone` (l'Alanya ID) sert de repli quand la session locale
- * est incomplete.
+ * Identifiant stable du compte, pour le verrou des caches locaux.
+ *
+ * C'est l'Alanya ID qui sert de cle, et non l'UUID backend : `phone` est toujours
+ * renseigne dans une session, alors que `id` est optionnel et absent de certains
+ * chemins de restauration. Une cle qui change de nature d'un chemin a l'autre
+ * ferait croire a un changement de compte et purgerait les caches de
+ * l'utilisateur lui-meme — constate en test : le verrou voyait « compte-A » a la
+ * connexion et l'Alanya ID a la restauration. Deux comptes ont toujours deux
+ * Alanya ID distincts, la protection reste donc entiere.
  */
 function accountKey(user: SessionUser) {
-  return user.id ?? user.phone
+  return normalizePhoneNumber(user.phone) || (user.id ?? "")
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
