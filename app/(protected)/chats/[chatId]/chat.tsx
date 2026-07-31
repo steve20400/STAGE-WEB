@@ -1319,14 +1319,17 @@ const ALBUM_WINDOW_MS = 60_000
  * regroupement se fait a l'affichage, ce qui vaut aussi pour l'historique deja
  * recu.
  *
- * Une legende ou une citation exclut le message du lot : elles ne survivraient
- * pas a la mise en grille, et perdre du texte serait pire que ne pas grouper.
+ * Une citation exclut le message du lot : elle ne survivrait pas a la mise en
+ * grille. Une legende, si, a condition qu'il n'y en ait qu'une dans le lot :
+ * c'est exactement ce que fait le mobile, ou un envoi multiple est un seul
+ * message portant plusieurs medias et une legende unique. Depuis l'ecran de
+ * confirmation avant envoi, chaque fichier peut porter sa legende, et exiger
+ * qu'aucune ne soit remplie faisait perdre le groupement des envois recents.
  */
 function isAlbumCandidate(msg: Message): boolean {
   return (
     !msg.isDeleted &&
     !msg.replyTo &&
-    !msg.content?.trim() &&
     Boolean(msg.mediaUrl) &&
     (msg.type === "image" || msg.type === "video" || msg.type === "file")
   )
@@ -1340,7 +1343,10 @@ function groupMediaRuns(items: TimelineItem[]): TimelineItem[] {
   const flush = () => {
     // Un media isole reste une bulle ordinaire : une grille d'un seul element
     // n'apporterait rien et retirerait son apercu au message.
-    if (run.length >= 2) out.push({ kind: "album", ts: run[0].timestamp, msgs: run })
+    // Deux legendes differentes dans un meme lot ne tiennent pas sous une seule
+    // grille : on prefere alors ne pas grouper plutot que d'en perdre une.
+    const captions = run.map((m) => m.content?.trim()).filter(Boolean)
+    if (run.length >= 2 && captions.length <= 1) out.push({ kind: "album", ts: run[0].timestamp, msgs: run })
     else run.forEach((m) => out.push({ kind: "msg", ts: m.timestamp, msg: m }))
     run = []
   }
@@ -1476,6 +1482,10 @@ function MessageBubble({
   const mediaSrc = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
   const isVideoFile = (msg.mediaMime ?? "").startsWith("video/")
   const canExpandMedia = Boolean(mediaSrc) && !msg.isDeleted
+  // La legende d'un lot vit sur l'un de ses messages, pas forcement le premier.
+  // Le regroupement garantit qu'il n'y en a qu'une : la premiere trouvee est
+  // donc bien celle du lot.
+  const albumCaption = albumMsgs?.map((item) => item.content?.trim()).find(Boolean) ?? ""
 
   // --- Swipe-to-reply (pointeur / tactile) ---
   const onPointerDown = (e: React.PointerEvent) => {
@@ -1901,7 +1911,10 @@ function MessageBubble({
               // Lot envoye d'un bloc : une seule grille, comme sur WhatsApp. Le
               // reste de la bulle (menu, glisser-pour-repondre, heure, statut)
               // reste celui d'un message ordinaire.
-              <MediaAlbumGrid msgs={albumMsgs} onOpen={onOpenAlbum ?? (() => {})} />
+              <>
+                <MediaAlbumGrid msgs={albumMsgs} onOpen={onOpenAlbum ?? (() => {})} />
+                {albumCaption && <span style={{ display: "block", marginTop: 5 }}>{albumCaption}</span>}
+              </>
             ) : (
               <>
                 {msg.type === "image" && mediaSrc && (
@@ -2196,6 +2209,9 @@ export default function ChatRoomPage() {
   )
 
   const [messages, setMessages] = useState<Message[]>([])
+  // Compteur des identifiants temporaires. Date.now() seul ne suffit pas :
+  // plusieurs fichiers d'un meme envoi partiraient dans la meme milliseconde.
+  const tempSeqRef = useRef(0)
   // Appels passes dans cette conversation, affiches dans le fil (facon WhatsApp)
   const [callEvents, setCallEvents] = useState<CallRecord[]>([])
   const [input, setInput] = useState("")
@@ -2552,7 +2568,7 @@ export default function ChatRoomPage() {
       /** Legende saisie a l'ecran de confirmation : elle voyage dans le meme message. */
       caption = ""
     ) => {
-      const tempId = `tmp-${Date.now()}`
+      const tempId = `tmp-${Date.now()}-${(tempSeqRef.current += 1)}`
       const localUrl = URL.createObjectURL(file)
       const optimistic: Message = {
         id: tempId,
