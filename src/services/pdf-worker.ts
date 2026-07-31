@@ -30,7 +30,10 @@
  * reseau mobile, ce presque megaoctet en moins est la premiere cause d'echec
  * qu'on supprime.
  */
-const WORKER_ASSET_URL = new URL("pdfjs-dist/legacy/build/pdf.worker.min.mjs", import.meta.url).toString()
+const WORKER_ASSET_URL = new URL(
+  "pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString()
 
 /** Un seul telechargement par session, partage par tous les appelants. */
 let workerSrc: Promise<string> | null = null
@@ -43,7 +46,11 @@ async function download(): Promise<string> {
   // Un repli SPA ou un portail captif repond 200 avec une page HTML. Sans ce
   // controle, le worker demarrerait sur du HTML et l'erreur serait illisible.
   if (/^\s*</.test(code)) throw new Error("worker PDF : page HTML recue au lieu du script")
-  if (!code.includes("PDFWorker") && !code.includes("GlobalWorkerOptions") && code.length < 100_000) {
+  if (
+    !code.includes("PDFWorker") &&
+    !code.includes("GlobalWorkerOptions") &&
+    code.length < 100_000
+  ) {
     throw new Error("worker PDF : contenu inattendu")
   }
 

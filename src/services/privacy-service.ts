@@ -47,7 +47,9 @@ export async function fetchPrivacy(): Promise<PrivacySettings> {
   )
   return {
     readReceipts: (data.readReceipts ?? 1) !== 0,
-    lastSeenVisibility: toVisibility(data.lastSeenVisibility ?? PRIVACY_DEFAULTS.lastSeenVisibility),
+    lastSeenVisibility: toVisibility(
+      data.lastSeenVisibility ?? PRIVACY_DEFAULTS.lastSeenVisibility
+    ),
   }
 }
 

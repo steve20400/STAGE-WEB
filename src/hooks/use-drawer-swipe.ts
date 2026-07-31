@@ -50,7 +50,10 @@ function claimsHorizontalGesture(target: EventTarget | null): boolean {
   while (node) {
     if (node.classList.contains("active-call-floating")) return true
     const overflowX = getComputedStyle(node).overflowX
-    if ((overflowX === "auto" || overflowX === "scroll") && node.scrollWidth > node.clientWidth + 1) {
+    if (
+      (overflowX === "auto" || overflowX === "scroll") &&
+      node.scrollWidth > node.clientWidth + 1
+    ) {
       return true
     }
     node = node.parentElement

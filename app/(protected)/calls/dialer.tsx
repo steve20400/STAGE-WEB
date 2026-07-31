@@ -63,7 +63,15 @@ export function Dialer({
   return (
     <div className="dialer-root" role="dialog" aria-label="Composer un numero">
       <button className="dialer-close" onClick={onClose} aria-label="Fermer le clavier">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
@@ -71,7 +79,11 @@ export function Dialer({
 
       <div className="dialer-number-zone">
         <div className="dialer-number" aria-live="polite">
-          {digits ? formatAlanyaNumber(digits) : <span className="dialer-placeholder">Alanya ID</span>}
+          {digits ? (
+            formatAlanyaNumber(digits)
+          ) : (
+            <span className="dialer-placeholder">Alanya ID</span>
+          )}
         </div>
         <div className="dialer-hint">
           {digits.length === 0
@@ -109,7 +121,15 @@ export function Dialer({
             aria-label="Appel audio"
             title={valide ? "Appel audio" : "Composez 6 ou 8 chiffres"}
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
               <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
             </svg>
           </button>
@@ -120,7 +140,15 @@ export function Dialer({
             aria-label="Appel video"
             title={valide ? "Appel video" : "Composez 6 ou 8 chiffres"}
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
               <polygon points="23 7 16 12 23 17 23 7" />
               <rect x="1" y="5" width="15" height="14" rx="2" />
             </svg>
@@ -134,7 +162,15 @@ export function Dialer({
           aria-label="Effacer le dernier chiffre"
           title="Effacer"
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+          >
             <path d="M21 5H9L3 12l6 7h12a1 1 0 001-1V6a1 1 0 00-1-1z" />
             <line x1="18" y1="9" x2="12" y2="15" />
             <line x1="12" y1="9" x2="18" y2="15" />
