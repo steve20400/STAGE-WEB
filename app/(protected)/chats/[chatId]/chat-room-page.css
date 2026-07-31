@@ -3,6 +3,7 @@
 .room-root {
   font-family: "DM Sans", sans-serif;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background:

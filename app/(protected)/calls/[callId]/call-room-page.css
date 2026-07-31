@@ -27,6 +27,7 @@
 
   font-family: "DM Sans", sans-serif;
   height: 100vh;
+  height: 100dvh;
   background: #4a2c1a; /* chocolat mobile */
   color: var(--text-primary);
   display: flex;

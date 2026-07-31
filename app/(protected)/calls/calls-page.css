@@ -11,6 +11,7 @@
 .calls-root {
   font-family: "DM Sans", sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
   background:
     linear-gradient(var(--motif-overlay), var(--motif-overlay)),
     url("/motif-bg.png") repeat;

@@ -1131,7 +1131,7 @@ export default function SettingsPage() {
 
         .settings-root {
           font-family: 'DM Sans', sans-serif;
-          min-height: 100vh; background: linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png") repeat; background-size: auto, 280px auto; color: var(--text-primary);
+          min-height: 100vh; min-height: 100dvh; background: linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png") repeat; background-size: auto, 280px auto; color: var(--text-primary);
           display: grid; grid-template-columns: 230px 1fr;
           width: 100%;
           overflow-x: hidden;
@@ -1142,7 +1142,7 @@ export default function SettingsPage() {
           border-right: 1px solid var(--border-subtle);
           padding: 28px 14px;
           display: flex; flex-direction: column; gap: 4px;
-          position: sticky; top: 0; height: 100vh;
+          position: sticky; top: 0; height: 100vh; height: 100dvh;
           overflow-y: auto;
         }
         .s-back {

@@ -3,6 +3,7 @@
 .chats-root {
   font-family: "DM Sans", sans-serif;
   height: calc(100vh - 0px);
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background:

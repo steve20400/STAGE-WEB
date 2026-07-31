@@ -185,6 +185,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           font-family: 'DM Sans', sans-serif;
           width: 320px;
           height: 100vh;
+          height: 100dvh;
           background: var(--bg-surface);
           border-left: 1px solid var(--border-subtle);
           display: flex;

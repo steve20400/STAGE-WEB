@@ -25,7 +25,13 @@
   display: flex;
   /* Hauteur figee (pas min-height) : la page ne defile jamais, ce sont les
      colonnes internes qui defilent -> les en-tetes restent visibles. */
+  /* dvh suit l'affichage de la barre du navigateur ; vh la suppose masquee, donc
+     sur telephone le bas de la mise en page passait sous l'interface du
+     navigateur. Les conteneurs etant en overflow:hidden, cette bande devenait
+     inatteignable et les listes ne se defilaient pas jusqu'au bout. vh reste en
+     repli pour les WebView anciens. */
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--bg-deep);
 }
@@ -49,6 +55,7 @@
 .sidebar {
   width: var(--sidebar-width);
   height: 100vh;
+  height: 100dvh;
   background: var(--bg-deep);
   border-right: 1px solid var(--bg-border);
   display: flex;
@@ -376,6 +383,7 @@
   top: 0;
   left: 0;
   height: 100vh;
+  height: 100dvh;
   z-index: 50;
   transform: translateX(-100%);
   transition: transform 0.25s ease;

@@ -9,6 +9,7 @@
     auto,
     280px auto;
   min-height: 100vh;
+  min-height: 100dvh;
   color: var(--text-primary);
   overflow: hidden;
 }

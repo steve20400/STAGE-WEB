@@ -13,6 +13,7 @@ import {
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
+import { RowActionsMenu } from "../../../src/components/row-actions-menu"
 import "../calls/calls-page.css"
 
 /**
@@ -98,17 +99,6 @@ export default function ContactsPage() {
     } finally {
       setConfirmDelete(null)
     }
-  }
-
-  const iconBtnStyle: React.CSSProperties = {
-    background: "var(--bg-elevated)",
-    border: "1px solid var(--border-subtle)",
-    borderRadius: 8,
-    padding: "7px 9px",
-    color: "var(--text-secondary)",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
   }
 
   return (
@@ -218,81 +208,16 @@ export default function ContactsPage() {
                 </div>
               </div>
 
-              <div className="call-right" style={{ display: "flex", gap: 8 }}>
-                <button
-                  style={iconBtnStyle}
-                  title="Envoyer un message"
-                  aria-label="Message"
-                  onClick={() => void openChat(contact.phone)}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  >
-                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                  </svg>
-                </button>
-                <button
-                  style={iconBtnStyle}
-                  title="Appel audio"
-                  aria-label="Appel audio"
-                  onClick={() => void callContact(contact.phone, contact.name, "audio")}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  >
-                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-                  </svg>
-                </button>
-                <button
-                  style={iconBtnStyle}
-                  title="Appel video"
-                  aria-label="Appel video"
-                  onClick={() => void callContact(contact.phone, contact.name, "video")}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  >
-                    <polygon points="23 7 16 12 23 17 23 7" />
-                    <rect x="1" y="5" width="15" height="14" rx="2" />
-                  </svg>
-                </button>
-                <button
-                  style={{ ...iconBtnStyle, color: "var(--danger)" }}
-                  title="Supprimer le contact"
-                  aria-label="Supprimer"
-                  onClick={() => setConfirmDelete(contact.id)}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                  </svg>
-                </button>
+              <div className="call-right">
+                <RowActionsMenu
+                  ariaLabel={`Actions pour ${contact.name}`}
+                  actions={[
+                    { label: "Envoyer un message", onSelect: () => void openChat(contact.phone) },
+                    { label: "Appel audio", onSelect: () => void callContact(contact.phone, contact.name, "audio") },
+                    { label: "Appel video", onSelect: () => void callContact(contact.phone, contact.name, "video") },
+                    { label: "Supprimer le contact", onSelect: () => setConfirmDelete(contact.id), danger: true },
+                  ]}
+                />
               </div>
             </div>
           )
