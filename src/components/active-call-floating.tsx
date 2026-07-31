@@ -2,6 +2,7 @@ import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
 import { ParticipantGrid } from "./participant-grid"
+
 import { useHasLiveVideo } from "../hooks/use-remote-video"
 import {
   hangUp,
@@ -12,6 +13,16 @@ import {
 } from "../services/call-manager"
 import { toInitials } from "../data/session-user"
 import { avatarDisplaySrc } from "../lib/avatar"
+
+/**
+ * Nombre de participants DISTANTS a partir duquel l'ecran se divise.
+ *
+ * A deux personnes en communication — un seul flux distant — l'ecran reste entier,
+ * avec le correspondant en grand : diviser n'aurait aucun sens. La division ne
+ * commence donc qu'a partir de trois personnes en communication, soit deux flux
+ * distants, en comptant l'utilisateur courant.
+ */
+const PARTICIPANTS_POUR_DIVISER = 2
 
 /**
  * Fenetre d'appel reduite — lecteur persistant qui conserve les sorties
@@ -97,9 +108,9 @@ export function ActiveCallFloating() {
       ))}
 
       <div className="active-call-content">
-        {/* Des qu'il y a plusieurs participants, la grille prend la place : le
-            rendu a un seul flux n'affichait que le premier et perdait les autres. */}
-        {participants.length > 1 ? (
+        {/* Au-dela du seuil, la grille prend la place : le rendu a un seul flux
+            n'affichait que le premier et perdait tous les autres. */}
+        {participants.length >= PARTICIPANTS_POUR_DIVISER ? (
           <ParticipantGrid
             participants={participants}
             isVideo={call.callType === "video"}

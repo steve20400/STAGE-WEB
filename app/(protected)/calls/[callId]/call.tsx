@@ -16,6 +16,16 @@ import { useTranslation } from "../../../../src/i18n"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./call-room-page.css"
 
+/**
+ * Nombre de participants DISTANTS a partir duquel l'ecran se divise.
+ *
+ * A deux personnes en communication — un seul flux distant — l'ecran reste entier,
+ * avec le correspondant en grand : diviser n'aurait aucun sens. La division ne
+ * commence donc qu'a partir de trois personnes en communication, soit deux flux
+ * distants, en comptant l'utilisateur courant.
+ */
+const PARTICIPANTS_POUR_DIVISER = 2
+
 type CallScreenState = "ringing" | "active" | "ended"
 
 function formatElapsed(seconds: number): string {
@@ -248,7 +258,7 @@ export default function CallRoomPage() {
           {/* Appel de groupe : tous les participants, en grille defilante. Le
               rendu precedent ne branchait que remoteStreamEntries[0] et perdait
               donc tous les autres flux, deja recus. */}
-          {participantsDistants.length > 1 ? (
+          {participantsDistants.length >= PARTICIPANTS_POUR_DIVISER ? (
             <ParticipantGrid participants={participantsDistants} isVideo={isVideo} size="full" />
           ) : showRemoteVideo ? (
             <video ref={remoteVideoRef} className="bg-video" autoPlay playsInline muted />
