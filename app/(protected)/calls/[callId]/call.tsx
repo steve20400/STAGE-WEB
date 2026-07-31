@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useCallState } from "../../../../src/hooks/use-call"
 import { useHasLiveVideo } from "../../../../src/hooks/use-remote-video"
+import { ParticipantGrid } from "../../../../src/components/participant-grid"
 import {
   acknowledgeCallEnded,
   hangUp as hangUpCall,
@@ -39,6 +40,16 @@ export default function CallRoomPage() {
     [call.remoteStreams]
   )
   const hasRemote = remoteStreamEntries.length > 0
+  // Ordre d'insertion = ordre d'arrivee des participants.
+  const participantsDistants = useMemo(
+    () =>
+      remoteStreamEntries.map(([id, stream]) => ({
+        id,
+        stream,
+        name: call.participantNames[id] ?? call.peerName ?? "Participant",
+      })),
+    [remoteStreamEntries, call.participantNames, call.peerName]
+  )
   // Vrai uniquement si le flux distant transporte une image (voir le hook).
   const remoteHasVideo = useHasLiveVideo(remoteStreamEntries[0]?.[1])
 
@@ -68,7 +79,13 @@ export default function CallRoomPage() {
   const [controlsVisible, setControlsVisible] = useState(true)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
-  const pipDrag = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({ x: 0, y: 0, ox: 0, oy: 0, active: false })
+  const pipDrag = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({
+    x: 0,
+    y: 0,
+    ox: 0,
+    oy: 0,
+    active: false,
+  })
 
   const liveTimerRef = useRef<number | null>(null)
   const showControlsTimerRef = useRef<number | null>(null)
@@ -110,8 +127,10 @@ export default function CallRoomPage() {
 
   // Branche le flux local sur l'apercu video (PiP)
   useEffect(() => {
-    if (localVideoRef.current && call.localStream) localVideoRef.current.srcObject = call.localStream
-    if (localFullVideoRef.current && call.localStream) localFullVideoRef.current.srcObject = call.localStream
+    if (localVideoRef.current && call.localStream)
+      localVideoRef.current.srcObject = call.localStream
+    if (localFullVideoRef.current && call.localStream)
+      localFullVideoRef.current.srcObject = call.localStream
   }, [call.localStream, callState, call.camOn])
 
   // Branche le premier flux distant sur la grande video. `showRemoteVideo` est
@@ -226,10 +245,22 @@ export default function CallRoomPage() {
         ))}
 
         <div className="bg-layer">
-          {showRemoteVideo ? (
+          {/* Appel de groupe : tous les participants, en grille defilante. Le
+              rendu precedent ne branchait que remoteStreamEntries[0] et perdait
+              donc tous les autres flux, deja recus. */}
+          {participantsDistants.length > 1 ? (
+            <ParticipantGrid participants={participantsDistants} isVideo={isVideo} size="full" />
+          ) : showRemoteVideo ? (
             <video ref={remoteVideoRef} className="bg-video" autoPlay playsInline muted />
           ) : isVideo && callState === "ringing" && call.localStream ? (
-            <video ref={localFullVideoRef} className="bg-video" autoPlay playsInline muted style={{ transform: "scaleX(-1)" }} />
+            <video
+              ref={localFullVideoRef}
+              className="bg-video"
+              autoPlay
+              playsInline
+              muted
+              style={{ transform: "scaleX(-1)" }}
+            />
           ) : (
             <div className="bg-audio-pattern" />
           )}
@@ -357,7 +388,31 @@ export default function CallRoomPage() {
 
           {/* Apercu de sa propre camera : visible aussi pendant la sonnerie */}
           {isVideo && callState === "active" && call.localStream && (
-            <div className="local-video-pip" style={{ transform: `translate(${pipPos.x}px, ${pipPos.y}px)`, touchAction: "none", cursor: "grab" }} onPointerDown={(e) => { pipDrag.current = { x: e.clientX, y: e.clientY, ox: pipPos.x, oy: pipPos.y, active: true }; e.currentTarget.setPointerCapture(e.pointerId) }} onPointerMove={(e) => { const d=pipDrag.current; if(d.active) setPipPos({x:d.ox+e.clientX-d.x,y:d.oy+e.clientY-d.y}) }} onPointerUp={() => { pipDrag.current.active=false }}>
+            <div
+              className="local-video-pip"
+              style={{
+                transform: `translate(${pipPos.x}px, ${pipPos.y}px)`,
+                touchAction: "none",
+                cursor: "grab",
+              }}
+              onPointerDown={(e) => {
+                pipDrag.current = {
+                  x: e.clientX,
+                  y: e.clientY,
+                  ox: pipPos.x,
+                  oy: pipPos.y,
+                  active: true,
+                }
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }}
+              onPointerMove={(e) => {
+                const d = pipDrag.current
+                if (d.active) setPipPos({ x: d.ox + e.clientX - d.x, y: d.oy + e.clientY - d.y })
+              }}
+              onPointerUp={() => {
+                pipDrag.current.active = false
+              }}
+            >
               {call.camOn ? (
                 <video
                   ref={localVideoRef}
@@ -472,8 +527,13 @@ export default function CallRoomPage() {
               )}
 
               {isVideo && (
-                <button className="ctrl-btn" onClick={() => void switchCamera()} aria-label="Changer de caméra">
-                  <div className="ctrl-btn-icon ctrl-on">↻</div><span className="ctrl-btn-label">Retourner</span>
+                <button
+                  className="ctrl-btn"
+                  onClick={() => void switchCamera()}
+                  aria-label="Changer de caméra"
+                >
+                  <div className="ctrl-btn-icon ctrl-on">↻</div>
+                  <span className="ctrl-btn-label">Retourner</span>
                 </button>
               )}
 
@@ -518,7 +578,10 @@ export default function CallRoomPage() {
               {call.activeConvId && (
                 <button
                   className="ctrl-btn"
-                  onClick={() => { minimizeActiveCall(); navigate(`/chats/${call.activeConvId}`) }}
+                  onClick={() => {
+                    minimizeActiveCall()
+                    navigate(`/chats/${call.activeConvId}`)
+                  }}
                   aria-label="Ouvrir le chat"
                 >
                   <div className="ctrl-btn-icon ctrl-on">

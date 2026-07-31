@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
+import { ParticipantGrid } from "./participant-grid"
 import { useHasLiveVideo } from "../hooks/use-remote-video"
 import {
   hangUp,
@@ -34,6 +35,13 @@ export function ActiveCallFloating() {
   const drag = useRef({ x: 0, y: 0, ox: 0, oy: 0, on: false })
 
   const remoteEntries = Object.entries(call.remoteStreams)
+  // L'ordre d'insertion des flux est l'ordre d'arrivee : la premiere tuile du
+  // petit ecran est donc bien celle du premier participant arrive apres nous.
+  const participants = remoteEntries.map(([id, stream]) => ({
+    id,
+    stream,
+    name: call.participantNames[id] ?? call.peerName ?? "Participant",
+  }))
   const remote = remoteEntries[0]?.[1]
   // Hook appele avant tout retour anticipe : l'ordre des hooks doit rester stable.
   const remoteHasVideo = useHasLiveVideo(remote)
@@ -89,7 +97,15 @@ export function ActiveCallFloating() {
       ))}
 
       <div className="active-call-content">
-        {showRemoteVideo ? (
+        {/* Des qu'il y a plusieurs participants, la grille prend la place : le
+            rendu a un seul flux n'affichait que le premier et perdait les autres. */}
+        {participants.length > 1 ? (
+          <ParticipantGrid
+            participants={participants}
+            isVideo={call.callType === "video"}
+            size={reduite ? "small" : "medium"}
+          />
+        ) : showRemoteVideo ? (
           <video
             ref={(el) => {
               if (el && remote && el.srcObject !== remote) {
