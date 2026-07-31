@@ -7,6 +7,15 @@ import { type SessionUser } from "../../../src/data/session-user"
 import { isTurnConfigured } from "../../../src/services/calls-service"
 import TurnTester from "../../../src/components/turn-tester"
 import RealtimeStatus from "../../../src/components/realtime-status"
+import {
+  RINGTONES,
+  RINGTONE_LABELS,
+  previewRingtone,
+  ringtoneFile,
+  setRingtone,
+  stopRingtonePreview,
+  type RingtoneEvent,
+} from "../../../src/services/ringtones"
 import { changePasswordApi, updateProfileApi } from "../../../src/services/auth-api"
 import {
   type Appareil,
@@ -78,6 +87,85 @@ function analyzePassword(pwd: string): { score: number; label: string; color: st
     { label: "Tres fort", color: "var(--accent)" },
   ]
   return { score, ...levels[Math.min(5, score)] }
+}
+
+/**
+ * Choix des sonneries. Les trois sons proposes par defaut sont ceux de
+ * l'application mobile, reprisa l'octet pres, pour que les deux plateformes
+ * sonnent pareil. Le choix est une preference d'appareil : il survit a la
+ * deconnexion.
+ */
+function RingtonePicker() {
+  const events: RingtoneEvent[] = ["incoming", "outgoing", "message"]
+  const [choices, setChoices] = useState<Record<RingtoneEvent, string>>(() => ({
+    incoming: ringtoneFile("incoming"),
+    outgoing: ringtoneFile("outgoing"),
+    message: ringtoneFile("message"),
+  }))
+  const [playing, setPlaying] = useState<string | null>(null)
+
+  // Ne pas laisser un extrait tourner apres avoir quitte les reglages.
+  useEffect(() => stopRingtonePreview, [])
+
+  const choose = (event: RingtoneEvent, file: string) => {
+    setRingtone(event, file)
+    setChoices((prev) => ({ ...prev, [event]: file }))
+  }
+
+  const listen = (file: string) => {
+    if (playing === file) {
+      stopRingtonePreview()
+      setPlaying(null)
+      return
+    }
+    setPlaying(file)
+    void previewRingtone(file)
+      .catch(() => setPlaying(null))
+      .finally(() => window.setTimeout(() => setPlaying((current) => (current === file ? null : current)), 4000))
+  }
+
+  return (
+    <div className="s-card">
+      <div className="s-card-title">Sonneries</div>
+      {events.map((event) => (
+        <div key={event} className="ringtone-row">
+          <div className="ringtone-row-label">{RINGTONE_LABELS[event]}</div>
+          <div className="ringtone-row-controls">
+            <select
+              className="ringtone-select"
+              value={choices[event]}
+              onChange={(e) => choose(event, e.target.value)}
+              aria-label={`Sonnerie pour ${RINGTONE_LABELS[event].toLowerCase()}`}
+            >
+              {RINGTONES.map((ringtone) => (
+                <option key={ringtone.file} value={ringtone.file}>
+                  {ringtone.label}
+                  {ringtone.note ? ` — ${ringtone.note}` : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="ringtone-listen"
+              onClick={() => listen(choices[event])}
+              aria-label={playing === choices[event] ? "Arreter l'ecoute" : "Ecouter"}
+              title={playing === choices[event] ? "Arreter" : "Ecouter"}
+            >
+              {playing === choices[event] ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20" /></svg>
+              )}
+            </button>
+          </div>
+        </div>
+      ))}
+      <div className="s-hint">
+        Les sons proposes en premier sont ceux de l'application mobile. L'ecoute
+        s'arrete au bout de quatre secondes.
+      </div>
+    </div>
+  )
 }
 
 function PushDiagnostic() {
@@ -1087,6 +1175,33 @@ export default function SettingsPage() {
           background: var(--bg-surface); border: 1px solid var(--border-subtle);
           border-radius: 14px; padding: 22px 24px; margin-bottom: 16px;
         }
+
+        /* Choix des sonneries : un evenement par ligne, son menu et son ecoute. */
+        .ringtone-row {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
+        }
+        .ringtone-row:last-of-type { border-bottom: none; }
+        .ringtone-row-label { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+        .ringtone-row-controls { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .ringtone-select {
+          max-width: 230px; padding: 7px 10px; border-radius: 8px;
+          border: 1px solid var(--border-subtle); background: var(--bg-base);
+          color: var(--text-primary); font-family: inherit; font-size: 12px;
+        }
+        .ringtone-listen {
+          width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
+          border: 1px solid var(--border-subtle); background: var(--bg-base);
+          color: var(--accent); cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .ringtone-listen:hover { background: var(--bg-surface); }
+        .ringtone-listen:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        @media (max-width: 560px) {
+          .ringtone-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+          .ringtone-row-controls { width: 100%; }
+          .ringtone-select { flex: 1; max-width: none; }
+        }
         .s-card-title {
           font-family: 'Bricolage Grotesque', sans-serif;
           font-size: 14px; font-weight: 700; color: var(--text-primary);
@@ -1815,6 +1930,8 @@ export default function SettingsPage() {
                 />
                 <PushDiagnostic />
               </div>
+
+              <RingtonePicker />
             </>
           )}
 

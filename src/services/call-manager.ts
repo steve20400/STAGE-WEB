@@ -1,7 +1,7 @@
 import { getMyUserId, loadSessionUser } from "../data/session-user"
 import { loadSessionToken } from "../data/session-auth"
 import { ApiError } from "../lib/api-client"
-import { publicAsset } from "../lib/asset-url"
+import { ringtoneUrl } from "./ringtones"
 import {
   acceptCallRest,
   endCallRest,
@@ -305,8 +305,12 @@ function startOutgoingRingtone() {
   const callsEnabled = localStorage.getItem("notif_calls") !== "false"
   if (!callsEnabled) return
 
-  if (!outgoingRingtoneAudio) {
-    outgoingRingtoneAudio = new Audio(publicAsset("sounds/assets_sounds_outgoing_ring.mp3"))
+  const url = ringtoneUrl("outgoing")
+  // L'element est conserve d'un appel a l'autre : on le recree si le choix de
+  // sonnerie a change entre-temps, sinon il rejouerait l'ancienne.
+  if (!outgoingRingtoneAudio || outgoingRingtoneAudio.dataset.source !== url) {
+    outgoingRingtoneAudio = new Audio(url)
+    outgoingRingtoneAudio.dataset.source = url
     outgoingRingtoneAudio.loop = true
   }
   outgoingRingtoneAudio.play().catch((err) => {
@@ -326,8 +330,10 @@ function startIncomingRingtone() {
   const callsEnabled = localStorage.getItem("notif_calls") !== "false"
   if (!callsEnabled) return
 
-  if (!incomingRingtoneAudio) {
-    incomingRingtoneAudio = new Audio(publicAsset("sounds/incoming_ring.mp3"))
+  const url = ringtoneUrl("incoming")
+  if (!incomingRingtoneAudio || incomingRingtoneAudio.dataset.source !== url) {
+    incomingRingtoneAudio = new Audio(url)
+    incomingRingtoneAudio.dataset.source = url
     incomingRingtoneAudio.loop = true
   }
   incomingRingtoneAudio.play().catch((err) => {
