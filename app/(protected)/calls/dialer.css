@@ -1,0 +1,181 @@
+/* Composeur plein ecran. Aucune couleur en dur : tout vient des tokens de theme,
+   pour que le clavier suive les quatre themes de l'application. */
+
+.dialer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 9400;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px 18px 28px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+.dialer-close {
+  justify-self: start;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dialer-close:hover {
+  background: var(--bg-surface);
+}
+
+.dialer-number-zone {
+  align-self: center;
+  text-align: center;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.dialer-number {
+  font-family: "Bricolage Grotesque", sans-serif;
+  /* Suit la largeur disponible : un Alanya ID a 8 chiffres tient sur une ligne
+     meme sur un petit telephone. */
+  font-size: clamp(30px, 11vw, 46px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.dialer-placeholder {
+  color: var(--text-ghost);
+  letter-spacing: 1px;
+}
+
+.dialer-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.dialer-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: min(320px, 100%);
+}
+
+.dialer-key {
+  aspect-ratio: 1;
+  max-height: 74px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.dialer-key:hover {
+  background: var(--bg-surface);
+}
+.dialer-key:active {
+  background: var(--accent-dim);
+}
+.dialer-key:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dialer-actions {
+  display: grid;
+  /* Les deux boutons d'appel restent centres sous le clavier, l'effacement a
+     droite : les colonnes laterales de meme largeur tiennent l'equilibre. */
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+  width: min(320px, 100%);
+  margin-top: 6px;
+}
+
+.dialer-call-pair {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.dialer-call {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Vert pour la voix, accent de l'application pour la video : la meme
+   distinction que sur les autres ecrans d'appel. */
+.dialer-call.audio {
+  background: var(--success);
+}
+.dialer-call.video {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.dialer-call:disabled,
+.dialer-call.audio:disabled,
+.dialer-call.video:disabled {
+  background: var(--bg-elevated);
+  color: var(--text-ghost);
+  cursor: not-allowed;
+}
+.dialer-call:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.dialer-erase {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dialer-erase:disabled {
+  color: var(--text-ghost);
+  cursor: not-allowed;
+}
+
+/* Ecran bas (telephone en paysage, petite fenetre) : on resserre pour que le
+   clavier et le bouton d'appel restent visibles sans defilement. */
+@media (max-height: 620px) {
+  .dialer-number {
+    font-size: clamp(24px, 8vw, 32px);
+  }
+  .dialer-keys {
+    gap: 8px;
+  }
+  .dialer-key {
+    max-height: 56px;
+    font-size: 20px;
+  }
+  .dialer-call {
+    width: 52px;
+    height: 52px;
+  }
+  .dialer-call-pair {
+    gap: 12px;
+  }
+}

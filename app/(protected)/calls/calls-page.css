@@ -65,7 +65,12 @@
 
 .calls-controls {
   display: flex;
-  align-items: center;
+  /* Empilement inconditionnel : recherche, filtres puis tri, chacun sur sa
+     ligne. En rangee, dans la colonne de 380 px du grand ecran, le champ de
+     recherche tombait a 48 px de large et le tri remontait au-dessus. Une media
+     query n'y pouvait rien : elle mesure le viewport, pas le conteneur. */
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
   margin-bottom: 24px;
 }
@@ -342,9 +347,7 @@
   .stats-strip {
     flex-wrap: wrap;
   }
-  .calls-controls {
-    flex-wrap: wrap;
-  }
+
   .filter-group {
     flex-wrap: wrap;
   }
@@ -366,4 +369,59 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+/* Les deux lanceurs d'appel, l'un sous l'autre : par le repertoire, ou en
+   composant un Alanya ID. Ils remplacent l'ancien bouton unique « Nouvel
+   appel » qui vivait sur la ligne du titre. */
+.calls-launchers {
+  display: flex;
+  flex-direction: column;
+  /* Les deux lanceurs sont deux actions distinctes : l'ecart doit se voir, pour
+     qu'on ne clique pas l'un en visant l'autre. */
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.calls-launchers > button {
+  width: 100%;
+  justify-content: center;
+}
+
+.dial-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.dial-btn:hover {
+  background: var(--bg-surface);
+}
+.dial-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Tri de l'historique, sous les filtres de type. */
+.sort-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.sort-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-ghost);
 }

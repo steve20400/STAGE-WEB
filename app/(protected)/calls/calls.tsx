@@ -8,7 +8,23 @@ import {
 } from "../../../src/services/calls-service"
 import "./calls-page.css"
 import { RowActionsMenu } from "../../../src/components/row-actions-menu"
+import { useToast } from "../../../src/components/toast"
+import { createPrivateChat } from "../../../src/services/chats-service"
+import { startOutgoingCall } from "../../../src/services/call-manager"
+import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
+import { ApiError } from "../../../src/lib/api-client"
+import { Dialer } from "./dialer"
+
 type FilterType = "all" | "missed" | "audio" | "video"
+
+/** Ordres de tri de l'historique. */
+type SortType = "recent" | "oldest" | "name"
+
+const SORT_LABELS: Record<SortType, string> = {
+  recent: "Plus recents",
+  oldest: "Plus anciens",
+  name: "Nom (A-Z)",
+}
 
 function formatItemTime(date: Date): string {
   const now = new Date()
@@ -50,8 +66,11 @@ function DirectionArrow({ direction }: { direction: CallDirection }) {
 export default function CallsPage() {
   const navigate = useNavigate()
   const [filter, setFilter] = useState<FilterType>("all")
+  const [sort, setSort] = useState<SortType>("recent")
   const [search, setSearch] = useState("")
   const [callsHistory, setCallsHistory] = useState<CallRecord[]>([])
+  const [dialerOpen, setDialerOpen] = useState(false)
+  const { error } = useToast()
 
   useEffect(() => {
     let cancelled = false
@@ -79,8 +98,19 @@ export default function CallsPage() {
       .filter((call) => call.contactName.toLowerCase().includes(search.toLowerCase()))
   }, [callsHistory, filter, search])
 
+  const sorted = useMemo(() => {
+    const list = [...filtered]
+    if (sort === "name") return list.sort((a, b) => a.contactName.localeCompare(b.contactName, "fr"))
+    return list.sort((a, b) =>
+      sort === "oldest" ? a.ts.getTime() - b.ts.getTime() : b.ts.getTime() - a.ts.getTime()
+    )
+  }, [filtered, sort])
+
   const grouped = useMemo(() => {
-    return filtered.reduce<Array<{ header: string; calls: CallRecord[] }>>((acc, call) => {
+    // Trie par nom, le regroupement par jour n'a plus de sens : on rend une
+    // liste plate, et l'en-tete vide n'est pas affiche.
+    if (sort === "name") return [{ header: "", calls: sorted }]
+    return sorted.reduce<Array<{ header: string; calls: CallRecord[] }>>((acc, call) => {
       const header = formatGroupHeader(call.ts)
       const last = acc[acc.length - 1]
       if (!last || last.header !== header) {
@@ -90,7 +120,39 @@ export default function CallsPage() {
       }
       return acc
     }, [])
-  }, [filtered])
+  }, [sorted, sort])
+
+  /**
+   * Appel direct d'un Alanya ID compose au clavier.
+   *
+   * Exactement le meme chemin que depuis la fiche d'un contact — conversation
+   * privee, puis appel sortant — donc un numero qui existe dans la base de
+   * l'application sonne comme un appel ordinaire. S'il n'existe pas, le backend
+   * refuse la creation de la conversation et l'echec est annonce tel quel.
+   */
+  const callComposedNumber = async (publicNumber: string, type: "audio" | "video") => {
+    try {
+      const conversation = await createPrivateChat(publicNumber)
+      const callId = await startOutgoingCall(conversation.id, type, formatAlanyaNumber(publicNumber))
+      setDialerOpen(false)
+      navigate(`/calls/${callId}?type=${type}&returnTo=/calls`)
+    } catch (err) {
+      // On distingue le numero inconnu du reseau injoignable : le premier est une
+      // faute de frappe a corriger, le second n'a rien a voir avec le numero.
+      const inconnu = err instanceof ApiError && [400, 404, 422].includes(err.status)
+      const reseau = err instanceof ApiError && err.status === 0
+      error(
+        "Appel impossible",
+        inconnu
+          ? `Aucun compte ne porte l'Alanya ID ${formatAlanyaNumber(publicNumber)}.`
+          : reseau
+            ? "Serveur injoignable : verifiez votre connexion."
+            : err instanceof Error
+              ? err.message
+              : "Appel impossible pour le moment."
+      )
+    }
+  }
 
   return (
     <>
@@ -98,20 +160,107 @@ export default function CallsPage() {
         <div className="calls-head">
           <div className="calls-title-row">
             <h1 className="calls-title">Appels</h1>
-            <button className="new-call-btn" onClick={() => navigate("/calls/new")}>
+          </div>
+
+          {/* Les deux facons de lancer un appel, l'une sous l'autre : par le
+              repertoire, ou en composant un Alanya ID. */}
+          <div className="calls-launchers">
+            <button className="new-call-btn" onClick={() => navigate("/contacts")}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+              </svg>
+              Appeler contact
+            </button>
+            <button className="dial-btn" onClick={() => setDialerOpen(true)}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="6" cy="6" r="1.9" />
+                <circle cx="12" cy="6" r="1.9" />
+                <circle cx="18" cy="6" r="1.9" />
+                <circle cx="6" cy="12" r="1.9" />
+                <circle cx="12" cy="12" r="1.9" />
+                <circle cx="18" cy="12" r="1.9" />
+                <circle cx="6" cy="18" r="1.9" />
+                <circle cx="12" cy="18" r="1.9" />
+                <circle cx="18" cy="18" r="1.9" />
+              </svg>
+              Composer ID
+            </button>
+          </div>
+
+          <div className="calls-controls">
+            <div className="search-wrap">
               <svg
                 width="14"
                 height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2.5"
+                strokeWidth="2"
                 strokeLinecap="round"
               >
-                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
               </svg>
-              Nouvel appel
-            </button>
+              <input
+                placeholder="Rechercher un contact..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="filter-group">
+              {(["all", "missed", "audio", "video"] as FilterType[]).map((current) => (
+                <button
+                  key={current}
+                  className={`filter-btn ${filter === current ? "on" : ""}`}
+                  onClick={() => setFilter(current)}
+                >
+                  {current === "all" ? (
+                    "Tous"
+                  ) : current === "missed" ? (
+                    <>
+                      Manques{" "}
+                      {missedCount > 0 && (
+                        <span
+                          style={{
+                            background: "#ef444425",
+                            color: "#ef4444",
+                            fontSize: 10,
+                            padding: "1px 5px",
+                            borderRadius: 4,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {missedCount}
+                        </span>
+                      )}
+                    </>
+                  ) : current === "audio" ? (
+                    "Audio"
+                  ) : (
+                    "Video"
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Tri de l'historique, distinct des filtres de type au-dessus. */}
+            <div className="sort-group" role="group" aria-label="Trier l'historique">
+              <span className="sort-label">Trier</span>
+              {(Object.keys(SORT_LABELS) as SortType[]).map((current) => (
+                <button
+                  key={current}
+                  className={`filter-btn ${sort === current ? "on" : ""}`}
+                  onClick={() => setSort(current)}
+                  aria-pressed={sort === current}
+                >
+                  {SORT_LABELS[current]}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="stats-strip">
@@ -189,65 +338,6 @@ export default function CallsPage() {
               </div>
             ))}
           </div>
-
-          <div className="calls-controls">
-            <div className="search-wrap">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
-              <input
-                placeholder="Rechercher un contact..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                autoComplete="off"
-              />
-            </div>
-
-            <div className="filter-group">
-              {(["all", "missed", "audio", "video"] as FilterType[]).map((current) => (
-                <button
-                  key={current}
-                  className={`filter-btn ${filter === current ? "on" : ""}`}
-                  onClick={() => setFilter(current)}
-                >
-                  {current === "all" ? (
-                    "Tous"
-                  ) : current === "missed" ? (
-                    <>
-                      Manques{" "}
-                      {missedCount > 0 && (
-                        <span
-                          style={{
-                            background: "#ef444425",
-                            color: "#ef4444",
-                            fontSize: 10,
-                            padding: "1px 5px",
-                            borderRadius: 4,
-                            fontWeight: 600,
-                          }}
-                        >
-                          {missedCount}
-                        </span>
-                      )}
-                    </>
-                  ) : current === "audio" ? (
-                    "Audio"
-                  ) : (
-                    "Video"
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className="calls-body">
@@ -271,7 +361,8 @@ export default function CallsPage() {
           ) : (
             grouped.map(({ header, calls }) => (
               <div key={header}>
-                <div className="date-header">{header}</div>
+                {/* Vide quand on trie par nom : le regroupement par jour n'a plus de sens. */}
+                {header && <div className="date-header">{header}</div>}
                 {calls.map((call) => {
                   const color = COLORS[call.contactColor]
                   const statusLabel = call.status === "missed" ? "Appel manqué" : call.status === "no_answer" ? "Sans réponse" : call.status === "declined" ? "Appel rejeté" : call.status === "busy" ? "Occupé" : null
@@ -354,6 +445,9 @@ export default function CallsPage() {
           )}
         </div>
       </div>
+      {dialerOpen && (
+        <Dialer onClose={() => setDialerOpen(false)} onCall={(number, type) => void callComposedNumber(number, type)} />
+      )}
     </>
   )
 }
