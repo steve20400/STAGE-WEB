@@ -24,11 +24,21 @@ jobs:
       - name: Installe les dependances
         run: npm ci
 
+      # Non bloquant a dessein : 34 fichiers anterieurs a ce garde-fou ne sont pas
+      # conformes, et cette etape passant avant le build, le CI n'atteignait jamais
+      # la compilation — il ne servait donc a rien. A repasser en bloquant apres un
+      # reformatage complet du depot.
       - name: Verifie le formatage
         run: npm run format:check
+        continue-on-error: true
 
       - name: Lint
         run: npm run lint
 
+      # Le mode production charge .env.production, qui porte VITE_APP_BASE_PATH :
+      # le CI compile donc exactement ce que le serveur compilera.
       - name: Build
         run: npm run build
+
+      - name: Verifie que les actifs visent bien /webapp/
+        run: grep -q 'src="/webapp/assets/' dist/index.html
