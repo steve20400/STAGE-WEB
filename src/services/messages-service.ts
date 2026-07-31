@@ -123,16 +123,20 @@ export function toFrontMessage(
   }
 }
 
-/** GET /api/conversations/{id}/messages — historique (renvoye du plus recent au plus ancien).
- *  Persiste les messages dans IndexedDB pour le cache-first. */
-export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> {
-  const response = await apiRequest<ListMessagesResponse>(
-    `/api/conversations/${chatId}/messages?limit=100`
-  )
-  const myId = getMyUserId()
-  const backendMessages = response.messages ?? []
+/**
+ * Taille du premier lot.
+ *
+ * Etait a 100, ce qui retardait le premier affichage et faisait rendre cent
+ * bulles d'un coup. Les messages arrivent du plus recent au plus ancien : trente
+ * suffisent a remplir plusieurs hauteurs d'ecran, le reste vient au defilement.
+ */
+export const INITIAL_PAGE_SIZE = 30
 
-  // Persiste en IndexedDB pour le cache-first
+/** Taille des pages suivantes, chargees en remontant l'historique. */
+export const OLDER_PAGE_SIZE = 30
+
+/** Enregistre un lot du backend dans IndexedDB, pour le cache-first. */
+function cacheBackendMessages(backendMessages: BackendMessage[]): void {
   void cacheMessages(
     backendMessages.map((m) => ({
       id: m.id,
@@ -148,8 +152,46 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
       media: m.media,
     }))
   )
+}
+
+/** GET /api/conversations/{id}/messages — historique (renvoye du plus recent au plus ancien).
+ *  Persiste les messages dans IndexedDB pour le cache-first. */
+export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> {
+  const response = await apiRequest<ListMessagesResponse>(
+    `/api/conversations/${chatId}/messages?limit=${INITIAL_PAGE_SIZE}`
+  )
+  const myId = getMyUserId()
+  const backendMessages = response.messages ?? []
+
+  cacheBackendMessages(backendMessages)
 
   // Le backend pagine en ordre descendant ; l'UI affiche en ordre chronologique.
+  return backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
+}
+
+/**
+ * Page precedente de l'historique, en remontant.
+ *
+ * Le curseur est l'identifiant du plus ancien message deja affiche, exactement
+ * comme le mobile (`chat_repository.dart`) : le backend accepte donc ce parametre,
+ * et le web n'avait simplement jamais fait de pagination — il demandait un gros
+ * lot unique et n'offrait aucun moyen de remonter plus loin.
+ *
+ * Renvoie les messages en ordre chronologique, et un lot vide quand on a atteint
+ * le debut de la conversation.
+ */
+export async function fetchOlderMessages(
+  chatId: string,
+  cursor: string
+): Promise<ChatMessageMock[]> {
+  const response = await apiRequest<ListMessagesResponse>(
+    `/api/conversations/${chatId}/messages?cursor=${encodeURIComponent(cursor)}&limit=${OLDER_PAGE_SIZE}`
+  )
+  const myId = getMyUserId()
+  const backendMessages = response.messages ?? []
+
+  cacheBackendMessages(backendMessages)
+
   return backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
 }
 
@@ -170,7 +212,7 @@ export async function fetchMessagesCacheFirst(
 
   // Étape 1 : lecture cache instantanée
   try {
-    const cached = await loadCachedMessages(chatId, 100)
+    const cached = await loadCachedMessages(chatId, INITIAL_PAGE_SIZE)
     if (cached.length > 0) {
       onCached(
         cached.map((m) => toFrontMessage(m as unknown as BackendMessage, myId))

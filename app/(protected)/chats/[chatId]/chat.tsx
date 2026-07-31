@@ -19,6 +19,7 @@ import {
   deleteChatMessage,
   fetchMessages,
   fetchMessagesCacheFirst,
+  fetchOlderMessages,
   forwardChatMessage,
   markChatAsRead,
   persistIncomingWsMessage,
@@ -37,6 +38,7 @@ import {
 } from "../../../../src/services/media-service"
 import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
 import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media-thumbnail"
+import { useTranslation } from "../../../../src/i18n"
 import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
 import {
   publishTyping,
@@ -2280,7 +2282,22 @@ export default function ChatRoomPage() {
   const [recordSec, setRecordSec] = useState(0)
 
   const bottomRef = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation()
   const messagesBodyRef = useRef<HTMLDivElement>(null)
+
+  /**
+   * Pagination de l'historique, en remontant.
+   *
+   * `olderExhausted` retient qu'on a atteint le debut de la conversation, pour ne
+   * pas redemander indefiniment une page vide. Il n'est PAS leve par une erreur
+   * reseau : dans ce cas on garde la possibilite de reessayer au prochain
+   * defilement. `loadingOlderRef` protege du declenchement multiple, le
+   * defilement emettant des dizaines d'evenements par seconde.
+   */
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  const [olderExhausted, setOlderExhausted] = useState(false)
+  const [olderError, setOlderError] = useState(false)
+  const loadingOlderRef = useRef(false)
   // Evite que les refresh/previews renvoient l'utilisateur en bas pendant sa lecture.
   const isNearBottomRef = useRef(true)
   const lastMessageIdRef = useRef<string | null>(null)
@@ -2305,29 +2322,35 @@ export default function ChatRoomPage() {
     return () => document.removeEventListener("pointerdown", closeOutside)
   }, [showAttach])
 
+  /**
+   * Fusionne un lot recu avec ce qui est deja affiche, au lieu de remplacer.
+   *
+   * Le remplacement d'origine effacait tout l'historique remonte au defilement :
+   * il suffisait d'un rafraichissement — evenement temps reel, retour de
+   * visibilite, resynchronisation — pour que le fil se rabatte sur sa derniere
+   * page. Les messages optimistes survivent, et l'ordre chronologique est
+   * retabli, un lot ancien arrivant apres un lot recent.
+   */
+  const fusionnerMessages = useCallback((prev: Message[], entrants: Message[]): Message[] => {
+    if (entrants.length === 0) return prev
+    const parId = new Map(prev.map((m) => [m.id, m]))
+    for (const entrant of entrants) {
+      const existant = parId.get(entrant.id)
+      // Un message deja connu est mis a jour (statut, suppression), pas duplique.
+      parId.set(entrant.id, existant ? { ...existant, ...entrant } : entrant)
+    }
+    return [...parId.values()].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  }, [])
+
   const refreshMessages = useCallback(async () => {
     await fetchMessagesCacheFirst(
       chatId,
       // onCached : affichage instantané depuis IndexedDB (~2ms)
-      (cached) => {
-        setMessages((prev) => {
-          const pending = prev.filter(
-            (m) => m.id.startsWith("tmp-") && !cached.some((saved) => saved.id === m.id)
-          )
-          return [...cached, ...pending]
-        })
-      },
+      (cached) => setMessages((prev) => fusionnerMessages(prev, cached)),
       // onFresh : mise à jour silencieuse avec les données réseau
-      (fresh) => {
-        setMessages((prev) => {
-          const pending = prev.filter(
-            (m) => m.id.startsWith("tmp-") && !fresh.some((saved) => saved.id === m.id)
-          )
-          return [...fresh, ...pending]
-        })
-      }
+      (fresh) => setMessages((prev) => fusionnerMessages(prev, fresh))
     )
-  }, [chatId])
+  }, [chatId, fusionnerMessages])
 
   // Evenements d'appel de cette conversation (pastilles dans le fil).
   const refreshCallEvents = useCallback(async () => {
@@ -2349,6 +2372,13 @@ export default function ChatRoomPage() {
     }
 
     let cancelled = false
+
+    // Nouvelle conversation : le fil et sa pagination repartent de zero. Ce vidage
+    // etait implicite tant que les lots remplacaient la liste ; la fusion l'exige
+    // desormais, sinon deux discussions se melangeraient.
+    setMessages([])
+    setOlderExhausted(false)
+    setOlderError(false)
 
     // Charge l'historique initial via GET /api/chats/{id}/messages
     void refreshMessages().catch((err) => {
@@ -2511,10 +2541,68 @@ export default function ChatRoomPage() {
     isNearBottomRef.current = true
   }, [chatId])
 
+  /**
+   * Charge la page precedente et la prepose au fil, en conservant la position de
+   * lecture : sans compensation, inserer du contenu au-dessus ferait sauter la
+   * vue de la hauteur ajoutee, et l'utilisateur perdrait le message qu'il lisait.
+   */
+  const loadOlderMessages = useCallback(async () => {
+    const body = messagesBodyRef.current
+    if (!body || loadingOlderRef.current || olderExhausted) return
+
+    // Le curseur est l'identifiant du plus ancien message REEL : un message
+    // optimiste (tmp-) n'existe pas encore pour le serveur.
+    const oldest = messages.find((m) => !m.id.startsWith("tmp-"))
+    if (!oldest) return
+
+    loadingOlderRef.current = true
+    setLoadingOlder(true)
+    setOlderError(false)
+    const hauteurAvant = body.scrollHeight
+    const positionAvant = body.scrollTop
+
+    try {
+      const older = await fetchOlderMessages(chatId, oldest.id)
+      if (older.length === 0) {
+        setOlderExhausted(true)
+        return
+      }
+      setMessages((prev) => {
+        // Dedoublonnage par identifiant : un message deja present ne doit pas
+        // reapparaitre, le backend pouvant renvoyer une page qui chevauche.
+        const connus = new Set(prev.map((m) => m.id))
+        const nouveaux = older.filter((m) => !connus.has(m.id))
+        if (nouveaux.length === 0) {
+          setOlderExhausted(true)
+          return prev
+        }
+        return [...nouveaux, ...prev]
+      })
+      // Apres le rendu, on rend a la vue la hauteur qu'elle a gagnee.
+      requestAnimationFrame(() => {
+        const apres = messagesBodyRef.current
+        if (apres) apres.scrollTop = positionAvant + (apres.scrollHeight - hauteurAvant)
+      })
+    } catch {
+      // Reseau en defaut : on ne declare pas l'historique epuise, et on affiche
+      // de quoi reessayer.
+      setOlderError(true)
+    } finally {
+      loadingOlderRef.current = false
+      setLoadingOlder(false)
+    }
+  }, [chatId, messages, olderExhausted])
+
+  /** Distance au haut du fil a partir de laquelle on precharge la page suivante. */
+  const OLDER_LOAD_THRESHOLD_PX = 240
+
   const handleMessagesScroll = () => {
     const body = messagesBodyRef.current
     if (!body) return
     isNearBottomRef.current = body.scrollHeight - body.scrollTop - body.clientHeight < 100
+    // Meme seuil que le mobile (chat_screen.dart) : le chargement part avant que
+    // l'utilisateur ne touche le haut, pour qu'il ne voie pas d'attente.
+    if (body.scrollTop <= OLDER_LOAD_THRESHOLD_PX) void loadOlderMessages()
   }
 
   // Reevalue la presence toutes les 30 s (pour faire expirer le "En ligne").
@@ -2987,6 +3075,23 @@ export default function ChatRoomPage() {
       </div>
 
       <div ref={messagesBodyRef} className="room-body" onScroll={handleMessagesScroll}>
+        {/* Etat du chargement de l'historique ancien, en haut du fil. Rien ne
+            s'affiche quand tout est charge : un « debut de la conversation »
+            permanent n'apporte rien. */}
+        {loadingOlder && (
+          <div className="older-state" aria-live="polite">
+            <span className="older-spinner" aria-hidden />
+            {t("loading")}
+          </div>
+        )}
+        {olderError && !loadingOlder && (
+          <div className="older-state">
+            <button className="older-retry" onClick={() => void loadOlderMessages()}>
+              {t("retry")}
+            </button>
+          </div>
+        )}
+
         {grouped.map(({ date, items }) => (
           <div key={date}>
             <div className="date-sep">
