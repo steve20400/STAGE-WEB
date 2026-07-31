@@ -156,7 +156,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       >
         <div className="ncm-card" role="dialog" aria-label="Nouveau chat">
           <div className="ncm-head">
-            <div className="ncm-title-row">
+            <div className="ncm-title-row page-title-row">
               <h2 className="ncm-title">
                 {mode === "chat" ? "Nouveau message" : "Nouveau groupe"}
               </h2>

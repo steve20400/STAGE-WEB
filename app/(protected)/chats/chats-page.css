@@ -20,10 +20,8 @@
   padding: 28px 28px 0;
   flex-shrink: 0;
 }
+/* Mise en page heritee de .page-title-row (src/styles/globals.css). */
 .ch-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 20px;
 }
 .ch-title {

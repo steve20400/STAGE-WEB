@@ -81,7 +81,7 @@ export default function NewCallPage() {
   return (
     <div className="calls-root" style={{ padding: "20px 0" }}>
       <div className="calls-head" style={{ marginBottom: 14 }}>
-        <div className="calls-title-row">
+        <div className="calls-title-row page-title-row">
           <h1 className="calls-title">Nouvel appel</h1>
         </div>
 

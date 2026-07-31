@@ -395,6 +395,42 @@ body {
   color: var(--bubble-me-text);
 }
 
+/* ── Barre de titre d'une page ────────────────────────────────────────────
+   Un titre a gauche, une action a droite. Les pages declaraient chacune leur
+   `space-between` sans ecart minimal ni retour a la ligne : des que la fenetre
+   se resserrait, les deux se touchaient — « Discussions » collait « Nouveau
+   chat ». La regle vit ici, une seule fois, et chaque en-tete de page en herite. */
+.page-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+/* Le titre cede la place avant l'action et se tronque, au lieu de la pousser. */
+.page-title-row > :first-child {
+  min-width: 0;
+}
+
+/* Cible tactile confortable, y compris sur les plus petits ecrans. */
+.page-title-row button {
+  min-height: 44px;
+}
+
+/* Sous cette largeur, l'action passe a la ligne et prend toute la place : un
+   bouton coince a cote d'un titre de 26 px ne laisse plus rien de lisible ni de
+   cliquable. */
+@media (max-width: 380px) {
+  .page-title-row > :not(:first-child) {
+    flex: 1 1 100%;
+  }
+  .page-title-row button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .skeleton {
   background: var(--skeleton-base);
   position: relative;

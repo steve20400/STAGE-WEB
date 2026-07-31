@@ -104,7 +104,7 @@ export default function ContactsPage() {
   return (
     <div className="calls-root" style={{ padding: "20px 0" }}>
       <div className="calls-head" style={{ marginBottom: 14 }}>
-        <div className="calls-title-row">
+        <div className="calls-title-row page-title-row">
           <h1 className="calls-title">Contacts</h1>
           <button className="new-call-btn" onClick={() => setShowAdd((v) => !v)}>
             {showAdd ? "Fermer" : "+ Nouveau contact"}

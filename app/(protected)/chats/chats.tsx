@@ -178,7 +178,7 @@ export default function ChatsPage() {
           </svg>
         </div>
 
-        <div className="ch-title-row">
+        <div className="ch-title-row page-title-row">
           <h1 className="ch-title">Discussions</h1>
           <button className="new-chat-btn" onClick={() => navigate("/chats/new")}>
             <svg

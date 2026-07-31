@@ -158,7 +158,7 @@ export default function CallsPage() {
     <>
       <div className="calls-root">
         <div className="calls-head">
-          <div className="calls-title-row">
+          <div className="calls-title-row page-title-row">
             <h1 className="calls-title">Appels</h1>
           </div>
 
