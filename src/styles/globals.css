@@ -413,21 +413,21 @@ body {
   min-width: 0;
 }
 
-/* Cible tactile confortable, y compris sur les plus petits ecrans. */
-.page-title-row button {
-  min-height: 44px;
-}
-
-/* Sous cette largeur, l'action passe a la ligne et prend toute la place : un
-   bouton coince a cote d'un titre de 26 px ne laisse plus rien de lisible ni de
-   cliquable. */
-@media (max-width: 380px) {
+/* Seuil volontairement bas : les Android courants commencent a 360 px de large,
+   et a cette largeur le titre et son action tiennent encore cote a cote grace a
+   l'ecart minimal ci-dessus. Ce n'est qu'en dessous — ecrans plus etroits que le
+   standard, ecran de couverture pliable — qu'ils ne tiennent plus. L'action passe
+   alors seule a la ligne, en pleine largeur, avec une cible tactile confortable.
+   Au-dela de ce seuil rien ne bouge : un bouton etire sur grand ecran serait
+   disgracieux, et les positions d'origine sont conservees. */
+@media (max-width: 340px) {
   .page-title-row > :not(:first-child) {
     flex: 1 1 100%;
   }
   .page-title-row button {
     width: 100%;
     justify-content: center;
+    min-height: 44px;
   }
 }
 
