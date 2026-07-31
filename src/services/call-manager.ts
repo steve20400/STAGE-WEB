@@ -297,48 +297,48 @@ function initialState(): CallManagerState {
 let state: CallManagerState = initialState()
 const stateListeners = new Set<() => void>()
 
-let callerRingtoneAudio: HTMLAudioElement | null = null
-let calleeRingtoneAudio: HTMLAudioElement | null = null
+let outgoingRingtoneAudio: HTMLAudioElement | null = null
+let incomingRingtoneAudio: HTMLAudioElement | null = null
 
-function startPlayingCallerRingtone() {
+function startOutgoingRingtone() {
   if (typeof window === "undefined") return
   const callsEnabled = localStorage.getItem("notif_calls") !== "false"
   if (!callsEnabled) return
 
-  if (!callerRingtoneAudio) {
-    callerRingtoneAudio = new Audio(publicAsset("sounds/incoming_ring.mp3"))
-    callerRingtoneAudio.loop = true
+  if (!outgoingRingtoneAudio) {
+    outgoingRingtoneAudio = new Audio(publicAsset("sounds/assets_sounds_outgoing_ring.mp3"))
+    outgoingRingtoneAudio.loop = true
   }
-  callerRingtoneAudio.play().catch((err) => {
-    console.warn("[CallManager] Failed to play caller ringtone:", err)
+  outgoingRingtoneAudio.play().catch((err) => {
+    console.warn("[CallManager] tonalite d'appel sortant injouable :", err)
   })
 }
 
-function stopPlayingCallerRingtone() {
-  if (callerRingtoneAudio) {
-    callerRingtoneAudio.pause()
-    callerRingtoneAudio.currentTime = 0
+function stopOutgoingRingtone() {
+  if (outgoingRingtoneAudio) {
+    outgoingRingtoneAudio.pause()
+    outgoingRingtoneAudio.currentTime = 0
   }
 }
 
-function startPlayingCalleeRingtone() {
+function startIncomingRingtone() {
   if (typeof window === "undefined") return
   const callsEnabled = localStorage.getItem("notif_calls") !== "false"
   if (!callsEnabled) return
 
-  if (!calleeRingtoneAudio) {
-    calleeRingtoneAudio = new Audio(publicAsset("sounds/assets_sounds_outgoing_ring.mp3"))
-    calleeRingtoneAudio.loop = true
+  if (!incomingRingtoneAudio) {
+    incomingRingtoneAudio = new Audio(publicAsset("sounds/incoming_ring.mp3"))
+    incomingRingtoneAudio.loop = true
   }
-  calleeRingtoneAudio.play().catch((err) => {
-    console.warn("[CallManager] Failed to play callee ringtone:", err)
+  incomingRingtoneAudio.play().catch((err) => {
+    console.warn("[CallManager] sonnerie d'appel entrant injouable :", err)
   })
 }
 
-function stopPlayingCalleeRingtone() {
-  if (calleeRingtoneAudio) {
-    calleeRingtoneAudio.pause()
-    calleeRingtoneAudio.currentTime = 0
+function stopIncomingRingtone() {
+  if (incomingRingtoneAudio) {
+    incomingRingtoneAudio.pause()
+    incomingRingtoneAudio.currentTime = 0
   }
 }
 
@@ -348,15 +348,15 @@ function setState(patch: Partial<CallManagerState>) {
   state = { ...state, ...patch }
   
   if (state.incoming && !prevIncoming) {
-    startPlayingCalleeRingtone()
+    startIncomingRingtone()
   } else if (!state.incoming && prevIncoming) {
-    stopPlayingCalleeRingtone()
+    stopIncomingRingtone()
   }
 
   if (state.role === "outgoing" && prevRole !== "outgoing") {
-    startPlayingCallerRingtone()
+    startOutgoingRingtone()
   } else if (state.role !== "outgoing" && prevRole === "outgoing") {
-    stopPlayingCallerRingtone()
+    stopOutgoingRingtone()
   }
 
   for (const listener of stateListeners) listener()
@@ -505,8 +505,8 @@ function clearCall(markEnded: boolean) {
     ringTimeoutId = null
   }
   stopMesh()
-  stopPlayingCallerRingtone()
-  stopPlayingCalleeRingtone()
+  stopOutgoingRingtone()
+  stopIncomingRingtone()
   const ended = markEnded && (state.activeCallId !== null || state.role !== null)
   state = {
     ...initialState(),
