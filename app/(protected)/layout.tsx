@@ -1,4 +1,4 @@
-﻿import { useState } from "react"
+﻿import { useCallback, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../src/components/auth-provider"
 import { ThemeToggle } from "../../src/components/theme-toggle"
@@ -8,6 +8,7 @@ import { useCallState } from "../../src/hooks/use-call"
 import { acceptIncomingCall, dismissIncomingCallLocally, rejectIncomingCall } from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
 import { avatarDisplaySrc } from "../../src/lib/avatar"
+import { useDrawerSwipe } from "../../src/hooks/use-drawer-swipe"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./layout.css"
 
@@ -343,6 +344,24 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       return next
     })
   }
+
+  // Ouverture du tiroir au glissement, sauf dans une discussion : le fil de
+  // messages capture deja le glissement gauche → droite pour repondre a un
+  // message recu, et les deux gestes se disputeraient le meme mouvement. La
+  // liste des discussions et l'ecran de nouvelle discussion, eux, n'ont pas ce
+  // geste : le tiroir y reste accessible au doigt.
+  const location = useLocation()
+  const chatSegment = /^\/chats\/([^/]+)/.exec(location.pathname)?.[1]
+  const inConversation = Boolean(chatSegment) && chatSegment !== "new"
+
+  const openDrawer = useCallback(() => setMobileOpen(true), [])
+  const closeDrawer = useCallback(() => setMobileOpen(false), [])
+  useDrawerSwipe({
+    open: mobileOpen,
+    canOpen: !inConversation,
+    onOpen: openDrawer,
+    onClose: closeDrawer,
+  })
 
   return (
     <div className={`layout-root ${collapsed ? "nav-collapsed" : ""}`}>
