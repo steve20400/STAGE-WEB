@@ -2,7 +2,13 @@ import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
 import { useHasLiveVideo } from "../hooks/use-remote-video"
-import { hangUp, restoreActiveCall, toggleMicrophone } from "../services/call-manager"
+import {
+  hangUp,
+  restoreActiveCall,
+  setCallDisplayMode,
+  toggleMicrophone,
+  type CallDisplayMode,
+} from "../services/call-manager"
 import { toInitials } from "../data/session-user"
 import { avatarDisplaySrc } from "../lib/avatar"
 
@@ -24,6 +30,7 @@ export function ActiveCallFloating() {
   const navigate = useNavigate()
 
   const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [menuOuvert, setMenuOuvert] = useState(false)
   const drag = useRef({ x: 0, y: 0, ox: 0, oy: 0, on: false })
 
   const remoteEntries = Object.entries(call.remoteStreams)
@@ -31,7 +38,10 @@ export function ActiveCallFloating() {
   // Hook appele avant tout retour anticipe : l'ordre des hooks doit rester stable.
   const remoteHasVideo = useHasLiveVideo(remote)
 
-  if (!call.activeCallId || call.displayMode !== "compact") return null
+  // La fenetre flottante sert les deux tailles reduites ; « full » est rendu par
+  // l'ecran d'appel entier.
+  if (!call.activeCallId || call.displayMode === "full") return null
+  const reduite = call.displayMode === "small"
 
   // Video affichee seulement si une image arrive vraiment. Sinon (audio seul,
   // piste video pas encore recue, camera du correspondant coupee) on montre sa
@@ -48,7 +58,7 @@ export function ActiveCallFloating() {
 
   return (
     <div
-      className="active-call-floating"
+      className={`active-call-floating ${reduite ? "taille-petite" : "taille-moyenne"}`}
       style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
       role="dialog"
       aria-label={`Appel en cours avec ${peerName}`}
@@ -108,6 +118,33 @@ export function ActiveCallFloating() {
         )}
       </div>
 
+      {menuOuvert && (
+        <div className="active-call-menu" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="acm-section">Taille de la fenetre</div>
+          {(
+            [
+              ["small", "Petit ecran"],
+              ["medium", "Ecran moyen"],
+              ["full", "Grand ecran"],
+            ] as Array<[CallDisplayMode, string]>
+          ).map(([mode, libelle]) => (
+            <button
+              key={mode}
+              className={call.displayMode === mode ? "acm-item on" : "acm-item"}
+              aria-pressed={call.displayMode === mode}
+              onClick={() => {
+                setMenuOuvert(false)
+                // Le grand ecran est un ecran a part entiere : il faut y naviguer.
+                if (mode === "full") restore()
+                else setCallDisplayMode(mode)
+              }}
+            >
+              {libelle}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Commandes toujours visibles : elles n'apparaissaient qu'apres un clic
           sur la fenetre, ce qui les rendait introuvables. */}
       <div className="active-call-controls" onPointerDown={(e) => e.stopPropagation()}>
@@ -123,6 +160,17 @@ export function ActiveCallFloating() {
         </button>
         <button className="end" onClick={() => void hangUp()} title="Raccrocher">
           Raccrocher
+        </button>
+        {/* Quatrieme bouton, prevu pour accueillir d'autres entrees : inviter des
+            participants et transferer l'appel viendront s'y ajouter. */}
+        <button
+          className="more"
+          onClick={() => setMenuOuvert((ouvert) => !ouvert)}
+          aria-expanded={menuOuvert}
+          aria-label="Autres actions"
+          title="Autres actions"
+        >
+          ⋮
         </button>
       </div>
     </div>

@@ -47,6 +47,9 @@ export interface IncomingCallInfo {
 export type CallRole = "outgoing" | "ongoing" | null
 export type CallProgress = "ringtone" | "ringing" | "ongoing" | null
 
+/** Les trois tailles de fenetre d'appel, commutables depuis chacune d'elles. */
+export type CallDisplayMode = "small" | "medium" | "full"
+
 export interface CallManagerState {
   incoming: IncomingCallInfo | null
   activeCallId: string | null
@@ -70,7 +73,12 @@ export interface CallManagerState {
   /** Rempli quand l'appel se termine (par nous ou a distance). */
   endedAt: number | null
   error: string | null
-  displayMode: "full" | "compact"
+  /**
+   * Taille de la fenetre d'appel. « small » est l'ancien « compact » : une
+   * vignette deplacable. « medium » est une fenetre flottante plus large, et
+   * « full » l'ecran d'appel entier.
+   */
+  displayMode: CallDisplayMode
 }
 
 interface WebrtcSignal {
@@ -352,7 +360,7 @@ function setState(patch: Partial<CallManagerState>) {
   const prevIncoming = state.incoming
   const prevRole = state.role
   state = { ...state, ...patch }
-  
+
   if (state.incoming && !prevIncoming) {
     startIncomingRingtone()
   } else if (!state.incoming && prevIncoming) {
@@ -946,16 +954,38 @@ export async function switchCamera(): Promise<boolean> {
   let replacement: MediaStream | null = null
   // Android Chrome reconnaît généralement facingMode même lorsque les labels/deviceId
   // sont masqués. On l'essaie d'abord, puis on retombe sur les appareils physiques.
-  try { replacement = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: targetFacing } }, audio: false }) } catch { /* fallback */ }
+  try {
+    replacement = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: targetFacing } },
+      audio: false,
+    })
+  } catch {
+    /* fallback */
+  }
   const devices = await navigator.mediaDevices.enumerateDevices()
   const cameras = devices.filter((device) => device.kind === "videoinput")
   const candidate = cameras.find((device) => device.deviceId !== current?.getSettings().deviceId)
-  if ((!replacement || replacement.getVideoTracks()[0]?.getSettings().deviceId === current?.getSettings().deviceId) && candidate) {
+  if (
+    (!replacement ||
+      replacement.getVideoTracks()[0]?.getSettings().deviceId ===
+        current?.getSettings().deviceId) &&
+    candidate
+  ) {
     replacement?.getTracks().forEach((track) => track.stop())
-    try { replacement = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: candidate.deviceId } }, audio: false }) } catch { return false }
+    try {
+      replacement = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: candidate.deviceId } },
+        audio: false,
+      })
+    } catch {
+      return false
+    }
   }
   const nextTrack = replacement?.getVideoTracks()[0]
-  if (!nextTrack || nextTrack.getSettings().deviceId === current?.getSettings().deviceId) { replacement?.getTracks().forEach((track) => track.stop()); return false }
+  if (!nextTrack || nextTrack.getSettings().deviceId === current?.getSettings().deviceId) {
+    replacement?.getTracks().forEach((track) => track.stop())
+    return false
+  }
   current?.stop()
   if (current) localStream.removeTrack(current)
   localStream.addTrack(nextTrack)
@@ -976,8 +1006,17 @@ export function toggleCamera(): boolean {
 
 /** Efface le marqueur "appel termine" (apres l'ecran de fin). */
 /** Affichage persistant pendant navigation chat/application. Ne touche jamais aux flux WebRTC. */
-export function minimizeActiveCall(): void { if (state.activeCallId) setState({ displayMode: "compact" }) }
-export function restoreActiveCall(): void { if (state.activeCallId) setState({ displayMode: "full" }) }
+/** Change la taille de la fenetre d'appel, depuis n'importe laquelle des trois. */
+export function setCallDisplayMode(mode: CallDisplayMode): void {
+  if (state.activeCallId) setState({ displayMode: mode })
+}
+
+export function minimizeActiveCall(): void {
+  setCallDisplayMode("small")
+}
+export function restoreActiveCall(): void {
+  setCallDisplayMode("full")
+}
 
 export function acknowledgeCallEnded() {
   if (state.endedAt !== null || state.error !== null) {

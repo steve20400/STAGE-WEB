@@ -487,6 +487,9 @@
   position: fixed;
   right: 20px;
   bottom: 20px;
+  /* Deux tailles reduites, commutables par le menu trois points. La petite reste
+     une vignette qu'on garde a l'oeil ; la moyenne laisse la place a une grille de
+     participants sans occuper tout l'ecran. */
   width: min(300px, 82vw);
   height: 250px;
   z-index: 9000;
@@ -531,7 +534,9 @@
   background:
     linear-gradient(var(--motif-overlay), var(--motif-overlay)),
     url("/motif-bg.png") repeat;
-  background-size: auto, 180px auto;
+  background-size:
+    auto,
+    180px auto;
 }
 .active-call-audio b {
   font-family: "Bricolage Grotesque", sans-serif;
@@ -607,3 +612,63 @@
    Le PIP local (.active-call-local-pip) a ete retire : il se superposait au
    flux du correspondant et apparaissait comme un rectangle noir. L'apercu
    local reste disponible sur l'ecran d'appel plein format. */
+
+/* Taille moyenne : environ le double de surface, bornee au viewport. */
+.active-call-floating.taille-moyenne {
+  width: min(520px, 92vw);
+  height: min(420px, 62vh);
+}
+
+/* Menu secondaire du bouton trois points. Il s'ouvre vers le haut : la fenetre
+   est ancree en bas a droite, un menu vers le bas sortirait de l'ecran. */
+.active-call-menu {
+  position: absolute;
+  right: 8px;
+  bottom: 52px;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 12px 30px #0007;
+  z-index: 2;
+  cursor: default;
+}
+
+.active-call-menu .acm-section {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+  padding: 6px 10px 4px;
+}
+
+.active-call-menu .acm-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.active-call-menu .acm-item:hover {
+  background: var(--bg-surface);
+}
+.active-call-menu .acm-item.on {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Le quatrieme bouton reste discret : c'est une porte vers d'autres actions, pas
+   une action en soi. */
+.active-call-controls .more {
+  font-size: 16px;
+  line-height: 1;
+  padding-inline: 10px;
+}
