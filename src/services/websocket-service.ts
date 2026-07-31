@@ -1,6 +1,7 @@
 import { WS_URL } from "../config/runtime"
 import { loadSessionToken } from "../data/session-auth"
 import { tryRefreshTokens } from "../lib/api-client"
+import { publicAsset } from "../lib/asset-url"
 
 /**
  * Client WebSocket pour le serveur temps reel d'Alanya (ws-server.mjs) :
@@ -282,7 +283,7 @@ function getMyUserIdFromToken(): string | null {
       if (myId && msg.senderId !== myId) {
         const soundsEnabled = localStorage.getItem("notif_sounds") !== "false"
         if (soundsEnabled) {
-          const audio = new Audio("/sounds/message.mp3")
+          const audio = new Audio(publicAsset("sounds/message.mp3"))
           audio.play().catch((err) => {
             console.warn("[ws] Failed to play message sound:", err)
           })

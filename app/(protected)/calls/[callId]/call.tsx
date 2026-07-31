@@ -60,6 +60,9 @@ export default function CallRoomPage() {
 
   const [elapsed, setElapsed] = useState(0)
   const [speakerOn, setSpeakerOn] = useState(true)
+  // Lecture refusee par le navigateur : sans cet etat, l'appel est muet et
+  // l'utilisateur n'a aucune explication ni aucun moyen de reessayer.
+  const [audioBlocked, setAudioBlocked] = useState(false)
   const [controlsVisible, setControlsVisible] = useState(true)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
@@ -127,6 +130,22 @@ export default function CallRoomPage() {
     }
   }, [speakerOn, remoteStreamEntries])
 
+  /**
+   * Deblocage manuel du son. Certains navigateurs mobiles refusent la lecture
+   * malgre le decroche et n'acceptent qu'un geste dedie sur un element visible.
+   */
+  const unblockAudio = useCallback(() => {
+    for (const audio of remoteAudioRefs.current.values()) {
+      audio.muted = false
+      audio.volume = 1
+      void audio
+        .play()
+        .then(() => setAudioBlocked(false))
+        .catch(() => undefined)
+    }
+    setSpeakerOn(true)
+  }, [])
+
   const resetHideTimer = useCallback(() => {
     setControlsVisible(true)
     if (showControlsTimerRef.current !== null) {
@@ -179,9 +198,18 @@ export default function CallRoomPage() {
               if (el) {
                 if (el.srcObject !== stream) {
                   el.srcObject = stream
+                  // Un element neuf sort deja a plein volume, mais un navigateur
+                  // mobile peut recycler l'element : on ne laisse pas le niveau
+                  // de sortie au hasard.
+                  el.volume = 1
                   // autoPlay seul peut etre refuse par le navigateur : on force
                   // la lecture, le clic d'appel/decroche fait office de geste.
-                  void el.play().catch(() => undefined)
+                  // L'echec est retenu, pas avale : c'est la seule facon de
+                  // proposer un deblocage au lieu d'un appel muet inexplique.
+                  void el
+                    .play()
+                    .then(() => setAudioBlocked(false))
+                    .catch(() => setAudioBlocked(true))
                 }
                 el.muted = !speakerOn
                 remoteAudioRefs.current.set(peerId, el)
@@ -262,6 +290,12 @@ export default function CallRoomPage() {
               {call.isGroup ? " (groupe)" : ""}
             </div>
           </div>
+
+          {audioBlocked && (
+            <button className="audio-unblock" onClick={unblockAudio}>
+              Le navigateur a bloque le son — appuyez pour l'activer
+            </button>
+          )}
 
           {/* Avatar + nom + statut : masques quand la video distante s'affiche
               (sinon le nom en gros recouvre l'image de l'interlocuteur). */}

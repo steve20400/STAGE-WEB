@@ -1,6 +1,7 @@
 import { getMyUserId, loadSessionUser } from "../data/session-user"
 import { loadSessionToken } from "../data/session-auth"
 import { ApiError } from "../lib/api-client"
+import { publicAsset } from "../lib/asset-url"
 import {
   acceptCallRest,
   endCallRest,
@@ -305,7 +306,7 @@ function startPlayingCallerRingtone() {
   if (!callsEnabled) return
 
   if (!callerRingtoneAudio) {
-    callerRingtoneAudio = new Audio("/sounds/incoming_ring.mp3")
+    callerRingtoneAudio = new Audio(publicAsset("sounds/incoming_ring.mp3"))
     callerRingtoneAudio.loop = true
   }
   callerRingtoneAudio.play().catch((err) => {
@@ -326,7 +327,7 @@ function startPlayingCalleeRingtone() {
   if (!callsEnabled) return
 
   if (!calleeRingtoneAudio) {
-    calleeRingtoneAudio = new Audio("/sounds/assets_sounds_outgoing_ring.mp3")
+    calleeRingtoneAudio = new Audio(publicAsset("sounds/assets_sounds_outgoing_ring.mp3"))
     calleeRingtoneAudio.loop = true
   }
   calleeRingtoneAudio.play().catch((err) => {

@@ -475,3 +475,27 @@
 .call-room-root .confirm-end:hover {
   background: #dc2626;
 }
+
+/* Bandeau de deblocage du son. Il n'apparait que si le navigateur a refuse la
+   lecture du flux distant : sans lui, l'appel reste muet sans explication. */
+.call-room-root .audio-unblock {
+  align-self: center;
+  max-width: min(92%, 420px);
+  margin: 10px 0 0;
+  padding: 10px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+}
+
+.call-room-root .audio-unblock:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
