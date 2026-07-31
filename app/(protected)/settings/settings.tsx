@@ -8,6 +8,14 @@ import { isTurnConfigured } from "../../../src/services/calls-service"
 import TurnTester from "../../../src/components/turn-tester"
 import RealtimeStatus from "../../../src/components/realtime-status"
 import {
+  LAST_SEEN_LABELS,
+  PRIVACY_DEFAULTS,
+  fetchPrivacy,
+  savePrivacy,
+  type LastSeenVisibility,
+  type PrivacySettings,
+} from "../../../src/services/privacy-service"
+import {
   RINGTONES,
   RINGTONE_LABELS,
   previewRingtone,
@@ -878,11 +886,46 @@ export default function SettingsPage() {
     localStorage.setItem("notif_preview", String(val))
   }
 
-  // Confidentialite
-  const [readReceipts, setReadReceipts] = useState(true)
-  const [onlineStatus, setOnlineStatus] = useState(true)
-  const [lastSeen, setLastSeen] = useState(true)
-  const [profileVisible, setProfileVisible] = useState(true)
+  // Confidentialite : les valeurs viennent du compte, pas d'un etat local.
+  const [privacy, setPrivacy] = useState<PrivacySettings>(PRIVACY_DEFAULTS)
+  const [privacyLoaded, setPrivacyLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchPrivacy()
+      .then((settings) => {
+        if (!cancelled) setPrivacy(settings)
+      })
+      .catch(() => {
+        // Serveur injoignable : on affiche les valeurs par defaut du backend
+        // plutot qu'un ecran vide, mais on le signale a la premiere modification.
+      })
+      .finally(() => {
+        if (!cancelled) setPrivacyLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  /**
+   * Enregistre un reglage et revient en arriere si le serveur refuse : une
+   * bascule qui reste dans sa nouvelle position apres un echec ferait croire que
+   * le reglage est pris en compte.
+   */
+  const updatePrivacy = async (patch: Partial<PrivacySettings>) => {
+    const precedent = privacy
+    setPrivacy((current) => ({ ...current, ...patch }))
+    try {
+      await savePrivacy(patch)
+    } catch (err) {
+      setPrivacy(precedent)
+      toastError(
+        "Reglage non enregistre",
+        err instanceof Error ? err.message : "Le serveur n'a pas accepte la modification."
+      )
+    }
+  }
 
   // Apparence
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium")
@@ -1174,6 +1217,25 @@ export default function SettingsPage() {
         .s-card {
           background: var(--bg-surface); border: 1px solid var(--border-subtle);
           border-radius: 14px; padding: 22px 24px; margin-bottom: 16px;
+        }
+
+        /* Reglage a plusieurs choix : un intitule, sa description, ses options. */
+        .privacy-choice {
+          padding: 14px 0 4px;
+          border-top: 1px solid var(--border-subtle);
+          margin-top: 6px;
+        }
+        .privacy-choice-label {
+          font-size: 13px; font-weight: 600; color: var(--text-primary);
+        }
+        .privacy-choice-desc {
+          font-size: 11.5px; color: var(--text-faint); line-height: 1.5; margin-top: 3px;
+        }
+        .privacy-choice-opts {
+          display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+        }
+        .privacy-choice-opts button:disabled {
+          opacity: 0.55; cursor: progress;
         }
 
         /* Choix des sonneries : un evenement par ligne, son menu et son ecoute. */
@@ -1942,43 +2004,39 @@ export default function SettingsPage() {
               <div className="s-card">
                 <div className="s-card-title">Visibilite</div>
                 <Toggle
-                  value={readReceipts}
-                  onChange={(v) => {
-                    setReadReceipts(v)
-                    v
-                      ? info("Confirmations de lecture activees")
-                      : info("Confirmations de lecture desactivees")
-                  }}
+                  value={privacy.readReceipts}
+                  onChange={(v) => void updatePrivacy({ readReceipts: v })}
                   label="Confirmations de lecture"
-                  description="Envoyer la confirmation de lecture quand vous lisez un message."
+                  description="Envoyer la confirmation de lecture quand vous lisez un message. Desactive, vous ne verrez pas non plus celles des autres."
                 />
-                <Toggle
-                  value={onlineStatus}
-                  onChange={(v) => {
-                    setOnlineStatus(v)
-                    v ? info("Statut en ligne visible") : info("Statut en ligne masque")
-                  }}
-                  label="Statut en ligne"
-                  description="Afficher 'En ligne' quand vous utilisez Alanya."
-                />
-                <Toggle
-                  value={lastSeen}
-                  onChange={(v) => {
-                    setLastSeen(v)
-                    v ? info("Derniere connexion visible") : info("Derniere connexion masquee")
-                  }}
-                  label="Derniere connexion"
-                  description="Afficher quand vous avez ete vu pour la derniere fois."
-                />
-                <Toggle
-                  value={profileVisible}
-                  onChange={(v) => {
-                    setProfileVisible(v)
-                    v ? info("Photo de profil visible") : info("Photo de profil masquee")
-                  }}
-                  label="Photo de profil"
-                  description="Rendre votre avatar visible par vos contacts."
-                />
+
+                <div className="privacy-choice">
+                  <div className="privacy-choice-head">
+                    <div className="privacy-choice-label">Derniere connexion et statut en ligne</div>
+                    <div className="privacy-choice-desc">
+                      Qui peut voir quand vous etes en ligne et quand vous avez ete vu pour la
+                      derniere fois.
+                    </div>
+                  </div>
+                  <div className="privacy-choice-opts" role="group" aria-label="Visibilite de la derniere connexion">
+                    {([2, 1, 0] as LastSeenVisibility[]).map((niveau) => (
+                      <button
+                        key={niveau}
+                        className={`filter-btn ${privacy.lastSeenVisibility === niveau ? "on" : ""}`}
+                        aria-pressed={privacy.lastSeenVisibility === niveau}
+                        disabled={!privacyLoaded}
+                        onClick={() => void updatePrivacy({ lastSeenVisibility: niveau })}
+                      >
+                        {LAST_SEEN_LABELS[niveau]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="s-hint">
+                  Ces deux reglages sont enregistres sur votre compte et s'appliquent aussi a
+                  l'application mobile.
+                </div>
               </div>
             </>
           )}
