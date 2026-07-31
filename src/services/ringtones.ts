@@ -1,4 +1,5 @@
 import { publicAsset } from "../lib/asset-url"
+import { resolveMediaUrl, uploadMedia } from "./media-service"
 
 /**
  * Les trois moments sonores de l'application, nommes par le sens de l'evenement
@@ -56,8 +57,93 @@ const STORAGE_KEYS: Record<RingtoneEvent, string> = {
   message: "alanya-ringtone-message",
 }
 
+/* ----------------- Sonneries importees par l'utilisateur ----------------- */
+
+/**
+ * Une sonnerie importee est designee par l'URL relative du media televerse
+ * (`/api/media/{id}`), la ou une sonnerie fournie est designee par son nom de
+ * fichier. Les deux espaces de noms ne se croisent pas — un nom de fichier ne
+ * commence jamais par une barre oblique — ce qui evite un champ « type » a
+ * trainer partout.
+ *
+ * Le fichier vit cote serveur, donc il reste disponible depuis un autre
+ * navigateur ; seule la liste de ce qui a ete importe est locale, faute d'un
+ * champ de profil pour la porter.
+ */
+const CUSTOM_STORAGE_KEY = "alanya-ringtones-custom-v1"
+
+/** Taille maximale d'une sonnerie importee. Les sonneries fournies font 15 Ko a 800 Ko. */
+export const MAX_CUSTOM_RINGTONE_BYTES = 5 * 1024 * 1024
+
+export interface CustomRingtone {
+  /** URL relative du media televerse, qui sert aussi d'identifiant. */
+  url: string
+  label: string
+}
+
+export function customRingtones(): CustomRingtone[] {
+  try {
+    const brut = localStorage.getItem(CUSTOM_STORAGE_KEY)
+    const liste = brut ? (JSON.parse(brut) as CustomRingtone[]) : []
+    return Array.isArray(liste) ? liste.filter((entree) => typeof entree?.url === "string") : []
+  } catch {
+    return []
+  }
+}
+
+function saveCustomRingtones(liste: CustomRingtone[]) {
+  try {
+    localStorage.setItem(CUSTOM_STORAGE_KEY, JSON.stringify(liste))
+  } catch {
+    // stockage indisponible : l'import ne survivra pas a la session
+  }
+}
+
+/** Vrai si l'identifiant designe une sonnerie importee et non un fichier fourni. */
+export function isCustomRingtone(id: string): boolean {
+  return id.startsWith("/")
+}
+
+/**
+ * Televerse un fichier audio et l'ajoute au catalogue. L'endpoint est celui des
+ * medias de discussion, `POST /api/media`, deja utilise pour les messages vocaux :
+ * aucune modification du backend n'est necessaire.
+ */
+export async function importRingtone(file: File): Promise<CustomRingtone> {
+  if (!file.type.startsWith("audio/") && !/\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(file.name)) {
+    throw new Error("Ce fichier n'est pas un son.")
+  }
+  if (file.size > MAX_CUSTOM_RINGTONE_BYTES) {
+    throw new Error(
+      `Fichier trop lourd : ${(file.size / 1024 / 1024).toFixed(1)} Mo pour ${MAX_CUSTOM_RINGTONE_BYTES / 1024 / 1024} Mo au maximum.`
+    )
+  }
+
+  const media = await uploadMedia(file, file.name)
+  const entree: CustomRingtone = {
+    url: media.url,
+    // Le nom du fichier sans son extension : c'est ce que l'utilisateur reconnait.
+    label: file.name.replace(/\.[^.]+$/, "").trim() || "Sonnerie importee",
+  }
+  saveCustomRingtones([...customRingtones().filter((e) => e.url !== entree.url), entree])
+  return entree
+}
+
+/**
+ * Retire une sonnerie importee du catalogue, et rend leur son par defaut aux
+ * evenements qui l'utilisaient — sinon ils deviendraient muets.
+ */
+export function removeCustomRingtone(url: string) {
+  saveCustomRingtones(customRingtones().filter((entree) => entree.url !== url))
+  for (const event of Object.keys(STORAGE_KEYS) as RingtoneEvent[]) {
+    if (ringtoneFile(event) === url) setRingtone(event, RINGTONE_DEFAULTS[event])
+  }
+}
+
 function isKnownFile(file: string | null): file is string {
-  return Boolean(file) && RINGTONES.some((ringtone) => ringtone.file === file)
+  if (!file) return false
+  if (isCustomRingtone(file)) return customRingtones().some((entree) => entree.url === file)
+  return RINGTONES.some((ringtone) => ringtone.file === file)
 }
 
 /** Fichier choisi pour cet evenement, ou celui du mobile a defaut. */
@@ -81,9 +167,18 @@ export function setRingtone(event: RingtoneEvent, file: string) {
   }
 }
 
-/** URL jouable du son choisi, prefixee par le chemin de base du deploiement. */
+/**
+ * URL jouable d'un son, quelle que soit son origine : un fichier fourni est
+ * prefixe par le chemin de base du deploiement, une sonnerie importee passe par
+ * le resolveur de medias, qui y ajoute le jeton de session.
+ */
+export function ringtoneSource(id: string): string {
+  return isCustomRingtone(id) ? resolveMediaUrl(id) : publicAsset(`sounds/${id}`)
+}
+
+/** URL jouable du son choisi pour cet evenement. */
 export function ringtoneUrl(event: RingtoneEvent): string {
-  return publicAsset(`sounds/${ringtoneFile(event)}`)
+  return ringtoneSource(ringtoneFile(event))
 }
 
 let previewAudio: HTMLAudioElement | null = null
@@ -95,7 +190,7 @@ let previewAudio: HTMLAudioElement | null = null
  */
 export function previewRingtone(file: string, seconds = 4) {
   stopRingtonePreview()
-  const audio = new Audio(publicAsset(`sounds/${file}`))
+  const audio = new Audio(ringtoneSource(file))
   previewAudio = audio
   window.setTimeout(() => {
     if (previewAudio === audio) stopRingtonePreview()

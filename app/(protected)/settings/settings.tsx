@@ -25,6 +25,10 @@ import {
 import {
   RINGTONES,
   RINGTONE_LABELS,
+  customRingtones,
+  importRingtone,
+  removeCustomRingtone,
+  type CustomRingtone,
   previewRingtone,
   ringtoneFile,
   setRingtone,
@@ -118,9 +122,46 @@ function RingtonePicker() {
     message: ringtoneFile("message"),
   }))
   const [playing, setPlaying] = useState<string | null>(null)
+  const [imported, setImported] = useState<CustomRingtone[]>(() => customRingtones())
+  const [importing, setImporting] = useState(false)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const { success, error: toastError } = useToast()
 
   // Ne pas laisser un extrait tourner apres avoir quitte les reglages.
   useEffect(() => stopRingtonePreview, [])
+
+  const onImport = async (file: File | undefined) => {
+    if (!file) return
+    setImporting(true)
+    try {
+      const entree = await importRingtone(file)
+      setImported(customRingtones())
+      success("Sonnerie importee", `« ${entree.label} » est disponible pour les trois evenements.`)
+    } catch (err) {
+      toastError(
+        "Import impossible",
+        err instanceof Error ? err.message : "Le fichier n'a pas pu etre televerse."
+      )
+    } finally {
+      setImporting(false)
+      // Reinitialise le champ, sinon reimporter le meme fichier n'emet aucun evenement.
+      if (fileInput.current) fileInput.current.value = ""
+    }
+  }
+
+  const onRemove = (entree: CustomRingtone) => {
+    removeCustomRingtone(entree.url)
+    setImported(customRingtones())
+    setChoices({
+      incoming: ringtoneFile("incoming"),
+      outgoing: ringtoneFile("outgoing"),
+      message: ringtoneFile("message"),
+    })
+    success(
+      "Sonnerie retiree",
+      `Les evenements qui utilisaient « ${entree.label} » reprennent leur son par defaut.`
+    )
+  }
 
   const choose = (event: RingtoneEvent, file: string) => {
     setRingtone(event, file)
@@ -136,7 +177,9 @@ function RingtonePicker() {
     setPlaying(file)
     void previewRingtone(file)
       .catch(() => setPlaying(null))
-      .finally(() => window.setTimeout(() => setPlaying((current) => (current === file ? null : current)), 4000))
+      .finally(() =>
+        window.setTimeout(() => setPlaying((current) => (current === file ? null : current)), 4000)
+      )
   }
 
   return (
@@ -158,6 +201,15 @@ function RingtonePicker() {
                   {ringtone.note ? ` — ${ringtone.note}` : ""}
                 </option>
               ))}
+              {imported.length > 0 && (
+                <optgroup label="Importees">
+                  {imported.map((entree) => (
+                    <option key={entree.url} value={entree.url}>
+                      {entree.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             <button
               type="button"
@@ -167,17 +219,90 @@ function RingtonePicker() {
               title={playing === choices[event] ? "Arreter" : "Ecouter"}
             >
               {playing === choices[event] ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
               ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="6 4 20 12 6 20" />
+                </svg>
               )}
             </button>
           </div>
         </div>
       ))}
+      <div className="ringtone-import">
+        <input
+          ref={fileInput}
+          type="file"
+          accept="audio/*"
+          hidden
+          onChange={(e) => void onImport(e.target.files?.[0])}
+        />
+        <button
+          type="button"
+          className="ringtone-import-btn"
+          onClick={() => fileInput.current?.click()}
+          disabled={importing}
+        >
+          {importing ? "Import en cours…" : "Importer une sonnerie"}
+        </button>
+        {imported.length > 0 && (
+          <ul className="ringtone-imported-list">
+            {imported.map((entree) => (
+              <li key={entree.url}>
+                <span className="ringtone-imported-name">{entree.label}</span>
+                <button
+                  type="button"
+                  className="ringtone-listen"
+                  onClick={() => listen(entree.url)}
+                  aria-label={
+                    playing === entree.url ? "Arreter l'ecoute" : `Ecouter ${entree.label}`
+                  }
+                  title={playing === entree.url ? "Arreter" : "Ecouter"}
+                >
+                  {playing === entree.url ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="5" width="4" height="14" rx="1" />
+                      <rect x="14" y="5" width="4" height="14" rx="1" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="6 4 20 12 6 20" />
+                    </svg>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="ringtone-remove"
+                  onClick={() => onRemove(entree)}
+                  aria-label={`Retirer ${entree.label}`}
+                  title="Retirer"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="s-hint">
-        Les sons proposes en premier sont ceux de l'application mobile. L'ecoute
-        s'arrete au bout de quatre secondes.
+        Les sons proposes en premier sont ceux de l'application mobile. Un son importe est televerse
+        sur votre compte, donc reutilisable, et se choisit pour n'importe lequel des trois
+        evenements. Cinq megaoctets au maximum. L'ecoute s'arrete au bout de quatre secondes.
       </div>
     </div>
   )
@@ -194,16 +319,26 @@ function PushDiagnostic() {
     if (typeof window === "undefined") return
 
     setPermission(Notification.permission)
-    
+
     const vapid = import.meta.env.VITE_FIREBASE_VAPID_KEY
-    setVapidKeyExists(!!vapid && vapid !== "VOTRE_CLÉ_VAPID_DEPUIS_FIREBASE" && vapid !== "OBTENIR_DEPUIS_CONSOLE_FIREBASE")
+    setVapidKeyExists(
+      !!vapid &&
+        vapid !== "VOTRE_CLÉ_VAPID_DEPUIS_FIREBASE" &&
+        vapid !== "OBTENIR_DEPUIS_CONSOLE_FIREBASE"
+    )
 
     const apiKey = import.meta.env.VITE_FIREBASE_API_KEY
     const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID
     const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID
     const appId = import.meta.env.VITE_FIREBASE_APP_ID
 
-    if (!apiKey || apiKey === "VOTRE_API_KEY_DEPUIS_FIREBASE" || !projectId || !messagingSenderId || !appId) {
+    if (
+      !apiKey ||
+      apiKey === "VOTRE_API_KEY_DEPUIS_FIREBASE" ||
+      !projectId ||
+      !messagingSenderId ||
+      !appId
+    ) {
       setConfigStatus("Configuration Firebase incomplete")
     } else {
       setConfigStatus("Configuration Firebase valide")
@@ -284,36 +419,65 @@ function PushDiagnostic() {
         </button>
       </div>
 
-      <div style={{ fontSize: 12, display: "flex", flexDirection: "column", gap: 8, color: "var(--text-secondary)" }}>
+      <div
+        style={{
+          fontSize: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          color: "var(--text-secondary)",
+        }}
+      >
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Permission :</span>
           <span
             style={{
               fontWeight: 700,
-              color: permission === "granted" ? "var(--success)" : permission === "denied" ? "var(--danger)" : "var(--text-muted)",
+              color:
+                permission === "granted"
+                  ? "var(--success)"
+                  : permission === "denied"
+                    ? "var(--danger)"
+                    : "var(--text-muted)",
             }}
           >
-            {permission === "granted" ? "Accordee ✓" : permission === "denied" ? "Bloquee ✗" : "Non demandee (default)"}
+            {permission === "granted"
+              ? "Accordee ✓"
+              : permission === "denied"
+                ? "Bloquee ✗"
+                : "Non demandee (default)"}
           </span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Service Worker Push :</span>
-          <span style={{ fontWeight: 700, color: swStatus.includes("Actif") ? "var(--success)" : "var(--danger)" }}>
+          <span
+            style={{
+              fontWeight: 700,
+              color: swStatus.includes("Actif") ? "var(--success)" : "var(--danger)",
+            }}
+          >
             {swStatus}
           </span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Variables Firebase Client :</span>
-          <span style={{ fontWeight: 700, color: configStatus.includes("valide") ? "var(--success)" : "var(--danger)" }}>
+          <span
+            style={{
+              fontWeight: 700,
+              color: configStatus.includes("valide") ? "var(--success)" : "var(--danger)",
+            }}
+          >
             {configStatus}
           </span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Cle VAPID configuree :</span>
-          <span style={{ fontWeight: 700, color: vapidKeyExists ? "var(--success)" : "var(--danger)" }}>
+          <span
+            style={{ fontWeight: 700, color: vapidKeyExists ? "var(--success)" : "var(--danger)" }}
+          >
             {vapidKeyExists ? "Oui ✓" : "Non ✗ (VITE_FIREBASE_VAPID_KEY manquant/invalide)"}
           </span>
         </div>
@@ -847,7 +1011,7 @@ export default function SettingsPage() {
         toastError("Deconnexion impossible", "Reessaie dans un instant.")
       }
     },
-    [warning, toastError],
+    [warning, toastError]
   )
   const [profile, setProfile] = useState<Profile>(() => getInitialProfile(user))
   const [draft, setDraft] = useState<Profile>(() => getInitialProfile(user))
@@ -1247,6 +1411,29 @@ export default function SettingsPage() {
         }
 
         /* Choix des sonneries : un evenement par ligne, son menu et son ecoute. */
+        /* Import d'une sonnerie : le bouton, puis la liste de ce qui a ete importe. */
+        .ringtone-import { padding-top: 12px; border-top: 1px solid var(--border-subtle); margin-top: 4px; }
+        .ringtone-import-btn {
+          width: 100%; padding: 10px 14px; border-radius: 9px;
+          border: 1px dashed var(--border-default); background: var(--bg-elevated);
+          color: var(--text-secondary); font-family: 'DM Sans', sans-serif;
+          font-size: 12.5px; font-weight: 600; cursor: pointer;
+        }
+        .ringtone-import-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-border); }
+        .ringtone-import-btn:disabled { cursor: progress; opacity: 0.7; }
+        .ringtone-imported-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+        .ringtone-imported-list li { display: flex; align-items: center; gap: 8px; }
+        .ringtone-imported-name {
+          flex: 1; min-width: 0; font-size: 12px; color: var(--text-primary);
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ringtone-remove {
+          width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%;
+          border: none; background: none; color: var(--text-ghost); cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .ringtone-remove:hover { color: var(--danger); background: var(--danger-dim); }
+
         .ringtone-row {
           display: flex; align-items: center; justify-content: space-between;
           gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
@@ -1745,9 +1932,7 @@ export default function SettingsPage() {
                       justifyContent: "space-between",
                       padding: "12px 0",
                       borderBottom:
-                        i < (sessions ?? []).length - 1
-                          ? "1px solid var(--border-subtle)"
-                          : "none",
+                        i < (sessions ?? []).length - 1 ? "1px solid var(--border-subtle)" : "none",
                       gap: 12,
                     }}
                   >
@@ -1864,9 +2049,8 @@ export default function SettingsPage() {
               <div className="s-card">
                 <div className="s-card-title">Historique de connexion</div>
                 <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 10 }}>
-                  Chaque ouverture de session est enregistree. Une connexion que
-                  tu ne reconnais pas ? Change ton mot de passe et deconnecte
-                  l appareil concerne.
+                  Chaque ouverture de session est enregistree. Une connexion que tu ne reconnais pas
+                  ? Change ton mot de passe et deconnecte l appareil concerne.
                 </div>
 
                 {historique === null && (
@@ -2020,13 +2204,19 @@ export default function SettingsPage() {
 
                 <div className="privacy-choice">
                   <div className="privacy-choice-head">
-                    <div className="privacy-choice-label">Derniere connexion et statut en ligne</div>
+                    <div className="privacy-choice-label">
+                      Derniere connexion et statut en ligne
+                    </div>
                     <div className="privacy-choice-desc">
                       Qui peut voir quand vous etes en ligne et quand vous avez ete vu pour la
                       derniere fois.
                     </div>
                   </div>
-                  <div className="privacy-choice-opts" role="group" aria-label="Visibilite de la derniere connexion">
+                  <div
+                    className="privacy-choice-opts"
+                    role="group"
+                    aria-label="Visibilite de la derniere connexion"
+                  >
                     {([2, 1, 0] as LastSeenVisibility[]).map((niveau) => (
                       <button
                         key={niveau}
