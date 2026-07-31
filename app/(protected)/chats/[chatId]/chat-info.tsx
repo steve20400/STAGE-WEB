@@ -9,6 +9,7 @@ import { fetchConversationById, addMembersToGroup, deleteGroupConversation, leav
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { getMyUserId } from "../../../../src/data/session-user"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
+import { AvatarCircle } from "../../../../src/components/avatar-circle"
 
 type BackendGroupMember = string | { id?: string; pseudo?: string | null; publicNumber?: string | null; role?: string }
 
@@ -35,6 +36,8 @@ interface ConvInfo {
   id: string
   name: string
   initials: string
+  /** Photo de profil de l'interlocuteur, ou du groupe. */
+  avatar?: string | null
   color: string
   isGroup: boolean
   description?: string
@@ -356,10 +359,14 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
         <div className="cip-body">
           <div className="cip-hero">
-            <div className="cip-av" style={{ background: color.bg, color: color.fg }}>
-              {conv.initials}
+            <AvatarCircle
+              className="cip-av"
+              style={{ background: color.bg, color: color.fg }}
+              avatar={conv.avatar}
+              initials={conv.initials}
+            >
               {!conv.isGroup && conv.online && <div className="cip-av-dot" />}
-            </div>
+            </AvatarCircle>
             <div className="cip-name">{conv.name}</div>
             {conv.isGroup && (
               <div className="cip-sub">{conv.description ?? `${members.length} membres`}</div>
@@ -529,16 +536,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                         className="m-av"
                         style={{ background: memberColor.bg, color: memberColor.fg, overflow: "hidden" }}
                       >
-                        {avatarDisplaySrc(member.avatar) ? (
-                          <img
-                            src={avatarDisplaySrc(member.avatar)!}
-                            alt=""
-                            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-                          />
-                        ) : (
-                          member.initials
-                        )}
-                        {member.online && <div className="m-dot" />}
+                        <AvatarCircle avatar={member.avatar} initials={member.initials}>
+                          {member.online && <div className="m-dot" />}
+                        </AvatarCircle>
                       </div>
                       <div className="m-info">
                         <div className="m-name">
@@ -846,6 +846,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
       id: conv.id,
       name: conv.name,
       initials: conv.initials,
+      avatar: conv.avatar,
       color: colorName,
       isGroup: true,
       members,
@@ -859,6 +860,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
     id: conv.id,
     name: conv.name,
     initials: conv.initials,
+    avatar: conv.avatar,
     color: colorName,
     isGroup: false,
     online: conv.online,
@@ -868,6 +870,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
         id: conv.id,
         name: conv.name,
         initials: conv.initials,
+        avatar: conv.avatar,
         color: colorName,
         role: "member",
         online: conv.online,
@@ -892,6 +895,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
       id: group.id,
       name: localConversation?.name ?? group.name,
       initials: localConversation?.initials ?? group.initials,
+      avatar: localConversation?.avatar ?? null,
       color: colorNames[(localConversation?.colorIdx ?? group.name.length) % colorNames.length],
       isGroup: true,
       members: group.memberIds.map((memberId, index) => {
@@ -924,6 +928,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
     id: contact.id,
     name: localConversation?.name ?? contact.name,
     initials: localConversation?.initials ?? contact.initials,
+    avatar: contact.avatar ?? localConversation?.avatar ?? null,
     color: contact.color,
     isGroup: false,
     online: contact.online,
@@ -933,6 +938,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
         id: contact.id,
         name: contact.name,
         initials: contact.initials,
+        avatar: contact.avatar ?? null,
         color: contact.color,
         role: "member",
         online: contact.online,

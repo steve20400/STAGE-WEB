@@ -6,6 +6,7 @@ import { useToast } from "../../../src/components/toast"
 import { createPrivateChat } from "../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../src/services/call-manager"
 import "./calls-page.css"
+import { AvatarCircle } from "../../../src/components/avatar-circle"
 
 export default function NewCallPage() {
   const navigate = useNavigate()
@@ -139,9 +140,12 @@ export default function NewCallPage() {
                   : undefined
               }
             >
-              <div className="call-av" style={{ background: color.bg, color: color.fg }}>
-                {contact.initials}
-              </div>
+              <AvatarCircle
+                className="call-av"
+                style={{ background: color.bg, color: color.fg }}
+                avatar={contact.avatar}
+                initials={contact.initials}
+              />
 
               <div className="call-info">
                 <div className="call-name">{contact.name}</div>

@@ -14,6 +14,7 @@ import { startOutgoingCall } from "../../../src/services/call-manager"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { ApiError } from "../../../src/lib/api-client"
 import { Dialer } from "./dialer"
+import { AvatarCircle } from "../../../src/components/avatar-circle"
 
 type FilterType = "all" | "missed" | "audio" | "video"
 
@@ -374,9 +375,12 @@ export default function CallsPage() {
                         navigate(`/calls/${call.id}?contact=${call.contactId}&type=${call.type}`)
                       }
                     >
-                      <div className="call-av" style={{ background: color.bg, color: color.fg }}>
-                        {call.contactInitials}
-                      </div>
+                      <AvatarCircle
+                        className="call-av"
+                        style={{ background: color.bg, color: color.fg }}
+                        avatar={call.contactAvatar}
+                        initials={call.contactInitials}
+                      />
 
                       <div className="call-info">
                         <div className="call-name">

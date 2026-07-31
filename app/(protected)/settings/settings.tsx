@@ -31,7 +31,7 @@ import {
   quand,
 } from "../../../src/services/user-access-service"
 import { sendSessionRevoked } from "../../../src/services/websocket-service"
-import { fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
+import { avatarDisplaySrc, fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 
 type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
@@ -1462,9 +1462,9 @@ export default function SettingsPage() {
                 <div className="avatar-section">
                   <div className="avatar-wrap" onClick={() => fileRef.current?.click()}>
                     <div className="avatar-circle">
-                      {draft.avatar ? (
+                      {avatarDisplaySrc(draft.avatar) ? (
                         <img
-                          src={draft.avatar}
+                          src={avatarDisplaySrc(draft.avatar)!}
                           alt="avatar"
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />

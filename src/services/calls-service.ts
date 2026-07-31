@@ -1,5 +1,7 @@
 import { apiRequest } from "../lib/api-client"
 import { createPrivateChat } from "./chats-service"
+import { loadContacts } from "../data/contacts"
+import { normalizePhoneNumber } from "../data/session-user"
 
 export type CallDirection = "in" | "out" | "missed"
 export type CallType = "audio" | "video"
@@ -13,6 +15,11 @@ export interface CallRecord {
   contactId: string
   contactName: string
   contactInitials: string
+  /**
+   * Photo de profil du correspondant. Le backend ne l'envoie pas avec
+   * l'historique : on la retrouve dans le repertoire local, par Alanya ID.
+   */
+  contactAvatar?: string | null
   contactColor: keyof typeof CALL_COLORS
   direction: CallDirection
   type: CallType
@@ -93,7 +100,20 @@ function formatDuration(seconds: number | null): string | undefined {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
 }
 
-function toCallRecord(c: BackendCall): CallRecord {
+/**
+ * Photos de profil connues localement, indexees par Alanya ID normalise.
+ * Construite une fois par lot d'appels plutot qu'a chaque ligne : lire le
+ * repertoire est une lecture de localStorage, pas gratuite.
+ */
+function avatarsParNumero(): Map<string, string> {
+  const parNumero = new Map<string, string>()
+  for (const contact of loadContacts()) {
+    if (contact.avatar) parNumero.set(normalizePhoneNumber(contact.phone), contact.avatar)
+  }
+  return parNumero
+}
+
+function toCallRecord(c: BackendCall, avatars?: Map<string, string>): CallRecord {
   const contactId = c.peerNumber ?? c.convId ?? c.id
   return {
     id: c.id,
@@ -101,6 +121,7 @@ function toCallRecord(c: BackendCall): CallRecord {
     contactId,
     contactName: c.peerName,
     contactInitials: toInitials(c.peerName),
+    contactAvatar: avatars?.get(normalizePhoneNumber(contactId)) ?? null,
     contactColor: pickColor(contactId),
     direction: mapDirection(c),
     type: c.type === "VIDEO" ? "video" : "audio",
@@ -115,7 +136,8 @@ function toCallRecord(c: BackendCall): CallRecord {
 export async function fetchCallsHistory(): Promise<CallRecord[]> {
   try {
     const response = await apiRequest<ListCallsResponse>("/api/calls")
-    return (response.calls ?? []).map(toCallRecord)
+    const avatars = avatarsParNumero()
+    return (response.calls ?? []).map((call) => toCallRecord(call, avatars))
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn("[calls] fetch a echoue", error)
