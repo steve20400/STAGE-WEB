@@ -1228,6 +1228,20 @@ function MediaComposer({
   )
 }
 
+/**
+ * Un vocal enregistre dans l'application, par opposition a un fichier audio
+ * importe depuis le telephone.
+ *
+ * L'enregistreur nomme ses envois `vocal-<horodatage>.<extension>` ; c'est le
+ * seul marqueur qui survive a l'aller-retour serveur, le backend ne transportant
+ * que le nom de fichier et le type MIME. Un vocal venu du mobile, ou un media
+ * sans nom, tombe aussi dans ce cas — c'est le comportement voulu : il n'y a rien
+ * d'utile a afficher.
+ */
+function isVoiceNote(msg: Message): boolean {
+  return msg.type === "audio" && (!msg.fileName || /^vocal-\d+\./i.test(msg.fileName))
+}
+
 /** Un message cite merite une vignette des lors qu'il porte un fichier. */
 function hasQuotedMedia(msg: Message): boolean {
   return Boolean(msg.mediaUrl) || msg.type === "image" || msg.type === "video" || msg.type === "audio" || msg.type === "file"
@@ -1923,9 +1937,33 @@ function MessageBubble({
 
                 {msg.type === "audio" && mediaSrc && (
                   <div>
-                    <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
-                    {/* Les fichiers audio importés restent identifiables, contrairement aux vocaux. */}
-                    {msg.fileName && <div style={{ marginTop: 5, fontSize: 10, opacity: 0.76, display: "flex", gap: 7, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
+                      {/* Un vocal n'a plus de ligne d'informations sous lui : le
+                          bouton de telechargement, jusqu'ici cache dans le menu
+                          du message, devient donc visible. */}
+                      {isVoiceNote(msg) && (
+                        <button
+                          onClick={downloadAudio}
+                          aria-label="Telecharger le vocal"
+                          title="Telecharger"
+                          style={{
+                            width: 26, height: 26, flexShrink: 0, borderRadius: "50%", border: "none", cursor: "pointer",
+                            background: isMe ? "#ffffff24" : "var(--accent-dim)",
+                            color: isMe ? "#fff" : "var(--accent)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                            <path d="M12 3v12M7 11l5 5 5-5M5 21h14" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {/* Un fichier audio importe reste identifiable par son nom et
+                        sa taille. Un vocal, non : sa duree est deja affichee par
+                        le lecteur, et son nom est un horodatage sans interet. */}
+                    {!isVoiceNote(msg) && msg.fileName && <div style={{ marginTop: 5, fontSize: 10, opacity: 0.76, display: "flex", gap: 7, flexWrap: "wrap" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170, whiteSpace: "nowrap" }}>{msg.fileName}</span>
                       {msg.fileSize && <span>{msg.fileSize}</span>}
                       <span>{formatAudioDuration(msg.durationMs)}</span>
