@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
 import { fetchMeeting, joinMeeting, leaveMeeting } from "../../../../src/services/meetings-service"
+import { startMeetingCall } from "../../../../src/services/call-manager"
+import { useCallState } from "../../../../src/hooks/use-call"
 import type { Meeting } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
@@ -9,11 +11,11 @@ export default function MeetingRoomPage() {
   const { meetingId } = useParams()
   const navigate = useNavigate()
   const { success, error: showError } = useToast()
+  const callState = useCallState()
 
   const [meeting, setMeeting] = useState<Meeting | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [callStarted, setCallStarted] = useState(false)
 
   useEffect(() => {
     if (!meetingId) return
@@ -41,7 +43,14 @@ export default function MeetingRoomPage() {
     try {
       await joinMeeting(parseInt(meetingId, 10))
       success("Réunion rejointe!")
-      setCallStarted(true)
+
+      const participantIds = meeting.participants?.map((p) => p.userId) || []
+      await startMeetingCall(
+        parseInt(meetingId, 10),
+        participantIds,
+        meeting.type_media === 2 ? "video" : "audio",
+        meeting.objet
+      )
     } catch (err) {
       showError("Erreur", err instanceof Error ? err.message : "Impossible de rejoindre")
     }
@@ -96,12 +105,12 @@ export default function MeetingRoomPage() {
       </div>
 
       <div className="meeting-actions">
-        {!callStarted && (
+        {!callState.activeCallId && (
           <button className="btn-join" onClick={() => void handleJoinMeeting()}>
             Rejoindre la réunion
           </button>
         )}
-        {callStarted && (
+        {callState.activeCallId && (
           <button className="btn-leave" onClick={() => void handleLeaveMeeting()}>
             Quitter la réunion
           </button>

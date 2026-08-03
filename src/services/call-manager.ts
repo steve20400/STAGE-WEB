@@ -838,6 +838,77 @@ export async function startOutgoingCall(
   return started.id
 }
 
+/** Démarre un appel de groupe pour une réunion. */
+export async function startMeetingCall(
+  meetingId: number,
+  participants: string[],
+  type: CallType,
+  title: string
+): Promise<string> {
+  ensureEventSubscription()
+
+  if (state.incoming) {
+    throw new Error("Un appel entrant est en cours. Répondez-y d'abord.")
+  }
+  if (state.activeCallId !== null || state.role !== null) {
+    await hangUp()
+  }
+
+  let started
+  try {
+    started = await startCallRest(`meeting_${meetingId}`, type)
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      await endStaleServerCalls()
+      try {
+        started = await startCallRest(`meeting_${meetingId}`, type)
+      } catch (retryError) {
+        if (retryError instanceof ApiError && retryError.status === 409) {
+          throw new Error("Occupé : un appel est déjà en cours. Réessayez plus tard.")
+        }
+        throw retryError
+      }
+    } else {
+      throw err
+    }
+  }
+  sendCallRing(started.id)
+
+  const participantNames: Record<string, string> = {}
+  for (const p of participants) {
+    participantNames[p] = p
+  }
+
+  setState({
+    activeCallId: started.id,
+    activeConvId: `meeting_${meetingId}`,
+    peerName: title,
+    peerAvatarUrl: null,
+    callType: type,
+    role: "outgoing",
+    progress: "ringtone",
+    isGroup: true,
+    isInitiator: true,
+    participantNames,
+    micOn: true,
+    camOn: type === "video",
+    audioOutput: type === "video" ? "speaker" : defaultAudioOutput(),
+    localStream: null,
+    remoteStreams: {},
+  })
+
+  try {
+    await ensureLocalStream(type === "video")
+  } catch {
+    setState({
+      error:
+        type === "video" ? "Micro et caméra requis pour l'appel." : "Micro requis pour l'appel.",
+    })
+  }
+
+  return started.id
+}
+
 /** Accepte l'appel entrant courant. Renvoie l'id de l'appel rejoint. */
 export async function acceptIncomingCall(): Promise<string | null> {
   const incoming = state.incoming
