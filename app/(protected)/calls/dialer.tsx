@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   ALANYA_NUMBER_MAX_LENGTH,
   formatAlanyaNumber,
   isValidAlanyaNumber,
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
+import { useContacts } from "../../../src/hooks/use-contacts"
 import "./dialer.css"
 
 /** Disposition d'un clavier de telephone, celle du composeur mobile. */
@@ -27,8 +28,14 @@ export function Dialer({
   /** Recoit les chiffres seuls, sans les espaces d'affichage, et le type d'appel. */
   onCall: (number: string, type: "audio" | "video") => void
 }) {
+  const { contacts } = useContacts()
   const [digits, setDigits] = useState("")
   const valide = isValidAlanyaNumber(digits)
+
+  const foundContact = useMemo(() => {
+    if (digits.length < 6) return null
+    return contacts.find((c) => c.phone === normalizeAlanyaNumber(digits))
+  }, [digits, contacts])
 
   const press = useCallback((key: string) => {
     setDigits((current) => normalizeAlanyaNumber(current + key).slice(0, ALANYA_NUMBER_MAX_LENGTH))
@@ -92,6 +99,18 @@ export function Dialer({
               ? "Pret a appeler"
               : `${digits.length} chiffre${digits.length > 1 ? "s" : ""} — il en faut 6 ou 8`}
         </div>
+        {digits.length >= 6 && (
+          <div
+            className={`dialer-contact-info ${foundContact ? "found" : "not-found"}`}
+            aria-live="polite"
+          >
+            {foundContact ? (
+              <span className="contact-name">{foundContact.name}</span>
+            ) : (
+              <span className="contact-error">Numero introuvable ou non attribue</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="dialer-keys">

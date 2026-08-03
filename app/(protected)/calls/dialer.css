@@ -158,6 +158,29 @@
   cursor: not-allowed;
 }
 
+.dialer-contact-info {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 20px;
+}
+
+.dialer-contact-info.found {
+  color: var(--success);
+}
+
+.contact-name {
+  display: block;
+}
+
+.dialer-contact-info.not-found {
+  color: var(--danger);
+}
+
+.contact-error {
+  display: block;
+}
+
 /* Ecran bas (telephone en paysage, petite fenetre) : on resserre pour que le
    clavier et le bouton d'appel restent visibles sans defilement. */
 @media (max-height: 620px) {
