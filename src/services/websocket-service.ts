@@ -541,11 +541,19 @@ export interface CallServerEvent {
 }
 
 const CALL_EVENT_TYPES = new Set(["incoming_call", "call_signal", "call_state"])
+const MEETING_EVENT_TYPES = new Set(["meeting_signal", "meeting_joined", "meeting_user_left", "meeting_user_joined"])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
 export function subscribeToCallEvents(handler: (event: CallServerEvent) => void): () => void {
   return addListener((event) => {
     if (CALL_EVENT_TYPES.has(event.type)) handler(event as CallServerEvent)
+  })
+}
+
+/** S'abonne aux evenements de réunion WebRTC (signalisation, participants). */
+export function subscribeToMeetingEvents(handler: (event: ServerEvent) => void): () => void {
+  return addListener((event) => {
+    if (MEETING_EVENT_TYPES.has(event.type)) handler(event)
   })
 }
 
@@ -557,6 +565,21 @@ export function sendCallRing(callId: string) {
 /** Relaie un signal WebRTC (offer / answer / ICE) a un participant precis. */
 export function sendCallSignal(callId: string, toUserId: string, signal: object) {
   sendRaw({ type: "call_signal", callId, toUserId, signal })
+}
+
+/** Relaie un signal WebRTC pour une réunion (offer / answer / ICE). */
+export function sendMeetingSignal(meetingId: number, toUserId: string, signal: object) {
+  sendRaw({ type: "meeting_signal", meetingId, toUserId, signal })
+}
+
+/** Notifie que l'utilisateur a rejoint une réunion. */
+export function sendMeetingJoined(meetingId: number) {
+  sendRaw({ type: "meeting_joined", meetingId })
+}
+
+/** Notifie que l'utilisateur a quitté une réunion. */
+export function sendMeetingLeft(meetingId: number) {
+  sendRaw({ type: "meeting_left", meetingId })
 }
 
 /** Diffuse un changement d'etat d'appel (joined / left / rejected / ended...). */
