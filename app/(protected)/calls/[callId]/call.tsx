@@ -11,6 +11,7 @@ import {
   switchCamera,
   minimizeActiveCall,
   setCallAudioOutput,
+  transferCall,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
 import { useTranslation } from "../../../../src/i18n"
@@ -93,6 +94,7 @@ export default function CallRoomPage() {
   const { t } = useTranslation()
   const [controlsVisible, setControlsVisible] = useState(true)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
   const pipDrag = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({
     x: 0,
@@ -634,6 +636,44 @@ export default function CallRoomPage() {
                   <span className="ctrl-btn-label">Chat</span>
                 </button>
               )}
+
+              <div style={{ position: "relative" }}>
+                <button
+                  className="ctrl-btn"
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  aria-label="Plus d'options"
+                  title="Plus d'options"
+                >
+                  <div className="ctrl-btn-icon ctrl-on">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <circle cx="12" cy="5" r="2" />
+                      <circle cx="12" cy="12" r="2" />
+                      <circle cx="12" cy="19" r="2" />
+                    </svg>
+                  </div>
+                </button>
+                {showMoreMenu && (
+                  <div className="call-more-menu">
+                    <button onClick={() => {
+                      setShowMoreMenu(false)
+                      // TODO: Implémenter l'invitation de personnes
+                    }}>
+                      Inviter une personne
+                    </button>
+                    <button onClick={() => {
+                      setShowMoreMenu(false)
+                      // TODO: Implémenter le choix du destinataire du transfert
+                    }}>
+                      Transférer l'appel
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <button
                 className="ctrl-btn"
