@@ -4,14 +4,13 @@ import { useToast } from "../../../src/components/toast"
 import { useTranslation } from "../../../src/i18n"
 import {
   fetchMeetings,
-  createMeeting,
   joinMeeting,
   declineMeeting,
   endMeeting,
   deleteMeeting,
   type Meeting,
-  type CreateMeetingRequest,
 } from "../../../src/services/meetings-service"
+import { CreateMeetingModal } from "./create-meeting-modal"
 import "./meetings.css"
 
 type MeetingTab = "ongoing" | "upcoming" | "ended"
@@ -25,6 +24,7 @@ export default function MeetingsPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const now = useMemo(() => Date.now(), [])
@@ -196,6 +196,19 @@ export default function MeetingsPage() {
           ))
         )}
       </div>
+
+      <button className="meetings-fab" onClick={() => setShowCreateModal(true)}>
+        +
+      </button>
+
+      <CreateMeetingModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          void loadMeetings()
+          setShowCreateModal(false)
+        }}
+      />
     </div>
   )
 }
