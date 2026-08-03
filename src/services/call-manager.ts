@@ -1117,3 +1117,14 @@ export function acknowledgeCallEnded() {
     setState({ endedAt: null, error: null })
   }
 }
+
+/** Initie un transfert d'appel vers un autre participant ou un contact. */
+export async function transferCall(toUserId: string): Promise<void> {
+  if (!state.activeCallId) {
+    throw new Error("Aucun appel actif à transférer")
+  }
+
+  // Notifie le serveur de la demande de transfert
+  // Le backend gère l'acceptation/rejet et la reconnexion des participants
+  sendCallState(state.activeCallId, "transfer_request", toUserId)
+}
