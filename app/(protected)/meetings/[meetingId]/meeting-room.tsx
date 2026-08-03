@@ -100,7 +100,25 @@ export default function MeetingRoomPage() {
         <p>Type: {meeting.type_media === 2 ? "Vidéo" : "Audio"}</p>
         <p>Durée: {Math.floor((meeting.duree || 3600) / 60)} minutes</p>
         {meeting.participants && meeting.participants.length > 0 && (
-          <p>Participants: {meeting.participants.length}</p>
+          <>
+            <p>Participants ({meeting.participants.length}):</p>
+            <div className="participants-grid">
+              {meeting.participants.map((p) => (
+                <div key={p.userId} className="participant-box">
+                  <div className="participant-name">{p.displayName}</div>
+                  <div className={`participant-status ${p.connecte ? "connected" : "pending"}`}>
+                    {p.connecte ? "Connecté" : "En attente"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {callState.activeCallId && (
+          <div className="call-status">
+            <div className="status-indicator active" />
+            <span>Appel en cours</span>
+          </div>
         )}
       </div>
 
