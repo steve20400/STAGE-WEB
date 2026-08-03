@@ -383,6 +383,14 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
         .cip-confirm-btn.confirm { border: 1px solid transparent; color: var(--bg-base); }
         .cip-confirm-btn.confirm.warning { background: var(--warning, #fbbf24); }
         .cip-confirm-btn.confirm.danger { background: var(--danger); }
+
+        /* Route plein ecran /chats/:id/info : la page vit dans .layout-main
+           (hauteur d'ecran figee, en-tete mobile au-dessus) et prend l'espace
+           RESTANT. Le panneau s'etire dans ce cadre : sa hauteur en dvh, prevue
+           pour le panneau lateral du grand ecran, deborderait de la hauteur de
+           l'en-tete et couperait le bas — meme famille de bugs que
+           .layout-main > .calls-root. */
+        .cip-standalone .cip-root { height: auto; min-height: 0; }
       `}</style>
 
       <div className="cip-root">
@@ -1310,7 +1318,8 @@ export default function ConvInfoPage({
       <div
         style={{
           display: "flex",
-          minHeight: "100vh",
+          flex: "1 1 auto",
+          minHeight: 0,
           background: "var(--bg-base)",
           justifyContent: "center",
           alignItems: "center",
@@ -1327,7 +1336,8 @@ export default function ConvInfoPage({
       <div
         style={{
           display: "flex",
-          minHeight: "100vh",
+          flex: "1 1 auto",
+          minHeight: 0,
           background: "var(--bg-base)",
           justifyContent: "center",
           alignItems: "center",
@@ -1346,9 +1356,10 @@ export default function ConvInfoPage({
 
   return (
     <div
+      className={embedded ? undefined : "cip-standalone"}
       style={{
         display: "flex",
-        minHeight: embedded ? "100%" : "100vh",
+        ...(embedded ? { minHeight: "100%" } : { flex: "1 1 auto", minHeight: 0 }),
         background: "var(--bg-base)",
         justifyContent: "center",
         width: "100%",

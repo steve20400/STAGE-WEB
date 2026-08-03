@@ -13,6 +13,12 @@
  * facon la sortie vers l'ecouteur d'oreille des qu'une capture micro est active,
  * sans qu'aucun code puisse s'y opposer.
  *
+ * Limite connue : Safari iOS ignore l'ecriture de HTMLMediaElement.volume (le
+ * volume y est reserve aux boutons physiques), la bascule y est donc sans effet.
+ * Un contournement par WebAudio (GainNode) existe mais fragiliserait le chemin
+ * audio WebRTC qui fonctionne ; on ne l'introduit pas sans appareil pour le
+ * verifier.
+ *
  * Ne s'applique qu'aux appels AUDIO. Un appel video reste toujours au
  * haut-parleur, sans bascule possible.
  */
@@ -28,6 +34,16 @@ export const OUTPUT_VOLUME: Record<AudioOutputMode, number> = {
 
 export const OUTPUT_LABELS: Record<AudioOutputMode, string> = {
   earpiece: "Ecoute a l'oreille",
+  speaker: "Haut-parleur",
+}
+
+/**
+ * Libelles courts pour la barre de controles d'appel : « Ecoute a l'oreille »
+ * y elargissait son bouton (~95 px) et faisait passer la barre sur deux lignes
+ * a 320 px, la plus petite largeur supportee.
+ */
+export const OUTPUT_LABELS_COURTS: Record<AudioOutputMode, string> = {
+  earpiece: "Oreille",
   speaker: "Haut-parleur",
 }
 

@@ -1379,10 +1379,18 @@ export default function SettingsPage() {
 
         .settings-root {
           font-family: 'DM Sans', sans-serif;
-          min-height: 100vh; min-height: 100dvh; background: linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png") repeat; background-size: auto, 280px auto; color: var(--text-primary);
+          background: linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png") repeat; background-size: auto, 280px auto; color: var(--text-primary);
           display: grid; grid-template-columns: 230px 1fr;
           width: 100%;
           overflow-x: hidden;
+          /* La page vit dans .layout-main (hauteur d'ecran figee, en-tete mobile
+             au-dessus) : elle prend l'espace RESTANT et defile seule. Une hauteur
+             en dvh deborderait de la hauteur de l'en-tete et couperait le bas de
+             la derniere carte — meme idiome que .layout-main > .calls-root. */
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow-y: auto;
+          overscroll-behavior: contain;
         }
 
 

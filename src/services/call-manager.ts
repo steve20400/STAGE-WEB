@@ -2,6 +2,7 @@ import { getMyUserId, loadSessionUser } from "../data/session-user"
 import { loadSessionToken } from "../data/session-auth"
 import { ApiError } from "../lib/api-client"
 import { ringtoneUrl } from "./ringtones"
+import { defaultAudioOutput, type AudioOutputMode } from "./audio-output"
 import {
   acceptCallRest,
   endCallRest,
@@ -70,6 +71,14 @@ export interface CallManagerState {
   remoteStreams: Record<string, MediaStream>
   micOn: boolean
   camOn: boolean
+  /**
+   * Sortie audio de l'appel en cours : haut-parleur ou ecoute a l'oreille
+   * (etape 3.5.5). Vit ici et non dans l'ecran d'appel : reduire l'appel
+   * demonte l'ecran et confie les elements <audio> a la fenetre flottante —
+   * le mode choisi doit survivre a cet aller-retour et s'appliquer aux deux
+   * rendus. Toujours « speaker » sur un appel video.
+   */
+  audioOutput: AudioOutputMode
   /** Rempli quand l'appel se termine (par nous ou a distance). */
   endedAt: number | null
   error: string | null
@@ -296,6 +305,7 @@ function initialState(): CallManagerState {
     remoteStreams: {},
     micOn: true,
     camOn: true,
+    audioOutput: defaultAudioOutput(),
     endedAt: null,
     error: null,
     displayMode: "full",
@@ -789,6 +799,9 @@ export async function startOutgoingCall(
     isGroup: started.isGroup,
     isInitiator: true,
     participantNames,
+    // Chaque appel repart du reglage par defaut : sans cette remise, un
+    // basculement fait pendant l'appel precedent collerait au suivant.
+    audioOutput: type === "video" ? "speaker" : defaultAudioOutput(),
     endedAt: null,
     error: null,
   })
@@ -851,6 +864,7 @@ export async function acceptIncomingCall(): Promise<string | null> {
     isInitiator: false,
     participantNames,
     incoming: null,
+    audioOutput: incoming.callType === "video" ? "speaker" : defaultAudioOutput(),
     endedAt: null,
     error: null,
   })
@@ -1009,6 +1023,11 @@ export function toggleCamera(): boolean {
 /** Change la taille de la fenetre d'appel, depuis n'importe laquelle des trois. */
 export function setCallDisplayMode(mode: CallDisplayMode): void {
   if (state.activeCallId) setState({ displayMode: mode })
+}
+
+/** Bascule haut-parleur / ecoute a l'oreille de l'appel en cours (appels audio). */
+export function setCallAudioOutput(mode: AudioOutputMode): void {
+  if (state.activeCallId) setState({ audioOutput: mode })
 }
 
 export function minimizeActiveCall(): void {

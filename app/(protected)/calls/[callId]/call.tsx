@@ -10,14 +10,14 @@ import {
   toggleMicrophone,
   switchCamera,
   minimizeActiveCall,
+  setCallAudioOutput,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
 import { useTranslation } from "../../../../src/i18n"
 import {
   OUTPUT_LABELS,
+  OUTPUT_LABELS_COURTS,
   OUTPUT_VOLUME,
-  defaultAudioOutput,
-  type AudioOutputMode,
 } from "../../../../src/services/audio-output"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./call-room-page.css"
@@ -87,16 +87,6 @@ export default function CallRoomPage() {
   const peerAvatar = avatarDisplaySrc(call.peerAvatarUrl)
 
   const [elapsed, setElapsed] = useState(0)
-  /**
-   * Sortie audio. Un appel video reste toujours au haut-parleur, sans bascule ;
-   * un appel audio part sur le mode choisi dans les reglages, l'ecoute a l'oreille
-   * par defaut. L'ancien etat etait un booleen initialise a `true` qui COUPAIT le
-   * son quand on le desactivait, et dont le libelle « Son / Muet » faisait doublon
-   * avec le bouton micro.
-   */
-  const [outputMode, setOutputMode] = useState<AudioOutputMode>(() =>
-    call.callType === "video" ? "speaker" : defaultAudioOutput()
-  )
   // Lecture refusee par le navigateur : sans cet etat, l'appel est muet et
   // l'utilisateur n'a aucune explication ni aucun moyen de reessayer.
   const [audioBlocked, setAudioBlocked] = useState(false)
@@ -171,7 +161,7 @@ export default function CallRoomPage() {
   // uniquement par les <audio> : la grande <video> reste muette en permanence,
   // sinon le meme flux serait joue deux fois (effet d'echo).
   useEffect(() => {
-    const volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[outputMode]
+    const volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[call.audioOutput]
     for (const audio of remoteAudioRefs.current.values()) {
       // On regle le NIVEAU et non la coupure : couper le son distant faisait
       // passer la bascule pour un second bouton « muet », alors qu'elle sert a
@@ -179,7 +169,7 @@ export default function CallRoomPage() {
       audio.muted = false
       audio.volume = volume
     }
-  }, [outputMode, isVideo, remoteStreamEntries])
+  }, [call.audioOutput, isVideo, remoteStreamEntries])
 
   /**
    * Deblocage manuel du son. Certains navigateurs mobiles refusent la lecture
@@ -188,13 +178,13 @@ export default function CallRoomPage() {
   const unblockAudio = useCallback(() => {
     for (const audio of remoteAudioRefs.current.values()) {
       audio.muted = false
-      audio.volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[outputMode]
+      audio.volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[call.audioOutput]
       void audio
         .play()
         .then(() => setAudioBlocked(false))
         .catch(() => undefined)
     }
-  }, [isVideo, outputMode])
+  }, [isVideo, call.audioOutput])
 
   const resetHideTimer = useCallback(() => {
     setControlsVisible(true)
@@ -265,7 +255,7 @@ export default function CallRoomPage() {
                     .catch(() => setAudioBlocked(true))
                 }
                 el.muted = false
-                el.volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[outputMode]
+                el.volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[call.audioOutput]
                 remoteAudioRefs.current.set(peerId, el)
               } else {
                 remoteAudioRefs.current.delete(peerId)
@@ -573,20 +563,20 @@ export default function CallRoomPage() {
                 <button
                   className="ctrl-btn"
                   onClick={() =>
-                    setOutputMode((mode) => (mode === "speaker" ? "earpiece" : "speaker"))
+                    setCallAudioOutput(call.audioOutput === "speaker" ? "earpiece" : "speaker")
                   }
-                  aria-label={OUTPUT_LABELS[outputMode]}
-                  aria-pressed={outputMode === "speaker"}
+                  aria-label={OUTPUT_LABELS[call.audioOutput]}
+                  aria-pressed={call.audioOutput === "speaker"}
                   title={
-                    outputMode === "speaker"
+                    call.audioOutput === "speaker"
                       ? "Passer en ecoute a l'oreille"
                       : "Passer en haut-parleur"
                   }
                 >
                   <div
-                    className={`ctrl-btn-icon ${outputMode === "speaker" ? "ctrl-on" : "ctrl-off"}`}
+                    className={`ctrl-btn-icon ${call.audioOutput === "speaker" ? "ctrl-on" : "ctrl-off"}`}
                   >
-                    {outputMode === "speaker" ? (
+                    {call.audioOutput === "speaker" ? (
                       <svg
                         width="20"
                         height="20"
@@ -615,7 +605,7 @@ export default function CallRoomPage() {
                       </svg>
                     )}
                   </div>
-                  <span className="ctrl-btn-label">{OUTPUT_LABELS[outputMode]}</span>
+                  <span className="ctrl-btn-label">{OUTPUT_LABELS_COURTS[call.audioOutput]}</span>
                 </button>
               )}
 

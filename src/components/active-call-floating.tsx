@@ -11,6 +11,7 @@ import {
   toggleMicrophone,
   type CallDisplayMode,
 } from "../services/call-manager"
+import { OUTPUT_VOLUME } from "../services/audio-output"
 import { toInitials } from "../data/session-user"
 import { avatarDisplaySrc } from "../lib/avatar"
 
@@ -93,7 +94,9 @@ export function ActiveCallFloating() {
         drag.current.on = false
       }}
     >
-      {/* Sorties audio des participants : conservees meme sans video affichee. */}
+      {/* Sorties audio des participants : conservees meme sans video affichee.
+          Le mode de sortie (haut-parleur vs ecoute a l'oreille) vit dans l'etat
+          global du call-manager et survit a la reduction/restauration de l'appel. */}
       {remoteEntries.map(([id, stream]) => (
         <audio
           key={id}
@@ -102,6 +105,11 @@ export function ActiveCallFloating() {
             if (el && el.srcObject !== stream) {
               el.srcObject = stream
               void el.play().catch(() => undefined)
+            }
+            if (el) {
+              el.muted = false
+              const volume = call.callType === "video" ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[call.audioOutput]
+              el.volume = volume
             }
           }}
         />
