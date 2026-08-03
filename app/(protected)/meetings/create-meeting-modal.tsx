@@ -15,8 +15,10 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
 
   const [step, setStep] = useState<"details" | "participants">("details")
   const [objet, setObjet] = useState("")
-  const [typeMedia, setTypeMedia] = useState(1) // 1 = audio, 2 = video
+  const [typeMedia, setTypeMedia] = useState(1)
   const [duree, setDuree] = useState("3600")
+  const [startTime, setStartTime] = useState("")
+  const [endTime, setEndTime] = useState("")
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
@@ -37,6 +39,10 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
       showError("Objet requis", "Veuillez entrer un objet pour la réunion")
       return
     }
+    if (!startTime) {
+      showError("Heure de début requise", "Veuillez entrer une heure de début")
+      return
+    }
 
     setLoading(true)
     try {
@@ -45,12 +51,16 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
         objet: objet.trim(),
         type_media: typeMedia,
         duree: parseInt(duree, 10) || 3600,
+        start_time: startTime,
+        ...(endTime && { end_time: endTime }),
         participantNumbers: participantNumbers.length > 0 ? participantNumbers : undefined,
       })
       success("Réunion créée!")
       setObjet("")
       setTypeMedia(1)
       setDuree("3600")
+      setStartTime("")
+      setEndTime("")
       setSelectedParticipants(new Set())
       setStep("details")
       onClose()
@@ -121,6 +131,24 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
                 max="28800"
               />
               <small>5 min min, 8 h max</small>
+            </div>
+
+            <div className="form-group">
+              <label>Heure de début *</label>
+              <input
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Heure de fin (optionnel)</label>
+              <input
+                type="datetime-local"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+              />
             </div>
 
             <div className="form-group">
