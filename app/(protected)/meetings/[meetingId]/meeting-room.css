@@ -1,0 +1,108 @@
+.meeting-room-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: linear-gradient(var(--motif-overlay), var(--motif-overlay)),
+    url("/motif-bg.png") repeat;
+  background-size: auto, 280px auto;
+  color: var(--text-primary);
+  padding: 20px;
+  gap: 20px;
+}
+
+.meeting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 16px;
+}
+
+.meeting-header h1 {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-primary);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-back:hover {
+  opacity: 0.7;
+}
+
+.meeting-info {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.meeting-info p {
+  margin: 8px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.meeting-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-join,
+.btn-leave {
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  transition: all 0.15s;
+}
+
+.btn-join {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn-join:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.btn-leave {
+  background: var(--danger);
+  color: white;
+}
+
+.btn-leave:hover {
+  opacity: 0.9;
+}
+
+.loading,
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--danger);
+}

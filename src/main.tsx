@@ -27,6 +27,7 @@ import SectionSplit from "../app/(protected)/section-split"
 import ContactsPage from "../app/(protected)/contacts/contacts"
 import StatusPage from "../app/(protected)/status/status"
 import MeetingsPage from "../app/(protected)/meetings/meetings"
+import MeetingRoomPage from "../app/(protected)/meetings/[meetingId]/meeting-room"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -240,6 +241,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       >
                         <MeetingsPage />
                       </SectionSplit>
+                    </ProtectedLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/meetings/:meetingId"
+                element={
+                  <ProtectedRoute>
+                    <ProtectedLayout>
+                      <MeetingRoomPage />
                     </ProtectedLayout>
                   </ProtectedRoute>
                 }
