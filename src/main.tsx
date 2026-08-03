@@ -26,6 +26,7 @@ import ChatsSplit, { ChatEmptyState } from "../app/(protected)/chats/chats-split
 import SectionSplit from "../app/(protected)/section-split"
 import ContactsPage from "../app/(protected)/contacts/contacts"
 import StatusPage from "../app/(protected)/status/status"
+import MeetingsPage from "../app/(protected)/meetings/meetings"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -203,6 +204,42 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <ProtectedRoute>
                     <ProtectedLayout>
                       <CallRoomPage />
+                    </ProtectedLayout>
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/meetings"
+                element={
+                  <ProtectedRoute>
+                    <ProtectedLayout>
+                      <SectionSplit
+                        title="Réunions"
+                        subtitle="Rejoignez vos réunions programmées et collaborez en direct."
+                        icon={
+                          <svg
+                            width="34"
+                            height="34"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                            <circle cx="8" cy="16" r="1" />
+                            <circle cx="12" cy="16" r="1" />
+                            <circle cx="16" cy="16" r="1" />
+                          </svg>
+                        }
+                      >
+                        <MeetingsPage />
+                      </SectionSplit>
                     </ProtectedLayout>
                   </ProtectedRoute>
                 }
