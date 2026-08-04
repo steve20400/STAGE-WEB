@@ -1054,7 +1054,9 @@ export async function hangUp(): Promise<void> {
 
   try {
     if (callId) {
-      if (wasGroup && !wasInitiator && wasRole === "ongoing") {
+      // Dans un groupe, même l'initiateur quitte individuellement après décrochage.
+      // Le backend ne termine globalement que lorsqu'il reste moins de deux personnes.
+      if (wasGroup && wasRole === "ongoing") {
         await leaveCallRest(callId)
         sendCallState(callId, "left", myUserId() ?? undefined, myDisplayName())
       } else {
