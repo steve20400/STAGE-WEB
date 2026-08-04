@@ -733,8 +733,10 @@ async function handleServerEvent(event: CallServerEvent) {
       }
       if (callId === state.activeCallId && userId) {
         removePeer(userId)
-        // Appel direct : si l'autre part, l'appel est fini pour nous aussi.
-        if (!state.isGroup) {
+        // Un appel direct peut devenir un transfert à trois participants.
+        // Ne terminons que lorsqu'aucun pair WebRTC ne reste après ce départ.
+        // Sinon, le correspondant transféré continuerait à être coupé.
+        if (!state.isGroup && peers.size === 0) {
           void hangUp()
         }
       }
