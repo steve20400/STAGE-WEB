@@ -1,0 +1,210 @@
+/* ============================================================
+   Menu « trois points » de l'appel — identique dans les trois
+   fenetres (petite, moyenne, grande).
+
+   Le panneau se positionne dans un .call-opt-anchor pose autour
+   du bouton trois points. Il s'ouvre VERS LE HAUT : la barre de
+   commandes est toujours en bas, un menu vers le bas sortirait
+   de la fenetre.
+   ============================================================ */
+.call-opt-anchor {
+  position: relative;
+  display: flex;
+}
+
+.call-opt-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: 0;
+  width: max-content;
+  min-width: 210px;
+  /* Borne la largeur : dans la petite fenetre, un menu plus large que la
+     fenetre elle-meme depasserait sur la page. */
+  max-width: min(280px, calc(100vw - 24px));
+  /* Et la hauteur : au-dela, le menu defile au lieu de sortir de l'ecran. */
+  max-height: min(320px, calc(100vh - 120px));
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 14px 34px #0009;
+  z-index: 60;
+  cursor: default;
+  text-align: left;
+}
+
+.call-opt-menu .call-opt-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  min-height: 38px;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.call-opt-menu .call-opt-item + .call-opt-item {
+  margin-top: 2px;
+}
+.call-opt-menu .call-opt-item:hover {
+  background: var(--bg-surface);
+}
+.call-opt-menu .call-opt-item:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: -2px;
+}
+
+.call-opt-menu .call-opt-chevron {
+  color: var(--text-ghost);
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Entete du sous-menu des tailles : sert aussi de retour vers la racine. */
+.call-opt-menu .call-opt-retour {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 12px 9px;
+  margin-bottom: 4px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  background: none;
+  color: var(--text-ghost);
+  font-family: "DM Sans", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.call-opt-menu .call-opt-retour:hover {
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   Dialogues « inviter » / « transferer »
+   Rendus dans un portail sur <body> : la petite fenetre d'appel
+   est en overflow:hidden, un dialogue interne y serait rogne.
+   ============================================================ */
+.call-opt-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9500;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.call-opt-overlay .call-opt-dialog {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 22px;
+  max-width: 360px;
+  width: 100%;
+  cursor: default;
+}
+
+.call-opt-overlay .call-opt-dialog-title {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+  margin-bottom: 14px;
+}
+
+.call-opt-overlay .call-opt-search {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.call-opt-overlay .call-opt-search:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 1px;
+}
+
+.call-opt-overlay .call-opt-list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-muted);
+}
+
+.call-opt-overlay .call-opt-contact {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.call-opt-overlay .call-opt-contact + .call-opt-contact {
+  border-top: 1px solid var(--border-subtle);
+}
+.call-opt-overlay .call-opt-contact:hover {
+  background: var(--bg-elevated);
+}
+.call-opt-overlay .call-opt-contact b {
+  display: block;
+  font-weight: 600;
+}
+.call-opt-overlay .call-opt-contact span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.call-opt-overlay .call-opt-vide {
+  padding: 12px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.call-opt-overlay .call-opt-annuler {
+  width: 100%;
+  background: var(--border-subtle);
+  border: 1px solid var(--border-default);
+  border-radius: 9px;
+  padding: 11px;
+  color: var(--text-secondary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.call-opt-overlay .call-opt-annuler:hover {
+  background: var(--border-default);
+}

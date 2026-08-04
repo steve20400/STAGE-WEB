@@ -4,13 +4,8 @@ import { useCallState } from "../hooks/use-call"
 import { ParticipantGrid } from "./participant-grid"
 
 import { useHasLiveVideo } from "../hooks/use-remote-video"
-import {
-  hangUp,
-  restoreActiveCall,
-  setCallDisplayMode,
-  toggleMicrophone,
-  type CallDisplayMode,
-} from "../services/call-manager"
+import { CallOptionsMenu } from "./call-options-menu"
+import { hangUp, restoreActiveCall, toggleMicrophone } from "../services/call-manager"
 import { OUTPUT_VOLUME } from "../services/audio-output"
 import { toInitials } from "../data/session-user"
 import { avatarDisplaySrc } from "../lib/avatar"
@@ -108,7 +103,8 @@ export function ActiveCallFloating() {
             }
             if (el) {
               el.muted = false
-              const volume = call.callType === "video" ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[call.audioOutput]
+              const volume =
+                call.callType === "video" ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[call.audioOutput]
               el.volume = volume
             }
           }}
@@ -153,35 +149,12 @@ export function ActiveCallFloating() {
         )}
       </div>
 
-      {menuOuvert && (
-        <div className="active-call-menu" onPointerDown={(e) => e.stopPropagation()}>
-          <div className="acm-section">Taille de la fenetre</div>
-          {(
-            [
-              ["small", "Petit ecran"],
-              ["medium", "Ecran moyen"],
-              ["full", "Grand ecran"],
-            ] as Array<[CallDisplayMode, string]>
-          ).map(([mode, libelle]) => (
-            <button
-              key={mode}
-              className={call.displayMode === mode ? "acm-item on" : "acm-item"}
-              aria-pressed={call.displayMode === mode}
-              onClick={() => {
-                setMenuOuvert(false)
-                // Le grand ecran est un ecran a part entiere : il faut y naviguer.
-                if (mode === "full") restore()
-                else setCallDisplayMode(mode)
-              }}
-            >
-              {libelle}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Commandes toujours visibles : elles n'apparaissaient qu'apres un clic
-          sur la fenetre, ce qui les rendait introuvables. */}
+          sur la fenetre, ce qui les rendait introuvables.
+
+          Le bouton trois points ferme la marche, tout a droite : c'est la porte
+          vers les autres actions, pas une commande d'appel — il ne se melange
+          donc pas aux boutons micro / raccrocher, qui restent a sa gauche. */}
       <div className="active-call-controls" onPointerDown={(e) => e.stopPropagation()}>
         <button onClick={restore} title="Revenir a l'ecran d'appel">
           Retour appel
@@ -196,17 +169,19 @@ export function ActiveCallFloating() {
         <button className="end" onClick={() => void hangUp()} title="Raccrocher">
           Raccrocher
         </button>
-        {/* Quatrieme bouton, prevu pour accueillir d'autres entrees : inviter des
-            participants et transferer l'appel viendront s'y ajouter. */}
-        <button
-          className="more"
-          onClick={() => setMenuOuvert((ouvert) => !ouvert)}
-          aria-expanded={menuOuvert}
-          aria-label="Autres actions"
-          title="Autres actions"
-        >
-          ⋮
-        </button>
+        <div className="call-opt-anchor">
+          <button
+            className="more"
+            onClick={() => setMenuOuvert((ouvert) => !ouvert)}
+            aria-expanded={menuOuvert}
+            aria-haspopup="menu"
+            aria-label="Autres actions"
+            title="Autres actions"
+          >
+            ⋮
+          </button>
+          <CallOptionsMenu open={menuOuvert} onClose={() => setMenuOuvert(false)} />
+        </div>
       </div>
     </div>
   )

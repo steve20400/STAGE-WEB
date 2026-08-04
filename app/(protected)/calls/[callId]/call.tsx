@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useCallState } from "../../../../src/hooks/use-call"
 import { useHasLiveVideo } from "../../../../src/hooks/use-remote-video"
-import { useContacts } from "../../../../src/hooks/use-contacts"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
+import { CallOptionsMenu } from "../../../../src/components/call-options-menu"
 import {
   acknowledgeCallEnded,
   hangUp as hangUpCall,
@@ -12,7 +12,6 @@ import {
   switchCamera,
   minimizeActiveCall,
   setCallAudioOutput,
-  transferCall,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
 import { useTranslation } from "../../../../src/i18n"
@@ -51,45 +50,6 @@ export default function CallRoomPage() {
   const returnTo = searchParams.get("returnTo") || "/calls"
 
   const call = useCallState()
-  const { contacts } = useContacts()
-
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
-  const [transferDialogOpen, setTransferDialogOpen] = useState(false)
-  const [inviteSearchQuery, setInviteSearchQuery] = useState("")
-  const [transferSearchQuery, setTransferSearchQuery] = useState("")
-
-  const filteredContactsForInvite = useMemo(() => {
-    const query = inviteSearchQuery.toLowerCase()
-    return contacts.filter((c) =>
-      c.name.toLowerCase().includes(query) || c.phone.includes(inviteSearchQuery)
-    )
-  }, [contacts, inviteSearchQuery])
-
-  const filteredContactsForTransfer = useMemo(() => {
-    const query = transferSearchQuery.toLowerCase()
-    return contacts.filter((c) =>
-      c.name.toLowerCase().includes(query) || c.phone.includes(transferSearchQuery)
-    )
-  }, [contacts, transferSearchQuery])
-
-  const handleInviteContact = (contactPhone: string) => {
-    // TODO: Implémenter l'envoi de l'invitation via WebSocket
-    // sendCallSignal() ou un événement similaire pour inviter le contact
-    setInviteDialogOpen(false)
-    setInviteSearchQuery("")
-    // Pour maintenant, juste fermer et montrer un message
-    console.log("Invitation envoyée à", contactPhone)
-  }
-
-  const handleTransferCall = (toUserId: string) => {
-    try {
-      void transferCall(toUserId)
-      setTransferDialogOpen(false)
-      setTransferSearchQuery("")
-    } catch (err) {
-      console.error("Erreur lors du transfert :", err)
-    }
-  }
 
   const isOurCall = call.activeCallId !== null && call.activeCallId === callId
   const remoteStreamEntries = useMemo(
@@ -234,10 +194,12 @@ export default function CallRoomPage() {
       window.clearTimeout(showControlsTimerRef.current)
       showControlsTimerRef.current = null
     }
-    if (isVideo && callState === "active") {
+    // Menu ouvert : pas d'effacement automatique. La barre emporterait le menu
+    // avec elle au bout de quatre secondes, en pleine lecture.
+    if (isVideo && callState === "active" && !showMoreMenu) {
       showControlsTimerRef.current = window.setTimeout(() => setControlsVisible(false), 4000)
     }
-  }, [isVideo, callState])
+  }, [isVideo, callState, showMoreMenu])
 
   useEffect(() => {
     resetHideTimer()
@@ -677,44 +639,6 @@ export default function CallRoomPage() {
                 </button>
               )}
 
-              <div style={{ position: "relative" }}>
-                <button
-                  className="ctrl-btn"
-                  onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  aria-label="Plus d'options"
-                  title="Plus d'options"
-                >
-                  <div className="ctrl-btn-icon ctrl-on">
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <circle cx="12" cy="5" r="2" />
-                      <circle cx="12" cy="12" r="2" />
-                      <circle cx="12" cy="19" r="2" />
-                    </svg>
-                  </div>
-                </button>
-                {showMoreMenu && (
-                  <div className="call-more-menu">
-                    <button onClick={() => {
-                      setShowMoreMenu(false)
-                      setInviteDialogOpen(true)
-                    }}>
-                      Inviter une personne
-                    </button>
-                    <button onClick={() => {
-                      setShowMoreMenu(false)
-                      setTransferDialogOpen(true)
-                    }}>
-                      Transférer l'appel
-                    </button>
-                  </div>
-                )}
-              </div>
-
               <button
                 className="ctrl-btn"
                 onClick={() => {
@@ -743,6 +667,35 @@ export default function CallRoomPage() {
                   Raccrocher
                 </span>
               </button>
+
+              {/* Dernier de la barre, tout a droite : le menu n'est pas une
+                  commande d'appel, il ouvre les autres actions. Toutes les
+                  commandes — micro, camera, chat, raccrocher — restent a sa
+                  gauche, comme dans les fenetres reduites. */}
+              <div className="call-opt-anchor">
+                <button
+                  className="ctrl-btn"
+                  onClick={() => setShowMoreMenu((ouvert) => !ouvert)}
+                  aria-expanded={showMoreMenu}
+                  aria-haspopup="menu"
+                  aria-label="Autres actions"
+                  title="Autres actions"
+                >
+                  <div className="ctrl-btn-icon ctrl-on">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="12" cy="5" r="2" />
+                      <circle cx="12" cy="12" r="2" />
+                      <circle cx="12" cy="19" r="2" />
+                    </svg>
+                  </div>
+                  <span className="ctrl-btn-label">Plus</span>
+                </button>
+                <CallOptionsMenu
+                  open={showMoreMenu}
+                  onClose={() => setShowMoreMenu(false)}
+                  returnTo={returnTo}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -786,152 +739,6 @@ export default function CallRoomPage() {
                 </button>
                 <button className="confirm-end" onClick={doHangUp}>
                   Raccrocher
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {inviteDialogOpen && (
-          <div className="confirm-overlay">
-            <div className="confirm-card">
-              <div className="confirm-title">Inviter une personne</div>
-              <div style={{ marginTop: "16px", marginBottom: "12px" }}>
-                <input
-                  type="text"
-                  placeholder="Rechercher par nom ou numero..."
-                  value={inviteSearchQuery}
-                  onChange={(e) => setInviteSearchQuery(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    borderRadius: "6px",
-                    border: "1px solid var(--border-default)",
-                    backgroundColor: "var(--bg-base)",
-                    color: "var(--text-primary)",
-                    fontFamily: '"DM Sans", sans-serif',
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-              <div style={{
-                maxHeight: "200px",
-                overflowY: "auto",
-                marginBottom: "12px",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: "6px",
-                backgroundColor: "var(--bg-muted)",
-              }}>
-                {filteredContactsForInvite.length > 0 ? (
-                  filteredContactsForInvite.map((contact) => (
-                    <button
-                      key={contact.phone}
-                      onClick={() => handleInviteContact(contact.phone)}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "10px",
-                        textAlign: "left",
-                        backgroundColor: "transparent",
-                        border: "none",
-                        borderBottom: "1px solid var(--border-subtle)",
-                        color: "var(--text-primary)",
-                        cursor: "pointer",
-                        fontSize: "13px",
-                        fontFamily: '"DM Sans", sans-serif',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-elevated)"}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                    >
-                      <div style={{ fontWeight: "600" }}>{contact.name}</div>
-                      <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{contact.phone}</div>
-                    </button>
-                  ))
-                ) : (
-                  <div style={{ padding: "10px", color: "var(--text-muted)", fontSize: "12px" }}>
-                    Aucun contact trouvé
-                  </div>
-                )}
-              </div>
-              <div className="confirm-btns">
-                <button className="confirm-cancel" onClick={() => {
-                  setInviteDialogOpen(false)
-                  setInviteSearchQuery("")
-                }}>
-                  Annuler
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {transferDialogOpen && (
-          <div className="confirm-overlay">
-            <div className="confirm-card">
-              <div className="confirm-title">Transferer l'appel</div>
-              <div style={{ marginTop: "16px", marginBottom: "12px" }}>
-                <input
-                  type="text"
-                  placeholder="Rechercher par nom ou numero..."
-                  value={transferSearchQuery}
-                  onChange={(e) => setTransferSearchQuery(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "8px",
-                    borderRadius: "6px",
-                    border: "1px solid var(--border-default)",
-                    backgroundColor: "var(--bg-base)",
-                    color: "var(--text-primary)",
-                    fontFamily: '"DM Sans", sans-serif',
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-              <div style={{
-                maxHeight: "200px",
-                overflowY: "auto",
-                marginBottom: "12px",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: "6px",
-                backgroundColor: "var(--bg-muted)",
-              }}>
-                {filteredContactsForTransfer.length > 0 ? (
-                  filteredContactsForTransfer.map((contact) => (
-                    <button
-                      key={contact.phone}
-                      onClick={() => handleTransferCall(contact.phone)}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "10px",
-                        textAlign: "left",
-                        backgroundColor: "transparent",
-                        border: "none",
-                        borderBottom: "1px solid var(--border-subtle)",
-                        color: "var(--text-primary)",
-                        cursor: "pointer",
-                        fontSize: "13px",
-                        fontFamily: '"DM Sans", sans-serif',
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--bg-elevated)"}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                    >
-                      <div style={{ fontWeight: "600" }}>{contact.name}</div>
-                      <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>{contact.phone}</div>
-                    </button>
-                  ))
-                ) : (
-                  <div style={{ padding: "10px", color: "var(--text-muted)", fontSize: "12px" }}>
-                    Aucun contact trouvé
-                  </div>
-                )}
-              </div>
-              <div className="confirm-btns">
-                <button className="confirm-cancel" onClick={() => {
-                  setTransferDialogOpen(false)
-                  setTransferSearchQuery("")
-                }}>
-                  Annuler
                 </button>
               </div>
             </div>
