@@ -1,15 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
 import { useContacts } from "../hooks/use-contacts"
 import { useToast } from "./toast"
 import {
+  inviteToCall,
   restoreActiveCall,
   setCallDisplayMode,
   transferCall,
   type CallDisplayMode,
 } from "../services/call-manager"
+import {
+  ALANYA_NUMBER_MAX_LENGTH,
+  formatAlanyaNumber,
+  isValidAlanyaNumber,
+  normalizeAlanyaNumber,
+} from "../lib/alanya-number"
 import "./call-options-menu.css"
 
 const LIBELLE_TAILLE: Record<CallDisplayMode, string> = {
@@ -17,6 +24,9 @@ const LIBELLE_TAILLE: Record<CallDisplayMode, string> = {
   medium: "Ecran moyen",
   full: "Grand ecran",
 }
+
+/** Disposition d'un clavier de telephone, la meme que celle du composeur. */
+const TOUCHES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""] as const
 
 /**
  * Les deux AUTRES tailles : une fenetre ne se propose jamais elle-meme.
@@ -61,6 +71,12 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
   const [vue, setVue] = useState<"racine" | "taille">("racine")
   const [dialogue, setDialogue] = useState<null | "inviter" | "transferer">(null)
   const [recherche, setRecherche] = useState("")
+  /**
+   * Deux facons de designer quelqu'un, au choix : le prendre dans ses contacts,
+   * ou composer son Alanya ID. Le destinataire n'est pas toujours enregistre.
+   */
+  const [onglet, setOnglet] = useState<"contacts" | "numero">("contacts")
+  const [chiffres, setChiffres] = useState("")
   const panneauRef = useRef<HTMLDivElement | null>(null)
 
   // Le menu repart toujours de sa racine : rouvrir sur le sous-menu des tailles
@@ -101,14 +117,17 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
 
   const ouvrirDialogue = (lequel: "inviter" | "transferer") => {
     setRecherche("")
+    setChiffres("")
+    setOnglet("contacts")
     setDialogue(lequel)
     onClose()
   }
 
-  const fermerDialogue = () => {
+  const fermerDialogue = useCallback(() => {
     setDialogue(null)
     setRecherche("")
-  }
+    setChiffres("")
+  }, [])
 
   const changerTaille = (mode: CallDisplayMode) => {
     onClose()
@@ -127,27 +146,77 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
     if (depuisLeGrandEcran) navigate(returnTo)
   }
 
-  const inviter = (nom: string) => {
-    // TODO: envoyer l'invitation par WebSocket quand le signal existera cote
-    // serveur. En attendant, l'utilisateur a au moins un retour explicite.
-    fermerDialogue()
-    toast.info("Invitation a venir", `L'invitation de ${nom} n'est pas encore transmise.`)
-  }
-
   /**
-   * Le destinataire est designe par son numero public : `contact.id` est
-   * l'identifiant de la FICHE contact, pas celui de l'utilisateur distant.
+   * Envoie l'action du dialogue vers un destinataire.
+   *
+   * Le destinataire est toujours designe par son numero public — jamais par
+   * `contact.id`, qui identifie la FICHE contact locale et non l'utilisateur
+   * distant. C'est ce qui permet de traiter de la meme facon un contact choisi
+   * dans la liste et un numero compose au clavier.
    */
-  const transferer = (numero: string, nom: string) => {
-    fermerDialogue()
-    // transferCall est asynchrone : un try/catch autour de l'appel ne verrait
-    // jamais le rejet, l'echec passerait pour un succes.
-    transferCall(numero)
-      .then(() => toast.success("Transfert demande", `L'appel est transfere vers ${nom}.`))
-      .catch((err: unknown) =>
-        toast.error("Transfert impossible", err instanceof Error ? err.message : undefined)
-      )
-  }
+  const valider = useCallback(
+    (numero: string, nom: string) => {
+      const cible = normalizeAlanyaNumber(numero) || numero
+      const inviter = dialogue === "inviter"
+      fermerDialogue()
+
+      // Les deux actions sont asynchrones : un try/catch autour de l'appel ne
+      // verrait jamais le rejet, et un echec passerait pour un succes.
+      const demande = inviter ? inviteToCall(cible) : transferCall(cible)
+      demande
+        .then(() =>
+          inviter
+            ? toast.success("Invitation envoyee", `Le telephone de ${nom} sonne.`)
+            : toast.info("Transfert lance", `Depart des que ${nom} decroche.`)
+        )
+        .catch((err: unknown) =>
+          toast.error(
+            inviter ? "Invitation impossible" : "Transfert impossible",
+            err instanceof Error ? err.message : undefined
+          )
+        )
+    },
+    [dialogue, fermerDialogue, toast]
+  )
+
+  // ---- Pave de saisie -------------------------------------------------------
+
+  const numeroValide = isValidAlanyaNumber(chiffres)
+
+  /** Un numero compose peut deja etre dans les contacts : autant le nommer. */
+  const contactDuNumero = useMemo(() => {
+    if (chiffres.length < 6) return null
+    return contacts.find((c) => normalizeAlanyaNumber(c.phone) === chiffres) ?? null
+  }, [chiffres, contacts])
+
+  const taper = useCallback((touche: string) => {
+    setChiffres((actuel) =>
+      normalizeAlanyaNumber(actuel + touche).slice(0, ALANYA_NUMBER_MAX_LENGTH)
+    )
+  }, [])
+
+  const effacer = useCallback(() => setChiffres((actuel) => actuel.slice(0, -1)), [])
+
+  const validerLeNumero = useCallback(() => {
+    if (!isValidAlanyaNumber(chiffres)) return
+    valider(chiffres, contactDuNumero?.name ?? formatAlanyaNumber(chiffres))
+  }, [chiffres, contactDuNumero, valider])
+
+  // On est dans un navigateur : le clavier physique doit composer aussi.
+  useEffect(() => {
+    if (dialogue === null || onglet !== "numero") return
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return fermerDialogue()
+      if (e.key === "Enter") return validerLeNumero()
+      if (e.key === "Backspace") {
+        e.preventDefault()
+        return effacer()
+      }
+      if (/^[0-9]$/.test(e.key)) taper(e.key)
+    }
+    document.addEventListener("keydown", surTouche)
+    return () => document.removeEventListener("keydown", surTouche)
+  }, [dialogue, onglet, effacer, fermerDialogue, taper, validerLeNumero])
 
   return (
     <>
@@ -217,35 +286,112 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                 {dialogue === "inviter" ? "Inviter une personne" : "Transferer l'appel"}
               </div>
 
-              <input
-                className="call-opt-search"
-                type="text"
-                autoFocus
-                placeholder="Rechercher par nom ou numero..."
-                value={recherche}
-                onChange={(e) => setRecherche(e.target.value)}
-              />
-
-              <div className="call-opt-list">
-                {contactsFiltres.length > 0 ? (
-                  contactsFiltres.map((contact) => (
-                    <button
-                      key={contact.id}
-                      className="call-opt-contact"
-                      onClick={() =>
-                        dialogue === "inviter"
-                          ? inviter(contact.name)
-                          : transferer(contact.phone, contact.name)
-                      }
-                    >
-                      <b>{contact.name}</b>
-                      <span>{contact.phone}</span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="call-opt-vide">Aucun contact trouve</div>
-                )}
+              {/* Deux entrees pour la meme action : la liste des contacts, ou le
+                  clavier. Un destinataire n'est pas toujours enregistre. */}
+              <div className="call-opt-onglets" role="tablist">
+                <button
+                  className={onglet === "contacts" ? "call-opt-onglet on" : "call-opt-onglet"}
+                  role="tab"
+                  aria-selected={onglet === "contacts"}
+                  onClick={() => setOnglet("contacts")}
+                >
+                  Contacts
+                </button>
+                <button
+                  className={onglet === "numero" ? "call-opt-onglet on" : "call-opt-onglet"}
+                  role="tab"
+                  aria-selected={onglet === "numero"}
+                  onClick={() => setOnglet("numero")}
+                >
+                  Composer un ID
+                </button>
               </div>
+
+              {onglet === "contacts" ? (
+                <>
+                  <input
+                    className="call-opt-search"
+                    type="text"
+                    autoFocus
+                    placeholder="Rechercher par nom ou numero..."
+                    value={recherche}
+                    onChange={(e) => setRecherche(e.target.value)}
+                  />
+
+                  <div className="call-opt-list">
+                    {contactsFiltres.length > 0 ? (
+                      contactsFiltres.map((contact) => (
+                        <button
+                          key={contact.id}
+                          className="call-opt-contact"
+                          onClick={() => valider(contact.phone, contact.name)}
+                        >
+                          <b>{contact.name}</b>
+                          <span>{contact.phone}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="call-opt-vide">Aucun contact trouve</div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="call-opt-pave">
+                  <div className="call-opt-numero" aria-live="polite">
+                    {chiffres ? (
+                      formatAlanyaNumber(chiffres)
+                    ) : (
+                      <span className="call-opt-numero-vide">Alanya ID</span>
+                    )}
+                  </div>
+                  <div className="call-opt-numero-aide" aria-live="polite">
+                    {chiffres.length === 0
+                      ? "Composez un Alanya ID de 6 ou 8 chiffres"
+                      : contactDuNumero
+                        ? contactDuNumero.name
+                        : numeroValide
+                          ? "Numero complet"
+                          : `${chiffres.length} chiffre${chiffres.length > 1 ? "s" : ""} — il en faut 6 ou 8`}
+                  </div>
+
+                  <div className="call-opt-touches">
+                    {TOUCHES.map((touche, index) =>
+                      touche === "" ? (
+                        // Les cases vides tiennent la grille : le 0 reste centre
+                        // sous le 8, comme sur un telephone.
+                        <span key={`vide-${index}`} aria-hidden />
+                      ) : (
+                        <button
+                          key={touche}
+                          className="call-opt-touche"
+                          onClick={() => taper(touche)}
+                          aria-label={touche}
+                        >
+                          {touche}
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  <button
+                    className="call-opt-effacer"
+                    onClick={effacer}
+                    disabled={chiffres.length === 0}
+                    aria-label="Effacer le dernier chiffre"
+                  >
+                    ⌫ Effacer
+                  </button>
+
+                  <button
+                    className="call-opt-valider"
+                    onClick={validerLeNumero}
+                    disabled={!numeroValide}
+                    title={numeroValide ? undefined : "Composez 6 ou 8 chiffres"}
+                  >
+                    {dialogue === "inviter" ? "Inviter ce numero" : "Transferer vers ce numero"}
+                  </button>
+                </div>
+              )}
 
               <button className="call-opt-annuler" onClick={fermerDialogue}>
                 Annuler

@@ -14,6 +14,7 @@ import {
   type CallType,
 } from "./calls-service"
 import {
+  sendCallInvite,
   sendCallRing,
   sendCallSignal,
   sendCallState,
@@ -24,6 +25,7 @@ import {
   sendMeetingLeft,
   type CallServerEvent,
 } from "./websocket-service"
+import { isValidAlanyaNumber, normalizeAlanyaNumber } from "../lib/alanya-number"
 
 /**
  * Gestion des appels WebRTC — miroir du CallController de l'app mobile Flutter
@@ -92,6 +94,12 @@ export interface CallManagerState {
    * « full » l'ecran d'appel entier.
    */
   displayMode: CallDisplayMode
+  /**
+   * Transfert supervise en attente : la cible a ete invitee, on attend qu'elle
+   * decroche pour partir. L'ecran d'appel le montre — sinon, entre le clic sur
+   * « Transferer » et le depart, rien ne bouge et l'action parait sans effet.
+   */
+  transferPending: boolean
 }
 
 interface WebrtcSignal {
@@ -313,11 +321,21 @@ function initialState(): CallManagerState {
     endedAt: null,
     error: null,
     displayMode: "full",
+    transferPending: false,
   }
 }
 
 let state: CallManagerState = initialState()
 const stateListeners = new Set<() => void>()
+
+/**
+ * Cible d'un transfert supervise. Elle n'est connue qu'apres le `call_state`
+ * "inviting" du serveur, qui nous apprend l'identifiant de l'invite : le numero
+ * compose ne suffit pas a le reconnaitre parmi les participants qui arrivent.
+ * L'attente elle-meme vit dans l'etat (`transferPending`), car l'ecran d'appel
+ * doit la montrer.
+ */
+let cibleDuTransfert: string | null = null
 
 let outgoingRingtoneAudio: HTMLAudioElement | null = null
 let incomingRingtoneAudio: HTMLAudioElement | null = null
@@ -532,6 +550,10 @@ function clearCall(markEnded: boolean) {
     clearTimeout(ringTimeoutId)
     ringTimeoutId = null
   }
+  // Un transfert ne survit pas a l'appel qu'il concernait : sans cette remise,
+  // l'appel suivant partirait des l'arrivee du premier participant.
+  // (transferPending repart a faux avec initialState.)
+  cibleDuTransfert = null
   stopMesh()
   stopOutgoingRingtone()
   stopIncomingRingtone()
@@ -665,12 +687,29 @@ async function handleServerEvent(event: CallServerEvent) {
       return
     }
 
+    if (callState === "inviting") {
+      // Le serveur nous apprend QUI vient d'etre invite. Sans cela, un transfert
+      // ne saurait pas reconnaitre sa cible parmi les arrivants.
+      if (state.transferPending && userId && userId !== me) {
+        cibleDuTransfert = userId
+      }
+      return
+    }
+
     if (callState === "joined" || callState === "accepted") {
       // Un autre appareil connecté au même compte a décroché : il faut arrêter
       // la sonnerie locale, mais surtout ne jamais terminer l'appel serveur.
       if (userId === me) {
         if (callId === state.incoming?.callId) setState({ incoming: null })
         return
+      }
+      // Transfert supervise : la cible a rejoint, on peut partir. L'appel
+      // continue entre le correspondant d'origine et elle.
+      if (state.transferPending && userId && userId === cibleDuTransfert) {
+        if (callId === state.activeCallId) {
+          await acheverLeTransfert(callId)
+          return
+        }
       }
       if (callId === state.activeCallId || callId === state.incoming?.callId) {
         await onPeerJoined(userId ?? "", displayName)
@@ -683,6 +722,13 @@ async function handleServerEvent(event: CallServerEvent) {
       // meme compte qui vient de refuser pendant que l'on sonne ici.
       if (userId === me) {
         if (callId === state.incoming?.callId) setState({ incoming: null })
+        return
+      }
+      // La cible du transfert refuse : on annule et on reste dans l'appel,
+      // plutot que de partir en laissant le correspondant seul.
+      if (callState === "declined" && state.transferPending && userId === cibleDuTransfert) {
+        cibleDuTransfert = null
+        setState({ transferPending: false, error: "Transfert refuse" })
         return
       }
       if (callId === state.activeCallId && userId) {
@@ -1118,13 +1164,65 @@ export function acknowledgeCallEnded() {
   }
 }
 
-/** Initie un transfert d'appel vers un autre participant ou un contact. */
-export async function transferCall(toUserId: string): Promise<void> {
+/**
+ * Verifie qu'une demande visant un tiers est realisable, et renvoie le numero
+ * Alanya normalise. Inviter et transferer ont exactement les memes prerequis :
+ * un appel en cours, et un numero valide qui n'est pas le sien.
+ */
+function cibleDeLaDemande(numeroSaisi: string, action: string): string {
   if (!state.activeCallId) {
-    throw new Error("Aucun appel actif à transférer")
+    throw new Error(`Aucun appel en cours : impossible de ${action}.`)
   }
+  const numero = normalizeAlanyaNumber(numeroSaisi)
+  if (!isValidAlanyaNumber(numero)) {
+    throw new Error("Numero Alanya invalide : il faut 6 ou 8 chiffres.")
+  }
+  if (numero === normalizeAlanyaNumber(loadSessionUser()?.phone ?? "")) {
+    throw new Error("C'est votre propre numero.")
+  }
+  return numero
+}
 
-  // Notifie le serveur de la demande de transfert
-  // Le backend gère l'acceptation/rejet et la reconnexion des participants
-  sendCallState(state.activeCallId, "transfer_request", toUserId)
+/**
+ * Invite un tiers dans l'appel en cours, par son numero Alanya, SANS quitter.
+ *
+ * Seul le serveur peut faire sonner quelqu'un : `call_invite` lui demande de
+ * sonner le numero et de l'ajouter aux participants. L'invite arrive ensuite
+ * comme n'importe quel participant — le `call_state` "joined" qui suit monte
+ * le flux WebRTC sans traitement particulier. L'appel devient multi-partie.
+ */
+export async function inviteToCall(publicNumber: string): Promise<void> {
+  const numero = cibleDeLaDemande(publicNumber, "inviter quelqu'un")
+  setState({ isGroup: true })
+  sendCallInvite(state.activeCallId as string, numero)
+}
+
+/**
+ * Transfert supervise : on invite la cible, et des qu'elle a REJOINT, on quitte
+ * l'appel — qui continue entre le correspondant d'origine et elle.
+ *
+ * On ne raccroche donc pas tout de suite : partir avant que la cible ait
+ * decroche couperait le correspondant, et un transfert refuse laisserait tout
+ * le monde en plan. C'est le meme protocole que l'application mobile.
+ */
+export async function transferCall(publicNumber: string): Promise<void> {
+  const numero = cibleDeLaDemande(publicNumber, "transferer l'appel")
+  cibleDuTransfert = null
+  setState({ transferPending: true, error: null })
+  sendCallInvite(state.activeCallId as string, numero)
+}
+
+/** L'initiateur quitte SANS terminer l'appel pour les autres (transfert). */
+async function acheverLeTransfert(callId: string): Promise<void> {
+  cibleDuTransfert = null
+  // Neutralise l'appel local avant le nettoyage, pour ignorer les echos.
+  setState({ activeCallId: null, transferPending: false })
+  try {
+    await leaveCallRest(callId)
+  } catch {
+    // l'etat serveur sera corrige par le prochain evenement
+  }
+  sendCallState(callId, "left", myUserId() ?? undefined, myDisplayName())
+  signalBuffer.delete(callId)
+  clearCall(true)
 }

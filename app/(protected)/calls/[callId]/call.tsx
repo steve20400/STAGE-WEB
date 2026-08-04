@@ -389,6 +389,13 @@ export default function CallRoomPage() {
                   ? ` — ${remoteStreamEntries.length + 1} participants`
                   : ""}
               </div>
+              {/* Transfert supervise : entre l'invitation et le depart, rien ne
+                  bougerait a l'ecran sans ce rappel. */}
+              {call.transferPending && (
+                <div className="call-status" style={{ color: "var(--accent)", marginTop: 8 }}>
+                  Transfert en cours — en attente de la reponse du destinataire…
+                </div>
+              )}
               {call.error && (
                 <div className="call-status" style={{ color: "var(--danger)", marginTop: 8 }}>
                   {call.error}

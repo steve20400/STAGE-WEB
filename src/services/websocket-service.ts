@@ -240,18 +240,18 @@ function connect() {
     dispatchResync()
   }
 
-function getMyUserIdFromToken(): string | null {
-  const token = loadSessionToken()
-  if (!token) return null
-  try {
-    const parts = token.split(".")
-    if (parts.length < 2) return null
-    const payload = JSON.parse(window.atob(parts[1]))
-    return payload.sub || null
-  } catch {
-    return null
+  function getMyUserIdFromToken(): string | null {
+    const token = loadSessionToken()
+    if (!token) return null
+    try {
+      const parts = token.split(".")
+      if (parts.length < 2) return null
+      const payload = JSON.parse(window.atob(parts[1]))
+      return payload.sub || null
+    } catch {
+      return null
+    }
   }
-}
 
   ws.onmessage = (frame) => {
     let event: ServerEvent
@@ -541,7 +541,12 @@ export interface CallServerEvent {
 }
 
 const CALL_EVENT_TYPES = new Set(["incoming_call", "call_signal", "call_state"])
-const MEETING_EVENT_TYPES = new Set(["meeting_signal", "meeting_joined", "meeting_user_left", "meeting_user_joined"])
+const MEETING_EVENT_TYPES = new Set([
+  "meeting_signal",
+  "meeting_joined",
+  "meeting_user_left",
+  "meeting_user_joined",
+])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
 export function subscribeToCallEvents(handler: (event: CallServerEvent) => void): () => void {
@@ -590,6 +595,18 @@ export function sendCallState(
   displayName?: string | null
 ) {
   sendRaw({ type: "call_state", callId, state, userId, displayName })
+}
+
+/**
+ * Fait entrer un utilisateur, designe par son numero public, dans un appel deja
+ * en cours : le serveur le fait sonner et l'ajoute aux participants.
+ *
+ * Meme message que l'application mobile (`callInvite`) — c'est le seul que le
+ * backend comprend, et les deux clients doivent parler la meme langue pour
+ * qu'une invitation lancee du web arrive sur un telephone.
+ */
+export function sendCallInvite(callId: string, publicNumber: string) {
+  sendRaw({ type: "call_invite", callId, publicNumber })
 }
 
 // 8 s : sur une 4G lente, l'aller-retour peut depasser 5 s ; un timeout trop
