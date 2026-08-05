@@ -26,17 +26,37 @@ export interface PersonneBloquee {
 
 interface ReponseListe {
   blocked: PersonneBloquee[]
+  blockedBy?: PersonneBloquee[]
 }
 
-/** GET /api/blocked — les personnes que j'ai bloquees. */
-export async function listerBloques(): Promise<PersonneBloquee[]> {
+/** Les deux sens du blocage, tels que le serveur les expose. */
+export interface Blocages {
+  /** Comptes que j'ai bloques. */
+  bloques: PersonneBloquee[]
+  /**
+   * Comptes qui m'ont bloque.
+   *
+   * Vide si mes accuses de lecture sont desactives : dans ce cas la regle est
+   * que je ne dois pas apprendre qu'on m'a bloque, et le serveur ne me le dit
+   * pas. Le client n'a donc rien a filtrer lui-meme.
+   */
+  quiMOntBloque: PersonneBloquee[]
+}
+
+/** GET /api/blocked — les blocages dans les deux sens. */
+export async function listerBlocages(): Promise<Blocages> {
   try {
     const reponse = await apiRequest<ReponseListe>("/api/blocked")
-    return reponse.blocked ?? []
+    return { bloques: reponse.blocked ?? [], quiMOntBloque: reponse.blockedBy ?? [] }
   } catch (err) {
     console.warn("[blocked] liste indisponible", err)
-    return []
+    return { bloques: [], quiMOntBloque: [] }
   }
+}
+
+/** GET /api/blocked — seulement les personnes que j'ai bloquees. */
+export async function listerBloques(): Promise<PersonneBloquee[]> {
+  return (await listerBlocages()).bloques
 }
 
 /** POST /api/blocked — bloque quelqu'un par son numero Alanya. */

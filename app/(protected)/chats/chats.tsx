@@ -14,7 +14,7 @@ import { useAuth } from "../../../src/components/auth-provider"
 import { getMyUserId, toInitials } from "../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
-import { listerBloques } from "../../../src/services/blocked-service"
+import { listerBlocages } from "../../../src/services/blocked-service"
 import "./chats-page.css"
 
 function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
@@ -31,8 +31,9 @@ export default function ChatsPage() {
   const [filter, setFilter] = useState<"all" | "unread" | "groups" | "blocked">("all")
 
   /**
-   * Numeros bloques, pour le filtre du meme nom : il rassemble les
-   * conversations dont le correspondant ne peut plus vous ecrire.
+   * Numeros concernes par un blocage, DANS LES DEUX SENS : ceux que j'ai
+   * bloques, et ceux qui m'ont bloque. L'echange est rompu dans les deux cas,
+   * c'est ce que le filtre rassemble.
    *
    * A ne pas confondre avec le futur filtre des conversations verrouillees, qui
    * portera sur les reservations posees par les appareils de VOTRE compte.
@@ -40,10 +41,16 @@ export default function ChatsPage() {
   const [numerosBloques, setNumerosBloques] = useState<Set<string>>(new Set())
   useEffect(() => {
     let annule = false
-    void listerBloques().then((liste) => {
+    void listerBlocages().then(({ bloques, quiMOntBloque }) => {
       if (annule) return
+      // Les DEUX sens : ceux que j'ai bloques, et ceux qui m'ont bloque. Dans
+      // les deux cas l'echange est rompu, c'est ce que le filtre doit montrer.
       setNumerosBloques(
-        new Set(liste.map((b) => (b.publicNumber ?? "").replace(/\D/g, "")).filter(Boolean))
+        new Set(
+          [...bloques, ...quiMOntBloque]
+            .map((b) => (b.publicNumber ?? "").replace(/\D/g, ""))
+            .filter(Boolean)
+        )
       )
     })
     return () => {
