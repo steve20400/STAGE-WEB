@@ -130,7 +130,30 @@ Transfert — trames émises :
 La seconde trame ne part qu'après le `joined` de la cible, et le client revient
 à la liste des appels.
 
-## 6. Déploiement
+## 6. Écran divisé (3 personnes et plus)
+
+À partir de deux flux distants — donc trois personnes en ligne — l'écran se
+divise en une tuile par participant (`ParticipantGrid`).
+
+- **Pas de cercle central.** Le grand avatar du correspondant (`.room-center`)
+  est masqué : chaque tuile porte déjà sa photo et son nom, le cercle flottait
+  par-dessus la grille en doublon d'une des tuiles. La durée et le nombre de
+  participants passent dans le bandeau discret en haut à gauche.
+- **Même fond qu'un appel audio à deux.** Diviser l'écran ne change pas la
+  nature de l'appel : le motif reste. Les tuiles audio ne posent donc **aucun
+  fond** (`.pgrid-audio .pg-tile`), un simple filet marque le partage, et le nom
+  se place sous l'avatar comme dans l'appel à deux — au lieu du bandeau en
+  dégradé qui posait une barre sombre en bas de chaque tuile.
+- Les tuiles **vidéo** gardent leur fond opaque : une image a besoin d'une base
+  pleine.
+- Idem dans les fenêtres réduites : la grille y reprend le motif de
+  `.active-call-audio`.
+
+La barre de commandes est tenue en bas par `margin-top: auto`. Auparavant
+c'était `.room-center` (`flex: 1`) qui la poussait — elle remontait donc dès que
+la vidéo ou la grille prenait l'écran.
+
+## 7. Déploiement
 
 Rien dans ce chantier ne touche au base path : pas de modification de
 `vite.config.ts`, `vercel.json`, ni du `basename` du routeur, et aucun chemin
@@ -142,11 +165,12 @@ VITE_APP_BASE_PATH=/webapp/ npm run build
 
 ## Fichiers concernés
 
-| Fichier                                   | Rôle                                                |
-| ----------------------------------------- | --------------------------------------------------- |
-| `src/components/call-options-menu.tsx`    | Menu commun, sous-menu des tailles, dialogues       |
-| `src/components/call-options-menu.css`    | Styles du menu, du pavé et des dialogues            |
-| `src/components/active-call-floating.tsx` | Fenêtres petite et moyenne                          |
-| `app/(protected)/calls/[callId]/call.tsx` | Grand écran                                         |
-| `src/services/call-manager.ts`            | `inviteToCall`, `transferCall`, transfert supervisé |
-| `src/services/websocket-service.ts`       | `sendCallInvite`                                    |
+| Fichier                                     | Rôle                                                |
+| ------------------------------------------- | --------------------------------------------------- |
+| `src/components/call-options-menu.tsx`      | Menu commun, sous-menu des tailles, dialogues       |
+| `src/components/call-options-menu.css`      | Styles du menu, du pavé et des dialogues            |
+| `src/components/active-call-floating.tsx`   | Fenêtres petite et moyenne                          |
+| `app/(protected)/calls/[callId]/call.tsx`   | Grand écran                                         |
+| `src/services/call-manager.ts`              | `inviteToCall`, `transferCall`, transfert supervisé |
+| `src/services/websocket-service.ts`         | `sendCallInvite`                                    |
+| `src/components/participant-grid.{tsx,css}` | Écran divisé, variantes audio et vidéo              |

@@ -81,6 +81,12 @@ export default function CallRoomPage() {
   // au lieu d'un grand rectangle noir. Declare ici (et non plus bas) pour servir
   // de dependance aux effets qui branchent les flux.
   const showRemoteVideo = isVideo && callState === "active" && hasRemote && remoteHasVideo
+  /**
+   * Ecran divise : chaque participant a sa tuile, avec sa photo et son nom.
+   * Le grand avatar central n'a alors plus lieu d'etre — il flottait par-dessus
+   * la grille, au milieu, en doublon d'une des tuiles.
+   */
+  const ecranDivise = participantsDistants.length >= PARTICIPANTS_POUR_DIVISER
   const peerName = call.peerName || "Contact"
   const peerInitials = toInitials(peerName)
   // Photo du correspondant : le destinataire appele quand on appelle, l'appelant
@@ -271,9 +277,15 @@ export default function CallRoomPage() {
         <div className="bg-layer">
           {/* Appel de groupe : tous les participants, en grille defilante. Le
               rendu precedent ne branchait que remoteStreamEntries[0] et perdait
-              donc tous les autres flux, deja recus. */}
-          {participantsDistants.length >= PARTICIPANTS_POUR_DIVISER ? (
-            <ParticipantGrid participants={participantsDistants} isVideo={isVideo} size="full" />
+              donc tous les autres flux, deja recus.
+
+              Le motif reste dessous : un appel de groupe audio doit avoir le
+              meme fond qu'un appel audio a deux, la division de l'ecran ne
+              change pas la nature de l'appel. */}
+          {ecranDivise ? (
+            <div className={isVideo ? "grid-layer" : "grid-layer sur-motif"}>
+              <ParticipantGrid participants={participantsDistants} isVideo={isVideo} size="full" />
+            </div>
           ) : showRemoteVideo ? (
             <video ref={remoteVideoRef} className="bg-video" autoPlay playsInline muted />
           ) : isVideo && callState === "ringing" && call.localStream ? (
@@ -358,8 +370,10 @@ export default function CallRoomPage() {
           )}
 
           {/* Avatar + nom + statut : masques quand la video distante s'affiche
-              (sinon le nom en gros recouvre l'image de l'interlocuteur). */}
-          {!showRemoteVideo && (
+              (sinon le nom en gros recouvre l'image de l'interlocuteur), et
+              quand l'ecran est divise (chaque tuile porte deja sa photo et son
+              nom — le grand cercle central faisait doublon par-dessus). */}
+          {!showRemoteVideo && !ecranDivise && (
             <div className="room-center">
               <div className="contact-avatar-wrap">
                 <div
@@ -404,16 +418,33 @@ export default function CallRoomPage() {
             </div>
           )}
 
-          {/* En appel video connecte : un bandeau discret rappelle le nom + duree
-              sans masquer la video. */}
-          {showRemoteVideo && (
+          {/* Video connectee ou ecran divise : un bandeau discret rappelle la
+              duree et le nombre de participants, sans rien recouvrir. C'est ce
+              qui remplace le bloc central quand celui-ci n'a plus lieu d'etre. */}
+          {(showRemoteVideo || ecranDivise) && (
             <div className="video-name-chip">
-              <span className="video-name-chip-name">{peerName}</span>
+              <span className="video-name-chip-name">
+                {ecranDivise ? `${remoteStreamEntries.length + 1} participants` : peerName}
+              </span>
               <span className="video-name-chip-time">
                 <span className="status-dot-live" />
                 {formatElapsed(elapsed)}
-                {call.isGroup ? ` — ${remoteStreamEntries.length + 1} participants` : ""}
+                {!ecranDivise && call.isGroup
+                  ? ` — ${remoteStreamEntries.length + 1} participants`
+                  : ""}
               </span>
+              {/* Le bloc central portait ces deux messages : sans lui, ils
+                  n'auraient plus nulle part ou s'afficher. */}
+              {call.transferPending && (
+                <span className="video-name-chip-time" style={{ color: "var(--accent)" }}>
+                  Transfert en cours…
+                </span>
+              )}
+              {call.error && (
+                <span className="video-name-chip-time" style={{ color: "var(--danger)" }}>
+                  {call.error}
+                </span>
+              )}
             </div>
           )}
 

@@ -524,7 +524,21 @@
 }
 
 /* Appel audio : meme fond que le fil de discussion (motif africain sous voile),
-   avec la photo et le pseudo de l'interlocuteur par-dessus. */
+   avec la photo et le pseudo de l'interlocuteur par-dessus.
+
+   La grille des participants le porte aussi : a plusieurs, la fenetre se divise
+   mais reste le meme ecran d'appel audio — le fond ne doit pas changer. */
+.active-call-audio,
+.active-call-content .pgrid-audio {
+  color: var(--text-primary);
+  background:
+    linear-gradient(var(--motif-overlay), var(--motif-overlay)),
+    url("/motif-bg.png") repeat;
+  background-size:
+    auto,
+    180px auto;
+}
+
 .active-call-audio {
   height: 100%;
   display: flex;
@@ -534,13 +548,6 @@
   gap: 8px;
   padding: 14px;
   text-align: center;
-  color: var(--text-primary);
-  background:
-    linear-gradient(var(--motif-overlay), var(--motif-overlay)),
-    url("/motif-bg.png") repeat;
-  background-size:
-    auto,
-    180px auto;
 }
 .active-call-audio b {
   font-family: "Bricolage Grotesque", sans-serif;

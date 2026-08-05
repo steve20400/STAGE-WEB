@@ -179,7 +179,7 @@ export function ParticipantGrid({
   if (participants.length === 0) return null
 
   return (
-    <div className={`pgrid pgrid-${size}`} role="list">
+    <div className={`pgrid pgrid-${size} ${isVideo ? "pgrid-video" : "pgrid-audio"}`} role="list">
       {participants.map((participant) => (
         <div role="listitem" key={participant.id} className="pg-cell">
           <TuileParticipant participant={participant} isVideo={isVideo} />

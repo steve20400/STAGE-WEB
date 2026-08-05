@@ -63,6 +63,34 @@
   justify-content: center;
 }
 
+/* Appel audio : la tuile ne pose AUCUN fond. Elle laisse voir celui de l'ecran
+   d'appel, pour qu'un appel de groupe reste visiblement le meme ecran qu'un
+   appel a deux — seule la division change. Un simple filet marque le partage. */
+.pgrid-audio .pg-tile {
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  flex-direction: column;
+}
+
+/* Nom et micro sous l'avatar, centres comme dans l'appel a deux, au lieu du
+   bandeau en degrade qui posait une barre sombre en bas de chaque tuile. */
+.pgrid-audio .pg-footer {
+  position: static;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 0 10px;
+  background: none;
+  color: var(--text-primary);
+}
+.pgrid-audio .pg-name {
+  flex: 0 1 auto;
+  text-align: center;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
 .pgrid-small .pg-tile {
   border-radius: 0;
 }
@@ -73,6 +101,15 @@
   object-fit: cover;
   display: block;
   background: var(--bg-base);
+}
+
+/* Sur le grand ecran en audio, l'avatar reprend la taille de l'appel a deux :
+   c'est le meme ecran, seulement divise. */
+.pgrid-full.pgrid-audio .pg-avatar {
+  width: 88px;
+  height: 88px;
+  font-size: 28px;
+  border: 1px solid var(--accent-border);
 }
 
 .pg-avatar {
