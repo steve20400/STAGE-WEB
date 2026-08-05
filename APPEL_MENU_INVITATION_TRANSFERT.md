@@ -153,7 +153,43 @@ La barre de commandes est tenue en bas par `margin-top: auto`. Auparavant
 c'était `.room-center` (`flex: 1`) qui la poussait — elle remontait donc dès que
 la vidéo ou la grille prenait l'écran.
 
-## 7. Déploiement
+## 7. Quitter l'écran d'appel sans raccrocher
+
+Le menu latéral reste accessible pendant un appel. Un clic dedans démontait
+l'écran d'appel alors que `displayMode` valait toujours `full` — or la fenêtre
+flottante ne s'affiche pas dans ce mode : l'appel **disparaissait
+complètement** tout en continuant.
+
+Au démontage de l'écran d'appel, si l'appel est toujours actif et que la taille
+est encore `full`, on bascule en **fenêtre moyenne**. Cela couvre d'un coup tous
+les départs : menu latéral, bouton « Chat », retour du navigateur. Audio comme
+vidéo.
+
+Deux garde-fous :
+
+- On ne touche à rien si l'utilisateur a déjà choisi une taille dans le menu
+  (`displayMode !== "full"`) ni si l'appel est raccroché (plus d'`activeCallId`).
+- Le mode strict de React rejoue le nettoyage juste après le montage. On vérifie
+  donc l'adresse : si elle est toujours celle de l'écran d'appel, c'est un faux
+  démontage. `endsWith` couvre le basename `/webapp/`.
+
+## 8. Rappeler depuis l'historique
+
+Une ligne de l'historique — et l'entrée « Rappeler » de son menu — lance
+maintenant l'appel **sur place** puis va directement à son écran.
+
+Avant, le menu passait par `/calls/new?contact=…`, c'est-à-dire la liste des
+contacts en plein écran, le temps qu'un effet y retrouve le contact et lance
+l'appel : une page de contacts clignotait avant l'appel demandé. Le clic sur la
+ligne, lui, naviguait vers `/calls/<id de la ligne d'historique>` — un
+identifiant qui n'est pas celui d'un appel en cours, d'où un écran d'appel déjà
+terminé qui rebondissait aussitôt.
+
+La conversation de l'appel d'origine est réutilisée quand elle est connue
+(`call.convId`) ; sinon elle est retrouvée par le numéro, comme depuis le
+composeur.
+
+## 9. Déploiement
 
 Rien dans ce chantier ne touche au base path : pas de modification de
 `vite.config.ts`, `vercel.json`, ni du `basename` du routeur, et aucun chemin

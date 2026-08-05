@@ -101,7 +101,8 @@ export default function CallsPage() {
 
   const sorted = useMemo(() => {
     const list = [...filtered]
-    if (sort === "name") return list.sort((a, b) => a.contactName.localeCompare(b.contactName, "fr"))
+    if (sort === "name")
+      return list.sort((a, b) => a.contactName.localeCompare(b.contactName, "fr"))
     return list.sort((a, b) =>
       sort === "oldest" ? a.ts.getTime() - b.ts.getTime() : b.ts.getTime() - a.ts.getTime()
     )
@@ -134,25 +135,56 @@ export default function CallsPage() {
   const callComposedNumber = async (publicNumber: string, type: "audio" | "video") => {
     try {
       const conversation = await createPrivateChat(publicNumber)
-      const callId = await startOutgoingCall(conversation.id, type, formatAlanyaNumber(publicNumber))
+      const callId = await startOutgoingCall(
+        conversation.id,
+        type,
+        formatAlanyaNumber(publicNumber)
+      )
       setDialerOpen(false)
       navigate(`/calls/${callId}?type=${type}&returnTo=/calls`)
     } catch (err) {
-      // On distingue le numero inconnu du reseau injoignable : le premier est une
-      // faute de frappe a corriger, le second n'a rien a voir avec le numero.
-      const inconnu = err instanceof ApiError && [400, 404, 422].includes(err.status)
-      const reseau = err instanceof ApiError && err.status === 0
-      error(
-        "Appel impossible",
-        inconnu
-          ? `Aucun compte ne porte l'Alanya ID ${formatAlanyaNumber(publicNumber)}.`
-          : reseau
-            ? "Serveur injoignable : verifiez votre connexion."
-            : err instanceof Error
-              ? err.message
-              : "Appel impossible pour le moment."
-      )
+      signalerEchecAppel(err, formatAlanyaNumber(publicNumber))
     }
+  }
+
+  /**
+   * Rappelle le correspondant d'une ligne de l'historique.
+   *
+   * L'appel part d'ici et l'on va DIRECTEMENT a son ecran. Le detour precedent
+   * par `/calls/new` affichait la liste des contacts en plein ecran, le temps
+   * qu'un effet y retrouve le contact et lance l'appel : on voyait donc une
+   * page de contacts clignoter avant l'appel qu'on venait de demander.
+   *
+   * La conversation de l'appel d'origine est reutilisee quand on la connait ;
+   * sinon on la retrouve par le numero, comme depuis le composeur.
+   */
+  const rappeler = async (call: CallRecord, type: "audio" | "video") => {
+    try {
+      const convId = call.convId ?? (await createPrivateChat(call.contactId)).id
+      const callId = await startOutgoingCall(convId, type, call.contactName)
+      navigate(`/calls/${callId}?type=${type}&returnTo=/calls`)
+    } catch (err) {
+      signalerEchecAppel(err, call.contactName)
+    }
+  }
+
+  /**
+   * On distingue le correspondant inconnu du reseau injoignable : le premier est
+   * une faute de frappe a corriger, le second n'a rien a voir avec le numero.
+   */
+  function signalerEchecAppel(err: unknown, cible: string) {
+    const inconnu = err instanceof ApiError && [400, 404, 422].includes(err.status)
+    const reseau = err instanceof ApiError && err.status === 0
+    error(
+      "Appel impossible",
+      inconnu
+        ? `Aucun compte ne correspond a ${cible}.`
+        : reseau
+          ? "Serveur injoignable : verifiez votre connexion."
+          : err instanceof Error
+            ? err.message
+            : "Appel impossible pour le moment."
+    )
   }
 
   return (
@@ -167,7 +199,15 @@ export default function CallsPage() {
               repertoire, ou en composant un Alanya ID. */}
           <div className="calls-launchers">
             <button className="new-call-btn" onClick={() => navigate("/contacts")}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              >
                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
                 <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
@@ -366,14 +406,25 @@ export default function CallsPage() {
                 {header && <div className="date-header">{header}</div>}
                 {calls.map((call) => {
                   const color = COLORS[call.contactColor]
-                  const statusLabel = call.status === "missed" ? "Appel manqué" : call.status === "no_answer" ? "Sans réponse" : call.status === "declined" ? "Appel rejeté" : call.status === "busy" ? "Occupé" : null
+                  const statusLabel =
+                    call.status === "missed"
+                      ? "Appel manqué"
+                      : call.status === "no_answer"
+                        ? "Sans réponse"
+                        : call.status === "declined"
+                          ? "Appel rejeté"
+                          : call.status === "busy"
+                            ? "Occupé"
+                            : null
                   return (
                     <div
                       className="call-item"
                       key={call.id}
-                      onClick={() =>
-                        navigate(`/calls/${call.id}?contact=${call.contactId}&type=${call.type}`)
-                      }
+                      // `call.id` est l'identifiant de la LIGNE d'historique, pas
+                      // d'un appel en cours : y naviguer ouvrait un ecran d'appel
+                      // deja termine, qui rebondissait aussitot. Une ligne
+                      // d'historique rappelle, du meme type que l'appel d'origine.
+                      onClick={() => void rappeler(call, call.type)}
                     >
                       <AvatarCircle
                         className="call-av"
@@ -386,7 +437,21 @@ export default function CallsPage() {
                         <div className="call-name">
                           {call.contactName}
                           {statusLabel && (
-                            <span className={call.status === "missed" ? "missed-badge" : undefined} style={call.status === "missed" ? undefined : { fontSize: 10, background: "var(--border-subtle)", color: "var(--text-muted)", padding: "2px 7px", borderRadius: 5, fontWeight: 500 }}>
+                            <span
+                              className={call.status === "missed" ? "missed-badge" : undefined}
+                              style={
+                                call.status === "missed"
+                                  ? undefined
+                                  : {
+                                      fontSize: 10,
+                                      background: "var(--border-subtle)",
+                                      color: "var(--text-muted)",
+                                      padding: "2px 7px",
+                                      borderRadius: 5,
+                                      fontWeight: 500,
+                                    }
+                              }
+                            >
                               {statusLabel}
                             </span>
                           )}
@@ -435,9 +500,18 @@ export default function CallsPage() {
                         <RowActionsMenu
                           ariaLabel={`Actions pour ${call.contactName}`}
                           actions={[
-                            { label: "Rappeler en audio", onSelect: () => navigate(`/calls/new?contact=${call.contactId}&type=audio`) },
-                            { label: "Rappeler en video", onSelect: () => navigate(`/calls/new?contact=${call.contactId}&type=video`) },
-                            { label: "Ouvrir la discussion", onSelect: () => navigate(`/chats/${call.contactId}`) },
+                            {
+                              label: "Rappeler en audio",
+                              onSelect: () => void rappeler(call, "audio"),
+                            },
+                            {
+                              label: "Rappeler en video",
+                              onSelect: () => void rappeler(call, "video"),
+                            },
+                            {
+                              label: "Ouvrir la discussion",
+                              onSelect: () => navigate(`/chats/${call.contactId}`),
+                            },
                           ]}
                         />
                       </div>
@@ -450,7 +524,10 @@ export default function CallsPage() {
         </div>
       </div>
       {dialerOpen && (
-        <Dialer onClose={() => setDialerOpen(false)} onCall={(number, type) => void callComposedNumber(number, type)} />
+        <Dialer
+          onClose={() => setDialerOpen(false)}
+          onCall={(number, type) => void callComposedNumber(number, type)}
+        />
       )}
     </>
   )

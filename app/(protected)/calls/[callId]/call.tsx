@@ -10,7 +10,7 @@ import {
   toggleCamera,
   toggleMicrophone,
   switchCamera,
-  minimizeActiveCall,
+  setCallDisplayMode,
   setCallAudioOutput,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
@@ -178,6 +178,35 @@ export default function CallRoomPage() {
       audio.volume = volume
     }
   }, [call.audioOutput, isVideo, remoteStreamEntries])
+
+  /**
+   * Quitter l'ecran d'appel sans raccrocher : l'appel passe en fenetre moyenne.
+   *
+   * Le menu lateral reste accessible pendant un appel, et un clic dedans
+   * demontait cet ecran alors que `displayMode` valait toujours « full » — la
+   * fenetre flottante ne s'affiche pas dans ce mode, et l'appel disparaissait
+   * donc completement de l'ecran tout en continuant. La bascule est faite ici,
+   * au demontage, pour couvrir d'un coup tous les departs : menu lateral,
+   * bouton « Chat », retour du navigateur.
+   *
+   * L'etat est lu dans une ref : le nettoyage d'un effet sans dependances
+   * capture les valeurs du premier rendu, qui seraient perimees.
+   */
+  const etatCourant = useRef(call)
+  etatCourant.current = call
+  useEffect(() => {
+    return () => {
+      const actuel = etatCourant.current
+      // Appel raccroche (plus d'id), ou taille deja choisie par l'utilisateur
+      // dans le menu : on ne repasse pas par-dessus.
+      if (!actuel.activeCallId || actuel.displayMode !== "full") return
+      // Le mode strict de React rejoue le nettoyage juste apres le montage.
+      // L'adresse, elle, ne ment pas : si on est toujours sur l'ecran d'appel,
+      // c'est un faux demontage. `endsWith` couvre le basename /webapp/.
+      if (window.location.pathname.endsWith(`/calls/${actuel.activeCallId}`)) return
+      setCallDisplayMode("medium")
+    }
+  }, [])
 
   /**
    * Deblocage manuel du son. Certains navigateurs mobiles refusent la lecture
@@ -654,10 +683,10 @@ export default function CallRoomPage() {
               {call.activeConvId && (
                 <button
                   className="ctrl-btn"
-                  onClick={() => {
-                    minimizeActiveCall()
-                    navigate(`/chats/${call.activeConvId}`)
-                  }}
+                  // La reduction est faite au demontage de l'ecran, pour tous
+                  // les departs a la fois : bouton, menu lateral, retour
+                  // navigateur.
+                  onClick={() => navigate(`/chats/${call.activeConvId}`)}
                   aria-label="Ouvrir le chat"
                 >
                   <div className="ctrl-btn-icon ctrl-on">
