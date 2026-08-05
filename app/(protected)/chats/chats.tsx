@@ -1,16 +1,20 @@
-import { useState, useMemo, useEffect, useRef } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
 import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data"
-import { fetchChatConversations, fetchChatConversationsCacheFirst } from "../../../src/services/chats-service"
+import {
+  fetchChatConversations,
+  fetchChatConversationsCacheFirst,
+} from "../../../src/services/chats-service"
 import {
   subscribeToAllMessages,
   subscribeToPresence,
   subscribeToWsConnected,
 } from "../../../src/services/websocket-service"
 import { useAuth } from "../../../src/components/auth-provider"
-import { toInitials } from "../../../src/data/session-user"
+import { getMyUserId, toInitials } from "../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
+import { listerBloques } from "../../../src/services/blocked-service"
 import "./chats-page.css"
 
 function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
@@ -24,7 +28,40 @@ export default function ChatsPage() {
   const navigate = useNavigate()
   const { user: sessionUser } = useAuth()
   const [query, setQuery] = useState("")
-  const [filter, setFilter] = useState<"all" | "unread" | "groups">("all")
+  const [filter, setFilter] = useState<"all" | "unread" | "groups" | "blocked">("all")
+
+  /**
+   * Numeros bloques, pour le filtre du meme nom : il rassemble les
+   * conversations dont le correspondant ne peut plus vous ecrire.
+   *
+   * A ne pas confondre avec le futur filtre des conversations verrouillees, qui
+   * portera sur les reservations posees par les appareils de VOTRE compte.
+   */
+  const [numerosBloques, setNumerosBloques] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    let annule = false
+    void listerBloques().then((liste) => {
+      if (annule) return
+      setNumerosBloques(
+        new Set(liste.map((b) => (b.publicNumber ?? "").replace(/\D/g, "")).filter(Boolean))
+      )
+    })
+    return () => {
+      annule = true
+    }
+  }, [])
+
+  /** Vrai si le correspondant d'un tete-a-tete figure parmi les bloques. */
+  const estConversationBloquee = useCallback(
+    (c: ConversationMock) => {
+      if (c.isGroup || numerosBloques.size === 0) return false
+      const moi = getMyUserId()
+      const pair = c.membersInfo?.find((m) => m.id !== moi)
+      const numero = (pair?.publicNumber ?? "").replace(/\D/g, "")
+      return numero !== "" && numerosBloques.has(numero)
+    },
+    [numerosBloques]
+  )
 
   const [conversations, setConversations] = useState<ConversationMock[]>([])
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -34,8 +71,12 @@ export default function ChatsPage() {
 
     // Chargement initial : cache-first (IndexedDB → affichage instantané, puis réseau)
     void fetchChatConversationsCacheFirst(
-      (cached) => { if (!cancelled) setConversations(cached) },
-      (fresh) => { if (!cancelled) setConversations(fresh) }
+      (cached) => {
+        if (!cancelled) setConversations(cached)
+      },
+      (fresh) => {
+        if (!cancelled) setConversations(fresh)
+      }
     )
 
     // Refresh réseau pur pour les mises à jour temps réel
@@ -92,10 +133,11 @@ export default function ChatsPage() {
       .filter((c) => {
         if (filter === "unread") return c.unread > 0
         if (filter === "groups") return c.isGroup
+        if (filter === "blocked") return estConversationBloquee(c)
         return true
       })
       .filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
-  }, [conversations, query, filter])
+  }, [conversations, query, filter, estConversationBloquee])
 
   const pinned = filtered.filter((c) => c.isPinned)
   const regular = filtered.filter((c) => !c.isPinned)
@@ -224,7 +266,7 @@ export default function ChatsPage() {
 
         {/* Filtres */}
         <div className="filter-row">
-          {(["all", "unread", "groups"] as const).map((f) => (
+          {(["all", "unread", "groups", "blocked"] as const).map((f) => (
             <button
               key={f}
               className={`filter-btn ${filter === f ? "active" : ""}`}
@@ -234,7 +276,9 @@ export default function ChatsPage() {
                 ? "Tous"
                 : f === "unread"
                   ? `Non lus (${conversations.reduce((a, c) => a + (c.unread > 0 ? 1 : 0), 0)})`
-                  : "Groupes"}
+                  : f === "groups"
+                    ? "Groupes"
+                    : `Bloques (${conversations.filter(estConversationBloquee).length})`}
             </button>
           ))}
         </div>

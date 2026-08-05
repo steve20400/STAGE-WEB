@@ -104,9 +104,23 @@
   border-color: var(--accent-border);
 }
 
+/* Meme regle que la rangee de filtres des discussions : une seule ligne, qui
+   defile lateralement sans barre visible plutot que de passer a la ligne. */
 .filter-group {
   display: flex;
+  flex-wrap: nowrap;
   gap: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.filter-group::-webkit-scrollbar {
+  display: none;
+}
+.filter-group .filter-btn {
+  flex: 0 0 auto;
 }
 .filter-btn {
   padding: 8px 16px;

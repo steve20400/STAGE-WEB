@@ -82,13 +82,41 @@
 }
 
 /* filtres */
+/* Les filtres tiennent sur UNE ligne. Au-dela de la largeur disponible, la
+   rangee defile lateralement plutot que de passer a la ligne : un filtre qui
+   descend decale toute la liste sous lui, et la rangee change de hauteur selon
+   le nombre de filtres actifs.
+
+   Le defilement est volontairement sans barre visible — elle occuperait une
+   bande sous des pastilles de 28 px de haut, pour un geste qui se fait
+   naturellement au doigt ou au trackpad. */
 .filter-row {
   display: flex;
+  flex-wrap: nowrap;
   gap: 6px;
   margin-bottom: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Le geste horizontal reste au defilement, le vertical va a la page. */
+  touch-action: pan-x;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Un filtre atteint par le clavier ne doit pas s'arreter a moitie visible. */
+  scroll-snap-type: x proximity;
+}
+.filter-row::-webkit-scrollbar {
+  display: none;
 }
 .filter-btn {
-  padding: 6px 14px;
+  /* Hauteur commune quel que soit le libelle, et aucun ecrasement quand la
+     rangee deborde : c'est le defilement qui absorbe, pas les pastilles. */
+  flex: 0 0 auto;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  padding: 0 14px;
   border-radius: 20px;
   border: 1px solid var(--border-subtle);
   background: transparent;
