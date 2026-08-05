@@ -1,4 +1,4 @@
-import { apiRequest } from "../lib/api-client"
+import { ApiError, apiRequest } from "../lib/api-client"
 import { type ChatMessageMock, type MessageStatus, type MessageType } from "../mocks/chat-data"
 import { getMyUserId } from "../data/session-user"
 import {
@@ -214,9 +214,7 @@ export async function fetchMessagesCacheFirst(
   try {
     const cached = await loadCachedMessages(chatId, INITIAL_PAGE_SIZE)
     if (cached.length > 0) {
-      onCached(
-        cached.map((m) => toFrontMessage(m as unknown as BackendMessage, myId))
-      )
+      onCached(cached.map((m) => toFrontMessage(m as unknown as BackendMessage, myId)))
     }
   } catch {
     // IndexedDB indisponible, on attend le réseau
@@ -343,15 +341,65 @@ export async function sendChatMessage(
     }
   }
 
-  const message = await deliverMessage(chatId, {
-    content: content || undefined,
-    msgType,
-    tempId,
-    mediaId: options.mediaId,
-    replyToId: options.replyToId,
-  })
+  let message: BackendMessage | WsMessagePayload
+  try {
+    message = await deliverMessage(chatId, {
+      content: content || undefined,
+      msgType,
+      tempId,
+      mediaId: options.mediaId,
+      replyToId: options.replyToId,
+    })
+  } catch (err) {
+    /**
+     * Blocage : le message reste « en cours d'envoi », pour toujours.
+     *
+     * C'est le comportement demande — ni confirmation, ni erreur. L'expediteur
+     * ne doit pas apprendre qu'il a ete bloque (sauf avis systeme, decide par
+     * le serveur selon les accuses de lecture du bloque).
+     *
+     * On s'appuie sur le refus du serveur plutot que sur une liste locale : lui
+     * seul fait autorite, et cela evite de promener l'etat de blocage dans tout
+     * l'ecran de discussion. Le message n'est PAS mis en file d'attente : la
+     * file reessaie au retour du reseau, et il repartirait indefiniment.
+     */
+    if (estRefusPourBlocage(err)) {
+      await cacheMessage({
+        id: tempId,
+        conversationId: chatId,
+        senderId: myId ?? "",
+        content: content || null,
+        type: msgType,
+        status: "PENDING",
+        createdAt: Date.now(),
+      })
+      return {
+        id: tempId,
+        senderId: "me",
+        content: content ?? "",
+        type,
+        status: "sending",
+        timestamp: new Date(),
+      }
+    }
+    throw err
+  }
   cacheDeliveredMessage(message)
   return toFrontMessage(message, myId)
+}
+
+/**
+ * Le serveur refuse-t-il ce message parce que les deux personnes sont bloquees ?
+ *
+ * Le code `BLOCKED` est la reponse de la route REST, celle sur laquelle le
+ * client bascule quand le WebSocket n'acquitte pas — ce qui est precisement ce
+ * qui se passe entre deux personnes bloquees.
+ */
+function estRefusPourBlocage(err: unknown): boolean {
+  if (!(err instanceof ApiError) || err.status !== 403) return false
+  // Le code voyage dans la charge : { error: { message, code } }.
+  const charge = err.payload as { error?: { code?: unknown } } | undefined
+  return charge?.error?.code === "BLOCKED"
 }
 
 /** Un seul drain a la fois : "online" et le montage peuvent se declencher ensemble. */

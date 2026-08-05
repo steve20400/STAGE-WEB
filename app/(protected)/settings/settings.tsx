@@ -8,6 +8,12 @@ import { isTurnConfigured } from "../../../src/services/calls-service"
 import TurnTester from "../../../src/components/turn-tester"
 import RealtimeStatus from "../../../src/components/realtime-status"
 import {
+  debloquer,
+  listerBloques,
+  nomDuBloque,
+  type PersonneBloquee,
+} from "../../../src/services/blocked-service"
+import {
   LANGUAGE_CODES,
   LANGUAGE_NAMES,
   libelleLangue,
@@ -1136,6 +1142,28 @@ export default function SettingsPage() {
   // pilote toute l'interface, pas seulement cet ecran.
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium")
   const { language, setLanguage, t } = useTranslation()
+
+  /** Personnes bloquees, chargees a l'ouverture des parametres. */
+  const [bloques, setBloques] = useState<PersonneBloquee[]>([])
+  useEffect(() => {
+    let annule = false
+    void listerBloques().then((liste) => {
+      if (!annule) setBloques(liste)
+    })
+    return () => {
+      annule = true
+    }
+  }, [])
+
+  const retirerBlocage = async (personne: PersonneBloquee) => {
+    try {
+      await debloquer(personne.idBlock)
+      setBloques((liste) => liste.filter((b) => b.idBlock !== personne.idBlock))
+      success("Debloque", `${nomDuBloque(personne)} peut de nouveau vous ecrire.`)
+    } catch (err) {
+      toastError("Deblocage impossible", err instanceof Error ? err.message : undefined)
+    }
+  }
 
   const fileRef = useRef<HTMLInputElement>(null)
   const isDirty = JSON.stringify(profile) !== JSON.stringify(draft)
@@ -2277,6 +2305,62 @@ export default function SettingsPage() {
                   Ces deux reglages sont enregistres sur votre compte et s'appliquent aussi a
                   l'application mobile.
                 </div>
+              </div>
+
+              {/* Personnes bloquees. Sans cette liste, on ne peut debloquer que
+                  quelqu'un dont on retrouve la fiche contact — or on peut
+                  parfaitement bloquer un numero qu'on n'a jamais enregistre. */}
+              <div className="s-card">
+                <div className="s-card-title">Personnes bloquees</div>
+                <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+                  Leurs messages ne vous parviennent pas. Debloquer retablit l'echange.
+                </div>
+                {bloques.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "6px 0" }}>
+                    Vous n'avez bloque personne.
+                  </div>
+                ) : (
+                  bloques.map((personne) => (
+                    <div
+                      key={personne.idBlock}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        padding: "10px 0",
+                        borderTop: "1px solid var(--border-subtle)",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: "var(--text-primary)" }}>
+                          {nomDuBloque(personne)}
+                        </div>
+                        {personne.publicNumber && (
+                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                            {personne.publicNumber}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => void retirerBlocage(personne)}
+                        style={{
+                          flexShrink: 0,
+                          padding: "7px 14px",
+                          borderRadius: 8,
+                          border: "1px solid var(--border-default)",
+                          background: "var(--bg-surface)",
+                          color: "var(--text-primary)",
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Debloquer
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </>
           )}
