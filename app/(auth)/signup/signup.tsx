@@ -275,13 +275,13 @@ export default function SignUpPage() {
           {/* Le choix de la langue vient AVANT le formulaire : quelqu'un qui ne
               lit pas le francais doit pouvoir basculer avant d'essayer de
               comprendre les champs, pas apres son inscription. */}
-          <div className="signup-langue">
-            <label className="signup-langue-label" htmlFor="signup-langue">
+          <div className="langue-field">
+            <label className="langue-label" htmlFor="signup-langue">
               {t("language_settings")}
             </label>
             <select
               id="signup-langue"
-              className="signup-langue-select"
+              className="langue-select"
               value={language}
               onChange={(event) => setLanguage(event.target.value as LanguageCode)}
             >

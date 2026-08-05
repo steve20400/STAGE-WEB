@@ -1,6 +1,7 @@
 ﻿import { useMemo, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
+import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from "../../../src/i18n"
 import {
   ALANYA_NUMBER_FORMATTED_MAX_LENGTH,
   formatAlanyaNumber,
@@ -33,6 +34,7 @@ function isValidIdentifier(value: string) {
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { language, setLanguage, t } = useTranslation()
   const location = useLocation()
   const { login } = useAuth()
   const [showPwd, setShowPwd] = useState(false)
@@ -77,38 +79,31 @@ export default function LoginPage() {
         </div>
 
         <div className="left-body">
-          <h1 className="left-heading">
-            Content de
-            <br />
-            te <em>revoir.</em>
-          </h1>
-          <p className="left-sub">
-            Utilisez votre email ou votre Alanya ID et votre mot de passe pour reprendre vos
-            conversations.
-          </p>
+          <h1 className="left-heading">{t("login_heading")}</h1>
+          <p className="left-sub">{t("login_left_sub")}</p>
         </div>
 
         <div className="stat-row">
           <div>
-            <div className="stat-num">Messages</div>
-            <div className="stat-lbl">texte, vocaux et fichiers</div>
+            <div className="stat-num">{t("login_stat_messages")}</div>
+            <div className="stat-lbl">{t("login_stat_messages_sub")}</div>
           </div>
           <div>
-            <div className="stat-num">Appels</div>
-            <div className="stat-lbl">audio et video</div>
+            <div className="stat-num">{t("login_stat_calls")}</div>
+            <div className="stat-lbl">{t("login_stat_calls_sub")}</div>
           </div>
           <div>
-            <div className="stat-num">Statuts</div>
-            <div className="stat-lbl">ephemeres 24 h</div>
+            <div className="stat-num">{t("login_stat_status")}</div>
+            <div className="stat-lbl">{t("login_stat_status_sub")}</div>
           </div>
         </div>
       </div>
 
       <div className="right-panel">
         <form className="form-card" onSubmit={handleSubmit}>
-          <div className="form-pretitle">Connexion</div>
-          <h2 className="form-title">Bon retour.</h2>
-          <p className="form-subtitle">Entrez vos identifiants pour acceder a votre compte.</p>
+          <div className="form-pretitle">{t("login_pretitle")}</div>
+          <h2 className="form-title">{t("login_back")}</h2>
+          <p className="form-subtitle">{t("login_subtitle")}</p>
 
           {error ? (
             <div
@@ -139,7 +134,7 @@ export default function LoginPage() {
                 isNumberLikeIdentifier(phone) ? ALANYA_NUMBER_FORMATTED_MAX_LENGTH : undefined
               }
             />
-            <label htmlFor="phone">Email ou Alanya ID (6 ou 8 chiffres)</label>
+            <label htmlFor="phone">{t("email_or_id")}</label>
           </div>
 
           <div className="field">
@@ -153,37 +148,58 @@ export default function LoginPage() {
               autoComplete="current-password"
               style={{ paddingRight: 52 }}
             />
-            <label htmlFor="password">Mot de passe</label>
+            <label htmlFor="password">{t("password")}</label>
             <button
               type="button"
               className="pwd-toggle"
               onClick={() => setShowPwd((value) => !value)}
-              aria-label={showPwd ? "Masquer" : "Afficher"}
+              aria-label={showPwd ? t("hide") : t("show")}
             >
-              {showPwd ? "Masquer" : "Afficher"}
+              {showPwd ? t("hide") : t("show")}
             </button>
           </div>
 
           <div className="forgot-row">
             <Link to="/forgot-password" className="forgot-link">
-              Mot de passe oublie ?
+              {t("forgot_password")}
             </Link>
+          </div>
+
+          {/* Juste au-dessus du bouton de connexion : c'est le dernier reglage
+              qu'on ajuste avant de valider. Meme choix que dans les parametres —
+              la langue est une preference d'appareil, deja retenue en arrivant. */}
+          <div className="langue-field">
+            <label className="langue-label" htmlFor="login-langue">
+              {t("language_settings")}
+            </label>
+            <select
+              id="login-langue"
+              className="langue-select"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as LanguageCode)}
+            >
+              {LANGUAGE_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {libelleLangue(code)}
+                </option>
+              ))}
+            </select>
           </div>
 
           <button type="submit" className="btn-submit" disabled={loading || !canSubmit}>
             {loading ? (
               <>
-                <div className="spinner" /> Connexion...
+                <div className="spinner" /> {t("signing_in")}
               </>
             ) : (
-              <>Connexion</>
+              <>{t("login_pretitle")}</>
             )}
           </button>
 
           <p className="signup-txt">
-            Pas encore de compte ?{" "}
+            {t("no_account")}{" "}
             <Link to="/signup" className="signup-link">
-              Creer un compte
+              {t("create_account")}
             </Link>
           </p>
         </form>

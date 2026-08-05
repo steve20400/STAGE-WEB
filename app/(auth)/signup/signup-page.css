@@ -627,34 +627,62 @@
   text-decoration: underline;
 }
 
-/* Choix de la langue, en tete du formulaire d'inscription. Discret : c'est un
-   reglage, pas une etape — il ne doit pas concurrencer le titre de l'etape. */
-.si-root .signup-langue {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-bottom: 22px;
+/* Selecteur de langue — habille comme un champ de l'application : meme rayon,
+   meme fond, meme hauteur. Il etait trop petit et detonnait a cote des champs. */
+/* Prefixe par la racine de l'ecran : sans cela, la largeur bornee prevue pour
+   l'inscription s'appliquait aussi au selecteur de la connexion — les deux
+   feuilles finissent dans le meme bundle. */
+.si-root .langue-field {
+  position: relative;
+  max-width: 260px;
+  margin: 0 0 28px auto;
 }
 
-.si-root .signup-langue-label {
+.si-root .langue-label {
+  position: absolute;
+  top: 8px;
+  left: 16px;
   font-size: 11px;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--text-dim);
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  pointer-events: none;
 }
 
-.si-root .signup-langue-select {
-  padding: 8px 12px;
-  border-radius: 9px;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.14));
-  background: var(--bg-surface, rgba(255, 255, 255, 0.04));
-  color: var(--text-primary, #fff);
+.si-root .langue-select {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 24px 16px 10px;
+  font-size: 15px;
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
   cursor: pointer;
+  transition: border-color 0.2s;
+  /* La fleche native varie d'un navigateur a l'autre : on pose la notre pour
+     que le champ ait la meme allure partout. */
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    right 20px center,
+    right 14px center;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
 }
-.si-root .signup-langue-select:focus-visible {
-  outline: 2px solid var(--gold);
+.si-root .langue-select:hover,
+.si-root .langue-select:focus {
+  border-color: var(--accent-border);
+}
+.si-root .langue-select:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+.si-root .langue-select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }

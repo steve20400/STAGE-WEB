@@ -370,3 +370,64 @@
     padding: 40px 24px;
   }
 }
+
+/* Selecteur de langue — habille comme un champ de l'application : meme rayon,
+   meme fond, meme hauteur. Il etait trop petit et detonnait a cote des champs. */
+.login-root .langue-field {
+  position: relative;
+  /* Plus etroit que les champs et cale a droite : c'est un reglage, pas une
+     information a saisir — il ne doit pas se lire comme un champ du
+     formulaire. De l'air des deux cotes, sinon il se colle au bouton de
+     validation et passe pour une partie de celui-ci. */
+  max-width: 260px;
+  margin: 20px 0 28px auto;
+}
+
+.login-root .langue-label {
+  position: absolute;
+  top: 8px;
+  left: 16px;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.login-root .langue-select {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 24px 16px 10px;
+  font-size: 15px;
+  font-family: "DM Sans", sans-serif;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  /* La fleche native varie d'un navigateur a l'autre : on pose la notre pour
+     que le champ ait la meme allure partout. */
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    right 20px center,
+    right 14px center;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+}
+.login-root .langue-select:hover,
+.login-root .langue-select:focus {
+  border-color: var(--accent-border);
+}
+.login-root .langue-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.login-root .langue-select option {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
