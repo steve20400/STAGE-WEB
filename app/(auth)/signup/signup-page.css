@@ -626,3 +626,35 @@
 .si-root .login-link a:hover {
   text-decoration: underline;
 }
+
+/* Choix de la langue, en tete du formulaire d'inscription. Discret : c'est un
+   reglage, pas une etape — il ne doit pas concurrencer le titre de l'etape. */
+.si-root .signup-langue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.si-root .signup-langue-label {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.si-root .signup-langue-select {
+  padding: 8px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.14));
+  background: var(--bg-surface, rgba(255, 255, 255, 0.04));
+  color: var(--text-primary, #fff);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+.si-root .signup-langue-select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}

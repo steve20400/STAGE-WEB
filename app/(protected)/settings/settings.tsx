@@ -10,6 +10,7 @@ import RealtimeStatus from "../../../src/components/realtime-status"
 import {
   LANGUAGE_CODES,
   LANGUAGE_NAMES,
+  libelleLangue,
   traduire,
   useTranslation,
   type LanguageCode,
@@ -2347,7 +2348,7 @@ export default function SettingsPage() {
                 >
                   {LANGUAGE_CODES.map((code) => (
                     <option key={code} value={code}>
-                      {LANGUAGE_NAMES[code]}
+                      {libelleLangue(code)}
                     </option>
                   ))}
                 </select>

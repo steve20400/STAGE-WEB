@@ -30,6 +30,34 @@ export const LANGUAGE_NAMES: Record<LanguageCode, string> = {
   sv: "Svenska",
   no: "Norsk",
 }
+
+/**
+ * Drapeau de chaque langue, repris a l'identique de l'application mobile
+ * (`lib/core/locale_controller.dart`) : les deux applications proposent la meme
+ * liste, avec les memes emblemes, pour qu'un utilisateur retrouve son entree au
+ * meme endroit d'un client a l'autre.
+ *
+ * Ce sont des emoji et non des images : ils suivent la police du systeme, ne
+ * demandent aucun chargement reseau, et ne cassent pas le deploiement sous
+ * /webapp/ comme le ferait un chemin d'asset.
+ */
+export const LANGUAGE_FLAGS: Record<LanguageCode, string> = {
+  fr: "🇫🇷",
+  en: "🇬🇧",
+  es: "🇪🇸",
+  de: "🇩🇪",
+  pt: "🇵🇹",
+  ru: "🇷🇺",
+  zh: "🇨🇳",
+  sv: "🇸🇪",
+  no: "🇳🇴",
+}
+
+/** Libelle complet d'une langue : drapeau puis nom natif. */
+export function libelleLangue(code: LanguageCode): string {
+  return `${LANGUAGE_FLAGS[code]}  ${LANGUAGE_NAMES[code]}`
+}
+
 export type { LanguageCode }
 
 /**

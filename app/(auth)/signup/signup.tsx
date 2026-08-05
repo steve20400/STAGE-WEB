@@ -2,6 +2,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { requestRegistrationOtp } from "../../../src/services/auth-api"
+import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from "../../../src/i18n"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./signup-page.css"
 
@@ -95,6 +96,7 @@ function OtpInput({ value, onChange }: { value: string[]; onChange: (value: stri
 
 export default function SignUpPage() {
   const navigate = useNavigate()
+  const { language, setLanguage, t } = useTranslation()
   const { register } = useAuth()
 
   const [step, setStep] = useState<Step>(1)
@@ -147,7 +149,8 @@ export default function SignUpPage() {
 
     // Le backend (POST /api/auth/setup) refuse tout mot de passe de moins de
     // 8 caracteres : autant le dire ici plutot qu'apres la saisie du code OTP.
-    if (form.password.length < 8) return setError("Le mot de passe doit faire au moins 8 caracteres.")
+    if (form.password.length < 8)
+      return setError("Le mot de passe doit faire au moins 8 caracteres.")
     if (strength.score < 2) return setError("Mot de passe trop faible.")
     if (!match) return setError("Les mots de passe ne correspondent pas.")
 
@@ -260,6 +263,27 @@ export default function SignUpPage() {
 
       <main className="si-right">
         <div className="form-wrap">
+          {/* Le choix de la langue vient AVANT le formulaire : quelqu'un qui ne
+              lit pas le francais doit pouvoir basculer avant d'essayer de
+              comprendre les champs, pas apres son inscription. */}
+          <div className="signup-langue">
+            <label className="signup-langue-label" htmlFor="signup-langue">
+              {t("language_settings")}
+            </label>
+            <select
+              id="signup-langue"
+              className="signup-langue-select"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as LanguageCode)}
+            >
+              {LANGUAGE_CODES.map((code) => (
+                <option key={code} value={code}>
+                  {libelleLangue(code)}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {error && (
             <div className="error-banner">
               <span>{error}</span>
