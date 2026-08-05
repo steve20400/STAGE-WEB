@@ -30,14 +30,16 @@ function passwordStrength(pwd: string) {
   if (/[^A-Za-z0-9]/.test(pwd)) score += 1
   if (pwd.length >= 12) score += 1
 
+  // La cle de traduction, pas le libelle : la force du mot de passe se dit dans
+  // la langue de l'utilisateur comme le reste de l'ecran.
   const levels = [
-    { label: "Tres faible", color: "var(--danger)" },
-    { label: "Faible", color: "#f97316" },
-    { label: "Moyen", color: "#eab308" },
-    { label: "Bon", color: "#84cc16" },
-    { label: "Fort", color: "var(--success)" },
-    { label: "Tres fort", color: "var(--accent)" },
-  ]
+    { cle: "strength_very_weak", color: "var(--danger)" },
+    { cle: "strength_weak", color: "#f97316" },
+    { cle: "strength_medium", color: "#eab308" },
+    { cle: "strength_good", color: "#84cc16" },
+    { cle: "strength_strong", color: "var(--success)" },
+    { cle: "strength_very_strong", color: "var(--accent)" },
+  ] as const
 
   return { score, ...levels[Math.min(5, score)] }
 }
@@ -51,9 +53,10 @@ function StepHeader({
   title: React.ReactNode
   subtitle: React.ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <div className="step-head">
-      <div className="step-pre">Etape {step} sur 3</div>
+      <div className="step-pre">{t("signup_step", { n: step })}</div>
       <h1 className="step-title">{title}</h1>
       <p className="step-sub">{subtitle}</p>
     </div>
@@ -227,7 +230,13 @@ export default function SignUpPage() {
         </div>
 
         <div className="stepper">
-          {["Informations", "Mot de passe", "Verification"].map((label, index) => {
+          {(
+            [
+              t("signup_step_info"),
+              t("signup_step_password"),
+              t("signup_step_verification"),
+            ] as const
+          ).map((label, index) => {
             const num = (index + 1) as Step
             const state = step > num ? "done" : step === num ? "active" : "todo"
             return (
@@ -245,18 +254,18 @@ export default function SignUpPage() {
         </div>
 
         <div className="sec-promises">
-          <div className="sec-title">Authentification</div>
+          <div className="sec-title">{t("auth_promises")}</div>
           <div className="sec-item">
             <div className="sec-icon">1</div>
-            <div className="sec-txt">Email obligatoire et lie a un seul numero.</div>
+            <div className="sec-txt">{t("auth_promise_email")}</div>
           </div>
           <div className="sec-item">
             <div className="sec-icon">2</div>
-            <div className="sec-txt">Mot de passe fort requis.</div>
+            <div className="sec-txt">{t("auth_promise_password")}</div>
           </div>
           <div className="sec-item">
             <div className="sec-icon">3</div>
-            <div className="sec-txt">Code OTP fictif pour le prototype.</div>
+            <div className="sec-txt">{t("auth_promise_otp")}</div>
           </div>
         </div>
       </aside>
@@ -294,8 +303,8 @@ export default function SignUpPage() {
             <form onSubmit={submitStep1} noValidate>
               <StepHeader
                 step={1}
-                title="Creer un compte."
-                subtitle="Votre nom et votre adresse email. Votre Alanya ID sera genere automatiquement."
+                title={t("signup_title_account")}
+                subtitle={t("signup_sub_account")}
               />
 
               <div className="field">
@@ -307,7 +316,7 @@ export default function SignUpPage() {
                   onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                   required
                 />
-                <label htmlFor="name">Nom complet</label>
+                <label htmlFor="name">{t("full_name")}</label>
               </div>
 
               <div className="field">
@@ -320,7 +329,7 @@ export default function SignUpPage() {
                   autoComplete="email"
                   required
                 />
-                <label htmlFor="email">Adresse email</label>
+                <label htmlFor="email">{t("email")}</label>
               </div>
 
               <button
@@ -328,10 +337,10 @@ export default function SignUpPage() {
                 className="btn-submit"
                 disabled={!form.name.trim() || !form.email.trim() || !validEmail(form.email)}
               >
-                Continuer -&gt;
+                {t("continue_action")} -&gt;
               </button>
               <div className="login-link">
-                Deja un compte ? <Link to="/login">Connexion</Link>
+                {t("have_account")} <Link to="/login">{t("login")}</Link>
               </div>
             </form>
           )}
@@ -340,8 +349,8 @@ export default function SignUpPage() {
             <form onSubmit={submitStep2} noValidate>
               <StepHeader
                 step={2}
-                title="Securisez votre compte."
-                subtitle={`Pour ${form.email.trim().toLowerCase()}`}
+                title={t("signup_title_secure")}
+                subtitle={t("signup_sub_secure", { email: form.email.trim().toLowerCase() })}
               />
 
               <div className="field">
@@ -356,7 +365,7 @@ export default function SignUpPage() {
                   className="input-with-toggle"
                   required
                 />
-                <label htmlFor="pwd">Mot de passe</label>
+                <label htmlFor="pwd">{t("password")}</label>
                 <div className="field-icon">
                   <button className="tog" type="button" onClick={() => setShowPwd((v) => !v)}>
                     {showPwd ? "Masquer" : "Afficher"}
@@ -377,7 +386,7 @@ export default function SignUpPage() {
                   </div>
                   <div className="strength-meta">
                     <span className="strength-label" style={{ color: strength.color }}>
-                      {strength.label}
+                      {t(strength.cle)}
                     </span>
                   </div>
                 </div>
@@ -395,7 +404,7 @@ export default function SignUpPage() {
                   className="input-with-toggle"
                   required
                 />
-                <label htmlFor="confirm">Confirmer le mot de passe</label>
+                <label htmlFor="confirm">{t("confirm_password")}</label>
                 <div className="field-icon">
                   <button className="tog" type="button" onClick={() => setShowConfirm((v) => !v)}>
                     {showConfirm ? "Masquer" : "Afficher"}
