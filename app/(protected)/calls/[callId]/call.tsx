@@ -148,13 +148,20 @@ export default function CallRoomPage() {
     }
   }, [callState, navigate, returnTo])
 
+  /**
+   * Changer de camera echange la piste DANS le meme MediaStream : ni la
+   * reference du flux, ni `camOn` ne bougent. Sans l'identifiant de la piste en
+   * dependance, l'apercu resterait branche sur l'ancienne image.
+   */
+  const idPisteLocale = call.localStream?.getVideoTracks()[0]?.id ?? null
+
   // Branche le flux local sur l'apercu video (PiP)
   useEffect(() => {
     if (localVideoRef.current && call.localStream)
       localVideoRef.current.srcObject = call.localStream
     if (localFullVideoRef.current && call.localStream)
       localFullVideoRef.current.srcObject = call.localStream
-  }, [call.localStream, callState, call.camOn])
+  }, [call.localStream, callState, call.camOn, idPisteLocale])
 
   // Branche le premier flux distant sur la grande video. `showRemoteVideo` est
   // dans les dependances : l'element <video> n'est monte que lorsqu'il passe a

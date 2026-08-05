@@ -249,8 +249,20 @@ class PeerSession {
   }
 
   async replaceVideoTrack(track: MediaStreamTrack) {
-    const sender = this.pc?.getSenders().find((item) => item.track?.kind === "video")
-    await sender?.replaceTrack(track)
+    const pc = this.pc
+    if (!pc) return
+    // `sender.track` peut etre nul — piste retiree, ou emetteur pas encore
+    // associe. On retombe alors sur le transceiver video, sinon le
+    // correspondant reste sur l'ancienne image apres un changement de camera.
+    const sender =
+      pc.getSenders().find((item) => item.track?.kind === "video") ??
+      pc.getTransceivers().find((item) => item.receiver.track?.kind === "video")?.sender
+    if (!sender) return
+    try {
+      await sender.replaceTrack(track)
+    } catch (err) {
+      console.warn(`[webrtc] remplacement de la piste video refuse (${this.peerId}) :`, err)
+    }
   }
 
   close() {
@@ -1084,53 +1096,102 @@ export function toggleMicrophone(): boolean {
   return next
 }
 
-/** Bascule entre les caméras disponibles et remplace la piste chez tous les pairs WebRTC. */
+/**
+ * Installe une nouvelle piste video locale, et la pousse a TOUS les pairs.
+ *
+ * Sans le `replaceTrack` sur chaque connexion, les correspondants gardent
+ * l'ancienne camera — figee, puisqu'elle vient d'etre arretee.
+ */
+async function appliquerPisteVideo(piste: MediaStreamTrack): Promise<void> {
+  if (!localStream) return
+  // Une piste neuve arrive toujours activee : si la camera etait coupee, elle
+  // se rallumerait toute seule en changeant d'objectif.
+  piste.enabled = state.camOn
+
+  for (const ancienne of localStream.getVideoTracks()) {
+    ancienne.stop()
+    localStream.removeTrack(ancienne)
+  }
+  localStream.addTrack(piste)
+
+  await Promise.all([...peers.values()].map((peer) => peer.replaceVideoTrack(piste)))
+  setState({ localStream })
+}
+
+/**
+ * Bascule sur l'autre camera de l'appareil, et remplace la piste chez tous les
+ * pairs WebRTC.
+ *
+ * La camera courante est liberee AVANT d'ouvrir l'autre : beaucoup d'appareils
+ * — les telephones en particulier — n'autorisent qu'un seul objectif ouvert a
+ * la fois. L'ancienne version demandait la seconde camera pendant que la
+ * premiere tournait encore : `getUserMedia` echouait, l'echec etait avale, et
+ * rien ne bougeait a l'ecran.
+ *
+ * En cas d'echec on revient a la camera d'origine : mieux vaut l'image de
+ * depart qu'un appel video devenu aveugle.
+ */
 export async function switchCamera(): Promise<boolean> {
   if (!localStream) return false
-  const current = localStream.getVideoTracks()[0]
-  const currentFacing = current?.getSettings().facingMode
-  const targetFacing = currentFacing === "environment" ? "user" : "environment"
-  let replacement: MediaStream | null = null
-  // Android Chrome reconnaît généralement facingMode même lorsque les labels/deviceId
-  // sont masqués. On l'essaie d'abord, puis on retombe sur les appareils physiques.
-  try {
-    replacement = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: targetFacing } },
-      audio: false,
-    })
-  } catch {
-    /* fallback */
-  }
-  const devices = await navigator.mediaDevices.enumerateDevices()
-  const cameras = devices.filter((device) => device.kind === "videoinput")
-  const candidate = cameras.find((device) => device.deviceId !== current?.getSettings().deviceId)
-  if (
-    (!replacement ||
-      replacement.getVideoTracks()[0]?.getSettings().deviceId ===
-        current?.getSettings().deviceId) &&
-    candidate
-  ) {
-    replacement?.getTracks().forEach((track) => track.stop())
-    try {
-      replacement = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: candidate.deviceId } },
-        audio: false,
-      })
-    } catch {
-      return false
-    }
-  }
-  const nextTrack = replacement?.getVideoTracks()[0]
-  if (!nextTrack || nextTrack.getSettings().deviceId === current?.getSettings().deviceId) {
-    replacement?.getTracks().forEach((track) => track.stop())
+  const courante = localStream.getVideoTracks()[0]
+  if (!courante) return false
+
+  const reglages = courante.getSettings()
+  const idCourant = reglages.deviceId
+  const cibleFacing = reglages.facingMode === "environment" ? "user" : "environment"
+
+  const cameras = (await navigator.mediaDevices.enumerateDevices()).filter(
+    (appareil) => appareil.kind === "videoinput"
+  )
+  const suivante = cameras.find((appareil) => appareil.deviceId !== idCourant)
+  if (!suivante && cameras.length <= 1) {
+    setState({ error: "Cet appareil n'a qu'une seule camera." })
     return false
   }
-  current?.stop()
-  if (current) localStream.removeTrack(current)
-  localStream.addTrack(nextTrack)
-  await Promise.all([...peers.values()].map((peer) => peer.replaceVideoTrack(nextTrack)))
-  setState({ localStream })
-  return true
+
+  // De quoi rouvrir l'objectif de depart si la bascule echoue.
+  const repli: MediaStreamConstraints = {
+    video: idCourant ? { deviceId: { exact: idCourant } } : true,
+    audio: false,
+  }
+  courante.stop()
+  localStream.removeTrack(courante)
+
+  // Par identifiant d'abord — c'est le seul critere fiable sur ordinateur, ou
+  // `facingMode` n'est generalement pas renseigne. La face opposee ensuite,
+  // pour les mobiles qui masquent les identifiants.
+  const tentatives: MediaStreamConstraints[] = []
+  if (suivante) {
+    tentatives.push({ video: { deviceId: { exact: suivante.deviceId } }, audio: false })
+  }
+  tentatives.push({ video: { facingMode: { exact: cibleFacing } }, audio: false })
+
+  for (const contraintes of tentatives) {
+    try {
+      const flux = await navigator.mediaDevices.getUserMedia(contraintes)
+      const piste = flux.getVideoTracks()[0]
+      if (!piste) continue
+      if (piste.getSettings().deviceId === idCourant) {
+        // Le navigateur a rendu la meme camera : inutile, on essaie autrement.
+        flux.getTracks().forEach((t) => t.stop())
+        continue
+      }
+      await appliquerPisteVideo(piste)
+      return true
+    } catch {
+      // objectif indisponible : on tente le critere suivant
+    }
+  }
+
+  try {
+    const retour = await navigator.mediaDevices.getUserMedia(repli)
+    const piste = retour.getVideoTracks()[0]
+    if (piste) await appliquerPisteVideo(piste)
+  } catch {
+    // meme la camera de depart est perdue : l'erreur ci-dessous le dira
+  }
+  setState({ error: "Changement de camera impossible sur cet appareil." })
+  return false
 }
 
 /** Coupe/retablit la camera (pistes video locales). */

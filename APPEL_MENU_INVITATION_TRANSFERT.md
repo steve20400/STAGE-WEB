@@ -189,7 +189,46 @@ La conversation de l'appel d'origine est réutilisée quand elle est connue
 (`call.convId`) ; sinon elle est retrouvée par le numéro, comme depuis le
 composeur.
 
-## 9. Déploiement
+## 9. Changement de caméra
+
+Le bouton « Retourner » ne changeait pas de caméra.
+
+**Cause.** La seconde caméra était demandée pendant que la première tournait
+encore. Beaucoup d'appareils — les téléphones en particulier — n'autorisent
+qu'un seul objectif ouvert à la fois : `getUserMedia` échouait, l'échec était
+avalé par un `catch` vide, et rien ne bougeait à l'écran.
+
+**Correctif.** La caméra courante est arrêtée et retirée du flux **avant**
+d'ouvrir l'autre. Deux critères sont tentés dans l'ordre : l'identifiant de
+l'autre caméra (seul critère fiable sur ordinateur, où `facingMode` n'est
+généralement pas renseigné), puis la face opposée (`facingMode`, pour les
+mobiles qui masquent les identifiants). Si le navigateur rend la même caméra,
+la tentative est rejetée et l'on passe à la suivante.
+
+Trois garde-fous :
+
+- **Échec ⇒ retour à la caméra de départ.** Mieux vaut l'image d'origine qu'un
+  appel vidéo devenu aveugle. Un message le dit, au lieu d'un bouton sans effet.
+- **Une seule caméra ⇒ message explicite** plutôt qu'un silence.
+- **Caméra coupée ⇒ elle le reste.** Une piste neuve arrive toujours activée :
+  sans cela, changer d'objectif rallumait la caméra tout seul.
+
+**Côté correspondants.** La nouvelle piste est poussée dans chaque connexion
+(`replaceTrack` sur tous les pairs), donc tout le monde voit le nouvel objectif.
+La recherche de l'émetteur retombe sur le transceiver vidéo quand
+`sender.track` est nul — sinon le remplacement était silencieusement sauté et
+le correspondant restait sur l'ancienne image, figée puisque la caméra venait
+d'être arrêtée.
+
+**Aperçu local.** Le changement échange la piste _dans_ le même `MediaStream` :
+ni la référence du flux ni `camOn` ne changent. L'identifiant de la piste est
+donc ajouté aux dépendances de l'effet qui branche l'aperçu, faute de quoi il
+resterait sur l'ancienne image.
+
+> Vérifié à la compilation et par lecture ; la confirmation visuelle demande un
+> appareil réel à deux caméras.
+
+## 10. Déploiement
 
 Rien dans ce chantier ne touche au base path : pas de modification de
 `vite.config.ts`, `vercel.json`, ni du `basename` du routeur, et aucun chemin
