@@ -18,6 +18,12 @@ import { getMyUserId } from "../../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
 import { useTranslation } from "../../../../src/i18n"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
+import {
+  bloquer,
+  debloquer,
+  listerBloques,
+  type PersonneBloquee,
+} from "../../../../src/services/blocked-service"
 import { AvatarCircle } from "../../../../src/components/avatar-circle"
 
 type BackendGroupMember =
@@ -139,6 +145,16 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
   const [tab, setTab] = useState<"membres" | "fichiers">("membres")
   const [muteNotifs, setMute] = useState(false)
+  /**
+   * Ligne de blocage visant ce correspondant, ou null. On garde la ligne et non
+   * un simple booleen : c'est son identifiant qui sert a debloquer.
+   *
+   * Bloquer n'est PAS verrouiller : ici on empeche les messages de cette
+   * personne d'arriver chez soi ; le verrou, lui, empechera les autres
+   * appareils de son propre compte d'ecrire. Deux fonctions, deux emplacements.
+   */
+  const [blocage, setBlocage] = useState<PersonneBloquee | null>(null)
+  const [blocageEnCours, setBlocageEnCours] = useState(false)
   const { t } = useTranslation()
   const [members, setMembers] = useState<Member[]>(conv.members)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
@@ -165,6 +181,44 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           .catch(() => warning("Retrait impossible"))
       },
     })
+  }
+
+  const numeroDuPair = conv?.alanyaId ?? null
+  useEffect(() => {
+    if (!numeroDuPair) return
+    let annule = false
+    const chiffres = (valeur: string) => valeur.replace(/\D/g, "")
+    void listerBloques().then((liste) => {
+      if (annule) return
+      setBlocage(
+        liste.find((b) => chiffres(b.publicNumber ?? "") === chiffres(numeroDuPair)) ?? null
+      )
+    })
+    return () => {
+      annule = true
+    }
+  }, [numeroDuPair])
+
+  const basculerBlocage = async () => {
+    if (!numeroDuPair || blocageEnCours) return
+    setBlocageEnCours(true)
+    try {
+      if (blocage) {
+        await debloquer(blocage.idBlock)
+        setBlocage(null)
+        info("Debloque", `${conv?.name ?? "Ce contact"} peut de nouveau vous ecrire.`)
+      } else {
+        setBlocage(await bloquer(numeroDuPair))
+        info("Bloque", `${conv?.name ?? "Ce contact"} ne peut plus vous ecrire.`)
+      }
+    } catch (err) {
+      warning(
+        blocage ? "Deblocage impossible" : "Blocage impossible",
+        err instanceof Error ? err.message : undefined
+      )
+    } finally {
+      setBlocageEnCours(false)
+    }
   }
 
   const leaveGroup = () => {
@@ -569,6 +623,48 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 />
               </button>
             </div>
+
+            {/* Bloquer : meme interrupteur que la sourdine — l'etat se lit d'un
+                coup d'oeil, ce qu'une entree de menu ne montre pas. Teinte
+                d'alerte pour qu'il ne passe pas pour un reglage anodin. */}
+            {!conv.isGroup && conv.alanyaId && (
+              <div className="notif-row" style={{ marginTop: 14, alignItems: "flex-start" }}>
+                <span className="notif-label">
+                  Bloquer ce contact
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                      marginTop: 2,
+                    }}
+                  >
+                    Ses messages ne vous parviendront plus
+                  </span>
+                </span>
+                <button
+                  className="tgl"
+                  style={{
+                    flexShrink: 0,
+                    background: blocage ? "var(--danger)" : "var(--border-default)",
+                    opacity: blocageEnCours ? 0.6 : 1,
+                  }}
+                  onClick={() => void basculerBlocage()}
+                  disabled={blocageEnCours}
+                  aria-checked={blocage !== null}
+                  role="switch"
+                  aria-label="Bloquer ce contact"
+                >
+                  <div
+                    className="tgl-knob"
+                    style={{
+                      left: blocage ? "20px" : "2.5px",
+                      background: blocage ? "#fff" : "var(--text-muted)",
+                    }}
+                  />
+                </button>
+              </div>
+            )}
           </div>
 
           {conv.isGroup && (

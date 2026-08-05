@@ -1,4 +1,14 @@
-import { Component, useState, useRef, useEffect, useCallback, useMemo, type ErrorInfo, type ReactNode, type RefObject } from "react"
+import {
+  Component,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  type ErrorInfo,
+  type ReactNode,
+  type RefObject,
+} from "react"
 import type { PDFDocumentLoadingTask } from "pdfjs-dist"
 import { useNavigate, useParams } from "react-router-dom"
 import {
@@ -39,6 +49,7 @@ import {
 import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
 import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media-thumbnail"
 import { useTranslation } from "../../../../src/i18n"
+import { composerMessageSysteme } from "../../../../src/i18n/messages-systeme"
 import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
 import {
   publishTyping,
@@ -59,20 +70,46 @@ import "./chat-room-page.css"
 type Message = ChatMessageMock
 
 /** Une carte média défectueuse ne doit jamais faire tomber toute la discussion. */
-class MessageErrorBoundary extends Component<{ children: ReactNode; name?: string; size?: string }, { failed: boolean }> {
+class MessageErrorBoundary extends Component<
+  { children: ReactNode; name?: string; size?: string },
+  { failed: boolean }
+> {
   state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
   componentDidCatch(error: Error, info: ErrorInfo) {
-    try { localStorage.setItem("alanya_last_preview_error", `${new Date().toISOString()} | ${error.message} | ${info.componentStack?.slice(0, 500) ?? ""}`) } catch { /* stockage facultatif */ }
+    try {
+      localStorage.setItem(
+        "alanya_last_preview_error",
+        `${new Date().toISOString()} | ${error.message} | ${info.componentStack?.slice(0, 500) ?? ""}`
+      )
+    } catch {
+      /* stockage facultatif */
+    }
     console.error("[Alanya preview] erreur isolée", error)
   }
   render() {
     if (!this.state.failed) return this.props.children
-    return <div style={{ margin: "6px 0", padding: "10px 12px", borderRadius: 9, border: "1px solid var(--border-subtle)", background: "var(--bg-elevated)", fontSize: 11, color: "var(--text-secondary)" }}>
-      <div style={{ fontWeight: 700 }}>{this.props.name ?? "Fichier"}</div>
-      {this.props.size && <div style={{ marginTop: 2 }}>{this.props.size}</div>}
-      <div style={{ marginTop: 5 }}>Aperçu indisponible pour ce fichier. Les autres messages restent accessibles.</div>
-    </div>
+    return (
+      <div
+        style={{
+          margin: "6px 0",
+          padding: "10px 12px",
+          borderRadius: 9,
+          border: "1px solid var(--border-subtle)",
+          background: "var(--bg-elevated)",
+          fontSize: 11,
+          color: "var(--text-secondary)",
+        }}
+      >
+        <div style={{ fontWeight: 700 }}>{this.props.name ?? "Fichier"}</div>
+        {this.props.size && <div style={{ marginTop: 2 }}>{this.props.size}</div>}
+        <div style={{ marginTop: 5 }}>
+          Aperçu indisponible pour ce fichier. Les autres messages restent accessibles.
+        </div>
+      </div>
+    )
   }
 }
 
@@ -104,45 +141,97 @@ function useViewerFullscreen(host: RefObject<HTMLElement | null>) {
     const node = host.current
     // F11 et Echap sortent du plein ecran sans passer par notre bouton : on suit
     // l'etat reel du document plutot que de le supposer.
-    const sync = () => { if (!document.fullscreenElement) setExpanded(false) }
+    const sync = () => {
+      if (!document.fullscreenElement) setExpanded(false)
+    }
     document.addEventListener("fullscreenchange", sync)
     return () => {
       document.removeEventListener("fullscreenchange", sync)
       // Fermeture du visionneur alors qu'il est en plein ecran : sans ca, la page
       // resterait en plein ecran une fois le visionneur disparu.
-      if (document.fullscreenElement === node) void document.exitFullscreen().catch(() => { /* deja sorti */ })
+      if (document.fullscreenElement === node)
+        void document.exitFullscreen().catch(() => {
+          /* deja sorti */
+        })
     }
   }, [host])
 
   const toggle = useCallback(() => {
     if (expanded) {
       setExpanded(false)
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => { /* deja sorti */ })
+      if (document.fullscreenElement)
+        void document.exitFullscreen().catch(() => {
+          /* deja sorti */
+        })
       return
     }
     setExpanded(true)
     const node = host.current
-    if (node?.requestFullscreen) void node.requestFullscreen().catch(() => { /* agrandissement CSS seul */ })
+    if (node?.requestFullscreen)
+      void node.requestFullscreen().catch(() => {
+        /* agrandissement CSS seul */
+      })
   }, [expanded, host])
 
   return { expanded, toggle }
 }
 
 /** Le bouton qui va avec, a poser dans la barre de titre d'un visionneur. */
-function ViewerFullscreenButton({ expanded, onToggle, color, style }: { expanded: boolean; onToggle: () => void; color: string; style?: React.CSSProperties }) {
+function ViewerFullscreenButton({
+  expanded,
+  onToggle,
+  color,
+  style,
+}: {
+  expanded: boolean
+  onToggle: () => void
+  color: string
+  style?: React.CSSProperties
+}) {
   return (
     <button
-      onClick={(event) => { event.stopPropagation(); onToggle() }}
+      onClick={(event) => {
+        event.stopPropagation()
+        onToggle()
+      }}
       aria-label={expanded ? "Revenir a la taille initiale" : "Afficher en plein ecran"}
       aria-pressed={expanded}
       title={expanded ? "Taille initiale" : "Plein ecran"}
-      style={{ background: "none", border: "none", color, cursor: "pointer", display: "flex", alignItems: "center", padding: 0, ...style }}
+      style={{
+        background: "none",
+        border: "none",
+        color,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        padding: 0,
+        ...style,
+      }}
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         {expanded ? (
-          <><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="14" y1="10" x2="21" y2="3" /><line x1="3" y1="21" x2="10" y2="14" /></>
+          <>
+            <polyline points="4 14 10 14 10 20" />
+            <polyline points="20 10 14 10 14 4" />
+            <line x1="14" y1="10" x2="21" y2="3" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </>
         ) : (
-          <><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></>
+          <>
+            <polyline points="15 3 21 3 21 9" />
+            <polyline points="9 21 3 21 3 15" />
+            <line x1="21" y1="3" x2="14" y2="10" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </>
         )}
       </svg>
     </button>
@@ -150,16 +239,37 @@ function ViewerFullscreenButton({ expanded, onToggle, color, style }: { expanded
 }
 
 /** Visionneuse intégrée pour documents (texte, code, PDF, image, vidéo, DOC, XLS, PPT). */
-function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?: string; mime?: string; isMe: boolean; onClose: () => void }) {
+function DocumentViewer({
+  url,
+  name,
+  mime,
+  isMe,
+  onClose,
+}: {
+  url: string
+  name?: string
+  mime?: string
+  isMe: boolean
+  onClose: () => void
+}) {
   const ext = (name ?? "").split(".").pop()?.toLowerCase() ?? ""
-  const isImage = mime?.startsWith("image/") || ["jpg","jpeg","png","gif","webp","bmp"].map((e)=>e.toLowerCase()).includes(ext)
-  const isVideo = mime?.startsWith("video/") || ["mp4","mov","avi","mkv","webm"].map((e)=>e.toLowerCase()).includes(ext)
-  const isAudio = mime?.startsWith("audio/") || ["mp3","aac","acc","wav","ogg","m4a","flac","webm"].includes(ext)
+  const isImage =
+    mime?.startsWith("image/") ||
+    ["jpg", "jpeg", "png", "gif", "webp", "bmp"].map((e) => e.toLowerCase()).includes(ext)
+  const isVideo =
+    mime?.startsWith("video/") ||
+    ["mp4", "mov", "avi", "mkv", "webm"].map((e) => e.toLowerCase()).includes(ext)
+  const isAudio =
+    mime?.startsWith("audio/") ||
+    ["mp3", "aac", "acc", "wav", "ogg", "m4a", "flac", "webm"].includes(ext)
   const isText = mime?.startsWith("text/") || TEXT_PREVIEW_EXTENSIONS.includes(ext)
   const isPdf = mime === "application/pdf" || ext === "pdf"
-  const isDoc = ["doc","docx"].includes(ext) || (mime ?? "").includes("word")
-  const isSpreadsheet = ["xls","xlsx","ods","numbers"].includes(ext) || (mime ?? "").includes("spreadsheet") || (mime ?? "").includes("excel")
-  const isPresentation = ["ppt","pptx"].includes(ext) || (mime ?? "").includes("presentation")
+  const isDoc = ["doc", "docx"].includes(ext) || (mime ?? "").includes("word")
+  const isSpreadsheet =
+    ["xls", "xlsx", "ods", "numbers"].includes(ext) ||
+    (mime ?? "").includes("spreadsheet") ||
+    (mime ?? "").includes("excel")
+  const isPresentation = ["ppt", "pptx"].includes(ext) || (mime ?? "").includes("presentation")
 
   // Pour le texte/code : on lit le contenu via fetch et on affiche dans un textarea
   const [textContent, setTextContent] = useState<string | null>(null)
@@ -174,7 +284,8 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
   useEffect(() => {
     if (isText && url) {
       setLoadingText(true)
-      loadPreviewBlob(url).then((blob) => blob.text())
+      loadPreviewBlob(url)
+        .then((blob) => blob.text())
         .then((t) => {
           setTextContent(t.slice(0, 50000))
           setLoadingText(false)
@@ -196,10 +307,15 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
       ref={host}
       onClick={onClose}
       style={{
-        position: "fixed", inset: 0, zIndex: 9500,
+        position: "fixed",
+        inset: 0,
+        zIndex: 9500,
         background: "#000000d9",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: expanded ? 0 : 24, flexDirection: "column",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: expanded ? 0 : 24,
+        flexDirection: "column",
       }}
     >
       <div
@@ -209,56 +325,205 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
           height: expanded ? "100vh" : undefined,
           maxHeight: expanded ? "100vh" : "88vh",
           background: isMe ? "#2a1f14" : "#0a0d12",
-          borderRadius: expanded ? 0 : 16, border: `1px solid ${isMe ? "#ffffff18" : "#1a1f24"}`,
+          borderRadius: expanded ? 0 : 16,
+          border: `1px solid ${isMe ? "#ffffff18" : "#1a1f24"}`,
           boxShadow: "0 32px 80px #000000b0",
           overflow: "hidden",
-          display: "flex", flexDirection: "column",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         {/* Barre de titre */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: `1px solid ${isMe ? "#ffffff15" : "#1a1f24"}`, fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 700, fontSize: 15, color: isMe ? "#fff" : "var(--text-primary)" }}>
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name ?? "Fichier"}</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 18px",
+            borderBottom: `1px solid ${isMe ? "#ffffff15" : "#1a1f24"}`,
+            fontFamily: "'Bricolage Grotesque', sans-serif",
+            fontWeight: 700,
+            fontSize: 15,
+            color: isMe ? "#fff" : "var(--text-primary)",
+          }}
+        >
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {name ?? "Fichier"}
+          </span>
           <span style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
-            <ViewerFullscreenButton expanded={expanded} onToggle={toggle} color={isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)"} />
-            <button onClick={onClose} aria-label="Fermer" style={{ background: "none", border: "none", color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>✕</button>
+            <ViewerFullscreenButton
+              expanded={expanded}
+              onToggle={toggle}
+              color={isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)"}
+            />
+            <button
+              onClick={onClose}
+              aria-label="Fermer"
+              style={{
+                background: "none",
+                border: "none",
+                color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)",
+                cursor: "pointer",
+                fontSize: 20,
+                lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
           </span>
         </div>
 
         {/* Corps */}
         <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
           {isOffice && (
-            <OfficePreview url={url} name={name} label={officeLabel} isMe={isMe} height={bodyHeight} />
+            <OfficePreview
+              url={url}
+              name={name}
+              label={officeLabel}
+              isMe={isMe}
+              height={bodyHeight}
+            />
           )}
           {!isOffice && isImage && (
-            <img src={url} alt={name ?? "image"} style={{ maxWidth: "100%", maxHeight: bodyHeight, borderRadius: 10, display: "block", margin: "0 auto" }} />
+            <img
+              src={url}
+              alt={name ?? "image"}
+              style={{
+                maxWidth: "100%",
+                maxHeight: bodyHeight,
+                borderRadius: 10,
+                display: "block",
+                margin: "0 auto",
+              }}
+            />
           )}
           {!isOffice && isVideo && (
-            <video src={url} controls preload="metadata" style={{ width: "100%", maxHeight: bodyHeight, borderRadius: 10, display: "block", margin: "0 auto" }} />
+            <video
+              src={url}
+              controls
+              preload="metadata"
+              style={{
+                width: "100%",
+                maxHeight: bodyHeight,
+                borderRadius: 10,
+                display: "block",
+                margin: "0 auto",
+              }}
+            />
           )}
-          {!isOffice && isAudio && <audio src={url} controls preload="metadata" style={{ width: "100%", marginTop: 12 }} />}
+          {!isOffice && isAudio && (
+            <audio src={url} controls preload="metadata" style={{ width: "100%", marginTop: 12 }} />
+          )}
           {!isOffice && isPdf && <PdfViewer url={url} isMe={isMe} full fullHeight={bodyHeight} />}
           {!isOffice && isText && (
             <>
               {loadingText ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: textHeight, color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)" }}>
-                  <span style={{ width: 20, height: 20, borderRadius: "50%", border: `3px solid ${isMe ? "rgba(255,255,255,0.2)" : "var(--border-subtle)"}`, borderTopColor: isMe ? "#fff" : "var(--accent)", animation: "spin 0.8s linear infinite", marginRight: 10 }} />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: textHeight,
+                    color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      border: `3px solid ${isMe ? "rgba(255,255,255,0.2)" : "var(--border-subtle)"}`,
+                      borderTopColor: isMe ? "#fff" : "var(--accent)",
+                      animation: "spin 0.8s linear infinite",
+                      marginRight: 10,
+                    }}
+                  />
                   <span>Chargement du document...</span>
                 </div>
               ) : textContent !== null ? (
-                <textarea readOnly value={textContent} style={{ width: "100%", height: textHeight, background: "#0d1117", color: isMe ? "#f0f6fc" : "#c9d1d9", border: "1px solid #30363d", borderRadius: 8, padding: 12, fontFamily: "'Fira Code', monospace", fontSize: 13, lineHeight: 1.5, resize: "none" }} />
+                <textarea
+                  readOnly
+                  value={textContent}
+                  style={{
+                    width: "100%",
+                    height: textHeight,
+                    background: "#0d1117",
+                    color: isMe ? "#f0f6fc" : "#c9d1d9",
+                    border: "1px solid #30363d",
+                    borderRadius: 8,
+                    padding: 12,
+                    fontFamily: "'Fira Code', monospace",
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    resize: "none",
+                  }}
+                />
               ) : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: bodyHeight, color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    height: bodyHeight,
+                    color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
                   <span>Impossible de charger le contenu.</span>
-                  <a href={url} target="_blank" rel="noreferrer" style={{ color: isMe ? "#fff" : "var(--accent)", fontWeight: 600, textDecoration: "underline" }}>Ouvrir dans un nouvel onglet</a>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      color: isMe ? "#fff" : "var(--accent)",
+                      fontWeight: 600,
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Ouvrir dans un nouvel onglet
+                  </a>
                 </div>
               )}
             </>
           )}
           {!isOffice && !isImage && !isVideo && !isAudio && !isPdf && !isText && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: bodyHeight, color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)", flexDirection: "column", gap: 12 }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={isMe ? "rgba(255,255,255,0.4)" : "var(--text-muted)"} strokeWidth="1.5" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: bodyHeight,
+                color: isMe ? "rgba(255,255,255,0.5)" : "var(--text-muted)",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={isMe ? "rgba(255,255,255,0.4)" : "var(--text-muted)"}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              >
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
               <div style={{ fontSize: 13, opacity: 0.8 }}>{name ?? "Fichier"}</div>
-              <a href={url} target="_blank" rel="noreferrer" style={{ color: isMe ? "#fff" : "var(--accent)", fontWeight: 600, textDecoration: "underline" }}>Télécharger / Ouvrir</a>
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  color: isMe ? "#fff" : "var(--accent)",
+                  fontWeight: 600,
+                  textDecoration: "underline",
+                }}
+              >
+                Télécharger / Ouvrir
+              </a>
             </div>
           )}
         </div>
@@ -268,7 +533,17 @@ function DocumentViewer({ url, name, mime, isMe, onClose }: { url: string; name?
 }
 
 /** Lecteur PDF rendu par PDF.js : ne dépend pas du lecteur PDF du téléphone. */
-function PdfViewer({ url, isMe, full = false, fullHeight = "70vh" }: { url: string; isMe: boolean; full?: boolean; fullHeight?: string }) {
+function PdfViewer({
+  url,
+  isMe,
+  full = false,
+  fullHeight = "70vh",
+}: {
+  url: string
+  isMe: boolean
+  full?: boolean
+  fullHeight?: string
+}) {
   const host = useRef<HTMLDivElement>(null)
   const [state, setState] = useState("Chargement du PDF…")
   const [errorMessage, setErrorMessage] = useState("")
@@ -282,18 +557,24 @@ function PdfViewer({ url, isMe, full = false, fullHeight = "70vh" }: { url: stri
     let cancelled = false
     let task: PDFDocumentLoadingTask | undefined
     const render = async () => {
-      setState("Chargement du PDF…"); setErrorMessage(""); setNativeFallback(false)
+      setState("Chargement du PDF…")
+      setErrorMessage("")
+      setNativeFallback(false)
       let blob: Blob
       try {
         blob = await loadPreviewBlob(url)
       } catch {
-        if (!cancelled) { setState(""); setNativeFallback(true) }
+        if (!cancelled) {
+          setState("")
+          setNativeFallback(true)
+        }
         return
       }
       let pdfjs: typeof import("pdfjs-dist/legacy/build/pdf.mjs")
       try {
         const sample = await blob.slice(0, 1000).text()
-        if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(sample)) throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
+        if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(sample))
+          throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
         pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
         // Le worker indisponible ne dit rien du document : il est peut-etre
         // parfaitement lisible. On passe la main au lecteur natif au lieu
@@ -302,7 +583,8 @@ function PdfViewer({ url, isMe, full = false, fullHeight = "70vh" }: { url: stri
       } catch (err: unknown) {
         if (cancelled) return
         setState("")
-        if (err instanceof Error && /quota de téléchargement/.test(err.message)) setErrorMessage(err.message)
+        if (err instanceof Error && /quota de téléchargement/.test(err.message))
+          setErrorMessage(err.message)
         else setNativeFallback(true)
         return
       }
@@ -313,39 +595,83 @@ function PdfViewer({ url, isMe, full = false, fullHeight = "70vh" }: { url: stri
         host.current.replaceChildren()
         // Premier rendu léger : les pages suivantes sont construites sans relancer le téléchargement.
         for (let pageNo = 1; pageNo <= Math.min(pdf.numPages, full ? 30 : 1); pageNo++) {
-          const page = await pdf.getPage(pageNo); const viewport = page.getViewport({ scale: 1.25 })
-          const canvas = document.createElement("canvas"); canvas.width = viewport.width; canvas.height = viewport.height
-          canvas.style.cssText = "display:block;width:100%;height:auto;margin:0 auto 12px;background:white;border-radius:6px"
-          const ctx = canvas.getContext("2d"); if (ctx) await page.render({ canvasContext: ctx, viewport }).promise
+          const page = await pdf.getPage(pageNo)
+          const viewport = page.getViewport({ scale: 1.25 })
+          const canvas = document.createElement("canvas")
+          canvas.width = viewport.width
+          canvas.height = viewport.height
+          canvas.style.cssText =
+            "display:block;width:100%;height:auto;margin:0 auto 12px;background:white;border-radius:6px"
+          const ctx = canvas.getContext("2d")
+          if (ctx) await page.render({ canvasContext: ctx, viewport }).promise
           if (!cancelled) host.current?.append(canvas)
         }
         if (!cancelled) setState("")
-      } catch (err: unknown) { if (!cancelled) { setState(""); setErrorMessage(err instanceof Error ? err.message : "Le PDF ne peut pas être chargé.") } }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setState("")
+          setErrorMessage(err instanceof Error ? err.message : "Le PDF ne peut pas être chargé.")
+        }
+      }
     }
-    void render(); return () => { cancelled = true; task?.destroy?.() }
+    void render()
+    return () => {
+      cancelled = true
+      task?.destroy?.()
+    }
   }, [url, full])
 
   // Repli natif : le document reste consultable et defilable, sans PDF.js.
   if (nativeFallback) {
-    return <div style={{ position: "relative" }}>
-      <iframe
-        src={url}
-        title="Apercu PDF"
-        style={{ width: "100%", height: full ? fullHeight : 220, border: "none", borderRadius: 8, background: "#fff", display: "block" }}
-      />
-      <a href={url} target="_blank" rel="noreferrer" style={{ display: "block", padding: "6px 2px 0", fontSize: 10, color: isMe ? "rgba(255,255,255,0.85)" : "var(--text-secondary)" }}>
-        Ouvrir dans un nouvel onglet
-      </a>
-    </div>
+    return (
+      <div style={{ position: "relative" }}>
+        <iframe
+          src={url}
+          title="Apercu PDF"
+          style={{
+            width: "100%",
+            height: full ? fullHeight : 220,
+            border: "none",
+            borderRadius: 8,
+            background: "#fff",
+            display: "block",
+          }}
+        />
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: "block",
+            padding: "6px 2px 0",
+            fontSize: 10,
+            color: isMe ? "rgba(255,255,255,0.85)" : "var(--text-secondary)",
+          }}
+        >
+          Ouvrir dans un nouvel onglet
+        </a>
+      </div>
+    )
   }
 
   // Le host canvas est volontairement distinct du texte React : PDF.js manipule
   // ses enfants avec replaceChildren(), React ne doit donc jamais les gérer.
-  return <div style={{ minHeight: 120, color: isMe ? "#fff" : "var(--text-secondary)", textAlign: "center", padding: 10 }}>
-    {state && <div style={{ padding: 10 }}>{state}</div>}
-    {errorMessage && <div style={{ padding: 10, color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</div>}
-    <div ref={host} />
-  </div>
+  return (
+    <div
+      style={{
+        minHeight: 120,
+        color: isMe ? "#fff" : "var(--text-secondary)",
+        textAlign: "center",
+        padding: 10,
+      }}
+    >
+      {state && <div style={{ padding: 10 }}>{state}</div>}
+      {errorMessage && (
+        <div style={{ padding: 10, color: isMe ? "#ffe0d1" : "var(--danger)" }}>{errorMessage}</div>
+      )}
+      <div ref={host} />
+    </div>
+  )
 }
 
 /** Coche simple (envoye) / double blanche (recu) / double bleue (lu), comme sur WhatsApp.
@@ -394,7 +720,8 @@ const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
 
 /** Detecte des coordonnees GPS (lat,lng) ou un lien Google Maps. */
 const GPS_REGEX = /(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})/
-const GMAPS_REGEX = /(?:google\.\w+\/maps|maps\.google\.\w+|goo\.gl\/maps).*?[/@](-?\d+\.\d+),(-?\d+\.\d+)/
+const GMAPS_REGEX =
+  /(?:google\.\w+\/maps|maps\.google\.\w+|goo\.gl\/maps).*?[/@](-?\d+\.\d+),(-?\d+\.\d+)/
 
 function extractGpsCoords(text: string): { lat: number; lng: number } | null {
   const gm = text.match(GMAPS_REGEX)
@@ -406,11 +733,23 @@ function extractGpsCoords(text: string): { lat: number; lng: number } | null {
 
 /** Les coordonnées sont affichées sous la carte : on évite de les répéter au-dessus. */
 function removeGpsCoordinates(text: string): string {
-  return text.replace(GPS_REGEX, "").replace(/\s{2,}/g, " ").trim()
+  return text
+    .replace(GPS_REGEX, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
 }
 
 /** Couleurs distinctes pour les noms d'envoyeurs en groupe. */
-const SENDER_NAME_COLORS = ["#E8B84B", "#60a5fa", "#a78bfa", "#34d399", "#f87171", "#fb923c", "#38bdf8", "#c084fc"]
+const SENDER_NAME_COLORS = [
+  "#E8B84B",
+  "#60a5fa",
+  "#a78bfa",
+  "#34d399",
+  "#f87171",
+  "#fb923c",
+  "#38bdf8",
+  "#c084fc",
+]
 function senderNameColor(id: string): string {
   let h = 0
   for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0
@@ -419,7 +758,83 @@ function senderNameColor(id: string): string {
 
 /** Extensions lues comme du texte source par le visionneur integre.
  *  Un .html n'est jamais execute : il est affiche tel quel. */
-const TEXT_PREVIEW_EXTENSIONS = ["txt","csv","log","md","tex","latex","bib","sty","tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro","css","scss","sass","less","styl","postcss","json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"]
+const TEXT_PREVIEW_EXTENSIONS = [
+  "txt",
+  "csv",
+  "log",
+  "md",
+  "tex",
+  "latex",
+  "bib",
+  "sty",
+  "tsx",
+  "ts",
+  "jsx",
+  "js",
+  "mjs",
+  "cjs",
+  "html",
+  "htm",
+  "xhtml",
+  "vue",
+  "svelte",
+  "astro",
+  "css",
+  "scss",
+  "sass",
+  "less",
+  "styl",
+  "postcss",
+  "json",
+  "yaml",
+  "yml",
+  "xml",
+  "toml",
+  "ini",
+  "cfg",
+  "env",
+  "properties",
+  "dockerfile",
+  "makefile",
+  "gradle",
+  "maven",
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "powershell",
+  "bat",
+  "cmd",
+  "py",
+  "java",
+  "cpp",
+  "c",
+  "h",
+  "hpp",
+  "cs",
+  "go",
+  "rust",
+  "rs",
+  "swift",
+  "kt",
+  "kts",
+  "scala",
+  "r",
+  "rb",
+  "pl",
+  "pm",
+  "lua",
+  "perl",
+  "php",
+  "sql",
+  "graphql",
+  "prisma",
+  "mdx",
+  "rst",
+  "asciidoc",
+  "org",
+  "wiki",
+]
 
 /** Icone + couleur par extension de fichier. */
 function fileTypeInfo(filename?: string, mime?: string): { color: string; label: string } {
@@ -427,13 +842,86 @@ function fileTypeInfo(filename?: string, mime?: string): { color: string; label:
   const m = (mime ?? "").toLowerCase()
   if (ext === "pdf" || m === "application/pdf") return { color: "#ef4444", label: "PDF" }
   if (["doc", "docx"].includes(ext) || m.includes("word")) return { color: "#3b82f6", label: "DOC" }
-  if (["xls", "xlsx"].includes(ext) || m.includes("spreadsheet") || m.includes("excel")) return { color: "#22c55e", label: "XLS" }
-  if (["ppt", "pptx"].includes(ext) || m.includes("presentation")) return { color: "#f97316", label: "PPT" }
+  if (["xls", "xlsx"].includes(ext) || m.includes("spreadsheet") || m.includes("excel"))
+    return { color: "#22c55e", label: "XLS" }
+  if (["ppt", "pptx"].includes(ext) || m.includes("presentation"))
+    return { color: "#f97316", label: "PPT" }
   if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { color: "#a855f7", label: "ZIP" }
-  if (["txt","csv","log","md","tex","latex","bib","sty"].includes(ext)) return { color: "#6b7280", label: "TXT" }
-  if (["tsx","ts","jsx","js","mjs","cjs","html","htm","xhtml","vue","svelte","astro"].includes(ext)) return { color: "#f59e0b", label: "CODE" }
-  if (["css","scss","sass","less","styl","postcss"].includes(ext)) return { color: "#6366f1", label: "CSS" }
-  if (["json","yaml","yml","xml","toml","ini","cfg","env","properties","dockerfile","makefile","gradle","maven","sh","bash","zsh","fish","powershell","bat","cmd","py","java","cpp","c","h","hpp","cs","go","rust","rs","swift","kt","kts","scala","r","rb","pl","pm","lua","perl","php","sql","graphql","prisma","mdx","rst","asciidoc","org","wiki"].includes(ext)) return { color: "#10b981", label: "CODE" }
+  if (["txt", "csv", "log", "md", "tex", "latex", "bib", "sty"].includes(ext))
+    return { color: "#6b7280", label: "TXT" }
+  if (
+    [
+      "tsx",
+      "ts",
+      "jsx",
+      "js",
+      "mjs",
+      "cjs",
+      "html",
+      "htm",
+      "xhtml",
+      "vue",
+      "svelte",
+      "astro",
+    ].includes(ext)
+  )
+    return { color: "#f59e0b", label: "CODE" }
+  if (["css", "scss", "sass", "less", "styl", "postcss"].includes(ext))
+    return { color: "#6366f1", label: "CSS" }
+  if (
+    [
+      "json",
+      "yaml",
+      "yml",
+      "xml",
+      "toml",
+      "ini",
+      "cfg",
+      "env",
+      "properties",
+      "dockerfile",
+      "makefile",
+      "gradle",
+      "maven",
+      "sh",
+      "bash",
+      "zsh",
+      "fish",
+      "powershell",
+      "bat",
+      "cmd",
+      "py",
+      "java",
+      "cpp",
+      "c",
+      "h",
+      "hpp",
+      "cs",
+      "go",
+      "rust",
+      "rs",
+      "swift",
+      "kt",
+      "kts",
+      "scala",
+      "r",
+      "rb",
+      "pl",
+      "pm",
+      "lua",
+      "perl",
+      "php",
+      "sql",
+      "graphql",
+      "prisma",
+      "mdx",
+      "rst",
+      "asciidoc",
+      "org",
+      "wiki",
+    ].includes(ext)
+  )
+    return { color: "#10b981", label: "CODE" }
   if (m.startsWith("audio/")) return { color: "#22c55e", label: "AUDIO" }
   if (m.startsWith("video/")) return { color: "#8b5cf6", label: "VIDEO" }
   if (m.startsWith("image/")) return { color: "#ec4899", label: "IMG" }
@@ -448,9 +936,62 @@ function estimatePages(fileName?: string, fileSize?: string): number {
   const bytesMatch = bytesStr.match(/([0-9]+(?:\.[0-9]+)?)\s*Mo/i)
   const bytes = bytesMatch ? parseFloat(bytesMatch[1]) * 1024 * 1024 : 0
   if (["pdf"].includes(ext)) return Math.max(1, Math.ceil(bytes / 5000))
-  if (["doc","docx","ppt","pptx","txt","csv","md","tex","latex","bib"].includes(ext)) return Math.max(1, Math.ceil(bytes / 3000))
-  if (["xls","xlsx","ods","numbers"].includes(ext)) return Math.max(1, Math.ceil(bytes / 2000))
-  if (["tsx","ts","jsx","js","mjs","cjs","html","htm","css","scss","json","yaml","yml","xml","py","java","cpp","c","h","cpp","go","rust","php","sql","sh","bash","zsh","vue","svelte","astro","mdx","rst","lua","perl","pl","rb","swift","kt","scala","r","cs","gradle","maven","ini","cfg","env","dockerfile","makefile"].includes(ext)) return Math.max(1, Math.ceil(bytes / 2500))
+  if (["doc", "docx", "ppt", "pptx", "txt", "csv", "md", "tex", "latex", "bib"].includes(ext))
+    return Math.max(1, Math.ceil(bytes / 3000))
+  if (["xls", "xlsx", "ods", "numbers"].includes(ext)) return Math.max(1, Math.ceil(bytes / 2000))
+  if (
+    [
+      "tsx",
+      "ts",
+      "jsx",
+      "js",
+      "mjs",
+      "cjs",
+      "html",
+      "htm",
+      "css",
+      "scss",
+      "json",
+      "yaml",
+      "yml",
+      "xml",
+      "py",
+      "java",
+      "cpp",
+      "c",
+      "h",
+      "cpp",
+      "go",
+      "rust",
+      "php",
+      "sql",
+      "sh",
+      "bash",
+      "zsh",
+      "vue",
+      "svelte",
+      "astro",
+      "mdx",
+      "rst",
+      "lua",
+      "perl",
+      "pl",
+      "rb",
+      "swift",
+      "kt",
+      "scala",
+      "r",
+      "cs",
+      "gradle",
+      "maven",
+      "ini",
+      "cfg",
+      "env",
+      "dockerfile",
+      "makefile",
+    ].includes(ext)
+  )
+    return Math.max(1, Math.ceil(bytes / 2500))
   return 0
 }
 
@@ -466,8 +1007,17 @@ function RichText({ text, isMe }: { text: string; isMe: boolean }) {
     const idx = remaining.indexOf(url)
     if (idx > 0) parts.push(<span key={key++}>{remaining.slice(0, idx)}</span>)
     parts.push(
-      <a key={key++} href={url} target="_blank" rel="noreferrer"
-        style={{ color: isMe ? "#93c5fd" : "var(--accent)", textDecoration: "underline", wordBreak: "break-all" }}>
+      <a
+        key={key++}
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          color: isMe ? "#93c5fd" : "var(--accent)",
+          textDecoration: "underline",
+          wordBreak: "break-all",
+        }}
+      >
         {url}
       </a>
     )
@@ -476,27 +1026,76 @@ function RichText({ text, isMe }: { text: string; isMe: boolean }) {
   if (remaining) parts.push(<span key={key++}>{remaining}</span>)
 
   let domain = ""
-  try { if (urls[0]) domain = new URL(urls[0]).hostname.replace("www.", "") } catch { /* ignore */ }
+  try {
+    if (urls[0]) domain = new URL(urls[0]).hostname.replace("www.", "")
+  } catch {
+    /* ignore */
+  }
 
   return (
     <>
       {parts}
       {domain && (
-        <a href={urls[0]} target="_blank" rel="noreferrer"
+        <a
+          href={urls[0]}
+          target="_blank"
+          rel="noreferrer"
           style={{
-            display: "flex", alignItems: "center", gap: 8, marginTop: 6,
-            padding: "8px 10px", background: isMe ? "#ffffff12" : "var(--bg-elevated)",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 6,
+            padding: "8px 10px",
+            background: isMe ? "#ffffff12" : "var(--bg-elevated)",
             border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
-            borderRadius: 8, textDecoration: "none", color: "inherit",
-          }}>
-          <img src={`https://www.google.com/s2/favicons?sz=32&domain=${domain}`} alt="" width={20} height={20}
+            borderRadius: 8,
+            textDecoration: "none",
+            color: "inherit",
+          }}
+        >
+          <img
+            src={`https://www.google.com/s2/favicons?sz=32&domain=${domain}`}
+            alt=""
+            width={20}
+            height={20}
             style={{ borderRadius: 4, flexShrink: 0 }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }} />
+            onError={(e) => {
+              ;(e.target as HTMLImageElement).style.display = "none"
+            }}
+          />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{domain}</div>
-            <div style={{ fontSize: 10, opacity: 0.6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{urls[0]}</div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {domain}
+            </div>
+            <div
+              style={{
+                fontSize: 10,
+                opacity: 0.6,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {urls[0]}
+            </div>
           </div>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
             <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
           </svg>
         </a>
@@ -509,34 +1108,83 @@ function RichText({ text, isMe }: { text: string; isMe: boolean }) {
 function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolean }) {
   return (
     <div style={{ marginTop: 6 }}>
-      <a href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`}
-        target="_blank" rel="noreferrer" style={{ textDecoration: "none", color: "inherit" }}>
-        <div style={{
-          width: "100%", maxWidth: 260, height: 140, borderRadius: 8, overflow: "hidden",
-          border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
-          background: isMe ? "#ffffff08" : "var(--bg-elevated)",
-          position: "relative",
-        }}>
-          <iframe title="Position GPS" loading="lazy"
+      <a
+        href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`}
+        target="_blank"
+        rel="noreferrer"
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 260,
+            height: 140,
+            borderRadius: 8,
+            overflow: "hidden",
+            border: `1px solid ${isMe ? "#ffffff18" : "var(--border-subtle)"}`,
+            background: isMe ? "#ffffff08" : "var(--bg-elevated)",
+            position: "relative",
+          }}
+        >
+          <iframe
+            title="Position GPS"
+            loading="lazy"
             src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.01},${lat - 0.01},${lng + 0.01},${lat + 0.01}&layer=mapnik&marker=${lat},${lng}`}
-            style={{ width: "100%", height: "130%", border: "none", pointerEvents: "none", display: "block" }} />
+            style={{
+              width: "100%",
+              height: "130%",
+              border: "none",
+              pointerEvents: "none",
+              display: "block",
+            }}
+          />
           {/* Masque tout message d'erreur ou texte intégré en bas du preview */}
-          <div style={{
-            position: "absolute", bottom: 0, left: 0, right: 0, height: 55,
-            background: `linear-gradient(to top, ${isMe ? "rgba(255,255,255,0.25)" : "var(--bg-elevated)"}, transparent 10%)`,
-            pointerEvents: "none",
-          }} />
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 55,
+              background: `linear-gradient(to top, ${isMe ? "rgba(255,255,255,0.25)" : "var(--bg-elevated)"}, transparent 10%)`,
+              pointerEvents: "none",
+            }}
+          />
           {/* Overlay supplémentaire au centre-bas pour cacher tout texte résiduel */}
-          <div style={{
-            position: "absolute", bottom: 0, left: 0, right: 0, height: 35,
-            background: isMe ? "rgba(255,255,255,0.15)" : "var(--bg-elevated)",
-            opacity: 0.9,
-            pointerEvents: "none",
-          }} />
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 35,
+              background: isMe ? "rgba(255,255,255,0.15)" : "var(--bg-elevated)",
+              opacity: 0.9,
+              pointerEvents: "none",
+            }}
+          />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontSize: 10, opacity: 0.75 }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" />
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 4,
+            fontSize: 10,
+            opacity: 0.75,
+          }}
+        >
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          >
+            <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" />
+            <circle cx="12" cy="10" r="3" />
           </svg>
           {lat.toFixed(6)}, {lng.toFixed(6)}
         </div>
@@ -551,7 +1199,14 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
  */
 function CallEventChip({ call }: { call: CallRecord }) {
   const isOutgoing = call.direction === "out"
-  const outcome = call.status === "missed" || call.status === "no_answer" ? "Appel manqué" : call.status === "declined" ? "Appel rejeté" : call.status === "busy" ? "Occupé" : ""
+  const outcome =
+    call.status === "missed" || call.status === "no_answer"
+      ? "Appel manqué"
+      : call.status === "declined"
+        ? "Appel rejeté"
+        : call.status === "busy"
+          ? "Occupé"
+          : ""
   const failed = Boolean(outcome)
 
   const label = `${call.type === "video" ? "Appel vidéo" : "Appel vocal"}${outcome ? ` — ${outcome}` : ""}`
@@ -561,41 +1216,97 @@ function CallEventChip({ call }: { call: CallRecord }) {
   const bgTint = failed ? "#ef444412" : isOutgoing ? "#22c55e12" : "#3b82f612"
 
   return (
-    <div style={{ display: "flex", justifyContent: isOutgoing ? "flex-end" : "flex-start", margin: "4px 0" }}>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: isOutgoing ? "flex-end" : "flex-start",
+        margin: "4px 0",
+      }}
+    >
       <div
         style={{
-          display: "flex", alignItems: "center", gap: 8, background: bgTint,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: bgTint,
           border: `1px solid ${tint}22`,
           borderRadius: isOutgoing ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-          padding: "8px 14px", fontSize: 12, color: tint, maxWidth: "min(70%, 340px)",
+          padding: "8px 14px",
+          fontSize: 12,
+          color: tint,
+          maxWidth: "min(70%, 340px)",
         }}
       >
-        <span style={{
-          width: 28, height: 28, borderRadius: "50%", background: bgTint,
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>
+        <span
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: bgTint,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
           {call.type === "video" ? (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
             </svg>
           ) : (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
               <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
             </svg>
           )}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+          <div
+            style={{ fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
+          >
             {/* Fleche de direction */}
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-              {isOutgoing
-                ? <><line x1="7" y1="17" x2="17" y2="7" /><polyline points="7 7 17 7 17 17" /></>
-                : <><line x1="17" y1="7" x2="7" y2="17" /><polyline points="17 17 7 17 7 7" /></>}
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            >
+              {isOutgoing ? (
+                <>
+                  <line x1="7" y1="17" x2="17" y2="7" />
+                  <polyline points="7 7 17 7 17 17" />
+                </>
+              ) : (
+                <>
+                  <line x1="17" y1="7" x2="7" y2="17" />
+                  <polyline points="17 17 7 17 7 7" />
+                </>
+              )}
             </svg>
             {label}
           </div>
           <div style={{ fontSize: 10, opacity: 0.75, marginTop: 1 }}>
-            {formatTime(call.ts)}{call.duration ? ` — ${call.duration}` : ""}
+            {formatTime(call.ts)}
+            {call.duration ? ` — ${call.duration}` : ""}
           </div>
         </div>
       </div>
@@ -738,7 +1449,6 @@ const ACTIONS_MENU_HEIGHT = 240
 /** Duree du flash du message d'origine quand on clique une citation (cf. .msg-highlight). */
 const MSG_FLASH_MS = 1200
 
-
 /** Composant de preview natif pour fichiers texte/code. */
 function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name?: string }) {
   const [text, setText] = useState<string>("")
@@ -749,38 +1459,217 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
   const isCsv = ext === "csv"
   useEffect(() => {
     let cancelled = false
-    setLoading(true); setErrorMessage(""); setText("")
-    void loadPreviewBlob(url).then((blob) => blob.text()).then((content) => {
-      if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(content.slice(0, 1000))) throw new Error("Stockage indisponible : quota de téléchargement atteint.")
-      if (!cancelled) { setText(content.slice(0, 50000)); setLoading(false) }
-    }).catch((err: unknown) => {
-      if (!cancelled) { setErrorMessage(err instanceof Error ? err.message : "Le document ne peut pas être chargé."); setLoading(false) }
-    })
-    return () => { cancelled = true }
+    setLoading(true)
+    setErrorMessage("")
+    setText("")
+    void loadPreviewBlob(url)
+      .then((blob) => blob.text())
+      .then((content) => {
+        if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(content.slice(0, 1000)))
+          throw new Error("Stockage indisponible : quota de téléchargement atteint.")
+        if (!cancelled) {
+          setText(content.slice(0, 50000))
+          setLoading(false)
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setErrorMessage(
+            err instanceof Error ? err.message : "Le document ne peut pas être chargé."
+          )
+          setLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
   }, [url])
 
-  const copy = () => { void navigator.clipboard?.writeText(text) }
-  const rows = useMemo(() => isCsv ? text.split(/\r?\n/).filter(Boolean).slice(0, 30).map((row) => row.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((cell) => cell.replace(/^"|"$/g, "").trim())) : [], [isCsv, text])
-  const visibleLines = useMemo(() => text.split(/\r?\n/).filter((line) => !query || line.toLowerCase().includes(query.toLowerCase())).slice(0, 80), [text, query])
+  const copy = () => {
+    void navigator.clipboard?.writeText(text)
+  }
+  const rows = useMemo(
+    () =>
+      isCsv
+        ? text
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .slice(0, 30)
+            .map((row) =>
+              row
+                .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
+                .map((cell) => cell.replace(/^"|"$/g, "").trim())
+            )
+        : [],
+    [isCsv, text]
+  )
+  const visibleLines = useMemo(
+    () =>
+      text
+        .split(/\r?\n/)
+        .filter((line) => !query || line.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 80),
+    [text, query]
+  )
   const tone = isMe ? "#ffffff" : "var(--text-primary)"
 
-  return <div style={{ width: "100%", borderRadius: 8, border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`, background: isMe ? "#00000018" : "#10151d", marginBottom: 6, overflow: "hidden", color: tone }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 8px", background: isMe ? "#00000018" : "#171d27" }}>
-      <span style={{ fontFamily: "monospace", fontSize: 10, opacity: .75, fontWeight: 700 }}>{ext.toUpperCase()}</span>
-      <input aria-label="Rechercher dans le document" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher" style={{ minWidth: 0, flex: 1, border: "none", borderRadius: 4, padding: "4px 6px", background: "#ffffff14", color: tone, fontSize: 10, outline: "none" }} />
-      <button onClick={copy} title="Copier le contenu" style={{ border: "none", borderRadius: 4, cursor: "pointer", padding: "4px 6px", background: "#ffffff18", color: tone, fontSize: 10 }}>Copier</button>
-    </div>
-    {loading ? <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11 }}>Chargement de l’aperçu…</div> : errorMessage ? (
-      // Le visionneur a besoin du texte : sans les octets il n'a rien a rendre.
-      // On laisse au moins une porte de sortie vers le fichier lui-meme.
-      <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11, color: "#ffb4a2" }}>
-        {errorMessage}
-        <a href={url} target="_blank" rel="noreferrer" style={{ display: "block", marginTop: 6, color: "inherit", opacity: 0.85 }}>Ouvrir dans un nouvel onglet</a>
+  return (
+    <div
+      style={{
+        width: "100%",
+        borderRadius: 8,
+        border: `1px solid ${isMe ? "#ffffff25" : "var(--border-subtle)"}`,
+        background: isMe ? "#00000018" : "#10151d",
+        marginBottom: 6,
+        overflow: "hidden",
+        color: tone,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "7px 8px",
+          background: isMe ? "#00000018" : "#171d27",
+        }}
+      >
+        <span style={{ fontFamily: "monospace", fontSize: 10, opacity: 0.75, fontWeight: 700 }}>
+          {ext.toUpperCase()}
+        </span>
+        <input
+          aria-label="Rechercher dans le document"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Rechercher"
+          style={{
+            minWidth: 0,
+            flex: 1,
+            border: "none",
+            borderRadius: 4,
+            padding: "4px 6px",
+            background: "#ffffff14",
+            color: tone,
+            fontSize: 10,
+            outline: "none",
+          }}
+        />
+        <button
+          onClick={copy}
+          title="Copier le contenu"
+          style={{
+            border: "none",
+            borderRadius: 4,
+            cursor: "pointer",
+            padding: "4px 6px",
+            background: "#ffffff18",
+            color: tone,
+            fontSize: 10,
+          }}
+        >
+          Copier
+        </button>
       </div>
-    ) : isCsv ? (
-      <div style={{ overflow: "auto", maxHeight: 180 }}><table style={{ borderCollapse: "collapse", width: "100%", fontSize: 10 }}><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} style={{ border: "1px solid #ffffff18", padding: "4px 6px", whiteSpace: "nowrap" }}>{cell}</td>)}</tr>)}</tbody></table>{text.split(/\r?\n/).filter(Boolean).length > 30 && <div style={{ padding: 6, fontSize: 10, opacity: .65 }}>30 premières lignes affichées</div>}</div>
-    ) : <div style={{ maxHeight: 180, overflow: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11, lineHeight: 1.48, padding: "6px 0" }}>{visibleLines.map((line, index) => <div key={index} style={{ display: "flex", paddingRight: 8, background: query && line.toLowerCase().includes(query.toLowerCase()) ? "#fbbf241f" : undefined }}><span style={{ width: 32, flexShrink: 0, textAlign: "right", paddingRight: 8, userSelect: "none", opacity: .42 }}>{index + 1}</span><code style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", color: line.trimStart().startsWith("#") ? "#8be9fd" : line.includes(":") ? "#f8c878" : tone }}>{line}</code></div>)}</div>}
-  </div>
+      {loading ? (
+        <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11 }}>
+          Chargement de l’aperçu…
+        </div>
+      ) : errorMessage ? (
+        // Le visionneur a besoin du texte : sans les octets il n'a rien a rendre.
+        // On laisse au moins une porte de sortie vers le fichier lui-meme.
+        <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11, color: "#ffb4a2" }}>
+          {errorMessage}
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            style={{ display: "block", marginTop: 6, color: "inherit", opacity: 0.85 }}
+          >
+            Ouvrir dans un nouvel onglet
+          </a>
+        </div>
+      ) : isCsv ? (
+        <div style={{ overflow: "auto", maxHeight: 180 }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 10 }}>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={i}>
+                  {row.map((cell, j) => (
+                    <td
+                      key={j}
+                      style={{
+                        border: "1px solid #ffffff18",
+                        padding: "4px 6px",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {text.split(/\r?\n/).filter(Boolean).length > 30 && (
+            <div style={{ padding: 6, fontSize: 10, opacity: 0.65 }}>
+              30 premières lignes affichées
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          style={{
+            maxHeight: 180,
+            overflow: "auto",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: 11,
+            lineHeight: 1.48,
+            padding: "6px 0",
+          }}
+        >
+          {visibleLines.map((line, index) => (
+            <div
+              key={index}
+              style={{
+                display: "flex",
+                paddingRight: 8,
+                background:
+                  query && line.toLowerCase().includes(query.toLowerCase())
+                    ? "#fbbf241f"
+                    : undefined,
+              }}
+            >
+              <span
+                style={{
+                  width: 32,
+                  flexShrink: 0,
+                  textAlign: "right",
+                  paddingRight: 8,
+                  userSelect: "none",
+                  opacity: 0.42,
+                }}
+              >
+                {index + 1}
+              </span>
+              <code
+                style={{
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word",
+                  color: line.trimStart().startsWith("#")
+                    ? "#8be9fd"
+                    : line.includes(":")
+                      ? "#f8c878"
+                      : tone,
+                }}
+              >
+                {line}
+              </code>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -798,16 +1687,28 @@ function LazyPreview({ minHeight, children }: { minHeight: number; children: Rea
     const node = holder.current
     if (!node) return
     // Navigateur sans IntersectionObserver : on affiche tout, comme avant.
-    if (typeof IntersectionObserver === "undefined") { setVisible(true); return }
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true)
+      return
+    }
     const observer = new IntersectionObserver(
-      (entries) => { if (entries.some((entry) => entry.isIntersecting)) { setVisible(true); observer.disconnect() } },
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
       { rootMargin: "600px 0px" }
     )
     observer.observe(node)
     return () => observer.disconnect()
   }, [])
   // La hauteur reservee evite que le fil ne sursaute quand l'apercu se monte.
-  return <div ref={holder} style={visible ? undefined : { minHeight }}>{visible ? children : null}</div>
+  return (
+    <div ref={holder} style={visible ? undefined : { minHeight }}>
+      {visible ? children : null}
+    </div>
+  )
 }
 
 /**
@@ -818,61 +1719,155 @@ function LazyPreview({ minHeight, children }: { minHeight: number; children: Rea
  * automatique : il demande un accord explicite, pour qu'aucun jeton ne parte a
  * l'insu de l'utilisateur a la simple ouverture d'une conversation.
  */
-function OfficePreview({ url, name, label, isMe, height, compact = false }: { url: string; name?: string; label: string; isMe: boolean; height: number | string; compact?: boolean }) {
+function OfficePreview({
+  url,
+  name,
+  label,
+  isMe,
+  height,
+  compact = false,
+}: {
+  url: string
+  name?: string
+  label: string
+  isMe: boolean
+  height: number | string
+  compact?: boolean
+}) {
   const [accepted, setAccepted] = useState(false)
 
   if (accepted) {
-    return <iframe
-      src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`}
-      title={name ?? label}
-      style={{ width: "100%", height, borderRadius: 8, border: "none", display: "block", marginBottom: 6 }}
-      loading="lazy"
-    />
+    return (
+      <iframe
+        src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`}
+        title={name ?? label}
+        style={{
+          width: "100%",
+          height,
+          borderRadius: 8,
+          border: "none",
+          display: "block",
+          marginBottom: 6,
+        }}
+        loading="lazy"
+      />
+    )
   }
 
-  return <div style={{
-    marginBottom: 6, padding: "9px 11px", borderRadius: 9,
-    background: isMe ? "#ffffff18" : "#f5f6fa",
-    border: `1px solid ${isMe ? "#ffffff2e" : "#dde1e7"}`,
-    color: isMe ? "#fff" : "var(--text-primary)",
-    display: "flex", alignItems: "center", gap: 10,
-  }}>
-    <div style={{ minWidth: 0, flex: 1 }}>
-      <div style={{ fontSize: 11, fontWeight: 600 }}>Apercu {label}</div>
-      <div style={{ fontSize: 9.5, opacity: 0.78, marginTop: 2, lineHeight: 1.4 }}>
-        Non rendu par Alanya. L'afficher l'envoie a Microsoft Office Online, avec le jeton de votre session.
-      </div>
-    </div>
-    <button
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAccepted(true) }}
-      style={{ flexShrink: 0, padding: "5px 10px", borderRadius: 6, border: "none", background: isMe ? "#ffffff28" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}
+  return (
+    <div
+      style={{
+        marginBottom: 6,
+        padding: "9px 11px",
+        borderRadius: 9,
+        background: isMe ? "#ffffff18" : "#f5f6fa",
+        border: `1px solid ${isMe ? "#ffffff2e" : "#dde1e7"}`,
+        color: isMe ? "#fff" : "var(--text-primary)",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}
     >
-      Afficher
-    </button>
-    {/* Dans le fil, la ligne de fichier sous l'apercu porte deja le
-        telechargement : le repeter ici alourdissait la bulle pour rien. */}
-    {!compact && (
-      <a
-        href={url}
-        target="_blank"
-        rel="noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        style={{ flexShrink: 0, padding: "5px 10px", borderRadius: 6, border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`, color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", fontSize: 10, fontWeight: 500, textDecoration: "none" }}
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ fontSize: 11, fontWeight: 600 }}>Apercu {label}</div>
+        <div style={{ fontSize: 9.5, opacity: 0.78, marginTop: 2, lineHeight: 1.4 }}>
+          Non rendu par Alanya. L'afficher l'envoie a Microsoft Office Online, avec le jeton de
+          votre session.
+        </div>
+      </div>
+      <button
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setAccepted(true)
+        }}
+        style={{
+          flexShrink: 0,
+          padding: "5px 10px",
+          borderRadius: 6,
+          border: "none",
+          background: isMe ? "#ffffff28" : "var(--accent)",
+          color: isMe ? "#fff" : "var(--accent-text)",
+          fontSize: 10,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
       >
-        Telecharger
-      </a>
-    )}
-  </div>
+        Afficher
+      </button>
+      {/* Dans le fil, la ligne de fichier sous l'apercu porte deja le
+        telechargement : le repeter ici alourdissait la bulle pour rien. */}
+      {!compact && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            flexShrink: 0,
+            padding: "5px 10px",
+            borderRadius: 6,
+            border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`,
+            color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)",
+            fontSize: 10,
+            fontWeight: 500,
+            textDecoration: "none",
+          }}
+        >
+          Telecharger
+        </a>
+      )}
+    </div>
+  )
 }
 
-function VideoPreview({ src, name, size, durationMs }: { src: string; name?: string; size?: string; durationMs?: number }) {
+function VideoPreview({
+  src,
+  name,
+  size,
+  durationMs,
+}: {
+  src: string
+  name?: string
+  size?: string
+  durationMs?: number
+}) {
   const [failed, setFailed] = useState(false)
-  if (failed) return <div style={{ marginBottom: 6, padding: "10px 12px", borderRadius: 9, background: "#00000012", fontSize: 11 }}>
-    <div style={{ fontWeight: 600 }}>{name ?? "Vidéo"}</div>
-    <div style={{ opacity: 0.72, marginTop: 3 }}>{size ?? "Taille inconnue"} · {formatAudioDuration(durationMs)}</div>
-    <div style={{ opacity: 0.72, marginTop: 4 }}>Aperçu indisponible — le fichier reste téléchargeable.</div>
-  </div>
-  return <video src={src} controls preload="metadata" onError={() => setFailed(true)} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 10, display: "block", marginBottom: 6 }} />
+  if (failed)
+    return (
+      <div
+        style={{
+          marginBottom: 6,
+          padding: "10px 12px",
+          borderRadius: 9,
+          background: "#00000012",
+          fontSize: 11,
+        }}
+      >
+        <div style={{ fontWeight: 600 }}>{name ?? "Vidéo"}</div>
+        <div style={{ opacity: 0.72, marginTop: 3 }}>
+          {size ?? "Taille inconnue"} · {formatAudioDuration(durationMs)}
+        </div>
+        <div style={{ opacity: 0.72, marginTop: 4 }}>
+          Aperçu indisponible — le fichier reste téléchargeable.
+        </div>
+      </div>
+    )
+  return (
+    <video
+      src={src}
+      controls
+      preload="metadata"
+      onError={() => setFailed(true)}
+      style={{
+        maxWidth: "100%",
+        maxHeight: 260,
+        borderRadius: 10,
+        display: "block",
+        marginBottom: 6,
+      }}
+    />
+  )
 }
 
 /** Fichier choisi par l'utilisateur, en attente de confirmation d'envoi. */
@@ -901,28 +1896,79 @@ interface PreviewSubject {
  * galerie d'un lot recu. Les deux montrent la meme chose : seule la provenance
  * de l'URL change (blob: local avant envoi, media backend apres).
  */
-function FullMediaPreview({ subject, maxHeight = "58vh" }: { subject: PreviewSubject; maxHeight?: string }) {
+function FullMediaPreview({
+  subject,
+  maxHeight = "58vh",
+}: {
+  subject: PreviewSubject
+  maxHeight?: string
+}) {
   const name = subject.name ?? "Fichier"
   const ext = name.split(".").pop()?.toLowerCase() ?? ""
   const isPdf = subject.mime === "application/pdf" || ext === "pdf"
   const isText = subject.mime.startsWith("text/") || TEXT_PREVIEW_EXTENSIONS.includes(ext)
-  const frame = { maxWidth: "100%", maxHeight, borderRadius: 12, display: "block", margin: "0 auto" } as const
+  const frame = {
+    maxWidth: "100%",
+    maxHeight,
+    borderRadius: 12,
+    display: "block",
+    margin: "0 auto",
+  } as const
 
-  if (subject.kind === "image") return <img src={subject.url} alt={name} style={{ ...frame, objectFit: "contain" }} />
-  if (subject.kind === "video") return <video src={subject.url} controls preload="metadata" style={frame} />
-  if (subject.kind === "audio") return <audio src={subject.url} controls preload="metadata" style={{ width: "100%" }} />
-  if (isPdf) return <div style={{ maxHeight, overflow: "auto", borderRadius: 12 }}><PdfViewer url={subject.url} isMe={false} full fullHeight={maxHeight} /></div>
+  if (subject.kind === "image")
+    return <img src={subject.url} alt={name} style={{ ...frame, objectFit: "contain" }} />
+  if (subject.kind === "video")
+    return <video src={subject.url} controls preload="metadata" style={frame} />
+  if (subject.kind === "audio")
+    return <audio src={subject.url} controls preload="metadata" style={{ width: "100%" }} />
+  if (isPdf)
+    return (
+      <div style={{ maxHeight, overflow: "auto", borderRadius: 12 }}>
+        <PdfViewer url={subject.url} isMe={false} full fullHeight={maxHeight} />
+      </div>
+    )
   if (isText) return <TextFilePreview url={subject.url} isMe={false} name={name} />
 
   // Formats binaires sans rendu local : on identifie au moins le fichier.
   const fti = fileTypeInfo(name, subject.mime)
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: 18, borderRadius: 12, background: "#ffffff10", border: "1px solid #ffffff1f" }}>
-      <div style={{ width: 54, height: 54, borderRadius: 12, background: `${fti.color}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: 18,
+        borderRadius: 12,
+        background: "#ffffff10",
+        border: "1px solid #ffffff1f",
+      }}
+    >
+      <div
+        style={{
+          width: 54,
+          height: 54,
+          borderRadius: 12,
+          background: `${fti.color}22`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
         <span style={{ fontSize: 11, fontWeight: 800, color: fti.color }}>{fti.label}</span>
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#fff",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {name}
+        </div>
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
           {subject.note ? `${subject.note} — ` : ""}ce format n'a pas d'apercu dans le navigateur.
         </div>
@@ -947,7 +1993,15 @@ function messageSubject(msg: Message): PreviewSubject {
  * horizontal. L'accrochage CSS (scroll-snap) fait le travail nativement, donc
  * le geste tactile reste celui du navigateur, sans gestionnaire maison.
  */
-function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number; onClose: () => void }) {
+function MediaGallery({
+  msgs,
+  index,
+  onClose,
+}: {
+  msgs: Message[]
+  index: number
+  onClose: () => void
+}) {
   const track = useRef<HTMLDivElement>(null)
   const host = useRef<HTMLDivElement>(null)
   const [current, setCurrent] = useState(index)
@@ -988,18 +2042,72 @@ function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number
   const shown = msgs[position]
 
   return (
-    <div ref={host} style={{ position: "fixed", inset: 0, zIndex: 9550, background: "#000000ee", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", color: "#fff", flexShrink: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    <div
+      ref={host}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9550,
+        background: "#000000ee",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 18px",
+          color: "#fff",
+          flexShrink: 0,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           {shown?.fileName ?? "Media"}
-          <span style={{ opacity: 0.6, fontWeight: 400 }}> — {position + 1}/{msgs.length}</span>
+          <span style={{ opacity: 0.6, fontWeight: 400 }}>
+            {" "}
+            — {position + 1}/{msgs.length}
+          </span>
         </span>
         <span style={{ display: "flex", gap: 14, alignItems: "center", flexShrink: 0 }}>
           {shown?.mediaUrl && (
-            <a href={resolveMediaUrl(shown.mediaUrl, { download: true })} target="_blank" rel="noreferrer" style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}>Telecharger</a>
+            <a
+              href={resolveMediaUrl(shown.mediaUrl, { download: true })}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}
+            >
+              Telecharger
+            </a>
           )}
-          <ViewerFullscreenButton expanded={expanded} onToggle={toggle} color="rgba(255,255,255,0.85)" />
-          <button onClick={onClose} aria-label="Fermer" style={{ background: "none", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>✕</button>
+          <ViewerFullscreenButton
+            expanded={expanded}
+            onToggle={toggle}
+            color="rgba(255,255,255,0.85)"
+          />
+          <button
+            onClick={onClose}
+            aria-label="Fermer"
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.85)",
+              cursor: "pointer",
+              fontSize: 22,
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
         </span>
       </div>
 
@@ -1007,10 +2115,27 @@ function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number
         <div
           ref={track}
           onScroll={onScroll}
-          style={{ flex: 1, display: "flex", overflowX: "auto", overflowY: "hidden", scrollSnapType: "x mandatory", scrollbarWidth: "none" }}
+          style={{
+            flex: 1,
+            display: "flex",
+            overflowX: "auto",
+            overflowY: "hidden",
+            scrollSnapType: "x mandatory",
+            scrollbarWidth: "none",
+          }}
         >
           {msgs.map((item) => (
-            <div key={item.id} style={{ flex: "0 0 100%", scrollSnapAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", padding: expanded ? "0 8px" : "0 18px" }}>
+            <div
+              key={item.id}
+              style={{
+                flex: "0 0 100%",
+                scrollSnapAlign: "center",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: expanded ? "0 8px" : "0 18px",
+              }}
+            >
               <div style={{ width: expanded ? "100%" : "min(100%, 820px)" }}>
                 <FullMediaPreview subject={messageSubject(item)} maxHeight={mediaHeight} />
               </div>
@@ -1022,23 +2147,66 @@ function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number
             de geste de balayage, d'ou ces deux fleches (masquees par la CSS
             sous 901 px, ou elles recouvriraient le media). */}
         {position > 0 && (
-          <button className="gallery-nav gallery-nav-prev" onClick={() => step(-1)} aria-label="Media precedent">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+          <button
+            className="gallery-nav gallery-nav-prev"
+            onClick={() => step(-1)}
+            aria-label="Media precedent"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
           </button>
         )}
         {position < msgs.length - 1 && (
-          <button className="gallery-nav gallery-nav-next" onClick={() => step(1)} aria-label="Media suivant">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          <button
+            className="gallery-nav gallery-nav-next"
+            onClick={() => step(1)}
+            aria-label="Media suivant"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 7, justifyContent: "center", padding: "12px 18px 20px", flexShrink: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 7,
+          justifyContent: "center",
+          padding: "12px 18px 20px",
+          flexShrink: 0,
+        }}
+      >
         {msgs.map((item, i) => (
           <span
             key={item.id}
             aria-hidden
-            style={{ width: 6, height: 6, borderRadius: "50%", background: i === position ? "#fff" : "#ffffff45" }}
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: i === position ? "#fff" : "#ffffff45",
+            }}
           />
         ))}
       </div>
@@ -1050,7 +2218,15 @@ function MediaGallery({ msgs, index, onClose }: { msgs: Message[]; index: number
  * Visionneuse d'une image seule, ouverte au clic sur une photo du fil. Elle porte
  * la meme bascule plein ecran que les autres visionneurs.
  */
-function ImageLightbox({ url, name, onClose }: { url: string; name?: string; onClose: () => void }) {
+function ImageLightbox({
+  url,
+  name,
+  onClose,
+}: {
+  url: string
+  name?: string
+  onClose: () => void
+}) {
   const host = useRef<HTMLDivElement>(null)
   const { expanded, toggle } = useViewerFullscreen(host)
   const chip = { background: "#ffffff20", borderRadius: 8, padding: "8px 10px" } as const
@@ -1058,7 +2234,9 @@ function ImageLightbox({ url, name, onClose }: { url: string; name?: string; onC
   useEffect(() => {
     // Comme dans la galerie : en plein ecran natif, Echap rend d'abord la main
     // au navigateur, la seconde pression ferme la visionneuse.
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !document.fullscreenElement) onClose() }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !document.fullscreenElement) onClose()
+    }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
   }, [onClose])
@@ -1101,12 +2279,32 @@ function ImageLightbox({ url, name, onClose }: { url: string; name?: string; onC
           aria-label="Telecharger l'image"
           style={{ ...chip, border: "none", color: "#fff", display: "flex", alignItems: "center" }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
           </svg>
         </a>
-        <button onClick={onClose} aria-label="Fermer" style={{ ...chip, border: "none", color: "#fff", cursor: "pointer" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <button
+          onClick={onClose}
+          aria-label="Fermer"
+          style={{ ...chip, border: "none", color: "#fff", cursor: "pointer" }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -1154,23 +2352,92 @@ function MediaComposer({
   if (!current) return null
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9600, background: "#000000ee", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", color: "#fff", flexShrink: 0 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9600,
+        background: "#000000ee",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 18px",
+          color: "#fff",
+          flexShrink: 0,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           {current.file.name}
-          {items.length > 1 && <span style={{ opacity: 0.6, fontWeight: 400 }}> — {index + 1}/{items.length}</span>}
+          {items.length > 1 && (
+            <span style={{ opacity: 0.6, fontWeight: 400 }}>
+              {" "}
+              — {index + 1}/{items.length}
+            </span>
+          )}
         </span>
-        <button onClick={onCancel} aria-label="Annuler l'envoi" style={{ background: "none", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>✕</button>
+        <button
+          onClick={onCancel}
+          aria-label="Annuler l'envoi"
+          style={{
+            background: "none",
+            border: "none",
+            color: "rgba(255,255,255,0.85)",
+            cursor: "pointer",
+            fontSize: 22,
+            lineHeight: 1,
+          }}
+        >
+          ✕
+        </button>
       </div>
 
-      <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px" }}>
+      <div
+        style={{
+          flex: 1,
+          overflow: "auto",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 18px",
+        }}
+      >
         <div style={{ width: "min(100%, 820px)" }}>
-          <FullMediaPreview subject={{ url: current.url, name: current.file.name, mime: current.mime, kind: current.kind, note: `${(current.file.size / 1024 / 1024).toFixed(1)} Mo` }} />
+          <FullMediaPreview
+            subject={{
+              url: current.url,
+              name: current.file.name,
+              mime: current.mime,
+              kind: current.kind,
+              note: `${(current.file.size / 1024 / 1024).toFixed(1)} Mo`,
+            }}
+          />
         </div>
       </div>
 
       {items.length > 1 && (
-        <div style={{ display: "flex", gap: 8, padding: "10px 18px", overflowX: "auto", flexShrink: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            padding: "10px 18px",
+            overflowX: "auto",
+            flexShrink: 0,
+          }}
+        >
           {items.map((item, i) => (
             <div key={item.url} style={{ position: "relative", flexShrink: 0 }}>
               <button
@@ -1178,17 +2445,38 @@ function MediaComposer({
                 aria-label={`Voir ${item.file.name}`}
                 aria-current={i === index}
                 style={{
-                  width: 52, height: 52, borderRadius: 8, cursor: "pointer", padding: 0, overflow: "hidden",
+                  width: 52,
+                  height: 52,
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  padding: 0,
+                  overflow: "hidden",
                   border: i === index ? "2px solid var(--accent)" : "2px solid transparent",
                   background: "#ffffff14",
                 }}
               >
                 {item.kind === "image" ? (
-                  <img src={item.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <img
+                    src={item.url}
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
                 ) : item.kind === "video" ? (
-                  <video src={`${item.url}#t=0.1`} preload="metadata" muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <video
+                    src={`${item.url}#t=0.1`}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
                 ) : (
-                  <span style={{ fontSize: 8, fontWeight: 800, color: fileTypeInfo(item.file.name, item.mime).color }}>
+                  <span
+                    style={{
+                      fontSize: 8,
+                      fontWeight: 800,
+                      color: fileTypeInfo(item.file.name, item.mime).color,
+                    }}
+                  >
                     {fileTypeInfo(item.file.name, item.mime).label}
                   </span>
                 )}
@@ -1196,7 +2484,20 @@ function MediaComposer({
               <button
                 onClick={() => onRemove(i)}
                 aria-label={`Retirer ${item.file.name}`}
-                style={{ position: "absolute", top: -5, right: -5, width: 18, height: 18, borderRadius: "50%", border: "none", background: "#000000cc", color: "#fff", fontSize: 11, lineHeight: 1, cursor: "pointer" }}
+                style={{
+                  position: "absolute",
+                  top: -5,
+                  right: -5,
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  border: "none",
+                  background: "#000000cc",
+                  color: "#fff",
+                  fontSize: 11,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                }}
               >
                 ✕
               </button>
@@ -1205,25 +2506,71 @@ function MediaComposer({
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, padding: "12px 18px 18px", flexShrink: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 10,
+          padding: "12px 18px 18px",
+          flexShrink: 0,
+        }}
+      >
         <textarea
           value={current.caption}
           onChange={(e) => onCaptionChange(index, e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend() } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault()
+              onSend()
+            }
+          }}
           placeholder="Ajouter une legende..."
           rows={1}
           style={{
-            flex: 1, minWidth: 0, resize: "none", maxHeight: 96,
-            padding: "11px 14px", borderRadius: 20, border: "1px solid #ffffff25",
-            background: "#ffffff12", color: "#fff", fontSize: 14, fontFamily: "inherit", outline: "none",
+            flex: 1,
+            minWidth: 0,
+            resize: "none",
+            maxHeight: 96,
+            padding: "11px 14px",
+            borderRadius: 20,
+            border: "1px solid #ffffff25",
+            background: "#ffffff12",
+            color: "#fff",
+            fontSize: 14,
+            fontFamily: "inherit",
+            outline: "none",
           }}
         />
         <button
           onClick={onSend}
           aria-label="Envoyer"
-          style={{ width: 44, height: 44, borderRadius: "50%", border: "none", background: "var(--accent)", color: "var(--accent-text)", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: "50%",
+            border: "none",
+            background: "var(--accent)",
+            color: "var(--accent-text)",
+            cursor: "pointer",
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+          <svg
+            width="19"
+            height="19"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
         </button>
       </div>
     </div>
@@ -1246,7 +2593,13 @@ function isVoiceNote(msg: Message): boolean {
 
 /** Un message cite merite une vignette des lors qu'il porte un fichier. */
 function hasQuotedMedia(msg: Message): boolean {
-  return Boolean(msg.mediaUrl) || msg.type === "image" || msg.type === "video" || msg.type === "audio" || msg.type === "file"
+  return (
+    Boolean(msg.mediaUrl) ||
+    msg.type === "image" ||
+    msg.type === "video" ||
+    msg.type === "audio" ||
+    msg.type === "file"
+  )
 }
 
 /** Libelle d'un media cite : sa legende si elle existe, sinon son nom, sinon son genre. */
@@ -1281,15 +2634,35 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
   useEffect(() => {
     if (!isPdf || !src) return
     let cancelled = false
-    void loadPdfThumbnail(src).then((dataUrl) => { if (!cancelled) setPdfThumb(dataUrl) })
-    return () => { cancelled = true }
+    void loadPdfThumbnail(src).then((dataUrl) => {
+      if (!cancelled) setPdfThumb(dataUrl)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [isPdf, src])
 
-  const box = { width: size, height: size, borderRadius: size > 48 ? 8 : 5, flexShrink: 0, display: "block" } as const
+  const box = {
+    width: size,
+    height: size,
+    borderRadius: size > 48 ? 8 : 5,
+    flexShrink: 0,
+    display: "block",
+  } as const
 
   if (isImage && src) return <img src={src} alt="" style={{ ...box, objectFit: "cover" }} />
-  if (isVideo && src) return <video src={videoPosterUrl(src)} preload="metadata" muted playsInline style={{ ...box, objectFit: "cover", background: "#000" }} />
-  if (isPdf && pdfThumb) return <img src={pdfThumb} alt="" style={{ ...box, objectFit: "cover", background: "#fff" }} />
+  if (isVideo && src)
+    return (
+      <video
+        src={videoPosterUrl(src)}
+        preload="metadata"
+        muted
+        playsInline
+        style={{ ...box, objectFit: "cover", background: "#000" }}
+      />
+    )
+  if (isPdf && pdfThumb)
+    return <img src={pdfThumb} alt="" style={{ ...box, objectFit: "cover", background: "#fff" }} />
 
   const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
 
@@ -1298,14 +2671,49 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
   // et son nom.
   if (size > 48) {
     return (
-      <div style={{ ...box, background: "#fbfbfd", border: `1px solid ${fti.color}40`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, overflow: "hidden", padding: 6, boxSizing: "border-box" }}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <div
+        style={{
+          ...box,
+          background: "#fbfbfd",
+          border: `1px solid ${fti.color}40`,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 5,
+          overflow: "hidden",
+          padding: 6,
+          boxSizing: "border-box",
+        }}
+      >
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={fti.color}
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
           <polyline points="14 2 14 8 20 8" />
         </svg>
-        <span style={{ fontSize: 9, fontWeight: 800, color: fti.color, letterSpacing: 0.5 }}>{fti.label}</span>
+        <span style={{ fontSize: 9, fontWeight: 800, color: fti.color, letterSpacing: 0.5 }}>
+          {fti.label}
+        </span>
         {msg.fileName && (
-          <span style={{ fontSize: 8, lineHeight: 1.25, color: "#4a5058", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span
+            style={{
+              fontSize: 8,
+              lineHeight: 1.25,
+              color: "#4a5058",
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {msg.fileName}
           </span>
         )}
@@ -1314,8 +2722,19 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
   }
 
   return (
-    <div style={{ ...box, background: `${fti.color}20`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-      <span style={{ fontSize: 8, fontWeight: 800, color: fti.color, letterSpacing: 0.4 }}>{fti.label}</span>
+    <div
+      style={{
+        ...box,
+        background: `${fti.color}20`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      <span style={{ fontSize: 8, fontWeight: 800, color: fti.color, letterSpacing: 0.4 }}>
+        {fti.label}
+      </span>
     </div>
   )
 }
@@ -1362,7 +2781,8 @@ function groupMediaRuns(items: TimelineItem[]): TimelineItem[] {
     // Deux legendes differentes dans un meme lot ne tiennent pas sous une seule
     // grille : on prefere alors ne pas grouper plutot que d'en perdre une.
     const captions = run.map((m) => m.content?.trim()).filter(Boolean)
-    if (run.length >= 2 && captions.length <= 1) out.push({ kind: "album", ts: run[0].timestamp, msgs: run })
+    if (run.length >= 2 && captions.length <= 1)
+      out.push({ kind: "album", ts: run[0].timestamp, msgs: run })
     else run.forEach((m) => out.push({ kind: "msg", ts: m.timestamp, msg: m }))
     run = []
   }
@@ -1399,22 +2819,67 @@ function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: num
   const tile = visible.length === 2 ? 108 : visible.length === 3 ? 88 : 108
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, ${tile}px)`, gap: 3, marginBottom: 6 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${columns}, ${tile}px)`,
+        gap: 3,
+        marginBottom: 6,
+      }}
+    >
       {visible.map((item, index) => (
         <button
           key={item.id}
-          onClick={(e) => { e.stopPropagation(); onOpen(index) }}
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpen(index)
+          }}
           aria-label={`Ouvrir ${item.fileName ?? "le media"} (${index + 1} sur ${msgs.length})`}
-          style={{ position: "relative", padding: 0, border: "none", background: "#00000018", borderRadius: 8, overflow: "hidden", cursor: "zoom-in", width: tile, height: tile }}
+          style={{
+            position: "relative",
+            padding: 0,
+            border: "none",
+            background: "#00000018",
+            borderRadius: 8,
+            overflow: "hidden",
+            cursor: "zoom-in",
+            width: tile,
+            height: tile,
+          }}
         >
           <QuoteThumbnail msg={item} size={tile} />
           {(item.mediaMime ?? "").startsWith("video/") && (
-            <span aria-hidden style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="#ffffffe0" stroke="none"><polygon points="7 4 20 12 7 20 7 4" /></svg>
+            <span
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="#ffffffe0" stroke="none">
+                <polygon points="7 4 20 12 7 20 7 4" />
+              </svg>
             </span>
           )}
           {index === visible.length - 1 && hidden > 0 && (
-            <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#000000a8", color: "#fff", fontSize: 20, fontWeight: 700, pointerEvents: "none" }}>
+            <span
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#000000a8",
+                color: "#fff",
+                fontSize: 20,
+                fontWeight: 700,
+                pointerEvents: "none",
+              }}
+            >
               +{hidden}
             </span>
           )}
@@ -1466,12 +2931,18 @@ function MessageBubble({
   const actionsVisible = actionsReveal !== null
   const hoverRevealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Les messages systeme se composent dans la langue du lecteur.
+  const { t } = useTranslation()
   /** Le menu deroulant s'ouvre vers le haut sauf s'il n'y a pas la place. */
   const [menuAbove, setMenuAbove] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const messageMenuRef = useRef<HTMLDivElement>(null)
   const [dragX, setDragX] = useState(0)
-  const [viewingDoc, setViewingDoc] = useState<{ url: string; name?: string; mime?: string } | null>(null)
+  const [viewingDoc, setViewingDoc] = useState<{
+    url: string
+    name?: string
+    mime?: string
+  } | null>(null)
   const [downloading, setDownloading] = useState(false)
   const lastPreviewTapRef = useRef(0)
   const dragStart = useRef<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false })
@@ -1656,542 +3127,914 @@ function MessageBubble({
   )
 
   if (msg.type === "system") {
-    return <div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
-      <div style={{ maxWidth: "82%", padding: "6px 12px", borderRadius: 14, background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)", textAlign: "center", fontSize: 11, lineHeight: 1.35 }}>
-        {msg.content}
+    // Le serveur enregistre un code et ses parametres, pas une phrase : le
+    // texte se compose ici, dans la langue du lecteur, et selon qu'il est
+    // concerne ou non. Une charge vide ne merite pas de bulle.
+    const texteSysteme = composerMessageSysteme(msg.content, getMyUserId(), t)
+    if (!texteSysteme) return null
+    return (
+      <div style={{ display: "flex", justifyContent: "center", margin: "10px 0" }}>
+        <div
+          style={{
+            maxWidth: "82%",
+            padding: "6px 12px",
+            borderRadius: 14,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-subtle)",
+            color: "var(--text-muted)",
+            textAlign: "center",
+            fontSize: 11,
+            lineHeight: 1.35,
+          }}
+        >
+          {texteSysteme}
+        </div>
       </div>
-    </div>
+    )
   }
 
-  return (<>
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: isMe ? "flex-end" : "flex-start",
-        marginBottom: 2,
-      }}
-      onMouseEnter={scheduleHoverReveal}
-      onMouseLeave={scheduleHide}
-    >
+  return (
+    <>
       <div
         style={{
           display: "flex",
-          alignItems: "flex-end",
-          gap: 6,
-          flexDirection: isMe ? "row-reverse" : "row",
-          // La limite de largeur vit ICI (le parent fait 100% de la colonne) :
-          // un % sur un enfant d'une rangee auto-dimensionnee ecrase la bulle
-          // a sa largeur minimale (une lettre par ligne).
-          maxWidth: "min(78%, 560px)",
-          transform: dragX ? `translateX(${dragX}px)` : undefined,
-          // Le message s'ecarte du bord pour laisser la place au bouton d'actions :
-          // celui-ci reste ainsi TOUJOURS dans le cadre, jamais hors de l'ecran.
-          marginRight: isMe && actionsShown ? ACTIONS_GUTTER : 0,
-          marginLeft: !isMe && actionsShown ? ACTIONS_GUTTER : 0,
-          transition: dragStart.current.active
-            ? "none"
-            : "transform 0.18s ease, margin 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
-          touchAction: "pan-y",
-          position: "relative",
+          flexDirection: "column",
+          alignItems: isMe ? "flex-end" : "flex-start",
+          marginBottom: 2,
         }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onClick={revealActionsNow}
-        onContextMenu={(e) => {
-          if (msg.isDeleted) return
-          e.preventDefault()
-          revealActionsNow()
-          setMenuOpen((v) => !v)
-        }}
+        onMouseEnter={scheduleHoverReveal}
+        onMouseLeave={scheduleHide}
       >
-        {/* Indicateur de swipe */}
-        {Math.abs(dragX) > 16 && (
-          <div
-            style={{
-              position: "absolute",
-              [isMe ? "right" : "left"]: -34,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "var(--accent)",
-              opacity: Math.min(1, Math.abs(dragX) / SWIPE_REPLY_THRESHOLD),
-            }}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            >
-              <polyline points="9 17 4 12 9 7" />
-              <path d="M20 18v-2a4 4 0 00-4-4H4" />
-            </svg>
-          </div>
-        )}
-
-        {/* Menu actions — hors du flux : son apparition ne pousse jamais la bulle. */}
-        {!msg.isDeleted && (
-          <div
-            ref={messageMenuRef}
-            onMouseEnter={cancelHide}
-            onMouseLeave={scheduleHide}
-            style={{
-              position: "absolute",
-              // Cote exterieur de la bulle. La gouttiere ouverte par la marge du
-              // message ci-dessus garantit qu'il reste dans le cadre.
-              [isMe ? "right" : "left"]: -ACTIONS_GUTTER,
-              top: "50%",
-              opacity: actionsShown ? 1 : 0,
-              transform: `translateY(-50%) scale(${actionsShown ? 1 : 0.85})`,
-              pointerEvents: actionsShown ? "auto" : "none",
-              // Clic : apparition instantanee. Survol prolonge : fondu doux.
-              transition:
-                actionsReveal === "instant" ? "none" : "opacity .18s ease, transform .18s ease",
-              zIndex: 20,
-            }}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setMenuOpen((v) => !v)
-              }}
-              aria-label="Actions du message"
-              aria-hidden={!actionsShown}
-              tabIndex={actionsShown ? 0 : -1}
-              style={{
-                background: "var(--bg-elevated)",
-                border: "1px solid var(--border-default)",
-                borderRadius: 8,
-                padding: "4px 7px",
-                color: "var(--text-secondary)",
-                fontSize: 12,
-                cursor: "pointer",
-                lineHeight: 1,
-                boxShadow: "0 2px 8px #00000024",
-                transition: "background .15s ease, color .15s ease",
-              }}
-            >
-              ⋮
-            </button>
-            {menuOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  ...(menuAbove ? { bottom: "110%" } : { top: "110%" }),
-                  [isMe ? "right" : "left"]: 0,
-                  background: "var(--bg-elevated)",
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: 10,
-                  boxShadow: "0 12px 32px #00000060",
-                  zIndex: 50,
-                  padding: "4px 0",
-                  minWidth: 170,
-                }}
-              >
-                {menuItem("Repondre", () => onReply(msg))}
-                {msg.content ? menuItem("Copier", () => onCopy(msg)) : null}
-                {/* Sur un lot, « Agrandir » ouvre la galerie : le menu porte sur la
-                    grille entiere, pas sur son premier fichier. */}
-                {albumMsgs && onOpenAlbum
-                  ? menuItem("Agrandir", () => onOpenAlbum(0))
-                  : canExpandMedia ? menuItem("Agrandir", openExpandedPreview) : null}
-                {msg.type === "audio" && mediaSrc ? menuItem("Télécharger l’audio", downloadAudio) : null}
-                {menuItem("Transferer", () => onForward(msg))}
-                {menuItem("Supprimer pour moi", () => onDelete(msg, "me"), true)}
-                {isMe
-                  ? menuItem("Supprimer pour tous", () => onDelete(msg, "everyone"), true)
-                  : null}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-          {/* Nom de l'envoyeur en groupe (pas pour soi-meme) */}
-          {isGroup && !isMe && senderName && !msg.isDeleted && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            gap: 6,
+            flexDirection: isMe ? "row-reverse" : "row",
+            // La limite de largeur vit ICI (le parent fait 100% de la colonne) :
+            // un % sur un enfant d'une rangee auto-dimensionnee ecrase la bulle
+            // a sa largeur minimale (une lettre par ligne).
+            maxWidth: "min(78%, 560px)",
+            transform: dragX ? `translateX(${dragX}px)` : undefined,
+            // Le message s'ecarte du bord pour laisser la place au bouton d'actions :
+            // celui-ci reste ainsi TOUJOURS dans le cadre, jamais hors de l'ecran.
+            marginRight: isMe && actionsShown ? ACTIONS_GUTTER : 0,
+            marginLeft: !isMe && actionsShown ? ACTIONS_GUTTER : 0,
+            transition: dragStart.current.active
+              ? "none"
+              : "transform 0.18s ease, margin 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
+            touchAction: "pan-y",
+            position: "relative",
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onClick={revealActionsNow}
+          onContextMenu={(e) => {
+            if (msg.isDeleted) return
+            e.preventDefault()
+            revealActionsNow()
+            setMenuOpen((v) => !v)
+          }}
+        >
+          {/* Indicateur de swipe */}
+          {Math.abs(dragX) > 16 && (
             <div
               style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: senderNameColor(msg.senderId),
-                marginBottom: 2,
-                padding: "2px 4px 0",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                position: "absolute",
+                [isMe ? "right" : "left"]: -34,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--accent)",
+                opacity: Math.min(1, Math.abs(dragX) / SWIPE_REPLY_THRESHOLD),
               }}
             >
-              {senderName}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <polyline points="9 17 4 12 9 7" />
+                <path d="M20 18v-2a4 4 0 00-4-4H4" />
+              </svg>
             </div>
           )}
-          {/* Bulle */}
-          <div
-            data-message-id={msg.id}
-            style={{
-              background: isMe ? "var(--bubble-me-bg)" : "var(--bubble-them-bg)",
-              color: isMe ? "var(--bubble-me-text)" : "var(--bubble-them-text)",
-              border: isMe ? "none" : "1px solid var(--bubble-them-border)",
-              boxShadow: "0 1px 1px rgba(0, 0, 0, 0.06)",
-              padding: msg.type === "image" && mediaSrc ? 4 : "6px 9px 5px",
-              borderRadius: isMe ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-              fontSize: 13.5,
-              lineHeight: 1.4,
-              wordBreak: "break-word",
-              // flow-root : contient l'heure flottante facon WhatsApp
-              display: "flow-root",
-            }}
-          >
-            {/* Citation — DANS la bulle, comme sur WhatsApp : le message cite et la
-                reponse forment un seul bloc, relies par la barre laterale coloree. */}
-            {quote && !msg.isDeleted && (
+
+          {/* Menu actions — hors du flux : son apparition ne pousse jamais la bulle. */}
+          {!msg.isDeleted && (
             <div
-              onClick={(event) => {
-                const originId = msg.replyTo
-                if (!originId || !onJumpToMessage) return
-                event.stopPropagation()
-                onJumpToMessage(originId)
-              }}
-              role={msg.replyTo && onJumpToMessage ? "button" : undefined}
-              title={msg.replyTo && onJumpToMessage ? "Aller au message d'origine" : undefined}
+              ref={messageMenuRef}
+              onMouseEnter={cancelHide}
+              onMouseLeave={scheduleHide}
               style={{
-                display: "flex",
-                borderRadius: 6,
-                overflow: "hidden",
-                background: isMe ? "rgba(0, 0, 0, 0.14)" : "var(--border-subtle)",
-                marginBottom: 5,
-                cursor: msg.replyTo && onJumpToMessage ? "pointer" : "default",
-                maxWidth: "100%",
+                position: "absolute",
+                // Cote exterieur de la bulle. La gouttiere ouverte par la marge du
+                // message ci-dessus garantit qu'il reste dans le cadre.
+                [isMe ? "right" : "left"]: -ACTIONS_GUTTER,
+                top: "50%",
+                opacity: actionsShown ? 1 : 0,
+                transform: `translateY(-50%) scale(${actionsShown ? 1 : 0.85})`,
+                pointerEvents: actionsShown ? "auto" : "none",
+                // Clic : apparition instantanee. Survol prolonge : fondu doux.
+                transition:
+                  actionsReveal === "instant" ? "none" : "opacity .18s ease, transform .18s ease",
+                zIndex: 20,
               }}
             >
-              <span
-                aria-hidden
-                style={{
-                  width: 4,
-                  flexShrink: 0,
-                  background: isMe ? "var(--bubble-me-text)" : senderNameColor(quotedAuthorKey),
-                  opacity: isMe ? 0.7 : 1,
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setMenuOpen((v) => !v)
                 }}
-              />
-              <div style={{ padding: "5px 9px", minWidth: 0, flex: 1 }}>
-                {quoteAuthor && (
-                  <div
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      lineHeight: 1.3,
-                      marginBottom: 1,
-                      color: isMe ? "var(--bubble-me-text)" : senderNameColor(quotedAuthorKey),
-                      opacity: isMe ? 0.92 : 1,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {quoteAuthor}
-                  </div>
-                )}
-                <div
-                  style={{
-                    fontSize: 12,
-                    lineHeight: 1.35,
-                    color: "inherit",
-                    opacity: 0.75,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-              {replyMsg && hasQuotedMedia(replyMsg) ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <QuoteThumbnail msg={replyMsg} />
-                  <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {quotedMediaLabel(replyMsg)}
-                  </span>
-                </div>
-              ) : <span>{quote.content}</span>}
-                </div>
-              </div>
-            </div>
-            )}
-
-            {msg.isDeleted ? (
-              <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: 12 }}>
-                Ce message a ete supprime
-              </span>
-            ) : albumMsgs ? (
-              // Lot envoye d'un bloc : une seule grille, comme sur WhatsApp. Le
-              // reste de la bulle (menu, glisser-pour-repondre, heure, statut)
-              // reste celui d'un message ordinaire.
-              <>
-                <MediaAlbumGrid msgs={albumMsgs} onOpen={onOpenAlbum ?? (() => {})} />
-                {albumCaption && <span style={{ display: "block", marginTop: 5 }}>{albumCaption}</span>}
-              </>
-            ) : (
-              <>
-                {msg.type === "image" && mediaSrc && (
-                  <img src={mediaSrc} alt={msg.fileName ?? "image"} onClick={() => onOpenImage(mediaSrc, msg.fileName)} style={{ width: "100%", maxWidth: 280, height: "auto", maxHeight: 320, objectFit: "contain", boxSizing: "border-box", borderRadius: 12, display: "block", cursor: "zoom-in" }} />
-                )}
-
-                {msg.type === "audio" && mediaSrc && (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
-                      {/* Un vocal n'a plus de ligne d'informations sous lui : le
-                          bouton de telechargement, jusqu'ici cache dans le menu
-                          du message, devient donc visible. */}
-                      {isVoiceNote(msg) && (
-                        <button
-                          onClick={downloadAudio}
-                          aria-label="Telecharger le vocal"
-                          title="Telecharger"
-                          style={{
-                            width: 26, height: 26, flexShrink: 0, borderRadius: "50%", border: "none", cursor: "pointer",
-                            background: isMe ? "#ffffff24" : "var(--accent-dim)",
-                            color: isMe ? "#fff" : "var(--accent)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                          }}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                            <path d="M12 3v12M7 11l5 5 5-5M5 21h14" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                    {/* Un fichier audio importe reste identifiable par son nom et
-                        sa taille. Un vocal, non : sa duree est deja affichee par
-                        le lecteur, et son nom est un horodatage sans interet. */}
-                    {!isVoiceNote(msg) && msg.fileName && <div style={{ marginTop: 5, fontSize: 10, opacity: 0.76, display: "flex", gap: 7, flexWrap: "wrap" }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", maxWidth: 170, whiteSpace: "nowrap" }}>{msg.fileName}</span>
-                      {msg.fileSize && <span>{msg.fileSize}</span>}
-                      <span>{formatAudioDuration(msg.durationMs)}</span>
-                    </div>}
-                  </div>
-                )}
-
-                {msg.type === "video" && mediaSrc && (
-                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} />
-                )}
-
-                {msg.type === "file" && mediaSrc && isVideoFile && (
-                  <VideoPreview src={mediaSrc} name={msg.fileName} size={msg.fileSize} durationMs={msg.durationMs} />
-                )}
-
-                {msg.type === "file" && (!mediaSrc || !isVideoFile) && (() => {
-                  const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
-                  const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
-                  const mime = msg.mediaMime ?? ""
-                  // --- Preview du fichier ---
-                  const filePreview = (() => {
-                    // Même sans mediaSrc : afficher la carte d'aperçu (visible sur PC et mobile)
-                    // Pour les images, PDF, CSV, DOC avec URL : on affiche le preview natif
-                    const isImageFile = mediaSrc && (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext))
-                    const isPdfFile = mediaSrc && (ext === "pdf" || mime === "application/pdf")
-                    const isTextOrCodeFile = mediaSrc && (TEXT_PREVIEW_EXTENSIONS.includes(ext) || mime.startsWith("text/"))
-                    const isDocFile = mediaSrc && (["doc","docx"].includes(ext) || mime.includes("word")) && !mediaSrc.startsWith("blob:")
-                    const isSpreadsheetFile = mediaSrc && (["xls","xlsx","ods","numbers"].includes(ext) || mime.includes("spreadsheet") || mime.includes("excel")) && !mediaSrc.startsWith("blob:")
-                    const isPresentationFile = mediaSrc && (["ppt","pptx"].includes(ext) || mime.includes("presentation")) && !mediaSrc.startsWith("blob:")
-                    const isVideoFileLocal = mediaSrc && (ext === "mp4" || ext === "mov" || ext === "avi" || ext === "mkv" || ext === "webm" || mime.startsWith("video/"))
-
-                    if (isImageFile) {
-                      return (
-                        <img src={mediaSrc} alt={msg.fileName ?? "image"} style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6, cursor: "zoom-in" }} />
-                      )
-                    }
-                    if (isVideoFileLocal) {
-                      return (
-                        <video src={mediaSrc} controls preload="metadata" style={{ maxWidth: "100%", maxHeight: 220, borderRadius: 10, display: "block", marginBottom: 6 }} />
-                      )
-                    }
-                    if (isPdfFile) {
-                      return (
-                        <LazyPreview minHeight={220}>
-                          <div style={{ maxHeight: 220, overflow: "hidden", borderRadius: 10, marginBottom: 6 }}><PdfViewer url={mediaSrc} isMe={isMe} /></div>
-                        </LazyPreview>
-                      )
-                    }
-                    if (isDocFile) {
-                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="Word" isMe={isMe} height={200} compact />
-                    }
-                    if (isSpreadsheetFile) {
-                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="Excel" isMe={isMe} height={200} compact />
-                    }
-                    if (isPresentationFile) {
-                      return <OfficePreview url={mediaSrc} name={msg.fileName} label="PowerPoint" isMe={isMe} height={200} compact />
-                    }
-                    if (isTextOrCodeFile) {
-                      return (
-                        <LazyPreview minHeight={180}>
-                          <TextFilePreview url={mediaSrc} isMe={isMe} name={msg.fileName} />
-                        </LazyPreview>
-                      )
-                    }
-
-                    // Fallback : carte d'aperçu avec info, bouton Ouvrir/Télécharger, et cercle de chargement
-                    return (
-                      <a
-                        href={mediaSrc ? mediaSrc : "#"}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={() => { setDownloading(true); setTimeout(() => setDownloading(false), 2500) }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 12,
-                          padding: "12px 14px", borderRadius: 10, marginBottom: 6,
-                          background: isMe ? "#ffffff20" : "#f5f6fa",
-                          border: `1px solid ${isMe ? "#ffffff35" : "#dde1e7"}`,
-                          textDecoration: "none", color: isMe ? "#fff" : "var(--text-primary)",
-                          width: "100%",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-                          position: "relative",
-                        }}
-                      >
-                        {downloading && (
-                          <div style={{ position: "absolute", top: 4, right: 4, width: 12, height: 12, borderRadius: "50%", border: `2px solid ${isMe ? "rgba(255,255,255,0.3)" : "var(--border-subtle)"}`, borderTopColor: isMe ? "#fff" : "var(--accent)", animation: "spin 0.8s linear infinite" }} />
-                        )}
-                        <div style={{
-                          width: 48, height: 48, borderRadius: 10,
-                          background: `${fti.color}18`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {msg.fileName ?? msg.content ?? "Fichier"}
-                          </div>
-                          {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
-                          {msg.fileSize && msg.fileName ? <div style={{ fontSize: 9, opacity: 0.7, marginTop: 1 }}>Pages : ~{estimatePages(msg.fileName, msg.fileSize)}</div> : null}
-                          <div style={{ fontSize: 9, opacity: 0.85, marginTop: 2, color: isMe ? "rgba(255,255,255,0.9)" : "var(--text-secondary)" }}>
-                            {mediaSrc ? "Aperçu disponible — cliquer pour ouvrir" : "Aperçu disponible après chargement"}
-                          </div>
-                          {msg.status === "sending" && (
-                            <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6, fontSize: 10, opacity: 0.8 }}>
-                              <span style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${isMe ? "rgba(255,255,255,0.35)" : "var(--text-secondary)"}`, borderTopColor: isMe ? "#fff" : "var(--accent)", animation: "spin 0.8s linear infinite" }} />
-                              <span style={{ color: isMe ? "rgba(255,255,255,0.9)" : "var(--text-secondary)" }}>Envoi en cours...</span>
-                            </div>
-                          )}
-                          <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
-                            <button
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewingDoc({ url: mediaSrc || msg.mediaUrl || "#", name: msg.fileName, mime: msg.mediaMime }); setDownloading(true); setTimeout(() => setDownloading(false), 2500); }}
-                              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: isMe ? "#ffffff25" : "var(--accent)", color: isMe ? "#fff" : "var(--accent-text)", fontSize: 10, fontWeight: 600, cursor: "pointer" }}
-                            >
-                              Ouvrir
-                            </button>
-                            <a href={mediaSrc ? mediaSrc : "#"} target="_blank" rel="noreferrer" onClick={(e) => { e.stopPropagation(); setDownloading(true); setTimeout(() => setDownloading(false), 2500); }} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`, background: "transparent", color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)", fontSize: 10, fontWeight: 500, textDecoration: "none", display: "inline-block" }}>
-                              Télécharger
-                            </a>
-                          </div>
-                        </div>
-                      </a>
-                    )
-                  })()
-
-                  return (
-                    <>
-                      <div
-                        style={{ position: "relative", cursor: canExpandMedia ? "zoom-in" : undefined }}
-                        onDoubleClick={() => { if (canExpandMedia) openExpandedPreview() }}
-                        onPointerUp={canExpandMedia ? onPreviewPointerUp : undefined}
-                        title={canExpandMedia ? "Double-cliquez ou tapez deux fois pour agrandir" : undefined}
-                      >
-                        {filePreview}
-                      </div>
-                      <a
-                        href={msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          display: "flex", alignItems: "center", gap: 10,
-                          minWidth: 200, color: "inherit", textDecoration: "none",
-                        }}
-                      >
-                        <div style={{
-                          width: 40, height: 40, borderRadius: 8,
-                          background: `${fti.color}18`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          flexShrink: 0, flexDirection: "column", gap: 1,
-                        }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={fti.color} strokeWidth="2" strokeLinecap="round">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                          </svg>
-                          <span style={{ fontSize: 7, fontWeight: 700, color: fti.color, letterSpacing: 0.5 }}>{fti.label}</span>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {msg.fileName ?? msg.content ?? "Fichier"}
-                          </div>
-                          {msg.fileSize && <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>}
-                        </div>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                        </svg>
-                      </a>
-                    </>
-                  )
-                })()}
-
-                {/* Legende du media : elle accompagne aussi les documents et les
-                    audios, sinon le texte saisi au moment de l'envoi serait perdu
-                    a l'affichage. */}
-                {msg.content && (
-                  <span
-                    style={
-                      msg.type === "image"
-                        ? { display: "block", padding: "6px 8px 4px" }
-                        : msg.type === "file" || msg.type === "audio" || msg.type === "video"
-                          ? { display: "block", marginTop: 5 }
-                          : undefined
-                    }
-                  >
-                    <RichText text={extractGpsCoords(msg.content) ? removeGpsCoordinates(msg.content) : msg.content} isMe={isMe} />
-                    {(() => {
-                      const gps = extractGpsCoords(msg.content)
-                      return gps ? <GpsPreview lat={gps.lat} lng={gps.lng} isMe={isMe} /> : null
-                    })()}
-                  </span>
-                )}
-              </>
-            )}
-
-            {/* Heure + coches a l'interieur de la bulle, en bas a droite (WhatsApp).
-                float: right -> le texte court reste sur la meme ligne, le texte
-                long passe au-dessus ; le parent en flow-root contient le flottant. */}
-            {!msg.isDeleted && (
-              <span
+                aria-label="Actions du message"
+                aria-hidden={!actionsShown}
+                tabIndex={actionsShown ? 0 : -1}
                 style={{
-                  float: "right",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  marginLeft: 8,
-                  transform: "translateY(4px)",
-                  fontSize: 10,
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: 8,
+                  padding: "4px 7px",
+                  color: "var(--text-secondary)",
+                  fontSize: 12,
+                  cursor: "pointer",
                   lineHeight: 1,
-                  whiteSpace: "nowrap",
-                  color: isMe ? "rgba(255, 255, 255, 0.75)" : "var(--text-faint)",
+                  boxShadow: "0 2px 8px #00000024",
+                  transition: "background .15s ease, color .15s ease",
                 }}
               >
-                {formatTime(msg.timestamp)}
-                {isMe && <StatusIcon status={msg.status} />}
-              </span>
+                ⋮
+              </button>
+              {menuOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    ...(menuAbove ? { bottom: "110%" } : { top: "110%" }),
+                    [isMe ? "right" : "left"]: 0,
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 10,
+                    boxShadow: "0 12px 32px #00000060",
+                    zIndex: 50,
+                    padding: "4px 0",
+                    minWidth: 170,
+                  }}
+                >
+                  {menuItem("Repondre", () => onReply(msg))}
+                  {msg.content ? menuItem("Copier", () => onCopy(msg)) : null}
+                  {/* Sur un lot, « Agrandir » ouvre la galerie : le menu porte sur la
+                    grille entiere, pas sur son premier fichier. */}
+                  {albumMsgs && onOpenAlbum
+                    ? menuItem("Agrandir", () => onOpenAlbum(0))
+                    : canExpandMedia
+                      ? menuItem("Agrandir", openExpandedPreview)
+                      : null}
+                  {msg.type === "audio" && mediaSrc
+                    ? menuItem("Télécharger l’audio", downloadAudio)
+                    : null}
+                  {menuItem("Transferer", () => onForward(msg))}
+                  {menuItem("Supprimer pour moi", () => onDelete(msg, "me"), true)}
+                  {isMe
+                    ? menuItem("Supprimer pour tous", () => onDelete(msg, "everyone"), true)
+                    : null}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Nom de l'envoyeur en groupe (pas pour soi-meme) */}
+            {isGroup && !isMe && senderName && !msg.isDeleted && (
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: senderNameColor(msg.senderId),
+                  marginBottom: 2,
+                  padding: "2px 4px 0",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {senderName}
+              </div>
             )}
+            {/* Bulle */}
+            <div
+              data-message-id={msg.id}
+              style={{
+                background: isMe ? "var(--bubble-me-bg)" : "var(--bubble-them-bg)",
+                color: isMe ? "var(--bubble-me-text)" : "var(--bubble-them-text)",
+                border: isMe ? "none" : "1px solid var(--bubble-them-border)",
+                boxShadow: "0 1px 1px rgba(0, 0, 0, 0.06)",
+                padding: msg.type === "image" && mediaSrc ? 4 : "6px 9px 5px",
+                borderRadius: isMe ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+                fontSize: 13.5,
+                lineHeight: 1.4,
+                wordBreak: "break-word",
+                // flow-root : contient l'heure flottante facon WhatsApp
+                display: "flow-root",
+              }}
+            >
+              {/* Citation — DANS la bulle, comme sur WhatsApp : le message cite et la
+                reponse forment un seul bloc, relies par la barre laterale coloree. */}
+              {quote && !msg.isDeleted && (
+                <div
+                  onClick={(event) => {
+                    const originId = msg.replyTo
+                    if (!originId || !onJumpToMessage) return
+                    event.stopPropagation()
+                    onJumpToMessage(originId)
+                  }}
+                  role={msg.replyTo && onJumpToMessage ? "button" : undefined}
+                  title={msg.replyTo && onJumpToMessage ? "Aller au message d'origine" : undefined}
+                  style={{
+                    display: "flex",
+                    borderRadius: 6,
+                    overflow: "hidden",
+                    background: isMe ? "rgba(0, 0, 0, 0.14)" : "var(--border-subtle)",
+                    marginBottom: 5,
+                    cursor: msg.replyTo && onJumpToMessage ? "pointer" : "default",
+                    maxWidth: "100%",
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 4,
+                      flexShrink: 0,
+                      background: isMe ? "var(--bubble-me-text)" : senderNameColor(quotedAuthorKey),
+                      opacity: isMe ? 0.7 : 1,
+                    }}
+                  />
+                  <div style={{ padding: "5px 9px", minWidth: 0, flex: 1 }}>
+                    {quoteAuthor && (
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          lineHeight: 1.3,
+                          marginBottom: 1,
+                          color: isMe ? "var(--bubble-me-text)" : senderNameColor(quotedAuthorKey),
+                          opacity: isMe ? 0.92 : 1,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {quoteAuthor}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        fontSize: 12,
+                        lineHeight: 1.35,
+                        color: "inherit",
+                        opacity: 0.75,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {replyMsg && hasQuotedMedia(replyMsg) ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          <QuoteThumbnail msg={replyMsg} />
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {quotedMediaLabel(replyMsg)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span>{quote.content}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {msg.isDeleted ? (
+                <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: 12 }}>
+                  Ce message a ete supprime
+                </span>
+              ) : albumMsgs ? (
+                // Lot envoye d'un bloc : une seule grille, comme sur WhatsApp. Le
+                // reste de la bulle (menu, glisser-pour-repondre, heure, statut)
+                // reste celui d'un message ordinaire.
+                <>
+                  <MediaAlbumGrid msgs={albumMsgs} onOpen={onOpenAlbum ?? (() => {})} />
+                  {albumCaption && (
+                    <span style={{ display: "block", marginTop: 5 }}>{albumCaption}</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  {msg.type === "image" && mediaSrc && (
+                    <img
+                      src={mediaSrc}
+                      alt={msg.fileName ?? "image"}
+                      onClick={() => onOpenImage(mediaSrc, msg.fileName)}
+                      style={{
+                        width: "100%",
+                        maxWidth: 280,
+                        height: "auto",
+                        maxHeight: 320,
+                        objectFit: "contain",
+                        boxSizing: "border-box",
+                        borderRadius: 12,
+                        display: "block",
+                        cursor: "zoom-in",
+                      }}
+                    />
+                  )}
+
+                  {msg.type === "audio" && mediaSrc && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
+                        {/* Un vocal n'a plus de ligne d'informations sous lui : le
+                          bouton de telechargement, jusqu'ici cache dans le menu
+                          du message, devient donc visible. */}
+                        {isVoiceNote(msg) && (
+                          <button
+                            onClick={downloadAudio}
+                            aria-label="Telecharger le vocal"
+                            title="Telecharger"
+                            style={{
+                              width: 26,
+                              height: 26,
+                              flexShrink: 0,
+                              borderRadius: "50%",
+                              border: "none",
+                              cursor: "pointer",
+                              background: isMe ? "#ffffff24" : "var(--accent-dim)",
+                              color: isMe ? "#fff" : "var(--accent)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                            >
+                              <path d="M12 3v12M7 11l5 5 5-5M5 21h14" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      {/* Un fichier audio importe reste identifiable par son nom et
+                        sa taille. Un vocal, non : sa duree est deja affichee par
+                        le lecteur, et son nom est un horodatage sans interet. */}
+                      {!isVoiceNote(msg) && msg.fileName && (
+                        <div
+                          style={{
+                            marginTop: 5,
+                            fontSize: 10,
+                            opacity: 0.76,
+                            display: "flex",
+                            gap: 7,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            style={{
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              maxWidth: 170,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {msg.fileName}
+                          </span>
+                          {msg.fileSize && <span>{msg.fileSize}</span>}
+                          <span>{formatAudioDuration(msg.durationMs)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {msg.type === "video" && mediaSrc && (
+                    <VideoPreview
+                      src={mediaSrc}
+                      name={msg.fileName}
+                      size={msg.fileSize}
+                      durationMs={msg.durationMs}
+                    />
+                  )}
+
+                  {msg.type === "file" && mediaSrc && isVideoFile && (
+                    <VideoPreview
+                      src={mediaSrc}
+                      name={msg.fileName}
+                      size={msg.fileSize}
+                      durationMs={msg.durationMs}
+                    />
+                  )}
+
+                  {msg.type === "file" &&
+                    (!mediaSrc || !isVideoFile) &&
+                    (() => {
+                      const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
+                      const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
+                      const mime = msg.mediaMime ?? ""
+                      // --- Preview du fichier ---
+                      const filePreview = (() => {
+                        // Même sans mediaSrc : afficher la carte d'aperçu (visible sur PC et mobile)
+                        // Pour les images, PDF, CSV, DOC avec URL : on affiche le preview natif
+                        const isImageFile =
+                          mediaSrc &&
+                          (mime.startsWith("image/") ||
+                            ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext))
+                        const isPdfFile = mediaSrc && (ext === "pdf" || mime === "application/pdf")
+                        const isTextOrCodeFile =
+                          mediaSrc &&
+                          (TEXT_PREVIEW_EXTENSIONS.includes(ext) || mime.startsWith("text/"))
+                        const isDocFile =
+                          mediaSrc &&
+                          (["doc", "docx"].includes(ext) || mime.includes("word")) &&
+                          !mediaSrc.startsWith("blob:")
+                        const isSpreadsheetFile =
+                          mediaSrc &&
+                          (["xls", "xlsx", "ods", "numbers"].includes(ext) ||
+                            mime.includes("spreadsheet") ||
+                            mime.includes("excel")) &&
+                          !mediaSrc.startsWith("blob:")
+                        const isPresentationFile =
+                          mediaSrc &&
+                          (["ppt", "pptx"].includes(ext) || mime.includes("presentation")) &&
+                          !mediaSrc.startsWith("blob:")
+                        const isVideoFileLocal =
+                          mediaSrc &&
+                          (ext === "mp4" ||
+                            ext === "mov" ||
+                            ext === "avi" ||
+                            ext === "mkv" ||
+                            ext === "webm" ||
+                            mime.startsWith("video/"))
+
+                        if (isImageFile) {
+                          return (
+                            <img
+                              src={mediaSrc}
+                              alt={msg.fileName ?? "image"}
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: 220,
+                                borderRadius: 10,
+                                display: "block",
+                                marginBottom: 6,
+                                cursor: "zoom-in",
+                              }}
+                            />
+                          )
+                        }
+                        if (isVideoFileLocal) {
+                          return (
+                            <video
+                              src={mediaSrc}
+                              controls
+                              preload="metadata"
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: 220,
+                                borderRadius: 10,
+                                display: "block",
+                                marginBottom: 6,
+                              }}
+                            />
+                          )
+                        }
+                        if (isPdfFile) {
+                          return (
+                            <LazyPreview minHeight={220}>
+                              <div
+                                style={{
+                                  maxHeight: 220,
+                                  overflow: "hidden",
+                                  borderRadius: 10,
+                                  marginBottom: 6,
+                                }}
+                              >
+                                <PdfViewer url={mediaSrc} isMe={isMe} />
+                              </div>
+                            </LazyPreview>
+                          )
+                        }
+                        if (isDocFile) {
+                          return (
+                            <OfficePreview
+                              url={mediaSrc}
+                              name={msg.fileName}
+                              label="Word"
+                              isMe={isMe}
+                              height={200}
+                              compact
+                            />
+                          )
+                        }
+                        if (isSpreadsheetFile) {
+                          return (
+                            <OfficePreview
+                              url={mediaSrc}
+                              name={msg.fileName}
+                              label="Excel"
+                              isMe={isMe}
+                              height={200}
+                              compact
+                            />
+                          )
+                        }
+                        if (isPresentationFile) {
+                          return (
+                            <OfficePreview
+                              url={mediaSrc}
+                              name={msg.fileName}
+                              label="PowerPoint"
+                              isMe={isMe}
+                              height={200}
+                              compact
+                            />
+                          )
+                        }
+                        if (isTextOrCodeFile) {
+                          return (
+                            <LazyPreview minHeight={180}>
+                              <TextFilePreview url={mediaSrc} isMe={isMe} name={msg.fileName} />
+                            </LazyPreview>
+                          )
+                        }
+
+                        // Fallback : carte d'aperçu avec info, bouton Ouvrir/Télécharger, et cercle de chargement
+                        return (
+                          <a
+                            href={mediaSrc ? mediaSrc : "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={() => {
+                              setDownloading(true)
+                              setTimeout(() => setDownloading(false), 2500)
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
+                              padding: "12px 14px",
+                              borderRadius: 10,
+                              marginBottom: 6,
+                              background: isMe ? "#ffffff20" : "#f5f6fa",
+                              border: `1px solid ${isMe ? "#ffffff35" : "#dde1e7"}`,
+                              textDecoration: "none",
+                              color: isMe ? "#fff" : "var(--text-primary)",
+                              width: "100%",
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                              position: "relative",
+                            }}
+                          >
+                            {downloading && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: 4,
+                                  right: 4,
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  border: `2px solid ${isMe ? "rgba(255,255,255,0.3)" : "var(--border-subtle)"}`,
+                                  borderTopColor: isMe ? "#fff" : "var(--accent)",
+                                  animation: "spin 0.8s linear infinite",
+                                }}
+                              />
+                            )}
+                            <div
+                              style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 10,
+                                background: `${fti.color}18`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <svg
+                                width="22"
+                                height="22"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke={fti.color}
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              >
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                              </svg>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {msg.fileName ?? msg.content ?? "Fichier"}
+                              </div>
+                              {msg.fileSize && (
+                                <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
+                              )}
+                              {msg.fileSize && msg.fileName ? (
+                                <div style={{ fontSize: 9, opacity: 0.7, marginTop: 1 }}>
+                                  Pages : ~{estimatePages(msg.fileName, msg.fileSize)}
+                                </div>
+                              ) : null}
+                              <div
+                                style={{
+                                  fontSize: 9,
+                                  opacity: 0.85,
+                                  marginTop: 2,
+                                  color: isMe ? "rgba(255,255,255,0.9)" : "var(--text-secondary)",
+                                }}
+                              >
+                                {mediaSrc
+                                  ? "Aperçu disponible — cliquer pour ouvrir"
+                                  : "Aperçu disponible après chargement"}
+                              </div>
+                              {msg.status === "sending" && (
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    fontSize: 10,
+                                    opacity: 0.8,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: 10,
+                                      height: 10,
+                                      borderRadius: "50%",
+                                      border: `2px solid ${isMe ? "rgba(255,255,255,0.35)" : "var(--text-secondary)"}`,
+                                      borderTopColor: isMe ? "#fff" : "var(--accent)",
+                                      animation: "spin 0.8s linear infinite",
+                                    }}
+                                  />
+                                  <span
+                                    style={{
+                                      color: isMe
+                                        ? "rgba(255,255,255,0.9)"
+                                        : "var(--text-secondary)",
+                                    }}
+                                  >
+                                    Envoi en cours...
+                                  </span>
+                                </div>
+                              )}
+                              <div style={{ marginTop: 6, display: "flex", gap: 8 }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    setViewingDoc({
+                                      url: mediaSrc || msg.mediaUrl || "#",
+                                      name: msg.fileName,
+                                      mime: msg.mediaMime,
+                                    })
+                                    setDownloading(true)
+                                    setTimeout(() => setDownloading(false), 2500)
+                                  }}
+                                  style={{
+                                    padding: "4px 10px",
+                                    borderRadius: 6,
+                                    border: "none",
+                                    background: isMe ? "#ffffff25" : "var(--accent)",
+                                    color: isMe ? "#fff" : "var(--accent-text)",
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Ouvrir
+                                </button>
+                                <a
+                                  href={mediaSrc ? mediaSrc : "#"}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setDownloading(true)
+                                    setTimeout(() => setDownloading(false), 2500)
+                                  }}
+                                  style={{
+                                    padding: "4px 10px",
+                                    borderRadius: 6,
+                                    border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`,
+                                    background: "transparent",
+                                    color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)",
+                                    fontSize: 10,
+                                    fontWeight: 500,
+                                    textDecoration: "none",
+                                    display: "inline-block",
+                                  }}
+                                >
+                                  Télécharger
+                                </a>
+                              </div>
+                            </div>
+                          </a>
+                        )
+                      })()
+
+                      return (
+                        <>
+                          <div
+                            style={{
+                              position: "relative",
+                              cursor: canExpandMedia ? "zoom-in" : undefined,
+                            }}
+                            onDoubleClick={() => {
+                              if (canExpandMedia) openExpandedPreview()
+                            }}
+                            onPointerUp={canExpandMedia ? onPreviewPointerUp : undefined}
+                            title={
+                              canExpandMedia
+                                ? "Double-cliquez ou tapez deux fois pour agrandir"
+                                : undefined
+                            }
+                          >
+                            {filePreview}
+                          </div>
+                          <a
+                            href={
+                              msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl, { download: true }) : "#"
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              minWidth: 200,
+                              color: "inherit",
+                              textDecoration: "none",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 8,
+                                background: `${fti.color}18`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                flexDirection: "column",
+                                gap: 1,
+                              }}
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke={fti.color}
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              >
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                              </svg>
+                              <span
+                                style={{
+                                  fontSize: 7,
+                                  fontWeight: 700,
+                                  color: fti.color,
+                                  letterSpacing: 0.5,
+                                }}
+                              >
+                                {fti.label}
+                              </span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: 500,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {msg.fileName ?? msg.content ?? "Fichier"}
+                              </div>
+                              {msg.fileSize && (
+                                <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
+                              )}
+                            </div>
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            >
+                              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                            </svg>
+                          </a>
+                        </>
+                      )
+                    })()}
+
+                  {/* Legende du media : elle accompagne aussi les documents et les
+                    audios, sinon le texte saisi au moment de l'envoi serait perdu
+                    a l'affichage. */}
+                  {msg.content && (
+                    <span
+                      style={
+                        msg.type === "image"
+                          ? { display: "block", padding: "6px 8px 4px" }
+                          : msg.type === "file" || msg.type === "audio" || msg.type === "video"
+                            ? { display: "block", marginTop: 5 }
+                            : undefined
+                      }
+                    >
+                      <RichText
+                        text={
+                          extractGpsCoords(msg.content)
+                            ? removeGpsCoordinates(msg.content)
+                            : msg.content
+                        }
+                        isMe={isMe}
+                      />
+                      {(() => {
+                        const gps = extractGpsCoords(msg.content)
+                        return gps ? <GpsPreview lat={gps.lat} lng={gps.lng} isMe={isMe} /> : null
+                      })()}
+                    </span>
+                  )}
+                </>
+              )}
+
+              {/* Heure + coches a l'interieur de la bulle, en bas a droite (WhatsApp).
+                float: right -> le texte court reste sur la meme ligne, le texte
+                long passe au-dessus ; le parent en flow-root contient le flottant. */}
+              {!msg.isDeleted && (
+                <span
+                  style={{
+                    float: "right",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 3,
+                    marginLeft: 8,
+                    transform: "translateY(4px)",
+                    fontSize: 10,
+                    lineHeight: 1,
+                    whiteSpace: "nowrap",
+                    color: isMe ? "rgba(255, 255, 255, 0.75)" : "var(--text-faint)",
+                  }}
+                >
+                  {formatTime(msg.timestamp)}
+                  {isMe && <StatusIcon status={msg.status} />}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    {viewingDoc && (
-      <DocumentViewer url={viewingDoc.url} name={viewingDoc.name} mime={viewingDoc.mime} isMe={isMe} onClose={() => setViewingDoc(null)} />
-    )}
-  </>)
+      {viewingDoc && (
+        <DocumentViewer
+          url={viewingDoc.url}
+          name={viewingDoc.name}
+          mime={viewingDoc.mime}
+          isMe={isMe}
+          onClose={() => setViewingDoc(null)}
+        />
+      )}
+    </>
+  )
 }
 
 export default function ChatRoomPage() {
@@ -2316,7 +4159,8 @@ export default function ChatRoomPage() {
   useEffect(() => {
     if (!showAttach) return
     const closeOutside = (event: PointerEvent) => {
-      if (attachRef.current && !attachRef.current.contains(event.target as Node)) setShowAttach(false)
+      if (attachRef.current && !attachRef.current.contains(event.target as Node))
+        setShowAttach(false)
     }
     document.addEventListener("pointerdown", closeOutside)
     return () => document.removeEventListener("pointerdown", closeOutside)
@@ -2722,31 +4566,43 @@ export default function ChatRoomPage() {
           const alreadyReceived = prev.some((m) => m.id === saved.id)
           const optMsg = prev.find((m) => m.id === tempId)
           if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
-          return prev.map((m) => m.id === tempId ? {
-            ...saved,
-            timestamp: optMsg?.timestamp ?? saved.timestamp,
-            // Le média confirmé est prioritaire; le blob garde le preview si le WS est incomplet.
-            mediaUrl: saved.mediaUrl || optMsg?.mediaUrl,
-            mediaMime: saved.mediaMime || optMsg?.mediaMime,
-            fileName: saved.fileName || optMsg?.fileName,
-            fileSize: saved.fileSize || optMsg?.fileSize,
-            content: saved.content || caption,
-            durationMs: saved.durationMs ?? optMsg?.durationMs,
-            type: saved.mediaMime?.startsWith("video/") ? "video" : saved.type,
-          } : m)
+          return prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...saved,
+                  timestamp: optMsg?.timestamp ?? saved.timestamp,
+                  // Le média confirmé est prioritaire; le blob garde le preview si le WS est incomplet.
+                  mediaUrl: saved.mediaUrl || optMsg?.mediaUrl,
+                  mediaMime: saved.mediaMime || optMsg?.mediaMime,
+                  fileName: saved.fileName || optMsg?.fileName,
+                  fileSize: saved.fileSize || optMsg?.fileSize,
+                  content: saved.content || caption,
+                  durationMs: saved.durationMs ?? optMsg?.durationMs,
+                  type: saved.mediaMime?.startsWith("video/") ? "video" : saved.type,
+                }
+              : m
+          )
         })
         // Le blob local n'est plus affiche des que le media confirme prend sa
         // place. Sans cette liberation, chaque fichier envoye restait retenu en
         // memoire jusqu'au rechargement de la page. On ne libere que si le
         // backend a bien renvoye une URL : sinon le blob porte encore l'apercu.
         if (saved.mediaUrl) {
-          try { URL.revokeObjectURL(localUrl) } catch { /* deja libere */ }
+          try {
+            URL.revokeObjectURL(localUrl)
+          } catch {
+            /* deja libere */
+          }
         }
       } catch (err) {
         setMessages((prev) => {
           const msg = prev.find((m) => m.id === tempId)
           if (msg?.mediaUrl && msg.mediaUrl.startsWith("blob:")) {
-            try { URL.revokeObjectURL(msg.mediaUrl) } catch { /* ignore */ }
+            try {
+              URL.revokeObjectURL(msg.mediaUrl)
+            } catch {
+              /* ignore */
+            }
           }
           return prev.filter((m) => m.id !== tempId)
         })
@@ -2759,21 +4615,34 @@ export default function ChatRoomPage() {
 
   const mediaKindFromFile = (file: File): "image" | "audio" | "video" | "file" => {
     const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
-    if (file.type.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic"].includes(ext)) return "image"
-    if (file.type.startsWith("video/") || ["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return "video"
-    if (file.type.startsWith("audio/") || ["mp3", "aac", "acc", "wav", "ogg", "m4a", "flac", "webm"].includes(ext)) return "audio"
+    if (
+      file.type.startsWith("image/") ||
+      ["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic"].includes(ext)
+    )
+      return "image"
+    if (file.type.startsWith("video/") || ["mp4", "mov", "avi", "mkv", "webm"].includes(ext))
+      return "video"
+    if (
+      file.type.startsWith("audio/") ||
+      ["mp3", "aac", "acc", "wav", "ogg", "m4a", "flac", "webm"].includes(ext)
+    )
+      return "audio"
     return "file"
   }
 
-  const readAudioDuration = (file: File): Promise<number | undefined> => new Promise((resolve) => {
-    const url = URL.createObjectURL(file)
-    const audio = document.createElement("audio")
-    audio.preload = "metadata"
-    const done = () => { URL.revokeObjectURL(url); resolve(Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : undefined) }
-    audio.onloadedmetadata = done
-    audio.onerror = done
-    audio.src = url
-  })
+  const readAudioDuration = (file: File): Promise<number | undefined> =>
+    new Promise((resolve) => {
+      const url = URL.createObjectURL(file)
+      const audio = document.createElement("audio")
+      audio.preload = "metadata"
+      const done = () => {
+        URL.revokeObjectURL(url)
+        resolve(Number.isFinite(audio.duration) ? Math.round(audio.duration * 1000) : undefined)
+      }
+      audio.onloadedmetadata = done
+      audio.onerror = done
+      audio.src = url
+    })
 
   // Selection de fichier (photo, document, audio) — supporte la selection multiple.
   // Certains téléphones ne renseignent pas File.type : l'extension est donc aussi reconnue.
@@ -2785,7 +4654,10 @@ export default function ChatRoomPage() {
     const toSend = Array.from(files)
     const oversized = toSend.filter((f) => f.size > 2000 * 1024 * 1024)
     if (oversized.length > 0) {
-      error("Fichier(s) trop volumineux", `${oversized.length} fichier(s) depassent 2 Go et seront ignores.`)
+      error(
+        "Fichier(s) trop volumineux",
+        `${oversized.length} fichier(s) depassent 2 Go et seront ignores.`
+      )
     }
     const valid = toSend.filter((f) => f.size <= 2000 * 1024 * 1024)
     const prepared: PendingMedia[] = []
@@ -2794,7 +4666,8 @@ export default function ChatRoomPage() {
       const ext = file.name.split(".").pop()?.toLowerCase()
       // Certains gestionnaires Android annoncent .aac/.acc comme octet-stream.
       // On transmet le MIME attendu par le backend afin qu'il ne soit pas rejeté.
-      const mime = (ext === "aac" || ext === "acc") ? "audio/aac" : (file.type || "application/octet-stream")
+      const mime =
+        ext === "aac" || ext === "acc" ? "audio/aac" : file.type || "application/octet-stream"
       const durationMs = kind === "audio" ? await readAudioDuration(file) : undefined
       prepared.push({ file, url: URL.createObjectURL(file), kind, mime, durationMs, caption: "" })
     }
@@ -2808,7 +4681,13 @@ export default function ChatRoomPage() {
   /** Libere les apercus locaux : ils ne servent qu'a l'ecran de confirmation. */
   const closeMediaComposer = useCallback(() => {
     setPendingMedia((prev) => {
-      prev.forEach((item) => { try { URL.revokeObjectURL(item.url) } catch { /* deja libere */ } })
+      prev.forEach((item) => {
+        try {
+          URL.revokeObjectURL(item.url)
+        } catch {
+          /* deja libere */
+        }
+      })
       return []
     })
     setPendingIndex(0)
@@ -2817,7 +4696,13 @@ export default function ChatRoomPage() {
   const removePendingMedia = useCallback((index: number) => {
     setPendingMedia((prev) => {
       const target = prev[index]
-      if (target) { try { URL.revokeObjectURL(target.url) } catch { /* deja libere */ } }
+      if (target) {
+        try {
+          URL.revokeObjectURL(target.url)
+        } catch {
+          /* deja libere */
+        }
+      }
       return prev.filter((_, i) => i !== index)
     })
     setPendingIndex((prev) => (index < prev || prev > 0 ? Math.max(0, prev - 1) : prev))
@@ -2826,7 +4711,14 @@ export default function ChatRoomPage() {
   /** Confirmation : chaque fichier part avec sa propre legende, dans l'ordre choisi. */
   const sendPendingMedia = useCallback(() => {
     pendingMedia.forEach((item) => {
-      void sendMediaMessage(item.file, item.file.name, item.mime, item.kind, item.durationMs, item.caption.trim())
+      void sendMediaMessage(
+        item.file,
+        item.file.name,
+        item.mime,
+        item.kind,
+        item.durationMs,
+        item.caption.trim()
+      )
     })
     closeMediaComposer()
   }, [pendingMedia, sendMediaMessage, closeMediaComposer])
@@ -2997,7 +4889,12 @@ export default function ChatRoomPage() {
   if (!chat) {
     // Ne pas rediriger brutalement après un échec réseau temporaire : cela faisait
     // « disparaître » la discussion quelques secondes après son ouverture.
-    return <div className="room-root" style={{ padding: 24, color: "var(--text-muted)" }}>Conversation temporairement indisponible. Vérifiez la connexion puis revenez à la liste des discussions.</div>
+    return (
+      <div className="room-root" style={{ padding: 24, color: "var(--text-muted)" }}>
+        Conversation temporairement indisponible. Vérifiez la connexion puis revenez à la liste des
+        discussions.
+      </div>
+    )
   }
 
   const color = CHAT_COLORS[chat.colorIdx % CHAT_COLORS.length]
@@ -3061,16 +4958,69 @@ export default function ChatRoomPage() {
 
         <div className="room-actions">
           {/* Appel audio */}
-          <button className="action-btn" aria-label="Appel audio" title="Appel audio" onClick={() => startCallFromChat("audio")}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" /></svg>
+          <button
+            className="action-btn"
+            aria-label="Appel audio"
+            title="Appel audio"
+            onClick={() => startCallFromChat("audio")}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+            </svg>
           </button>
           {/* Appel video */}
-          <button className="action-btn" aria-label="Appel video" title="Appel video" onClick={() => startCallFromChat("video")}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
+          <button
+            className="action-btn"
+            aria-label="Appel video"
+            title="Appel video"
+            onClick={() => startCallFromChat("video")}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
           </button>
-          {!infoPanelOpen && <button className="action-btn" aria-label="Infos conversation" title="Infos" onClick={() => { if (window.matchMedia("(min-width: 901px)").matches) setInfoPanelOpen(true); else navigate(`/chats/${chatId}/info`) }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-          </button>}
+          {!infoPanelOpen && (
+            <button
+              className="action-btn"
+              aria-label="Infos conversation"
+              title="Infos"
+              onClick={() => {
+                if (window.matchMedia("(min-width: 901px)").matches) setInfoPanelOpen(true)
+                else navigate(`/chats/${chatId}/info`)
+              }}
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -3122,7 +5072,9 @@ export default function ChatRoomPage() {
                       onForward={setForwardMsg}
                       onCopy={handleCopy}
                       isGroup={chat?.isGroup}
-                      senderName={!albumIsMe && chat?.isGroup ? resolveSenderName(head.senderId) : undefined}
+                      senderName={
+                        !albumIsMe && chat?.isGroup ? resolveSenderName(head.senderId) : undefined
+                      }
                       albumMsgs={lot}
                       onOpenAlbum={(index) => setGallery({ msgs: lot, index })}
                     />
@@ -3133,27 +5085,32 @@ export default function ChatRoomPage() {
               const isMe = msg.senderId === "me"
               const reply = msg.replyTo ? messagesById.get(msg.replyTo) : undefined
               // Resoudre le nom de l'envoyeur pour les groupes
-              const resolvedName = !isMe && chat?.isGroup ? resolveSenderName(msg.senderId) : undefined
+              const resolvedName =
+                !isMe && chat?.isGroup ? resolveSenderName(msg.senderId) : undefined
               // Auteur du message cite : affiche en tete du bloc de citation.
               const quotedSenderId = msg.replySnapshot?.senderId ?? reply?.senderId
               const quoteAuthor = quotedSenderId ? resolveSenderName(quotedSenderId) : undefined
               return (
-                <MessageErrorBoundary key={msg.id} name={msg.fileName ?? msg.content} size={msg.fileSize}>
-                <MessageBubble
+                <MessageErrorBoundary
                   key={msg.id}
-                  msg={msg}
-                  isMe={isMe}
-                  replyMsg={reply}
-                  onReply={setReplyTo}
-                  onOpenImage={(url, name) => setLightbox({ url, name })}
-                  onDelete={handleDelete}
-                  onForward={setForwardMsg}
-                  onCopy={handleCopy}
-                  isGroup={chat?.isGroup}
-                  senderName={resolvedName}
-                  quoteAuthor={quoteAuthor}
-                  onJumpToMessage={jumpToMessage}
-                />
+                  name={msg.fileName ?? msg.content}
+                  size={msg.fileSize}
+                >
+                  <MessageBubble
+                    key={msg.id}
+                    msg={msg}
+                    isMe={isMe}
+                    replyMsg={reply}
+                    onReply={setReplyTo}
+                    onOpenImage={(url, name) => setLightbox({ url, name })}
+                    onDelete={handleDelete}
+                    onForward={setForwardMsg}
+                    onCopy={handleCopy}
+                    isGroup={chat?.isGroup}
+                    senderName={resolvedName}
+                    quoteAuthor={quoteAuthor}
+                    onJumpToMessage={jumpToMessage}
+                  />
                 </MessageErrorBoundary>
               )
             })}
@@ -3230,7 +5187,12 @@ export default function ChatRoomPage() {
           onChange={handleFileSelect}
         />
 
-        <div ref={attachRef} className="room-input-row" style={{ position: "relative" }} onMouseLeave={() => setShowAttach(false)}>
+        <div
+          ref={attachRef}
+          className="room-input-row"
+          style={{ position: "relative" }}
+          onMouseLeave={() => setShowAttach(false)}
+        >
           {/* Popup attachement */}
           {showAttach && (
             <div className="attach-menu">
@@ -3265,10 +5227,7 @@ export default function ChatRoomPage() {
                   fileRef.current!.click()
                 }}
               >
-                <div
-                  className="attach-icon"
-                  style={{ background: "#8b5cf620", color: "#8b5cf6" }}
-                >
+                <div className="attach-icon" style={{ background: "#8b5cf620", color: "#8b5cf6" }}>
                   <svg
                     width="14"
                     height="14"
@@ -3278,7 +5237,8 @@ export default function ChatRoomPage() {
                     strokeWidth="2"
                     strokeLinecap="round"
                   >
-                    <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" />
                   </svg>
                 </div>
                 Vidéo
@@ -3286,7 +5246,8 @@ export default function ChatRoomPage() {
               <button
                 className="attach-opt"
                 onClick={() => {
-                  fileRef.current!.accept = ".pdf,.doc,.docx,.txt,.tsx,.css,.json,.py,.java,.cpp,.h,.md,.yaml,.yml,.properties,.xml,.php"
+                  fileRef.current!.accept =
+                    ".pdf,.doc,.docx,.txt,.tsx,.css,.json,.py,.java,.cpp,.h,.md,.yaml,.yml,.properties,.xml,.php"
                   fileRef.current!.click()
                 }}
               >
@@ -3343,11 +5304,16 @@ export default function ChatRoomPage() {
                   fileRef.current!.click()
                 }}
               >
-                <div
-                  className="attach-icon"
-                  style={{ background: "#6b728020", color: "#6b7280" }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <div className="attach-icon" style={{ background: "#6b728020", color: "#6b7280" }}>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
                   </svg>
                 </div>
@@ -3498,10 +5464,13 @@ export default function ChatRoomPage() {
             </>
           )}
         </div>
-
       </div>
 
-      {infoPanelOpen && <aside className="chat-info-drawer"><ChatInfoPage embedded onEmbeddedClose={() => setInfoPanelOpen(false)} /></aside>}
+      {infoPanelOpen && (
+        <aside className="chat-info-drawer">
+          <ChatInfoPage embedded onEmbeddedClose={() => setInfoPanelOpen(false)} />
+        </aside>
+      )}
 
       {/* Visionneuse d'image plein ecran */}
       {gallery && (
@@ -3514,7 +5483,9 @@ export default function ChatRoomPage() {
           index={Math.min(pendingIndex, pendingMedia.length - 1)}
           onIndexChange={setPendingIndex}
           onCaptionChange={(index, caption) =>
-            setPendingMedia((prev) => prev.map((item, i) => (i === index ? { ...item, caption } : item)))
+            setPendingMedia((prev) =>
+              prev.map((item, i) => (i === index ? { ...item, caption } : item))
+            )
           }
           onRemove={removePendingMedia}
           onCancel={closeMediaComposer}

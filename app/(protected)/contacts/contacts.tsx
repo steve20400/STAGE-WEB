@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { CONTACT_COLORS } from "../../../src/data/contacts"
 import { useContacts } from "../../../src/hooks/use-contacts"
@@ -14,6 +14,12 @@ import {
 } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
 import { RowActionsMenu } from "../../../src/components/row-actions-menu"
+import {
+  bloquer,
+  debloquer,
+  listerBloques,
+  type PersonneBloquee,
+} from "../../../src/services/blocked-service"
 import "../calls/calls-page.css"
 
 /**
@@ -31,6 +37,45 @@ export default function ContactsPage() {
   const [newAlias, setNewAlias] = useState("")
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  /**
+   * Personnes bloquees, par numero Alanya. Il faut la LIGNE de blocage et pas
+   * seulement l'etat : c'est son identifiant qui sert a debloquer.
+   */
+  const [bloques, setBloques] = useState<PersonneBloquee[]>([])
+
+  useEffect(() => {
+    let annule = false
+    void listerBloques().then((liste) => {
+      if (!annule) setBloques(liste)
+    })
+    return () => {
+      annule = true
+    }
+  }, [])
+
+  const blocageDe = (numero: string) =>
+    bloques.find((b) => (b.publicNumber ?? "").replace(/\D/g, "") === numero.replace(/\D/g, "")) ??
+    null
+
+  const basculerBlocage = async (numero: string, nom: string) => {
+    const existant = blocageDe(numero)
+    try {
+      if (existant) {
+        await debloquer(existant.idBlock)
+        setBloques((liste) => liste.filter((b) => b.idBlock !== existant.idBlock))
+        success("Debloque", `${nom} peut de nouveau vous ecrire.`)
+      } else {
+        const ligne = await bloquer(numero)
+        setBloques((liste) => [...liste, ligne])
+        success("Bloque", `${nom} ne peut plus vous ecrire.`)
+      }
+    } catch (err) {
+      error(
+        existant ? "Deblocage impossible" : "Blocage impossible",
+        err instanceof Error ? err.message : undefined
+      )
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -203,9 +248,7 @@ export default function ContactsPage() {
 
               <div className="call-info">
                 <div className="call-name">{contact.name}</div>
-                <div className="call-detail">
-                  Alanya ID : {formatAlanyaNumber(contact.phone)}
-                </div>
+                <div className="call-detail">Alanya ID : {formatAlanyaNumber(contact.phone)}</div>
               </div>
 
               <div className="call-right">
@@ -213,9 +256,29 @@ export default function ContactsPage() {
                   ariaLabel={`Actions pour ${contact.name}`}
                   actions={[
                     { label: "Envoyer un message", onSelect: () => void openChat(contact.phone) },
-                    { label: "Appel audio", onSelect: () => void callContact(contact.phone, contact.name, "audio") },
-                    { label: "Appel video", onSelect: () => void callContact(contact.phone, contact.name, "video") },
-                    { label: "Supprimer le contact", onSelect: () => setConfirmDelete(contact.id), danger: true },
+                    {
+                      label: "Appel audio",
+                      onSelect: () => void callContact(contact.phone, contact.name, "audio"),
+                    },
+                    {
+                      label: "Appel video",
+                      onSelect: () => void callContact(contact.phone, contact.name, "video"),
+                    },
+                    blocageDe(contact.phone)
+                      ? {
+                          label: "Debloquer",
+                          onSelect: () => void basculerBlocage(contact.phone, contact.name),
+                        }
+                      : {
+                          label: "Bloquer",
+                          onSelect: () => void basculerBlocage(contact.phone, contact.name),
+                          danger: true,
+                        },
+                    {
+                      label: "Supprimer le contact",
+                      onSelect: () => setConfirmDelete(contact.id),
+                      danger: true,
+                    },
                   ]}
                 />
               </div>

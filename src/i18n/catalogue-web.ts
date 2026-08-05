@@ -78,12 +78,16 @@ export const WEB_TRANSLATION_KEYS = [
   "no_account",
   "show",
   "hide",
+  "system_you_blocked",
+  "system_you_were_blocked",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    system_you_blocked: "Vous avez bloqué {name}",
+    system_you_were_blocked: "Vous avez été bloqué par {name}",
     login_pretitle: "Connexion",
     login_back: "Bon retour.",
     login_subtitle: "Entrez vos identifiants pour acceder a votre compte.",
@@ -153,6 +157,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    system_you_blocked: "You blocked {name}",
+    system_you_were_blocked: "You were blocked by {name}",
     login_pretitle: "Sign in",
     login_back: "Welcome back.",
     login_subtitle: "Enter your credentials to access your account.",
@@ -221,6 +227,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    system_you_blocked: "Has bloqueado a {name}",
+    system_you_were_blocked: "{name} te ha bloqueado",
     login_pretitle: "Iniciar sesión",
     login_back: "Bienvenido de nuevo.",
     login_subtitle: "Introduce tus credenciales para acceder a tu cuenta.",
@@ -289,6 +297,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    system_you_blocked: "Du hast {name} blockiert",
+    system_you_were_blocked: "Du wurdest von {name} blockiert",
     login_pretitle: "Anmelden",
     login_back: "Willkommen zurück.",
     login_subtitle: "Gib deine Zugangsdaten ein, um auf dein Konto zuzugreifen.",
@@ -358,6 +368,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    system_you_blocked: "Você bloqueou {name}",
+    system_you_were_blocked: "Você foi bloqueado por {name}",
     login_pretitle: "Iniciar sessão",
     login_back: "Bem-vindo de volta.",
     login_subtitle: "Introduza as suas credenciais para aceder à sua conta.",
@@ -426,6 +438,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    system_you_blocked: "Вы заблокировали {name}",
+    system_you_were_blocked: "{name} заблокировал вас",
     login_pretitle: "Вход",
     login_back: "С возвращением.",
     login_subtitle: "Введите данные для входа в аккаунт.",
@@ -493,6 +507,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    system_you_blocked: "您已屏蔽 {name}",
+    system_you_were_blocked: "您已被 {name} 屏蔽",
     login_pretitle: "登录",
     login_back: "欢迎回来。",
     login_subtitle: "请输入凭据以访问您的账户。",
@@ -560,6 +576,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    system_you_blocked: "Du har blockerat {name}",
+    system_you_were_blocked: "Du har blockerats av {name}",
     login_pretitle: "Logga in",
     login_back: "Välkommen tillbaka.",
     login_subtitle: "Ange dina uppgifter för att komma åt ditt konto.",
@@ -628,6 +646,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    system_you_blocked: "Du har blokkert {name}",
+    system_you_were_blocked: "Du er blokkert av {name}",
     login_pretitle: "Logg inn",
     login_back: "Velkommen tilbake.",
     login_subtitle: "Skriv inn opplysningene dine for å få tilgang til kontoen.",
