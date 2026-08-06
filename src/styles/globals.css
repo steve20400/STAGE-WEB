@@ -57,6 +57,8 @@ button {
   --warning-dim: #c04d2915;
   --info: #53bde5; /* bleu des coches de lecture */
   --info-dim: #53bde515;
+  --agent-name: #7ddcff;
+  --agent-name-dim: #7ddcff22;
 
   --bubble-them-bg: #2b1b12;
   --bubble-them-text: #f5efe6;
@@ -128,6 +130,8 @@ button {
   --warning-dim: #c04d2915;
   --info: #53bde5; /* bleu des coches de lecture */
   --info-dim: #53bde515;
+  --agent-name: #0b5cad;
+  --agent-name-dim: #0b5cad16;
 
   --bubble-them-bg: #ffffff; /* blanc franc facon WhatsApp (ressort sur le fond creme) */
   --bubble-them-text: #2b1b12;
@@ -187,6 +191,8 @@ button {
   --accent-dim: #38bdf820;
   --accent-border: #38bdf848;
   --accent-text: #07111f;
+  --agent-name: #5ed6ff;
+  --agent-name-dim: #5ed6ff22;
   --warning: #facc15;
   --warning-dim: #facc1518;
 
@@ -226,6 +232,8 @@ button {
   --accent-dim: #0f4c8118;
   --accent-border: #0f4c8140;
   --accent-text: #ffffff;
+  --agent-name: #075ca8;
+  --agent-name-dim: #075ca816;
   --warning: #b7791f;
   --warning-dim: #b7791f15;
 
