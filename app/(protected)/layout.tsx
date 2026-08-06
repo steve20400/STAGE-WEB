@@ -229,9 +229,9 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
   const pathname = location.pathname
 
   const user = {
-    name: sessionUser?.name ?? "Utilisateur Alanya",
+    name: sessionUser?.name ?? t("default_user_name"),
     email: sessionUser?.email ?? "",
-    initials: toInitials(sessionUser?.name ?? "Utilisateur Alanya"),
+    initials: toInitials(sessionUser?.name ?? t("default_user_name")),
     status: t("online"),
   }
 
@@ -253,8 +253,8 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           <button
             className="sb-collapse"
             onClick={onToggleCollapse}
-            aria-label={collapsed ? "Deplier le menu" : "Replier le menu"}
-            title={collapsed ? "Deplier" : "Replier"}
+            aria-label={collapsed ? t("sidebar_expand") : t("sidebar_collapse")}
+            title={collapsed ? t("sidebar_expand") : t("sidebar_collapse")}
           >
             <svg
               width="16"
@@ -281,7 +281,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
 
       {/* Navigation principale */}
       <nav className="sb-nav">
-        <div className="sb-nav-section">Navigation</div>
+        <div className="sb-nav-section">{t("nav_section_navigation")}</div>
 
         {NAV_ITEMS.map(({ href, labelKey, icon }) => {
           const isActive = pathname.startsWith(href)
@@ -303,7 +303,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           )
         })}
 
-        <div className="sb-nav-section">Compte</div>
+        <div className="sb-nav-section">{t("nav_section_account")}</div>
 
         <Link
           to="/settings"
@@ -359,6 +359,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
 // LAYOUT PROTEGE
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
   // Navigation repliee par defaut (plus de place pour les discussions).
   const [collapsed, setCollapsed] = useState(() => {
@@ -418,7 +419,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           <button
             className="topbar-menu"
             onClick={() => setMobileOpen(true)}
-            aria-label="Ouvrir le menu"
+            aria-label={t("open_menu")}
           >
             <Icons.Menu />
           </button>
