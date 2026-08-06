@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useTranslation } from "../i18n"
 import { useAuth } from "./auth-provider"
 import { enregistrerPseudo, pseudoManquant } from "../services/pseudo-appareil-service"
 
@@ -16,6 +17,7 @@ import { enregistrerPseudo, pseudoManquant } from "../services/pseudo-appareil-s
  */
 export function PseudoAppareilGate() {
   const { isAuthenticated, user } = useAuth()
+  const { t } = useTranslation()
   const [demande, setDemande] = useState(false)
   const [pseudo, setPseudo] = useState("")
   const [envoi, setEnvoi] = useState(false)
@@ -49,7 +51,7 @@ export function PseudoAppareilGate() {
       setDemande(false)
       setPseudo("")
     } catch (err) {
-      setErreur(err instanceof Error ? err.message : "Enregistrement impossible.")
+      setErreur(err instanceof Error ? err.message : t("device_name_save"))
     } finally {
       setEnvoi(false)
     }
@@ -58,23 +60,20 @@ export function PseudoAppareilGate() {
   return (
     <div className="pseudo-gate-overlay" role="dialog" aria-modal="true">
       <div className="pseudo-gate">
-        <div className="pseudo-gate-titre">Nommez cet appareil</div>
-        <p className="pseudo-gate-sous">
-          Ce nom apparait au-dessus des messages envoyes depuis cet appareil, et uniquement pour les
-          autres appareils connectes a ce compte. Vos correspondants ne le voient jamais.
-        </p>
+        <div className="pseudo-gate-titre">{t("device_name_title")}</div>
+        <p className="pseudo-gate-sous">{t("device_name_explain")}</p>
 
         <input
           className="pseudo-gate-champ"
           autoFocus
           maxLength={50}
-          placeholder="Poste accueil, Bureau d'Awa..."
+          placeholder={t("device_name_placeholder")}
           value={pseudo}
           onChange={(e) => setPseudo(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") void valider()
           }}
-          aria-label="Nom de cet appareil"
+          aria-label={t("device_name_label")}
         />
 
         {erreur && <div className="pseudo-gate-erreur">{erreur}</div>}
@@ -84,9 +83,9 @@ export function PseudoAppareilGate() {
           onClick={() => void valider()}
           disabled={!pseudo.trim() || envoi}
         >
-          {envoi ? "Enregistrement..." : "Enregistrer"}
+          {envoi ? t("device_name_saving") : t("device_name_save")}
         </button>
-        <p className="pseudo-gate-note">Modifiable a tout moment dans Parametres.</p>
+        <p className="pseudo-gate-note">{t("device_name_editable")}</p>
       </div>
     </div>
   )

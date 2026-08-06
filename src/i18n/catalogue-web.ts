@@ -89,12 +89,27 @@ export const WEB_TRANSLATION_KEYS = [
   "sidebar_expand",
   "open_menu",
   "default_user_name",
+  "device_name_title",
+  "device_name_explain",
+  "device_name_placeholder",
+  "device_name_save",
+  "device_name_saving",
+  "device_name_editable",
+  "device_name_label",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    device_name_title: "Nommez cet appareil",
+    device_name_explain:
+      "Ce nom apparait au-dessus des messages envoyes depuis cet appareil, et uniquement pour les autres appareils connectes a ce compte. Vos correspondants ne le voient jamais.",
+    device_name_placeholder: "Poste accueil, Bureau d'Awa...",
+    device_name_save: "Enregistrer",
+    device_name_saving: "Enregistrement...",
+    device_name_editable: "Modifiable a tout moment dans Parametres.",
+    device_name_label: "Nom de cet appareil",
     nav_section_navigation: "Navigation",
     nav_section_account: "Compte",
     sidebar_collapse: "Replier",
@@ -175,6 +190,14 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    device_name_title: "Name this device",
+    device_name_explain:
+      "This name appears above messages sent from this device, and only for other devices signed in to this account. Your contacts never see it.",
+    device_name_placeholder: "Front desk, Awa's office...",
+    device_name_save: "Save",
+    device_name_saving: "Saving...",
+    device_name_editable: "You can change it anytime in Settings.",
+    device_name_label: "Name of this device",
     nav_section_navigation: "Navigation",
     nav_section_account: "Account",
     sidebar_collapse: "Collapse",
@@ -254,6 +277,14 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    device_name_title: "Nombra este dispositivo",
+    device_name_explain:
+      "Este nombre aparece encima de los mensajes enviados desde este dispositivo, y solo para los demás dispositivos conectados a esta cuenta. Tus contactos nunca lo ven.",
+    device_name_placeholder: "Recepción, Oficina de Awa...",
+    device_name_save: "Guardar",
+    device_name_saving: "Guardando...",
+    device_name_editable: "Puedes cambiarlo cuando quieras en Ajustes.",
+    device_name_label: "Nombre de este dispositivo",
     nav_section_navigation: "Navegación",
     nav_section_account: "Cuenta",
     sidebar_collapse: "Contraer",
@@ -333,6 +364,14 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    device_name_title: "Diesem Gerät einen Namen geben",
+    device_name_explain:
+      "Dieser Name erscheint über Nachrichten, die von diesem Gerät gesendet werden, und nur für andere Geräte dieses Kontos. Deine Kontakte sehen ihn nie.",
+    device_name_placeholder: "Empfang, Awas Büro...",
+    device_name_save: "Speichern",
+    device_name_saving: "Wird gespeichert...",
+    device_name_editable: "Jederzeit in den Einstellungen änderbar.",
+    device_name_label: "Name dieses Geräts",
     nav_section_navigation: "Navigation",
     nav_section_account: "Konto",
     sidebar_collapse: "Einklappen",
@@ -413,6 +452,14 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    device_name_title: "Dê um nome a este aparelho",
+    device_name_explain:
+      "Este nome aparece acima das mensagens enviadas deste aparelho, e apenas para os outros aparelhos ligados a esta conta. Os seus contactos nunca o veem.",
+    device_name_placeholder: "Receção, Escritório da Awa...",
+    device_name_save: "Guardar",
+    device_name_saving: "A guardar...",
+    device_name_editable: "Pode alterá-lo a qualquer momento nas Definições.",
+    device_name_label: "Nome deste aparelho",
     nav_section_navigation: "Navegação",
     nav_section_account: "Conta",
     sidebar_collapse: "Recolher",
@@ -492,6 +539,14 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    device_name_title: "Назовите это устройство",
+    device_name_explain:
+      "Это имя отображается над сообщениями, отправленными с этого устройства, и только на других устройствах этого аккаунта. Ваши собеседники его никогда не видят.",
+    device_name_placeholder: "Стойка регистрации, кабинет Авы...",
+    device_name_save: "Сохранить",
+    device_name_saving: "Сохранение...",
+    device_name_editable: "Можно изменить в любой момент в настройках.",
+    device_name_label: "Имя этого устройства",
     nav_section_navigation: "Навигация",
     nav_section_account: "Аккаунт",
     sidebar_collapse: "Свернуть",
@@ -570,6 +625,14 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    device_name_title: "为此设备命名",
+    device_name_explain:
+      "该名称会显示在从此设备发送的消息上方，且仅对本账户的其他设备可见。您的联系人永远看不到它。",
+    device_name_placeholder: "前台、阿瓦的办公室…",
+    device_name_save: "保存",
+    device_name_saving: "正在保存…",
+    device_name_editable: "可随时在设置中修改。",
+    device_name_label: "此设备的名称",
     nav_section_navigation: "导航",
     nav_section_account: "账户",
     sidebar_collapse: "收起",
@@ -648,6 +711,14 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    device_name_title: "Namnge den här enheten",
+    device_name_explain:
+      "Namnet visas ovanför meddelanden som skickas från den här enheten, och endast för andra enheter som är inloggade på kontot. Dina kontakter ser det aldrig.",
+    device_name_placeholder: "Receptionen, Awas kontor...",
+    device_name_save: "Spara",
+    device_name_saving: "Sparar...",
+    device_name_editable: "Kan ändras när som helst i Inställningar.",
+    device_name_label: "Namn på den här enheten",
     nav_section_navigation: "Navigering",
     nav_section_account: "Konto",
     sidebar_collapse: "Fäll ihop",
@@ -727,6 +798,14 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    device_name_title: "Gi denne enheten et navn",
+    device_name_explain:
+      "Navnet vises over meldinger som sendes fra denne enheten, og bare for andre enheter som er logget på kontoen. Kontaktene dine ser det aldri.",
+    device_name_placeholder: "Resepsjonen, Awas kontor...",
+    device_name_save: "Lagre",
+    device_name_saving: "Lagrer...",
+    device_name_editable: "Kan endres når som helst i Innstillinger.",
+    device_name_label: "Navnet på denne enheten",
     nav_section_navigation: "Navigasjon",
     nav_section_account: "Konto",
     sidebar_collapse: "Slå sammen",
