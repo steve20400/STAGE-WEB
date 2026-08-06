@@ -15,6 +15,14 @@ export interface ConversationMock {
   members?: string[]
   membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string; role?: string }>
   isPinned?: boolean
+  /**
+   * Verrou pose par un appareil de MON compte, s'il y en a un.
+   *
+   * Present dans la liste pour que l'indice s'affiche sans ouvrir la
+   * conversation : savoir qu'elle est deja prise en charge par un collegue est
+   * precisement ce qu'on veut voir avant de cliquer.
+   */
+  lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null
   /** Photo de profil de l'interlocuteur (data-URL miniature ou URL). */
   avatar?: string | null
 }
@@ -29,6 +37,8 @@ export interface ChatInfoMock {
   members?: string[]
   membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string; role?: string }>
   typing?: boolean
+  /** Verrou pose par un appareil de mon compte, ou null. Voir ConversationMock. */
+  lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null
 }
 
 export interface ChatMessageMock {

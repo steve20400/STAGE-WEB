@@ -47,6 +47,8 @@ interface BackendConversation {
     createdAt: string
   } | null
   unread?: number
+  /** Verrou pose par un appareil du compte courant, ou null. */
+  lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null
   updatedAt?: string
 }
 
@@ -95,6 +97,7 @@ function toFrontConversation(c: BackendConversation): ConversationMock {
     members: c.members?.map((m) => toInitials(m.pseudo ?? m.publicNumber)),
     membersInfo: c.members,
     avatar: c.avatarUrl ?? null,
+    lock: c.lock ?? null,
   }
 }
 
@@ -132,9 +135,7 @@ export async function fetchChatConversations(): Promise<ConversationMock[]> {
     try {
       const cached = await loadCachedConversations()
       if (cached.length > 0) {
-        return cached.map((c) =>
-          toFrontConversation(c as unknown as BackendConversation)
-        )
+        return cached.map((c) => toFrontConversation(c as unknown as BackendConversation))
       }
     } catch {
       // IndexedDB indisponible, on continue
@@ -159,9 +160,7 @@ export async function fetchChatConversationsCacheFirst(
   try {
     const cached = await loadCachedConversations()
     if (cached.length > 0) {
-      onCached(
-        cached.map((c) => toFrontConversation(c as unknown as BackendConversation))
-      )
+      onCached(cached.map((c) => toFrontConversation(c as unknown as BackendConversation)))
     }
   } catch {
     // IndexedDB indisponible, on attend le réseau
@@ -233,18 +232,28 @@ export async function fetchConversationById(
  * POST /api/conversations/:id/members — Ajoute des membres a un groupe existant.
  * Envoie les numeros Alanya des nouveaux membres.
  */
-export async function addMembersToGroup(
-  convId: string,
-  memberNumbers: string[]
-): Promise<void> {
+export async function addMembersToGroup(convId: string, memberNumbers: string[]): Promise<void> {
   await apiRequest<void>(`/api/conversations/${convId}/members`, {
     method: "POST",
     body: { publicNumbers: memberNumbers },
   })
 }
 
-export async function removeGroupMember(convId:string,userId:string){ return apiRequest(`/api/conversations/${convId}/members?userId=${encodeURIComponent(userId)}`,{method:"DELETE"}) }
-export async function setGroupMemberRole(convId:string,userId:string,role:"ADMIN"|"MEMBER"){ return apiRequest(`/api/conversations/${convId}/members`,{method:"PATCH",body:{userId,role}}) }
-export async function leaveGroup(convId:string){ return apiRequest(`/api/conversations/${convId}/leave`,{method:"POST"}) }
+export async function removeGroupMember(convId: string, userId: string) {
+  return apiRequest(`/api/conversations/${convId}/members?userId=${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  })
+}
+export async function setGroupMemberRole(convId: string, userId: string, role: "ADMIN" | "MEMBER") {
+  return apiRequest(`/api/conversations/${convId}/members`, {
+    method: "PATCH",
+    body: { userId, role },
+  })
+}
+export async function leaveGroup(convId: string) {
+  return apiRequest(`/api/conversations/${convId}/leave`, { method: "POST" })
+}
 
-export async function deleteGroupConversation(convId:string){ return apiRequest(`/api/conversations/${convId}/delete`,{method:"DELETE"}) }
+export async function deleteGroupConversation(convId: string) {
+  return apiRequest(`/api/conversations/${convId}/delete`, { method: "DELETE" })
+}

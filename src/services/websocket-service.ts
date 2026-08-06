@@ -597,6 +597,53 @@ export function sendCallState(
   sendRaw({ type: "call_state", callId, state, userId, displayName })
 }
 
+/* ----------------- Verrou de conversation ----------------- */
+
+/**
+ * Etat du verrou d'une conversation, tel que le serveur le diffuse.
+ *
+ * Le verrou se joue entre appareils d'un MEME compte : il reserve l'ecriture a
+ * celui qui l'a pose. Il ne coupe rien d'autre — les autres appareils
+ * continuent de tout recevoir et de tout lire.
+ */
+export interface EtatVerrou {
+  convId: string
+  locked: boolean
+  appareilId: number | null
+  detenteur: string | null
+  expiresAt: string | null
+}
+
+/** Pose ou retire le verrou d'une conversation pour ce compte. */
+export function envoyerVerrou(
+  convId: string,
+  lock: boolean,
+  appareilId: number | null,
+  detenteur: string | null
+) {
+  sendRaw({ type: "conversation_lock", convId, lock, appareilId, detenteur })
+}
+
+/**
+ * S'abonne aux changements de verrou. Le serveur les diffuse a toutes les
+ * sockets du compte, y compris celle qui vient de poser le verrou : l'appareil
+ * detenteur apprend donc son propre etat par le meme chemin que les autres, et
+ * il n'y a pas deux sources de verite a garder d'accord.
+ */
+export function subscribeToConversationLocks(handler: (etat: EtatVerrou) => void): () => void {
+  const relais = (event: ServerEvent) => {
+    if (event.type !== "conversation_lock") return
+    handler({
+      convId: String(event.convId ?? ""),
+      locked: Boolean(event.locked),
+      appareilId: typeof event.appareilId === "number" ? event.appareilId : null,
+      detenteur: typeof event.detenteur === "string" ? event.detenteur : null,
+      expiresAt: typeof event.expiresAt === "string" ? event.expiresAt : null,
+    })
+  }
+  return addListener(relais)
+}
+
 /**
  * Fait entrer un utilisateur, designe par son numero public, dans un appel deja
  * en cours : le serveur le fait sonner et l'ajoute aux participants.

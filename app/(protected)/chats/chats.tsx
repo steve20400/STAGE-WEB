@@ -28,7 +28,7 @@ export default function ChatsPage() {
   const navigate = useNavigate()
   const { user: sessionUser } = useAuth()
   const [query, setQuery] = useState("")
-  const [filter, setFilter] = useState<"all" | "unread" | "groups" | "blocked">("all")
+  const [filter, setFilter] = useState<"all" | "unread" | "groups" | "blocked" | "locked">("all")
 
   /**
    * Numeros concernes par un blocage, DANS LES DEUX SENS : ceux que j'ai
@@ -141,6 +141,10 @@ export default function ChatsPage() {
         if (filter === "unread") return c.unread > 0
         if (filter === "groups") return c.isGroup
         if (filter === "blocked") return estConversationBloquee(c)
+        // Toutes les conversations reservees du compte, sans distinguer quel
+        // appareil a pose le verrou : c'est la vue « ce qui est en cours de
+        // traitement chez nous », l'interet d'un numero partage.
+        if (filter === "locked") return c.lock != null
         return true
       })
       .filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
@@ -273,7 +277,7 @@ export default function ChatsPage() {
 
         {/* Filtres */}
         <div className="filter-row">
-          {(["all", "unread", "groups", "blocked"] as const).map((f) => (
+          {(["all", "unread", "groups", "blocked", "locked"] as const).map((f) => (
             <button
               key={f}
               className={`filter-btn ${filter === f ? "active" : ""}`}
@@ -285,7 +289,9 @@ export default function ChatsPage() {
                   ? `Non lus (${conversations.reduce((a, c) => a + (c.unread > 0 ? 1 : 0), 0)})`
                   : f === "groups"
                     ? "Groupes"
-                    : `Bloques (${conversations.filter(estConversationBloquee).length})`}
+                    : f === "blocked"
+                      ? `Bloques (${conversations.filter(estConversationBloquee).length})`
+                      : `Reservees (${conversations.filter((c) => c.lock != null).length})`}
             </button>
           ))}
         </div>
@@ -401,6 +407,34 @@ function ConvItem({ conv }: { conv: ConversationMock }) {
               }}
             >
               groupe
+            </span>
+          )}
+          {/* Reservee par un appareil du compte. Visible AVANT d'ouvrir : c'est
+              tout l'interet, savoir qu'un collegue s'en occupe deja plutot que
+              de le decouvrir devant une zone de saisie absente. */}
+          {conv.lock != null && (
+            <span
+              className="conv-lock"
+              title={
+                conv.lock.detenteur
+                  ? `${conv.lock.detenteur} a la main`
+                  : "Reservee par un appareil de ce compte"
+              }
+            >
+              <svg
+                width="9"
+                height="9"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <rect x="4" y="11" width="16" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 018 0v4" />
+              </svg>
+              {conv.lock.detenteur ?? "reservee"}
             </span>
           )}
         </div>

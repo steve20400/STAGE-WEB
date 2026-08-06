@@ -113,6 +113,33 @@ function systemeCourt(): string {
  * Le libelle n'est envoye qu'a la creation implicite ; si l'utilisateur a
  * renomme son appareil, le serveur conserve son choix.
  */
+/**
+ * Identifiant de la LIGNE d'appareil de ce navigateur pour le compte courant.
+ *
+ * A ne pas confondre avec `cookies_WebID`, qui identifie le navigateur : la
+ * ligne, elle, vaut pour un couple (navigateur, compte). C'est elle que le
+ * verrou de conversation designe, puisqu'il se joue entre appareils d'un meme
+ * compte.
+ *
+ * Conserve pour survivre a un rechargement : l'enregistrement ne repasse pas a
+ * chaque montage, et le verrou doit pouvoir partir sans l'attendre.
+ */
+const CLE_APPAREIL_COURANT = "alanya-appareil-courant"
+
+export function appareilCourantId(): number | null {
+  if (typeof window === "undefined") return null
+  const brut = window.localStorage.getItem(CLE_APPAREIL_COURANT)
+  const valeur = Number(brut)
+  return Number.isFinite(valeur) && valeur > 0 ? valeur : null
+}
+
+function retenirAppareilCourant(appareil: Appareil | null) {
+  if (typeof window === "undefined") return
+  if (appareil?.appareilId) {
+    window.localStorage.setItem(CLE_APPAREIL_COURANT, String(appareil.appareilId))
+  }
+}
+
 export async function enregistrerAppareilCourant(): Promise<Appareil | null> {
   try {
     const response = await apiRequest<SingleResponse>("/api/appareils", {
@@ -125,6 +152,7 @@ export async function enregistrerAppareilCourant(): Promise<Appareil | null> {
         isOnline: 1,
       },
     })
+    retenirAppareilCourant(response.appareil)
     return response.appareil
   } catch (error) {
     // Un echec ici ne doit jamais empecher l'utilisateur d'entrer dans l'app :
