@@ -277,7 +277,7 @@ export default function ChatsPage() {
 
         {/* Filtres */}
         <div className="filter-row">
-          {(["all", "unread", "groups", "blocked", "locked"] as const).map((f) => (
+          {(["all", "unread", "groups", "locked", "blocked"] as const).map((f) => (
             <button
               key={f}
               className={`filter-btn ${filter === f ? "active" : ""}`}
