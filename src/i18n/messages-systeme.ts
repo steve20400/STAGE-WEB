@@ -68,6 +68,20 @@ export function composerMessageSysteme(
       const nom = jeSuisLeBloqueur ? texte(charge.blockedName) : texte(charge.blockerName)
       return modele.replace("{name}", nom)
     }
+    case "member_added":
+      return t("system_member_added")
+        .replace("{target}", texte(charge.target))
+        .replace("{actor}", texte(charge.actor))
+
+    case "member_removed":
+      return t("system_member_removed")
+        .replace("{target}", texte(charge.target))
+        .replace("{actor}", texte(charge.actor))
+
+    case "member_left":
+      // Un depart volontaire ne nomme personne d'autre : pas d'auteur.
+      return t("system_member_left").replace("{target}", texte(charge.target))
+
     default:
       // Code inconnu — client plus ancien que le serveur. On n'invente pas de
       // phrase : on ne montre rien plutot qu'un JSON brut.

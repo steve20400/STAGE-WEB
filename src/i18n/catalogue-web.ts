@@ -80,12 +80,18 @@ export const WEB_TRANSLATION_KEYS = [
   "hide",
   "system_you_blocked",
   "system_you_were_blocked",
+  "system_member_added",
+  "system_member_removed",
+  "system_member_left",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    system_member_added: "{target} a été ajouté(e) par {actor}",
+    system_member_removed: "{target} a été retiré(e) du groupe par {actor}",
+    system_member_left: "{target} a quitté le groupe",
     system_you_blocked: "Vous avez bloqué {name}",
     system_you_were_blocked: "Vous avez été bloqué par {name}",
     login_pretitle: "Connexion",
@@ -157,6 +163,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    system_member_added: "{target} was added by {actor}",
+    system_member_removed: "{target} was removed from the group by {actor}",
+    system_member_left: "{target} left the group",
     system_you_blocked: "You blocked {name}",
     system_you_were_blocked: "You were blocked by {name}",
     login_pretitle: "Sign in",
@@ -227,6 +236,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    system_member_added: "{actor} añadió a {target}",
+    system_member_removed: "{actor} expulsó a {target} del grupo",
+    system_member_left: "{target} salió del grupo",
     system_you_blocked: "Has bloqueado a {name}",
     system_you_were_blocked: "{name} te ha bloqueado",
     login_pretitle: "Iniciar sesión",
@@ -297,6 +309,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    system_member_added: "{target} wurde von {actor} hinzugefügt",
+    system_member_removed: "{target} wurde von {actor} aus der Gruppe entfernt",
+    system_member_left: "{target} hat die Gruppe verlassen",
     system_you_blocked: "Du hast {name} blockiert",
     system_you_were_blocked: "Du wurdest von {name} blockiert",
     login_pretitle: "Anmelden",
@@ -368,6 +383,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    system_member_added: "{target} foi adicionado(a) por {actor}",
+    system_member_removed: "{target} foi removido(a) do grupo por {actor}",
+    system_member_left: "{target} saiu do grupo",
     system_you_blocked: "Você bloqueou {name}",
     system_you_were_blocked: "Você foi bloqueado por {name}",
     login_pretitle: "Iniciar sessão",
@@ -438,6 +456,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    system_member_added: "{actor} добавил(а) {target}",
+    system_member_removed: "{actor} удалил(а) {target} из группы",
+    system_member_left: "{target} покинул(а) группу",
     system_you_blocked: "Вы заблокировали {name}",
     system_you_were_blocked: "{name} заблокировал вас",
     login_pretitle: "Вход",
@@ -507,6 +528,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    system_member_added: "{actor} 添加了 {target}",
+    system_member_removed: "{actor} 将 {target} 移出群组",
+    system_member_left: "{target} 退出了群组",
     system_you_blocked: "您已屏蔽 {name}",
     system_you_were_blocked: "您已被 {name} 屏蔽",
     login_pretitle: "登录",
@@ -576,6 +600,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    system_member_added: "{target} lades till av {actor}",
+    system_member_removed: "{target} togs bort från gruppen av {actor}",
+    system_member_left: "{target} lämnade gruppen",
     system_you_blocked: "Du har blockerat {name}",
     system_you_were_blocked: "Du har blockerats av {name}",
     login_pretitle: "Logga in",
@@ -646,6 +673,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    system_member_added: "{target} ble lagt til av {actor}",
+    system_member_removed: "{target} ble fjernet fra gruppen av {actor}",
+    system_member_left: "{target} forlot gruppen",
     system_you_blocked: "Du har blokkert {name}",
     system_you_were_blocked: "Du er blokkert av {name}",
     login_pretitle: "Logg inn",
