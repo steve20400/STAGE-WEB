@@ -368,8 +368,12 @@ textarea.room-textarea::placeholder {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Clic sur une citation : le message d'origine s'illumine puis revient a son
@@ -425,12 +429,45 @@ textarea.room-textarea::placeholder {
       0 1px 1px rgba(0, 0, 0, 0.06) !important;
   }
 }
-.chat-info-drawer{position:absolute;top:0;right:0;bottom:0;width:min(420px,42vw);z-index:80;background:var(--bg-base);border-left:1px solid var(--border-subtle);box-shadow:-16px 0 36px #0003;overflow:auto;animation:infoSlide .22s ease-out}
-.chat-info-drawer .cip-page{min-height:100%!important}
-@keyframes infoSlide{from{transform:translateX(100%)}to{transform:translateX(0)}}
-@media(max-width:900px){.chat-info-drawer{display:none}}
+.chat-info-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 42vw);
+  z-index: 80;
+  background: var(--bg-base);
+  border-left: 1px solid var(--border-subtle);
+  box-shadow: -16px 0 36px #0003;
+  overflow: auto;
+  animation: infoSlide 0.22s ease-out;
+}
+.chat-info-drawer .cip-page {
+  min-height: 100% !important;
+}
+@keyframes infoSlide {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@media (max-width: 900px) {
+  .chat-info-drawer {
+    display: none;
+  }
+}
 
-@media (min-width:901px){.room-root.info-panel-open{padding-right:min(420px,42vw);transition:padding-right .22s ease}.room-root.info-panel-open .chat-info-drawer{right:0}}
+@media (min-width: 901px) {
+  .room-root.info-panel-open {
+    padding-right: min(420px, 42vw);
+    transition: padding-right 0.22s ease;
+  }
+  .room-root.info-panel-open .chat-info-drawer {
+    right: 0;
+  }
+}
 
 /* Galerie d'un lot de medias. Sur mobile on passe d'un fichier a l'autre au
    doigt ; un grand ecran n'a pas ce geste, d'ou les deux fleches. Elles restent
@@ -540,10 +577,12 @@ textarea.room-textarea::placeholder {
    sauter quand la main passe d'un appareil a l'autre. */
 .room-locked {
   display: flex;
-  align-items: center;
+  /* Deux lignes : le detenteur, puis ce qui est reserve. On aligne en haut
+     pour que l'icone reste au niveau de la premiere. */
+  align-items: flex-start;
   gap: 10px;
   min-height: 44px;
-  padding: 0 14px;
+  padding: 10px 14px;
   border-radius: 12px;
   background: var(--bg-muted);
   border: 1px dashed var(--border-default);
@@ -554,4 +593,12 @@ textarea.room-textarea::placeholder {
 .room-locked svg {
   flex-shrink: 0;
   color: var(--accent);
+  margin-top: 1px;
+}
+/* La precision passe apres le fait : plus petite, plus discrete. */
+.room-locked-detail {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-ghost);
 }

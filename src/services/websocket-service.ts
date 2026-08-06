@@ -217,6 +217,19 @@ function connect() {
       }
     }, READY_WATCHDOG_MS)
 
+    /**
+     * Annonce de l'appareil, avant tout le reste.
+     *
+     * Le serveur doit savoir quelle socket appartient a quel poste : c'est ce
+     * qui lui permet de ne faire sonner que le detenteur d'une conversation
+     * reservee. Envoye a chaque (re)connexion, puisqu'une socket neuve ne
+     * porte encore aucune identite.
+     */
+    const monAppareil = appareilCourantId()
+    if (monAppareil !== null) {
+      ws.send(JSON.stringify({ type: "device", appareilId: monAppareil }))
+    }
+
     while (pendingSends.length) {
       const data = pendingSends.shift()
       if (data) ws.send(data)

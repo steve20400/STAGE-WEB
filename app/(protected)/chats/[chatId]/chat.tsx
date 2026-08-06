@@ -4992,52 +4992,64 @@ export default function ChatRoomPage() {
         </div>
 
         <div className="room-actions">
-          {/* Appel audio */}
-          <button
-            className="action-btn"
-            aria-label="Appel audio"
-            title="Appel audio"
-            onClick={() => startCallFromChat("audio")}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            >
-              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-            </svg>
-          </button>
-          {/* Appel video */}
-          <button
-            className="action-btn"
-            aria-label="Appel video"
-            title="Appel video"
-            onClick={() => startCallFromChat("video")}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            >
-              <polygon points="23 7 16 12 23 17 23 7" />
-              <rect x="1" y="5" width="15" height="14" rx="2" />
-            </svg>
-          </button>
+          {/* Appels. Retires — pas seulement desactives — quand un AUTRE
+              appareil du compte a reserve la conversation : la reservation
+              couvre toute la relation avec ce correspondant, pas seulement
+              l'ecriture. Le serveur ne fait de toute facon pas sonner ce poste
+              et refuserait l'appel sortant ; un bouton visible ne ferait que
+              promettre une action impossible. */}
+          {!verrou.parUnAutre && (
+            <>
+              {/* Appel audio */}
+              <button
+                className="action-btn"
+                aria-label="Appel audio"
+                title="Appel audio"
+                onClick={() => startCallFromChat("audio")}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                >
+                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                </svg>
+              </button>
+              {/* Appel video */}
+              <button
+                className="action-btn"
+                aria-label="Appel video"
+                title="Appel video"
+                onClick={() => startCallFromChat("video")}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                >
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" />
+                </svg>
+              </button>
+            </>
+          )}
           {/* Verrou de conversation. Absent — pas seulement desactive — quand un
               AUTRE appareil du compte a la main : il n'y a rien a reprendre, et
               un bouton grise inviterait a essayer.
 
-              Il ne gouverne QUE l'ecriture. Les boutons d'appel ci-dessus
-              restent volontairement hors de cette condition : un appareil qui
-              n'a pas la main peut toujours appeler. */}
+              La reservation couvre TOUTE la relation avec ce correspondant :
+              les boutons d'appel disparaissent aussi (voir plus haut), et le
+              serveur ne fait meme pas sonner ce poste. Il suit le fil en
+              lecture, et retrouve tous ses droits quand le detenteur rend la
+              main. */}
           {!verrou.parUnAutre && (
             <button
               className={`action-btn${verrou.parMoi ? " action-btn-on" : ""}`}
@@ -5274,6 +5286,13 @@ export default function ChatRoomPage() {
               {verrou.detenteur
                 ? `${verrou.detenteur} a la main sur cette conversation.`
                 : "Un autre appareil de ce compte a la main sur cette conversation."}
+              {/* On dit ce qui est reserve, pas seulement qu'il l'est : sans
+                  cette precision, on chercherait pourquoi les boutons d'appel
+                  ont disparu. */}
+              <span className="room-locked-detail">
+                Vous suivez le fil en direct. Ecriture et appels reprendront des qu'il rendra la
+                main.
+              </span>
             </span>
           </div>
         </div>
