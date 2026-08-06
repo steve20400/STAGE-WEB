@@ -1275,8 +1275,6 @@ export default function SettingsPage() {
     if (!security.currentPwd) return toastError("Mot de passe actuel requis")
     if (security.newPwd.length < 8)
       return toastError("Mot de passe trop court", "Le backend exige au moins 8 caracteres.")
-    if (pwdStrength.score < 2)
-      return toastError("Mot de passe trop faible", "Choisissez un mot de passe plus securise.")
     if (security.newPwd !== security.confirmPwd)
       return toastError("Les mots de passe ne correspondent pas")
     if (security.newPwd === security.currentPwd)
@@ -1992,7 +1990,8 @@ export default function SettingsPage() {
                     !security.currentPwd ||
                     !security.newPwd ||
                     security.newPwd !== security.confirmPwd ||
-                    pwdStrength.score < 2
+                    security.newPwd.length < 8 ||
+                    security.newPwd === security.currentPwd
                   }
                   style={{
                     background: "var(--accent)",
@@ -2012,7 +2011,8 @@ export default function SettingsPage() {
                       !security.currentPwd ||
                       !security.newPwd ||
                       security.newPwd !== security.confirmPwd ||
-                      pwdStrength.score < 2
+                      security.newPwd.length < 8 ||
+                      security.newPwd === security.currentPwd
                         ? 0.4
                         : 1,
                     transition: "opacity .15s",
