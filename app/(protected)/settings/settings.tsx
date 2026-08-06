@@ -53,7 +53,11 @@ import {
   setDefaultAudioOutput,
   type AudioOutputMode,
 } from "../../../src/services/audio-output"
-import { changePasswordApi, updateProfileApi } from "../../../src/services/auth-api"
+import {
+  changePasswordApi,
+  demanderReinitialisation,
+  updateProfileApi,
+} from "../../../src/services/auth-api"
 import {
   type Appareil,
   TYPE_DEVICE,
@@ -623,6 +627,7 @@ function Field({
   helper,
   error,
   disabled,
+  autoComplete,
 }: {
   label: string
   value: string
@@ -633,6 +638,8 @@ function Field({
   helper?: string
   error?: string
   disabled?: boolean
+  /** Sert surtout a dire au navigateur de NE PAS remplir un champ. */
+  autoComplete?: string
 }) {
   const [focused, setFocused] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
@@ -668,6 +675,7 @@ function Field({
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
           placeholder={placeholder}
+          autoComplete={autoComplete}
           maxLength={maxLength}
           disabled={disabled}
           onFocus={() => setFocused(true)}
@@ -1185,6 +1193,32 @@ export default function SettingsPage() {
     }
   }
 
+  /**
+   * Envoi d'un code de reinitialisation a l'adresse du compte.
+   *
+   * Le serveur repond toujours un succes, meme pour une adresse inconnue — on
+   * ne peut donc pas promettre que le mail est parti, seulement que la demande
+   * a ete prise. Le message le dit dans ces termes.
+   */
+  const [reinitEnvoi, setReinitEnvoi] = useState(false)
+  const envoyerReinitialisation = async () => {
+    const email = user?.email?.trim()
+    if (!email) {
+      toastError("Aucune adresse email", "Ajoutez une adresse a votre profil d'abord.")
+      return
+    }
+    if (reinitEnvoi) return
+    setReinitEnvoi(true)
+    try {
+      await demanderReinitialisation(email)
+      success("Code envoye", `Consultez ${email} pour reinitialiser votre mot de passe.`)
+    } catch (err) {
+      toastError("Envoi impossible", err instanceof Error ? err.message : undefined)
+    } finally {
+      setReinitEnvoi(false)
+    }
+  }
+
   /** Personnes bloquees, chargees a l'ouverture des parametres. */
   const [bloques, setBloques] = useState<PersonneBloquee[]>([])
   useEffect(() => {
@@ -1494,6 +1528,27 @@ export default function SettingsPage() {
           color: var(--text-primary); margin-bottom: 6px;
         }
         .s-page-sub { font-size: 13px; color: var(--text-faint); margin-bottom: 32px; line-height: 1.6; }
+
+        /* Sortie de secours sous le champ « mot de passe actuel ». Discrete et
+           courte : c'est un recours, pas l'action principale de la carte. Alignee
+           a droite, la ou l'oeil arrive apres avoir laisse le champ vide, et de
+           la largeur de son texte — pleine largeur, elle concurrencerait le
+           bouton de validation juste en dessous. */
+        .pwd-oubli-rangee {
+          display: flex; justify-content: flex-end; margin: -12px 0 18px;
+        }
+        .pwd-oubli {
+          padding: 7px 12px; border-radius: 8px;
+          border: 1px solid transparent; background: none;
+          color: var(--accent); font-family: 'DM Sans', sans-serif;
+          font-size: 12px; font-weight: 600; cursor: pointer;
+          transition: background .15s, border-color .15s;
+        }
+        .pwd-oubli:hover:not(:disabled) {
+          background: var(--accent-dim); border-color: var(--accent-border);
+        }
+        .pwd-oubli:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .pwd-oubli:disabled { opacity: .55; cursor: default; }
 
 
         .s-card {
@@ -1936,13 +1991,30 @@ export default function SettingsPage() {
 
               <div className="s-card">
                 <div className="s-card-title">Changer le mot de passe</div>
+                {/* Champ vide, sans placeholder d'asterisques : une suite
+                    d'etoiles ressemble a un mot de passe deja saisi, et on
+                    cherche a l'effacer avant de comprendre qu'il n'y a rien.
+                    `autoComplete="off"` empeche en plus le navigateur de le
+                    pre-remplir, ce qui produisait la meme confusion. */}
                 <Field
                   label="Mot de passe actuel"
                   value={security.currentPwd}
                   onChange={(v) => setSecurity((p) => ({ ...p, currentPwd: v }))}
                   type="password"
-                  placeholder="********"
+                  autoComplete="off"
                 />
+                {/* Sortie de secours : sans elle, quelqu'un qui a oublie son mot
+                    de passe actuel ne peut plus rien faire depuis cet ecran. */}
+                <div className="pwd-oubli-rangee">
+                  <button
+                    type="button"
+                    className="pwd-oubli"
+                    onClick={() => void envoyerReinitialisation()}
+                    disabled={reinitEnvoi}
+                  >
+                    {reinitEnvoi ? "Envoi..." : "Mot de passe oublie ?"}
+                  </button>
+                </div>
                 <Field
                   label="Nouveau mot de passe"
                   value={security.newPwd}

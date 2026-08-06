@@ -121,6 +121,20 @@ export async function loginWithPassword(payload: LoginPayload) {
 }
 
 /** GET /api/me — restaure la session au chargement de l'app. */
+/**
+ * POST /api/auth/forgot-password — envoie un code de reinitialisation par mail.
+ *
+ * Le serveur repond toujours un succes, meme si l'adresse est inconnue : c'est
+ * volontaire, cela empeche de deviner quels comptes existent. On ne peut donc
+ * pas promettre que le mail est parti, seulement que la demande a ete prise.
+ */
+export async function demanderReinitialisation(email: string): Promise<void> {
+  await apiRequest<{ message?: string }>("/api/auth/forgot-password", {
+    method: "POST",
+    body: { email },
+  })
+}
+
 export async function restoreAuthenticatedUser() {
   const existing = loadSessionUser()
   if (!existing) return null
