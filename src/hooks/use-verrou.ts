@@ -6,6 +6,7 @@ import {
   type EtatVerrou,
 } from "../services/websocket-service"
 import { loadSessionUser } from "../data/session-user"
+import { pseudoEnCache } from "../services/pseudo-appareil-service"
 
 /**
  * Verrou d'une conversation, du point de vue de CET appareil.
@@ -81,7 +82,7 @@ export function useVerrou(convId: string | undefined, initial?: VerrouConversati
     // On ne reprend jamais la main a un autre appareil : le bouton n'existe
     // meme pas chez lui, et le serveur refuserait de toute facon.
     if (verrou.parUnAutre) return
-    envoyerVerrou(convId, !verrou.parMoi, appareilCourantId(), loadSessionUser()?.name ?? null)
+    envoyerVerrou(convId, !verrou.parMoi, appareilCourantId(), pseudoEnCache() ?? loadSessionUser()?.name ?? null)
   }, [convId, verrou.parMoi, verrou.parUnAutre])
 
   return { verrou, basculer }
