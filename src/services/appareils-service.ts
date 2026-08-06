@@ -24,6 +24,8 @@ export interface Appareil {
   isOnline: boolean
   typeDevice: number
   system: string | null
+  /** Pseudo donne a cet appareil pour ce compte. Null tant qu'il n'en a pas. */
+  nomAgent: string | null
   createAt: string
   lastLogin: string | null
   /** Deconnecte a distance. La ligne survit pour garder l'historique. */

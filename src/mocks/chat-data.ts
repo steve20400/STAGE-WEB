@@ -47,6 +47,14 @@ export interface ChatMessageMock {
   content: string
   type: MessageType
   status: MessageStatus
+  /**
+   * Pseudo de l'appareil qui a envoye le message.
+   *
+   * Present UNIQUEMENT si le lecteur appartient au meme compte que
+   * l'expediteur : le serveur ne met pas ce champ dans la charge des autres
+   * comptes. Le client n'a donc rien a filtrer, il affiche ce qu'il recoit.
+   */
+  nomAgent?: string | null
   timestamp: Date
   fileName?: string
   fileSize?: string

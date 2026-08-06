@@ -2,6 +2,7 @@ import { WS_URL } from "../config/runtime"
 import { loadSessionToken } from "../data/session-auth"
 import { tryRefreshTokens } from "../lib/api-client"
 import { ringtoneUrl } from "./ringtones"
+import { appareilCourantId } from "./appareils-service"
 
 /**
  * Client WebSocket pour le serveur temps reel d'Alanya (ws-server.mjs) :
@@ -683,7 +684,19 @@ export function sendMessageOverSocket(
     }, SEND_ACK_TIMEOUT_MS)
 
     pendingAcks.set(tempId, { resolve, reject, timer })
-    sendRaw({ type: "send", convId: conversationId, content, msgType, tempId, mediaId, replyToId })
+    // L'appareil emetteur voyage avec le message : il etiquette la bulle du
+    // pseudo de cet appareil, visible seulement par les autres appareils du
+    // meme compte. Le serveur verifie l'appartenance, on ne fait que declarer.
+    sendRaw({
+      type: "send",
+      convId: conversationId,
+      content,
+      msgType,
+      tempId,
+      mediaId,
+      replyToId,
+      appareilId: appareilCourantId(),
+    })
   })
 }
 

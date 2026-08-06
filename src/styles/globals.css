@@ -504,3 +504,88 @@ body {
     transform: scale(1);
   }
 }
+
+/* ============================================================
+   Pseudo d'appareil — demande a la premiere connexion d'un compte
+   ============================================================ */
+.pseudo-gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9800;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.pseudo-gate {
+  width: 100%;
+  max-width: 380px;
+  padding: 26px;
+  border-radius: 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 24px 60px #0009;
+}
+
+.pseudo-gate-titre {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+.pseudo-gate-sous {
+  margin: 8px 0 18px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.pseudo-gate-champ {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+}
+.pseudo-gate-champ:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.pseudo-gate-erreur {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+.pseudo-gate-valider {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pseudo-gate-valider:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pseudo-gate-note {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-ghost);
+}

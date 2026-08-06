@@ -104,6 +104,9 @@ export function toFrontMessage(
     content: m.content ?? "",
     type: media?.mimeType?.startsWith("video/") ? "video" : mapType(m.type),
     status: mapStatus(m.status),
+    // Le serveur ne met ce champ que dans la charge des appareils du compte
+    // emetteur : le recevoir suffit a avoir le droit de l'afficher.
+    nomAgent: (m as { nomAgent?: string | null }).nomAgent ?? null,
     timestamp: m.createdAt ? new Date(m.createdAt) : new Date(),
     replyTo: m.replyToId ?? undefined,
     replySnapshot: m.replyTo

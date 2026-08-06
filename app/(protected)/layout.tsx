@@ -3,9 +3,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../src/components/auth-provider"
 import { ThemeToggle } from "../../src/components/theme-toggle"
 import { ActiveCallFloating } from "../../src/components/active-call-floating"
+import { PseudoAppareilGate } from "../../src/components/pseudo-appareil-gate"
 import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
-import { acceptIncomingCall, dismissIncomingCallLocally, rejectIncomingCall } from "../../src/services/call-manager"
+import {
+  acceptIncomingCall,
+  dismissIncomingCallLocally,
+  rejectIncomingCall,
+} from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
 import { avatarDisplaySrc } from "../../src/lib/avatar"
 import { useDrawerSwipe } from "../../src/hooks/use-drawer-swipe"
@@ -431,6 +436,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Overlay global d'appel entrant (WebSocket incoming_call) */}
+      {/* Pseudo d'appareil : demande une fois par compte, ici plutot que dans
+          l'ecran de connexion — l'inscription enchaine directement sur la
+          session, et la demande y serait sautee. */}
+      <PseudoAppareilGate />
       <ActiveCallFloating />
       <GlobalIncomingCall />
     </div>

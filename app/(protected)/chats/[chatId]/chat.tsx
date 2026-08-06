@@ -3308,6 +3308,30 @@ function MessageBubble({
           )}
 
           <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            {/* Pseudo de l'appareil emetteur.
+                Le serveur ne le met dans la charge que pour les appareils du
+                MEME compte : le recevoir suffit a avoir le droit de l'afficher,
+                il n'y a rien a filtrer ici. En tete-a-tete c'est la seule ligne
+                au-dessus de la bulle ; en groupe elle vient en complement du
+                nom complet, deja affiche pour tout le monde. */}
+            {msg.nomAgent && !msg.isDeleted && (
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: 0.2,
+                  color: "var(--text-ghost)",
+                  padding: "2px 4px 0",
+                  textAlign: isMe ? "right" : "left",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={`Envoye depuis ${msg.nomAgent}`}
+              >
+                {msg.nomAgent}
+              </div>
+            )}
             {/* Nom de l'envoyeur en groupe (pas pour soi-meme) */}
             {isGroup && !isMe && senderName && !msg.isDeleted && (
               <div

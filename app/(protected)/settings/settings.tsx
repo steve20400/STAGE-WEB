@@ -14,6 +14,11 @@ import {
   type PersonneBloquee,
 } from "../../../src/services/blocked-service"
 import {
+  enregistrerPseudo,
+  lirePseudoServeur,
+  pseudoEnCache,
+} from "../../../src/services/pseudo-appareil-service"
+import {
   LANGUAGE_CODES,
   LANGUAGE_NAMES,
   libelleLangue,
@@ -994,7 +999,14 @@ function versSession(a: Appareil): SessionAffichee {
     appareilId: a.appareilId,
     cookiesWebId: a.cookiesWebId,
     device: a.libelle,
-    location: a.system ?? "",
+    /**
+     * Systeme, complete du pseudo de l'appareil quand il est renseigne :
+     * « Windows 11 (Poste accueil) ». Sans lui, deux appareils du meme systeme
+     * sont impossibles a distinguer dans cette liste.
+     *
+     * Rien n'est ajoute quand le pseudo est absent — pas de parentheses vides.
+     */
+    location: a.nomAgent ? `${a.system ?? ""} (${a.nomAgent})`.trim() : (a.system ?? ""),
     current: estAppareilCourant(a),
     ts: derniereActivite(a.lastLogin),
     isMobile: a.typeDevice === TYPE_DEVICE.android || a.typeDevice === TYPE_DEVICE.ios,
@@ -1142,6 +1154,36 @@ export default function SettingsPage() {
   // pilote toute l'interface, pas seulement cet ecran.
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium")
   const { language, setLanguage, t } = useTranslation()
+
+  /**
+   * Pseudo de CET appareil pour ce compte, modifiable ici.
+   *
+   * Il est demande une fois a la connexion ; les parametres sont l'endroit ou
+   * on le change ensuite — un poste qui change de titulaire, une faute de
+   * frappe a corriger.
+   */
+  const [pseudoAppareil, setPseudoAppareil] = useState<string>(pseudoEnCache() ?? "")
+  const [pseudoEnregistre, setPseudoEnregistre] = useState(false)
+  useEffect(() => {
+    void lirePseudoServeur().then((valeur) => {
+      if (valeur) setPseudoAppareil(valeur)
+    })
+  }, [])
+
+  const sauverPseudo = async () => {
+    const propre = pseudoAppareil.trim()
+    if (!propre || pseudoEnregistre) return
+    setPseudoEnregistre(true)
+    try {
+      const enregistre = await enregistrerPseudo(propre)
+      setPseudoAppareil(enregistre)
+      success("Nom de l'appareil enregistre", enregistre)
+    } catch (err) {
+      toastError("Enregistrement impossible", err instanceof Error ? err.message : undefined)
+    } finally {
+      setPseudoEnregistre(false)
+    }
+  }
 
   /** Personnes bloquees, chargees a l'ouverture des parametres. */
   const [bloques, setBloques] = useState<PersonneBloquee[]>([])
@@ -1978,6 +2020,60 @@ export default function SettingsPage() {
                 >
                   {saving ? "Modification..." : "Modifier le mot de passe"}
                 </button>
+              </div>
+
+              {/* Pseudo de cet appareil. Place juste avant la liste des
+                  sessions : c'est la qu'on lit « Windows 11 (Poste accueil) »,
+                  donc la qu'on comprend a quoi sert ce champ. */}
+              <div className="s-card">
+                <div className="s-card-title">Nom de cet appareil</div>
+                <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+                  Affiche au-dessus des messages envoyes depuis cet appareil, et uniquement pour les
+                  autres appareils de ce compte. Vos correspondants ne le voient jamais.
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    value={pseudoAppareil}
+                    maxLength={50}
+                    onChange={(e) => setPseudoAppareil(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void sauverPseudo()
+                    }}
+                    placeholder="Poste accueil, Bureau d'Awa..."
+                    aria-label="Nom de cet appareil"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border-subtle)",
+                      borderRadius: 10,
+                      padding: "12px 14px",
+                      fontSize: 13,
+                      color: "var(--text-primary)",
+                      fontFamily: "'DM Sans', sans-serif",
+                      outline: "none",
+                    }}
+                  />
+                  <button
+                    onClick={() => void sauverPseudo()}
+                    disabled={!pseudoAppareil.trim() || pseudoEnregistre}
+                    style={{
+                      flexShrink: 0,
+                      padding: "0 18px",
+                      borderRadius: 10,
+                      border: "none",
+                      background: "var(--accent)",
+                      color: "var(--accent-text)",
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: pseudoAppareil.trim() ? "pointer" : "default",
+                      opacity: pseudoAppareil.trim() && !pseudoEnregistre ? 1 : 0.5,
+                    }}
+                  >
+                    {pseudoEnregistre ? "..." : "Enregistrer"}
+                  </button>
+                </div>
               </div>
 
               <div className="s-card">
