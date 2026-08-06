@@ -5033,7 +5033,11 @@ export default function ChatRoomPage() {
           </button>
           {/* Verrou de conversation. Absent — pas seulement desactive — quand un
               AUTRE appareil du compte a la main : il n'y a rien a reprendre, et
-              un bouton grise inviterait a essayer. */}
+              un bouton grise inviterait a essayer.
+
+              Il ne gouverne QUE l'ecriture. Les boutons d'appel ci-dessus
+              restent volontairement hors de cette condition : un appareil qui
+              n'a pas la main peut toujours appeler. */}
           {!verrou.parUnAutre && (
             <button
               className={`action-btn${verrou.parMoi ? " action-btn-on" : ""}`}

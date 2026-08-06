@@ -123,6 +123,15 @@ export async function fetchChatConversations(): Promise<ConversationMock[]> {
         members: c.members,
         lastMessage: c.lastMessage,
         unread: c.unread,
+        // Le verrou voyage avec la conversation qui le porte : au prochain
+        // demarrage, la liste affiche la reservation immediatement, sans
+        // attendre le reseau. Sans cette ligne le cache la perdait, et une
+        // conversation reservee paraissait libre une fraction de seconde.
+        //
+        // Pas de magasin IndexedDB dedie : le verrou n'a pas de vie propre, il
+        // est un attribut de la conversation. Un second magasin serait une
+        // deuxieme source de verite a garder d'accord avec la premiere.
+        lock: c.lock ?? null,
         updatedAt: c.updatedAt ? new Date(c.updatedAt).getTime() : Date.now(),
       }))
     )
