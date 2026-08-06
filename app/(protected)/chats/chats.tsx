@@ -15,6 +15,7 @@ import { getMyUserId, toInitials } from "../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
 import { listerBlocages } from "../../../src/services/blocked-service"
+import { useTranslation } from "../../../src/i18n"
 import "./chats-page.css"
 
 function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
@@ -25,6 +26,7 @@ function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
 }
 
 export default function ChatsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user: sessionUser } = useAuth()
   const [query, setQuery] = useState("")
@@ -232,7 +234,7 @@ export default function ChatsPage() {
         </div>
 
         <div className="ch-title-row page-title-row">
-          <h1 className="ch-title">Discussions</h1>
+          <h1 className="ch-title">{t("chats")}</h1>
           <button className="new-chat-btn" onClick={() => navigate("/chats/new")}>
             <svg
               width="14"
@@ -246,7 +248,7 @@ export default function ChatsPage() {
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Nouveau chat
+            {t("new_chat")}
           </button>
         </div>
 
@@ -268,7 +270,7 @@ export default function ChatsPage() {
           <input
             className="search-input"
             type="search"
-            placeholder="Rechercher une conversation..."
+            placeholder={t("search_conversation")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
@@ -284,14 +286,14 @@ export default function ChatsPage() {
               onClick={() => setFilter(f)}
             >
               {f === "all"
-                ? "Tous"
+                ? t("filter_all")
                 : f === "unread"
-                  ? `Non lus (${conversations.reduce((a, c) => a + (c.unread > 0 ? 1 : 0), 0)})`
+                  ? `${t("filter_unread")} (${conversations.reduce((a, c) => a + (c.unread > 0 ? 1 : 0), 0)})`
                   : f === "groups"
-                    ? "Groupes"
+                    ? t("filter_groups")
                     : f === "blocked"
-                      ? `Bloques (${conversations.filter(estConversationBloquee).length})`
-                      : `Reservees (${conversations.filter((c) => c.lock != null).length})`}
+                      ? `${t("filter_blocked")} (${conversations.filter(estConversationBloquee).length})`
+                      : `${t("filter_locked")} (${conversations.filter((c) => c.lock != null).length})`}
             </button>
           ))}
         </div>
@@ -303,16 +305,16 @@ export default function ChatsPage() {
           <div className="empty">
             <div className="empty-icon">...</div>
             <div className="empty-txt">
-              Aucune conversation trouvee
+              {t("no_conversation_found")}
               <br />
-              pour "{query}"
+              {`"${query}"`}
             </div>
           </div>
         ) : (
           <>
             {pinned.length > 0 && (
               <>
-                <div className="section-label">Epinglees</div>
+                <div className="section-label">{t("section_pinned")}</div>
                 {pinned.map((conv) => (
                   <ConvItem key={conv.id} conv={conv} />
                 ))}
@@ -320,7 +322,7 @@ export default function ChatsPage() {
             )}
             {regular.length > 0 && (
               <>
-                {pinned.length > 0 && <div className="section-label">Recents</div>}
+                {pinned.length > 0 && <div className="section-label">{t("section_recent")}</div>}
                 {regular.map((conv) => (
                   <ConvItem key={conv.id} conv={conv} />
                 ))}
@@ -335,8 +337,8 @@ export default function ChatsPage() {
       <button
         className="chats-fab"
         onClick={() => navigate("/contacts")}
-        aria-label="Ouvrir les contacts"
-        title="Contacts"
+        aria-label={t("open_contacts")}
+        title={t("contacts")}
         style={{
           position: "absolute",
           right: 20,
@@ -372,6 +374,7 @@ export default function ChatsPage() {
 }
 
 function ConvItem({ conv }: { conv: ConversationMock }) {
+  const { t } = useTranslation()
   const color = CHAT_COLORS[conv.colorIdx % CHAT_COLORS.length]
   return (
     <NavLink
@@ -416,9 +419,7 @@ function ConvItem({ conv }: { conv: ConversationMock }) {
             <span
               className="conv-lock"
               title={
-                conv.lock.detenteur
-                  ? `${conv.lock.detenteur} a la main`
-                  : "Reservee par un appareil de ce compte"
+                conv.lock.detenteur ? `${conv.lock.detenteur} a la main` : t("locked_by_device")
               }
             >
               <svg

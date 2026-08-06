@@ -319,7 +319,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
       {/* Profil + deconnexion */}
       <div className="sb-footer">
         <div className="sb-theme-row">
-          <span className="sb-theme-label">Theme</span>
+          <span className="sb-theme-label">{t("theme")}</span>
           <ThemeToggle />
         </div>
         <div className="sb-profile" onClick={() => navigate("/settings")}>

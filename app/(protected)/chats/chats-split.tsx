@@ -1,3 +1,4 @@
+import { useTranslation } from "../../../src/i18n"
 import { Outlet, useMatch } from "react-router-dom"
 import ChatsPage from "./chats"
 import "./chats-split.css"
@@ -26,6 +27,7 @@ export default function ChatsSplit() {
 
 /** Etat vide affiche a droite tant qu'aucune conversation n'est ouverte. */
 export function ChatEmptyState() {
+  const { t } = useTranslation()
   return (
     <div className="chats-empty">
       <div className="chats-empty-badge">
@@ -43,9 +45,7 @@ export function ChatEmptyState() {
         </svg>
       </div>
       <div className="chats-empty-title">Alanya Web</div>
-      <div className="chats-empty-sub">
-        Selectionnez une conversation a gauche pour commencer a discuter.
-      </div>
+      <div className="chats-empty-sub">{t("select_conversation")}</div>
     </div>
   )
 }
