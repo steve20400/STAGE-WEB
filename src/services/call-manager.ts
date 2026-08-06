@@ -23,7 +23,10 @@ import {
  * Gestion des appels WebRTC — miroir du CallController de l'app mobile Flutter
  * pour rester interoperable :
  * - mesh : une RTCPeerConnection par participant distant ;
- * - offreur = celui dont l'UUID est lexicographiquement inferieur ;
+ * - offreur = celui qui est DEJA dans l'appel, envers celui qui arrive. Regle
+ *   positionnelle, et non plus comparaison d'UUID : le mobile a change, et une
+ *   divergence entre les deux clients laissait les appels Web -> Android sans
+ *   offreur du tout ;
  * - signaux { kind: "offer" | "answer" | "ice" } relayes via le WebSocket ;
  * - etats via call_state ("joined", "left", "rejected", "ended", "declined").
  */
@@ -391,10 +394,9 @@ function myDisplayName(): string {
   return loadSessionUser()?.name ?? "Utilisateur Alanya"
 }
 
-/** Regle d'offreur identique au mobile : le plus petit UUID cree l'offre. */
-function shouldOffer(myId: string, peerId: string): boolean {
-  return myId < peerId
-}
+// La regle d'offreur n'est plus une comparaison d'UUID : elle est POSITIONNELLE
+// et vit desormais dans le parametre `asOfferer` de `connectToPeer`. Voir le
+// commentaire de cette fonction.
 
 function ensureEventSubscription() {
   if (eventsUnsubscribe) return
@@ -446,7 +448,22 @@ async function loadIceServers(): Promise<RTCIceServer[]> {
   return iceServersCache
 }
 
-async function connectToPeer(peerId: string) {
+/**
+ * Ouvre la connexion WebRTC avec un pair.
+ *
+ * `asOfferer` : celui qui est DEJA dans l'appel emet l'offre a celui qui
+ * arrive. Cette regle est POSITIONNELLE, et elle a remplace cote mobile la
+ * comparaison d'UUID (`myId < peerId`) qui vivait ici aussi.
+ *
+ * ⚠️ C'est la desynchronisation entre les deux clients qui a casse les appels
+ * Web -> Android : le web, reste sur la comparaison d'UUID, ne s'estimait pas
+ * offreur, et le mobile ne l'etait pas non plus puisqu'il venait d'arriver.
+ * Personne n'emettait d'offre. Le web voyait bien l'acceptation et lancait son
+ * compteur, le mobile restait sur « connexion en cours » — les deux attendaient
+ * l'autre. Deterministe par paire, l'ancienne regle dependant d'une
+ * comparaison stable : d'ou « ca ne passe jamais dans ce sens ».
+ */
+async function connectToPeer(peerId: string, asOfferer: boolean) {
   const me = myUserId()
   const callId = state.activeCallId
   if (!me || !callId || peerId === me || peers.has(peerId)) return
@@ -466,7 +483,7 @@ async function connectToPeer(peerId: string) {
   const session = new PeerSession(
     peerId,
     isVideo,
-    shouldOffer(me, peerId),
+    asOfferer,
     stream,
     iceServers,
     (signal) => sendCallSignal(callId, peerId, signal),
@@ -555,7 +572,8 @@ async function onPeerJoined(userId: string, displayName: string | null) {
     clearTimeout(ringTimeoutId)
     ringTimeoutId = null
   }
-  await connectToPeer(userId)
+  // Nous sommes deja dans l appel, ce pair vient d arriver : nous offrons.
+  await connectToPeer(userId, true)
   if (state.activeCallId) await flushBufferedSignals(state.activeCallId)
 }
 
@@ -857,7 +875,8 @@ export async function acceptIncomingCall(): Promise<string | null> {
 
   for (const participant of result.activeParticipants ?? []) {
     if (participant.userId !== me) {
-      await connectToPeer(participant.userId)
+      // Nous venons d accepter : les autres sont deja la, ils offriront.
+      await connectToPeer(participant.userId, false)
     }
   }
   await flushBufferedSignals(incoming.callId)
