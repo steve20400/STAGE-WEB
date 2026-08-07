@@ -55,6 +55,12 @@ export interface ChatMessageMock {
    * comptes. Le client n'a donc rien a filtrer, il affiche ce qu'il recoit.
    */
   nomAgent?: string | null
+  /**
+   * Appareil qui a envoye le message. Present seulement avec `nomAgent`, donc
+   * uniquement pour les appareils du compte emetteur. Sert a se reconnaitre :
+   * un poste n'affiche pas son propre nom au-dessus de ses propres messages.
+   */
+  appareilId?: number | null
   timestamp: Date
   fileName?: string
   fileSize?: string

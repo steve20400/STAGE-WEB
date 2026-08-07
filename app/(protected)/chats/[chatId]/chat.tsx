@@ -49,6 +49,7 @@ import {
 import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
 import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media-thumbnail"
 import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
+import { appareilCourantId } from "../../../../src/services/appareils-service"
 import { composerMessageSysteme } from "../../../../src/i18n/messages-systeme"
 import { lireVerrou, useVerrou } from "../../../../src/hooks/use-verrou"
 import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
@@ -3317,7 +3318,11 @@ function MessageBubble({
                 il n'y a rien a filtrer ici. En tete-a-tete c'est la seule ligne
                 au-dessus de la bulle ; en groupe elle vient en complement du
                 nom complet, deja affiche pour tout le monde. */}
-            {msg.nomAgent && !msg.isDeleted && (
+            {/* Le pseudo ne s'affiche PAS sur cet appareil pour ses propres
+                messages : il sait deja qui il est. Il sert aux AUTRES appareils
+                du compte, pour savoir qui dans l'equipe a repondu. Les autres
+                comptes ne recoivent meme pas le champ. */}
+            {msg.nomAgent && msg.appareilId !== appareilCourantId() && !msg.isDeleted && (
               <div
                 style={{
                   fontSize: 10,
