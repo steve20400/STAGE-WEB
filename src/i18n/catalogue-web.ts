@@ -316,12 +316,18 @@ export const WEB_TRANSLATION_KEYS = [
   "more",
   "call_ended_title",
   "call_duration",
+  "unread_below",
+  "go_to_unread",
+  "go_to_latest",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    unread_below: "Messages non lus",
+    go_to_unread: "Aller au premier message non lu",
+    go_to_latest: "Aller au dernier message",
     hang_up_confirm: "Raccrocher ?",
     call_will_end: "L'appel avec {name} sera termine.",
     current_duration: "Duree actuelle",
@@ -641,6 +647,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    unread_below: "Unread messages",
+    go_to_unread: "Go to the first unread message",
+    go_to_latest: "Go to the latest message",
     hang_up_confirm: "Hang up?",
     call_will_end: "The call with {name} will end.",
     current_duration: "Current duration",
@@ -958,6 +967,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    unread_below: "Mensajes no leídos",
+    go_to_unread: "Ir al primer mensaje no leído",
+    go_to_latest: "Ir al último mensaje",
     hang_up_confirm: "¿Colgar?",
     call_will_end: "La llamada con {name} terminará.",
     current_duration: "Duración actual",
@@ -1275,6 +1287,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    unread_below: "Ungelesene Nachrichten",
+    go_to_unread: "Zur ersten ungelesenen Nachricht",
+    go_to_latest: "Zur neuesten Nachricht",
     hang_up_confirm: "Auflegen?",
     call_will_end: "Der Anruf mit {name} wird beendet.",
     current_duration: "Aktuelle Dauer",
@@ -1596,6 +1611,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    unread_below: "Mensagens não lidas",
+    go_to_unread: "Ir para a primeira mensagem não lida",
+    go_to_latest: "Ir para a última mensagem",
     hang_up_confirm: "Desligar?",
     call_will_end: "A chamada com {name} vai terminar.",
     current_duration: "Duração atual",
@@ -1914,6 +1932,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    unread_below: "Непрочитанные сообщения",
+    go_to_unread: "Перейти к первому непрочитанному сообщению",
+    go_to_latest: "Перейти к последнему сообщению",
     hang_up_confirm: "Завершить звонок?",
     call_will_end: "Звонок с {name} будет завершён.",
     current_duration: "Текущая длительность",
@@ -2230,6 +2251,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    unread_below: "未读消息",
+    go_to_unread: "跳到第一条未读消息",
+    go_to_latest: "跳到最新消息",
     hang_up_confirm: "挂断？",
     call_will_end: "与 {name} 的通话将结束。",
     current_duration: "当前时长",
@@ -2537,6 +2561,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    unread_below: "Olästa meddelanden",
+    go_to_unread: "Gå till det första olästa meddelandet",
+    go_to_latest: "Gå till det senaste meddelandet",
     hang_up_confirm: "Lägga på?",
     call_will_end: "Samtalet med {name} avslutas.",
     current_duration: "Nuvarande längd",
@@ -2854,6 +2881,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    unread_below: "Uleste meldinger",
+    go_to_unread: "Gå til den første uleste meldingen",
+    go_to_latest: "Gå til den siste meldingen",
     hang_up_confirm: "Legge på?",
     call_will_end: "Samtalen med {name} avsluttes.",
     current_duration: "Nåværende varighet",

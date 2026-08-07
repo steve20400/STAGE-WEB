@@ -4180,7 +4180,20 @@ export default function ChatRoomPage() {
   const loadingOlderRef = useRef(false)
   // Evite que les refresh/previews renvoient l'utilisateur en bas pendant sa lecture.
   const isNearBottomRef = useRef(true)
+  /**
+   * Premier message arrive alors qu'on ne regardait PAS le bas du fil.
+   *
+   * C'est la frontiere du « non lu » : tout ce qui suit est arrive pendant
+   * qu'on lisait ailleurs. On ne se fie pas au compteur de la liste des
+   * conversations — il vaut pour la conversation entiere, pas pour la position
+   * de lecture a l'instant present.
+   */
+  const [frontiereNonLus, setFrontiereNonLus] = useState<string | null>(null)
+  /** Le bouton n'a de sens que si l'on s'est eloigne du bas. */
+  const [loinDuBas, setLoinDuBas] = useState(false)
   const lastMessageIdRef = useRef<string | null>(null)
+  /** La frontiere d'ouverture ne se pose qu'une fois par conversation. */
+  const frontiereOuvertureFaiteRef = useRef(false)
   const initialScrollDoneRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -4411,6 +4424,10 @@ export default function ChatRoomPage() {
       initialScrollDoneRef.current = true
     } else if (newestId !== lastMessageIdRef.current && isNearBottomRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    } else if (newestId !== lastMessageIdRef.current && !isNearBottomRef.current) {
+      // Arrive pendant qu'on lisait plus haut : on marque la frontiere une
+      // seule fois, sur le PREMIER de la salve. Les suivants viennent apres.
+      setFrontiereNonLus((actuelle) => actuelle ?? newestId)
     }
     lastMessageIdRef.current = newestId
   }, [messages])
@@ -4420,7 +4437,96 @@ export default function ChatRoomPage() {
     initialScrollDoneRef.current = false
     lastMessageIdRef.current = null
     isNearBottomRef.current = true
+    frontiereOuvertureFaiteRef.current = false
+    setFrontiereNonLus(null)
+    setLoinDuBas(false)
   }, [chatId])
+
+  /**
+   * Reprise de lecture a l'ouverture.
+   *
+   * Le compteur de la conversation dit combien de messages sont arrives depuis
+   * la derniere visite : on remonte le fil d'autant, on pose la frontiere sur
+   * le premier d'entre eux et on ouvre la conversation LA, pas tout en bas.
+   * Sans cela, la frontiere n'existerait que pour les messages arrives sous les
+   * yeux — le cas le plus rare — et on rouvrirait toujours au dernier message
+   * en ayant saute ceux qu'on n'a pas lus.
+   *
+   * On ne compte que les messages RECUS : le compteur du serveur ignore les
+   * notres, et melanger les deux decalerait la frontiere vers le bas.
+   */
+  useEffect(() => {
+    if (frontiereOuvertureFaiteRef.current || !initialScrollDoneRef.current) return
+    const nonLus = backendChat?.unread ?? 0
+    if (nonLus <= 0 || messages.length === 0) return
+    frontiereOuvertureFaiteRef.current = true
+
+    let restants = nonLus
+    let premier: string | null = null
+    for (let i = messages.length - 1; i >= 0 && restants > 0; i--) {
+      if (messages[i].senderId === "me") continue
+      restants -= 1
+      premier = messages[i].id
+    }
+    if (!premier) return
+
+    setFrontiereNonLus(premier)
+    // Un tour de boucle pour laisser le separateur entrer dans le DOM : il
+    // n'existe pas encore au moment ou l'on demande le defilement.
+    requestAnimationFrame(() => {
+      messagesBodyRef.current
+        ?.querySelector('[data-separateur-non-lus="1"]')
+        ?.scrollIntoView({ behavior: "auto", block: "center" })
+    })
+  }, [backendChat, messages])
+
+  /**
+   * Le separateur s'efface tout seul huit secondes apres qu'on a rejoint le bas.
+   *
+   * Il repond a « ou en etais-je ? » — une fois la reponse lue, il n'est plus
+   * qu'une ligne de plus dans le fil. On ne l'efface pas des l'arrivee en bas :
+   * il faut le temps de le voir passer.
+   */
+  useEffect(() => {
+    if (frontiereNonLus === null || loinDuBas) return
+    const minuteur = setTimeout(() => setFrontiereNonLus(null), 8000)
+    return () => clearTimeout(minuteur)
+  }, [frontiereNonLus, loinDuBas])
+
+  /**
+   * Nombre de messages sous la frontiere. Sert le badge du bouton : « revenir
+   * en bas » et « il y a 3 messages non lus » ne demandent pas le meme geste.
+   */
+  const nbNonLus = useMemo(() => {
+    if (!frontiereNonLus) return 0
+    const index = messages.findIndex((m) => m.id === frontiereNonLus)
+    return index === -1 ? 0 : messages.length - index
+  }, [messages, frontiereNonLus])
+
+  /**
+   * Retour au premier non-lu s'il y en a un, au dernier message sinon.
+   *
+   * L'ordre compte : quelqu'un qui remonte le fil veut reprendre la ou il s'est
+   * arrete, pas sauter la fin qu'il n'a pas lue.
+   */
+  const revenirEnBas = () => {
+    const corps = messagesBodyRef.current
+    const cible = frontiereNonLus
+      ? corps?.querySelector('[data-separateur-non-lus="1"]')
+      : null
+    // Si la frontiere est deja sous les yeux, y sauter ne bougerait rien : le
+    // geste suivant attendu est d'aller au bout. Un seul bouton, deux etapes.
+    if (cible && corps) {
+      const zone = corps.getBoundingClientRect()
+      const ligne = cible.getBoundingClientRect()
+      const dejaVisible = ligne.bottom > zone.top && ligne.top < zone.bottom
+      if (!dejaVisible) {
+        cible.scrollIntoView({ behavior: "smooth", block: "center" })
+        return
+      }
+    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
 
   /**
    * Charge la page precedente et la prepose au fil, en conservant la position de
@@ -4480,7 +4586,11 @@ export default function ChatRoomPage() {
   const handleMessagesScroll = () => {
     const body = messagesBodyRef.current
     if (!body) return
-    isNearBottomRef.current = body.scrollHeight - body.scrollTop - body.clientHeight < 100
+    const distanceDuBas = body.scrollHeight - body.scrollTop - body.clientHeight
+    isNearBottomRef.current = distanceDuBas < 100
+    // 240 px : au-dela, le bas n'est plus a portee de regard, le bouton se
+    // justifie. En deca il ferait doublon avec un simple coup de molette.
+    setLoinDuBas(distanceDuBas > 240)
     // Meme seuil que le mobile (chat_screen.dart) : le chargement part avant que
     // l'utilisateur ne touche le haut, pour qu'il ne voie pas d'attente.
     if (body.scrollTop <= OLDER_LOAD_THRESHOLD_PX) void loadOlderMessages()
@@ -5175,6 +5285,14 @@ export default function ChatRoomPage() {
                   name={msg.fileName ?? msg.content}
                   size={msg.fileSize}
                 >
+                  {/* Frontiere du non-lu : une ligne centree, juste au-dessus du
+                      premier message arrive pendant qu'on lisait ailleurs. Elle
+                      repond a « ou en etais-je ? » puis s'efface d'elle-meme. */}
+                  {msg.id === frontiereNonLus && (
+                    <div className="separateur-non-lus" data-separateur-non-lus="1">
+                      <span>{t("unread_below")}</span>
+                    </div>
+                  )}
                   <MessageBubble
                     key={msg.id}
                     msg={msg}
@@ -5211,6 +5329,40 @@ export default function ChatRoomPage() {
         )}
 
         <div ref={bottomRef} />
+      </div>
+
+      {/* Retour au fil. N'apparait qu'une fois eloigne du bas : pose en
+          permanence, il masquerait un message pour rien. Le compte des non-lus
+          le change de nature — « revenir en bas » et « trois messages
+          t'attendent » n'appellent pas le meme geste, et la fleche vise alors
+          la frontiere du non-lu plutot que le dernier message. */}
+      <div className="retour-fil-zone" aria-hidden={!loinDuBas}>
+        {loinDuBas && (
+          <button
+            type="button"
+            className={`retour-fil${nbNonLus > 0 ? " a-des-non-lus" : ""}`}
+            onClick={revenirEnBas}
+            aria-label={nbNonLus > 0 ? t("go_to_unread") : t("go_to_latest")}
+            title={nbNonLus > 0 ? t("go_to_unread") : t("go_to_latest")}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M19 12l-7 7-7-7" />
+            </svg>
+            {nbNonLus > 0 && (
+              <span className="retour-fil-compte">{nbNonLus > 99 ? "99+" : nbNonLus}</span>
+            )}
+          </button>
+        )}
       </div>
 
       {replyTo && (

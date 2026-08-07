@@ -141,6 +141,115 @@
   white-space: nowrap;
 }
 
+/* Frontiere du non-lu.
+   Meme grammaire que le separateur de date — une ligne, une pastille centree —
+   mais teintee de l'accent : c'est un repere de lecture, pas un reperage dans le
+   temps, et il doit se distinguer d'un coup d'oeil parmi les separateurs de jour.
+   Il s'efface tout seul, d'ou la transition sur l'opacite. */
+.separateur-non-lus {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 10px;
+  animation: apparition-non-lus 0.28s ease-out;
+}
+.separateur-non-lus::before,
+.separateur-non-lus::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent));
+  opacity: 0.5;
+}
+.separateur-non-lus::after {
+  background: linear-gradient(270deg, transparent, var(--accent));
+}
+.separateur-non-lus span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 3px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent);
+  border-radius: 20px;
+  white-space: nowrap;
+}
+@keyframes apparition-non-lus {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Bouton de retour au fil.
+   Pose dans une bande de hauteur nulle entre le fil et la zone de saisie : il
+   flotte donc au-dessus des messages sans jamais decaler la mise en page, et
+   reste ancre au bas a droite quelle que soit la longueur de la discussion. */
+.retour-fil-zone {
+  position: relative;
+  height: 0;
+  z-index: 5;
+}
+.retour-fil {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.16s,
+    color 0.16s,
+    border-color 0.16s;
+  animation: apparition-retour-fil 0.2s ease-out;
+}
+.retour-fil:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.retour-fil:active {
+  transform: translateY(0);
+}
+/* Des qu'il y a du non-lu, la fleche passe a l'accent : le bouton cesse d'etre
+   un raccourci discret sans pour autant crier. C'est la pastille, elle, qui
+   porte l'annonce — et elle reprend exactement la pastille de la liste des
+   discussions, pour qu'un meme signal garde partout la meme couleur. */
+.retour-fil.a-des-non-lus {
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+.retour-fil-compte {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: var(--bg-base);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  border: 2px solid var(--bg-base);
+}
+@keyframes apparition-retour-fil {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+  }
+}
+
 /* indicateur de frappe */
 .typing-indicator {
   display: flex;
