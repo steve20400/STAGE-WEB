@@ -1,3 +1,4 @@
+import { useTranslation } from "../../../src/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useToast } from "../../../src/components/toast"
 import { toInitials } from "../../../src/data/session-user"
@@ -101,6 +102,7 @@ function StatusAvatar({
 }
 
 export default function StatusPage() {
+  const { t } = useTranslation()
   const { success, error } = useToast()
   const [feed, setFeed] = useState<StatusFeed>({ me: null, others: [] })
   const [loading, setLoading] = useState(true)
@@ -206,7 +208,7 @@ export default function StatusPage() {
     setPosting(true)
     try {
       await postTextStatus(text, composerBg)
-      success("Statut publie", "Visible par vos contacts pendant 24 h.")
+      success("Statut publie", t("status_visible_24h"))
       setComposerText("")
       setComposerOpen(false)
       await reload()
@@ -227,7 +229,7 @@ export default function StatusPage() {
     setPosting(true)
     try {
       await postMediaStatus(file)
-      success("Statut publie", "Visible par vos contacts pendant 24 h.")
+      success("Statut publie", t("status_visible_24h"))
       setComposerOpen(false)
       await reload()
     } catch (err) {
@@ -259,7 +261,7 @@ export default function StatusPage() {
         <div className="calls-title-row page-title-row">
           <h1 className="calls-title">Statuts</h1>
           <button className="new-call-btn" onClick={() => setComposerOpen((v) => !v)}>
-            {composerOpen ? "Fermer" : "+ Publier un statut"}
+            {composerOpen ? "Fermer" : t("publish_status")}
           </button>
         </div>
       </div>
@@ -275,11 +277,11 @@ export default function StatusPage() {
           }}
         >
           <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
-            Statut texte (fond colore) ou photo/video — visible 24 h par vos contacts.
+            {t("status_help")}
           </div>
           <textarea
             className="input-base"
-            placeholder="Exprimez-vous..."
+            placeholder={t("express_yourself")}
             value={composerText}
             onChange={(e) => setComposerText(e.target.value)}
             maxLength={700}
@@ -374,9 +376,7 @@ export default function StatusPage() {
       )}
       {!loading && !feed.me?.statuses.length && feed.others.length === 0 && (
         <div className="empty-state">
-          <div className="empty-txt">
-            Aucun statut pour le moment. Publiez le votre ou ajoutez des contacts !
-          </div>
+          <div className="empty-txt">{t("no_status_yet")}</div>
         </div>
       )}
 
@@ -442,7 +442,7 @@ export default function StatusPage() {
             {viewer.isMine && (
               <button
                 onClick={() => void handleDeleteCurrent()}
-                aria-label="Supprimer ce statut"
+                aria-label={t("delete_status")}
                 style={{
                   background: "#ffffff20",
                   border: "none",

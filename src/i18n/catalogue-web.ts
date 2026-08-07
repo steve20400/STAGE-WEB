@@ -284,12 +284,24 @@ export const WEB_TRANSLATION_KEYS = [
   "add_members",
   "group_name",
   "search_alanya_accounts",
+  "status_visible_24h",
+  "publish_status",
+  "express_yourself",
+  "delete_status",
+  "status_help",
+  "no_status_yet",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    status_visible_24h: "Visible par vos contacts pendant 24 h.",
+    publish_status: "+ Publier un statut",
+    express_yourself: "Exprimez-vous...",
+    delete_status: "Supprimer ce statut",
+    status_help: "Statut texte (fond colore) ou photo/video — visible 24 h par vos contacts.",
+    no_status_yet: "Aucun statut pour le moment. Publiez le votre ou ajoutez des contacts !",
     conv_create_failed: "Impossible de creer la conversation.",
     group_needs_members: "Ajoutez un nom et au moins 2 membres.",
     group_create_failed: "Impossible de creer le groupe.",
@@ -576,6 +588,13 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    status_visible_24h: "Visible to your contacts for 24 h.",
+    publish_status: "+ Post a status",
+    express_yourself: "Express yourself...",
+    delete_status: "Delete this status",
+    status_help:
+      "Text status (coloured background) or photo/video — visible to your contacts for 24 h.",
+    no_status_yet: "No status yet. Post yours or add contacts!",
     conv_create_failed: "Could not create the conversation.",
     group_needs_members: "Add a name and at least 2 members.",
     group_create_failed: "Could not create the group.",
@@ -859,6 +878,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    status_visible_24h: "Visible para tus contactos durante 24 h.",
+    publish_status: "+ Publicar un estado",
+    express_yourself: "Exprésate...",
+    delete_status: "Eliminar este estado",
+    status_help: "Estado de texto (fondo de color) o foto/vídeo — visible 24 h para tus contactos.",
+    no_status_yet: "Aún no hay estados. ¡Publica el tuyo o añade contactos!",
     conv_create_failed: "No se pudo crear la conversación.",
     group_needs_members: "Añade un nombre y al menos 2 miembros.",
     group_create_failed: "No se pudo crear el grupo.",
@@ -1143,6 +1168,13 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    status_visible_24h: "24 Stunden lang für deine Kontakte sichtbar.",
+    publish_status: "+ Status veröffentlichen",
+    express_yourself: "Drück dich aus...",
+    delete_status: "Diesen Status löschen",
+    status_help:
+      "Textstatus (farbiger Hintergrund) oder Foto/Video — 24 Stunden für deine Kontakte sichtbar.",
+    no_status_yet: "Noch kein Status. Veröffentliche deinen oder füge Kontakte hinzu!",
     conv_create_failed: "Die Unterhaltung konnte nicht erstellt werden.",
     group_needs_members: "Gib einen Namen und mindestens 2 Mitglieder an.",
     group_create_failed: "Die Gruppe konnte nicht erstellt werden.",
@@ -1430,6 +1462,13 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    status_visible_24h: "Visível para os seus contactos durante 24 h.",
+    publish_status: "+ Publicar um estado",
+    express_yourself: "Exprima-se...",
+    delete_status: "Eliminar este estado",
+    status_help:
+      "Estado de texto (fundo colorido) ou foto/vídeo — visível 24 h para os seus contactos.",
+    no_status_yet: "Ainda não há estados. Publique o seu ou adicione contactos!",
     conv_create_failed: "Não foi possível criar a conversa.",
     group_needs_members: "Adicione um nome e pelo menos 2 membros.",
     group_create_failed: "Não foi possível criar o grupo.",
@@ -1714,6 +1753,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    status_visible_24h: "Виден вашим контактам 24 часа.",
+    publish_status: "+ Опубликовать статус",
+    express_yourself: "Выразите себя...",
+    delete_status: "Удалить этот статус",
+    status_help: "Текстовый статус (цветной фон) или фото/видео — виден контактам 24 часа.",
+    no_status_yet: "Пока нет статусов. Опубликуйте свой или добавьте контакты!",
     conv_create_failed: "Не удалось создать беседу.",
     group_needs_members: "Добавьте название и минимум 2 участников.",
     group_create_failed: "Не удалось создать группу.",
@@ -1997,6 +2042,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    status_visible_24h: "您的联系人可见 24 小时。",
+    publish_status: "+ 发布状态",
+    express_yourself: "表达你自己…",
+    delete_status: "删除此状态",
+    status_help: "文字状态（彩色背景）或照片/视频 — 联系人可见 24 小时。",
+    no_status_yet: "暂无状态。发布您的状态或添加联系人吧！",
     conv_create_failed: "无法创建会话。",
     group_needs_members: "请填写名称并至少添加 2 位成员。",
     group_create_failed: "无法创建群组。",
@@ -2272,6 +2323,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    status_visible_24h: "Synlig för dina kontakter i 24 h.",
+    publish_status: "+ Publicera en status",
+    express_yourself: "Uttryck dig...",
+    delete_status: "Ta bort den här statusen",
+    status_help: "Textstatus (färgad bakgrund) eller foto/video — synlig 24 h för dina kontakter.",
+    no_status_yet: "Ingen status ännu. Publicera din eller lägg till kontakter!",
     conv_create_failed: "Kunde inte skapa konversationen.",
     group_needs_members: "Lägg till ett namn och minst 2 medlemmar.",
     group_create_failed: "Kunde inte skapa gruppen.",
@@ -2556,6 +2613,13 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    status_visible_24h: "Synlig for kontaktene dine i 24 t.",
+    publish_status: "+ Publiser en status",
+    express_yourself: "Uttrykk deg...",
+    delete_status: "Slett denne statusen",
+    status_help:
+      "Tekststatus (farget bakgrunn) eller bilde/video — synlig 24 t for kontaktene dine.",
+    no_status_yet: "Ingen status ennå. Publiser din egen eller legg til kontakter!",
     conv_create_failed: "Kunne ikke opprette samtalen.",
     group_needs_members: "Legg til et navn og minst 2 medlemmer.",
     group_create_failed: "Kunne ikke opprette gruppen.",
