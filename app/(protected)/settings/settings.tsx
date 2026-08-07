@@ -1309,8 +1309,7 @@ export default function SettingsPage() {
     if (!security.currentPwd) return toastError("Mot de passe actuel requis")
     if (security.newPwd.length < 8)
       return toastError("Mot de passe trop court", "Le backend exige au moins 8 caracteres.")
-    if (security.newPwd !== security.confirmPwd)
-      return toastError("Les mots de passe ne correspondent pas")
+    if (security.newPwd !== security.confirmPwd) return toastError(t("passwords_differ"))
     if (security.newPwd === security.currentPwd)
       return toastError("Mot de passe identique", "Choisissez un mot de passe different.")
     setSaving(true)
@@ -1929,7 +1928,7 @@ export default function SettingsPage() {
                       >
                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
                       </svg>
-                      Changer la photo
+                      {t("change_photo")}
                     </button>
                   </div>
                 </div>
@@ -1939,15 +1938,15 @@ export default function SettingsPage() {
                   value={draft.name}
                   onChange={setD("name")}
                   maxLength={60}
-                  placeholder="Votre nom"
+                  placeholder={t("your_name")}
                 />
                 <Field
-                  label="Message de statut"
+                  label={t("status_message")}
                   value={draft.statusMsg}
                   onChange={setD("statusMsg")}
                   maxLength={100}
-                  placeholder="Ce que vous faites en ce moment..."
-                  helper="Visible par tous vos contacts."
+                  placeholder={t("status_placeholder")}
+                  helper={t("status_visible")}
                 />
               </div>
 
@@ -1961,14 +1960,14 @@ export default function SettingsPage() {
                     label="Adresse email"
                     value={draft.email}
                     disabled
-                    helper="Contactez le support pour modifier votre email."
+                    helper={t("email_support_note")}
                   />
                 ) : (
                   <Field
                     label="Adresse email"
-                    value="Aucun email renseigne"
+                    value={t("no_email")}
                     disabled
-                    helper="Les nouveaux comptes exigent maintenant une adresse email verifiee."
+                    helper={t("email_required_note")}
                   />
                 )}
                 {/* C'est ici que le repertoire renvoie l'utilisateur chercher son
@@ -1978,7 +1977,7 @@ export default function SettingsPage() {
                   label="Alanya ID"
                   value={draft.phone ? formatAlanyaNumber(draft.phone) : "—"}
                   disabled
-                  helper="Cet identifiant est lie a votre compte et ne peut pas etre change."
+                  helper={t("alanya_id_locked")}
                 />
               </div>
             </>
@@ -1987,17 +1986,17 @@ export default function SettingsPage() {
           {section === "security" && (
             <>
               <div className="s-page-title">Securite</div>
-              <p className="s-page-sub">Gerez votre mot de passe et la securite de votre compte.</p>
+              <p className="s-page-sub">{t("security_sub")}</p>
 
               <div className="s-card">
-                <div className="s-card-title">Changer le mot de passe</div>
+                <div className="s-card-title">{t("change_password")}</div>
                 {/* Champ vide, sans placeholder d'asterisques : une suite
                     d'etoiles ressemble a un mot de passe deja saisi, et on
                     cherche a l'effacer avant de comprendre qu'il n'y a rien.
                     `autoComplete="off"` empeche en plus le navigateur de le
                     pre-remplir, ce qui produisait la meme confusion. */}
                 <Field
-                  label="Mot de passe actuel"
+                  label={t("current_password")}
                   value={security.currentPwd}
                   onChange={(v) => setSecurity((p) => ({ ...p, currentPwd: v }))}
                   type="password"
@@ -2016,11 +2015,11 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 <Field
-                  label="Nouveau mot de passe"
+                  label={t("new_password")}
                   value={security.newPwd}
                   onChange={(v) => setSecurity((p) => ({ ...p, newPwd: v }))}
                   type="password"
-                  placeholder="Choisissez un mot de passe fort"
+                  placeholder={t("strong_password")}
                 />
 
                 {security.newPwd && (
@@ -2043,14 +2042,14 @@ export default function SettingsPage() {
                 )}
 
                 <Field
-                  label="Confirmer le nouveau mot de passe"
+                  label={t("confirm_new_password")}
                   value={security.confirmPwd}
                   onChange={(v) => setSecurity((p) => ({ ...p, confirmPwd: v }))}
                   type="password"
-                  placeholder="Repetez le mot de passe"
+                  placeholder={t("repeat_password")}
                   error={
                     security.confirmPwd && security.newPwd !== security.confirmPwd
-                      ? "Les mots de passe ne correspondent pas"
+                      ? t("passwords_differ")
                       : undefined
                   }
                 />
@@ -2098,7 +2097,7 @@ export default function SettingsPage() {
                   sessions : c'est la qu'on lit « Windows 11 (Poste accueil) »,
                   donc la qu'on comprend a quoi sert ce champ. */}
               <div className="s-card">
-                <div className="s-card-title">Nom de cet appareil</div>
+                <div className="s-card-title">{t("device_name_section")}</div>
                 <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
                   Affiche au-dessus des messages envoyes depuis cet appareil, et uniquement pour les
                   autres appareils de ce compte. Vos correspondants ne le voient jamais.
@@ -2112,7 +2111,7 @@ export default function SettingsPage() {
                       if (e.key === "Enter") void sauverPseudo()
                     }}
                     placeholder="Poste accueil, Bureau d'Awa..."
-                    aria-label="Nom de cet appareil"
+                    aria-label={t("device_name_label")}
                     style={{
                       flex: 1,
                       minWidth: 0,
@@ -2157,7 +2156,7 @@ export default function SettingsPage() {
                 )}
                 {sessions !== null && sessions.length === 0 && (
                   <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
-                    Aucun appareil enregistre pour le moment.
+                    {t("no_device_yet")}
                   </div>
                 )}
                 {(sessions ?? []).map((s, i) => (
@@ -2285,7 +2284,7 @@ export default function SettingsPage() {
               </div>
 
               <div className="s-card">
-                <div className="s-card-title">Historique de connexion</div>
+                <div className="s-card-title">{t("login_history")}</div>
                 <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 10 }}>
                   Chaque ouverture de session est enregistree. Une connexion que tu ne reconnais pas
                   ? Change ton mot de passe et deconnecte l appareil concerne.
@@ -2298,7 +2297,7 @@ export default function SettingsPage() {
                 )}
                 {historique !== null && historique.length === 0 && (
                   <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
-                    Aucune connexion enregistree pour le moment.
+                    {t("no_login_yet")}
                   </div>
                 )}
                 {(historique ?? []).map((a, i) => {
@@ -2345,7 +2344,7 @@ export default function SettingsPage() {
                             fontWeight: 600,
                           }}
                         >
-                          La plus recente
+                          {t("most_recent")}
                         </span>
                       )}
                     </div>
@@ -2603,7 +2602,7 @@ export default function SettingsPage() {
           {section === "about" && (
             <>
               <div className="s-page-title">A propos</div>
-              <p className="s-page-sub">Informations sur l'application Alanya.</p>
+              <p className="s-page-sub">{t("about_sub")}</p>
               <div className="s-card">
                 {[
                   { label: "Application", value: "Alanya" },
