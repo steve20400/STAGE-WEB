@@ -1361,7 +1361,7 @@ export default function SettingsPage() {
   const NAV: { id: SettingsSection; label: string; icon: React.ReactNode }[] = [
     {
       id: "profile",
-      label: "Profil",
+      label: t("settings_profile"),
       icon: (
         <svg
           width="15"
@@ -1379,7 +1379,7 @@ export default function SettingsPage() {
     },
     {
       id: "security",
-      label: "Securite",
+      label: t("settings_security"),
       icon: (
         <svg
           width="15"
@@ -1396,7 +1396,7 @@ export default function SettingsPage() {
     },
     {
       id: "notifications",
-      label: "Notifications",
+      label: t("settings_notifications"),
       icon: (
         <svg
           width="15"
@@ -1414,7 +1414,7 @@ export default function SettingsPage() {
     },
     {
       id: "privacy",
-      label: "Confidentialite",
+      label: t("settings_privacy"),
       icon: (
         <svg
           width="15"
@@ -1432,7 +1432,7 @@ export default function SettingsPage() {
     },
     {
       id: "appearance",
-      label: "Apparence",
+      label: t("settings_appearance"),
       icon: (
         <svg
           width="15"
@@ -1450,7 +1450,7 @@ export default function SettingsPage() {
     },
     {
       id: "about",
-      label: "A propos",
+      label: t("settings_about"),
       icon: (
         <svg
           width="15"
@@ -1814,10 +1814,10 @@ export default function SettingsPage() {
             >
               <path d="M19 12H5M12 5l-7 7 7 7" />
             </svg>
-            Retour
+            {t("back")}
           </button>
 
-          <div className="s-nav-title">Parametres</div>
+          <div className="s-nav-title">{t("settings")}</div>
 
           {NAV.map((n) => (
             <SectionLink

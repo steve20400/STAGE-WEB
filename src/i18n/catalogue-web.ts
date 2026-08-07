@@ -300,12 +300,14 @@ export const WEB_TRANSLATION_KEYS = [
   "loading",
   "ai_clear_confirm",
   "ai_clear_detail",
+  "back",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    back: "Retour",
     ai_clear_confirm: "Effacer la conversation ?",
     ai_clear_detail: "Tout l'historique avec l'assistant sera supprime.",
     ai_unavailable: "L'assistant est indisponible.",
@@ -609,6 +611,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    back: "Back",
     ai_clear_confirm: "Clear the conversation?",
     ai_clear_detail: "All the history with the assistant will be deleted.",
     ai_unavailable: "The assistant is unavailable.",
@@ -910,6 +913,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    back: "Volver",
     ai_clear_confirm: "¿Borrar la conversación?",
     ai_clear_detail: "Se eliminará todo el historial con el asistente.",
     ai_unavailable: "El asistente no está disponible.",
@@ -1211,6 +1215,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    back: "Zurück",
     ai_clear_confirm: "Unterhaltung löschen?",
     ai_clear_detail: "Der gesamte Verlauf mit dem Assistenten wird gelöscht.",
     ai_unavailable: "Der Assistent ist nicht verfügbar.",
@@ -1516,6 +1521,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    back: "Voltar",
     ai_clear_confirm: "Limpar a conversa?",
     ai_clear_detail: "Todo o histórico com o assistente será eliminado.",
     ai_unavailable: "O assistente está indisponível.",
@@ -1818,6 +1824,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    back: "Назад",
     ai_clear_confirm: "Очистить беседу?",
     ai_clear_detail: "Вся история общения с ассистентом будет удалена.",
     ai_unavailable: "Ассистент недоступен.",
@@ -2118,6 +2125,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    back: "返回",
     ai_clear_confirm: "清空会话？",
     ai_clear_detail: "与助手的全部历史记录将被删除。",
     ai_unavailable: "助手当前不可用。",
@@ -2409,6 +2417,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    back: "Tillbaka",
     ai_clear_confirm: "Rensa konversationen?",
     ai_clear_detail: "All historik med assistenten kommer att raderas.",
     ai_unavailable: "Assistenten är inte tillgänglig.",
@@ -2710,6 +2719,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    back: "Tilbake",
     ai_clear_confirm: "Tømme samtalen?",
     ai_clear_detail: "All historikk med assistenten blir slettet.",
     ai_unavailable: "Assistenten er utilgjengelig.",
