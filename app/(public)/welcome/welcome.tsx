@@ -15,7 +15,7 @@ export default function WelcomePage() {
             <img src={alanyaLogo} alt="Logo Alanya" className="school-logo" />
             <div className="brand-copy">
               <span className="display-font brand-name">Alanya</span>
-              <span className="brand-subtitle">Messagerie ENSPY</span>
+              <span className="brand-subtitle">{t("brand_subtitle")}</span>
             </div>
           </div>
           <div className="nav-links">
@@ -23,7 +23,7 @@ export default function WelcomePage() {
               <span className="welcome-theme-label">{t("theme")}</span>
               <ThemeToggle className="welcome-theme-toggle" />
             </div>
-            <a href="#features">Fonctionnalites</a>
+            <a href="#features">{t("welcome_nav_features")}</a>
             <Link to="/login" className="btn-nav">
               {t("login")}
             </Link>
@@ -60,23 +60,19 @@ export default function WelcomePage() {
 
             <div id="features" className="features">
               <div className="feat">
-                <div className="feat-label">Latence</div>
+                <div className="feat-label">{t("welcome_latency")}</div>
                 <div className="feat-val">
                   <strong>&lt; 500ms</strong>
                   {t("welcome_delivery")}
                 </div>
               </div>
               <div className="feat">
-                <div className="feat-label">Fichiers</div>
-                <div className="feat-val">
-                  Jusqu'a <strong>50 Mo</strong>
-                </div>
+                <div className="feat-label">{t("welcome_files")}</div>
+                <div className="feat-val">{t("welcome_files_sub")}</div>
               </div>
               <div className="feat">
-                <div className="feat-label">Appels</div>
-                <div className="feat-val">
-                  Audio <strong>&amp;</strong> Video
-                </div>
+                <div className="feat-label">{t("welcome_calls")}</div>
+                <div className="feat-val">{t("welcome_calls_sub")}</div>
               </div>
             </div>
           </div>
@@ -88,7 +84,7 @@ export default function WelcomePage() {
                 <div className="avatar-sm">KM</div>
                 <div>
                   <div className="phone-name">Kevin Manga</div>
-                  <div className="phone-status">en ligne</div>
+                  <div className="phone-status">{t("welcome_demo_status")}</div>
                 </div>
               </div>
               <div className="chat-body">
@@ -98,10 +94,10 @@ export default function WelcomePage() {
                 </div>
                 <div>
                   <div className="bubble me">{t("welcome_demo_a")}</div>
-                  <div className="meta right">10:43 lu</div>
+                  <div className="meta right">{`10:43 ${t("welcome_demo_read")}`}</div>
                 </div>
                 <div>
-                  <div className="bubble them">Merci frere, tu geres vraiment</div>
+                  <div className="bubble them">{t("welcome_demo_r")}</div>
                   <div className="meta">10:43</div>
                 </div>
                 <div className="typing">
@@ -111,7 +107,7 @@ export default function WelcomePage() {
                 </div>
               </div>
               <div className="phone-input">
-                <div className="phone-input-field">Message...</div>
+                <div className="phone-input-field">{t("welcome_demo_input")}</div>
                 <div className="send-btn">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--bg-base)">
                     <path
