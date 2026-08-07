@@ -1,9 +1,11 @@
-﻿import { Link } from "react-router-dom"
+﻿import { useTranslation } from "../../../src/i18n"
+import { Link } from "react-router-dom"
 import { ThemeToggle } from "../../../src/components/theme-toggle"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./welcome-page.css"
 
 export default function WelcomePage() {
+  const { t } = useTranslation()
   return (
     <>
       <div className="alanya-root">
@@ -18,12 +20,12 @@ export default function WelcomePage() {
           </div>
           <div className="nav-links">
             <div className="welcome-theme-row">
-              <span className="welcome-theme-label">Theme</span>
+              <span className="welcome-theme-label">{t("theme")}</span>
               <ThemeToggle className="welcome-theme-toggle" />
             </div>
             <a href="#features">Fonctionnalites</a>
             <Link to="/login" className="btn-nav">
-              Connexion
+              {t("login")}
             </Link>
           </div>
         </nav>
@@ -33,28 +35,25 @@ export default function WelcomePage() {
           <div className="hero-left">
             <div className="badge">
               <div className="badge-dot" />
-              <span>Discutez, appelez, partagez — en toute simplicite.</span>
+              <span>{t("welcome_tagline")}</span>
             </div>
 
             <h1 className="headline">
-              <span>Parle.</span>
-              <span>Partage.</span>
+              <span>{t("welcome_word1")}</span>
+              <span>{t("welcome_word2")}</span>
               <span className="overflow-word">
-                <em>Connecte.</em>
+                <em>{t("welcome_word3")}</em>
               </span>
             </h1>
 
-            <p className="subline">
-              La messagerie pensee pour les ingenieurs de demain. Securisee, rapide, et taillee pour
-              les esprits brillants de l'ENSPY.
-            </p>
+            <p className="subline">{t("welcome_pitch")}</p>
 
             <div className="cta-row">
               <Link to="/signup" className="btn-primary">
-                Commencer gratuitement
+                {t("welcome_start")}
               </Link>
               <a href="#features" className="btn-ghost">
-                Voir les fonctionnalites
+                {t("welcome_features")}
                 <span style={{ fontSize: 14 }}>-&gt;</span>
               </a>
             </div>
@@ -63,7 +62,8 @@ export default function WelcomePage() {
               <div className="feat">
                 <div className="feat-label">Latence</div>
                 <div className="feat-val">
-                  <strong>&lt; 500ms</strong> livraison
+                  <strong>&lt; 500ms</strong>
+                  {t("welcome_delivery")}
                 </div>
               </div>
               <div className="feat">
@@ -93,11 +93,11 @@ export default function WelcomePage() {
               </div>
               <div className="chat-body">
                 <div>
-                  <div className="bubble them">T'as envoye le TP de BD ?</div>
+                  <div className="bubble them">{t("welcome_demo_q")}</div>
                   <div className="meta">10:42</div>
                 </div>
                 <div>
-                  <div className="bubble me">Oui, je viens de l'uploader.</div>
+                  <div className="bubble me">{t("welcome_demo_a")}</div>
                   <div className="meta right">10:43 lu</div>
                 </div>
                 <div>

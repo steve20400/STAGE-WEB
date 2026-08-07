@@ -48,7 +48,7 @@ import {
 } from "../../../../src/services/media-service"
 import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
 import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media-thumbnail"
-import { useTranslation } from "../../../../src/i18n"
+import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
 import { composerMessageSysteme } from "../../../../src/i18n/messages-systeme"
 import { lireVerrou, useVerrou } from "../../../../src/hooks/use-verrou"
 import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
@@ -106,9 +106,7 @@ class MessageErrorBoundary extends Component<
       >
         <div style={{ fontWeight: 700 }}>{this.props.name ?? "Fichier"}</div>
         {this.props.size && <div style={{ marginTop: 2 }}>{this.props.size}</div>}
-        <div style={{ marginTop: 5 }}>
-          Aperçu indisponible pour ce fichier. Les autres messages restent accessibles.
-        </div>
+        <div style={{ marginTop: 5 }}>{traduire(langueInitiale(), "preview_unavailable")}</div>
       </div>
     )
   }
@@ -189,13 +187,14 @@ function ViewerFullscreenButton({
   color: string
   style?: React.CSSProperties
 }) {
+  const { t } = useTranslation()
   return (
     <button
       onClick={(event) => {
         event.stopPropagation()
         onToggle()
       }}
-      aria-label={expanded ? "Revenir a la taille initiale" : "Afficher en plein ecran"}
+      aria-label={expanded ? t("reset_zoom") : "Afficher en plein ecran"}
       aria-pressed={expanded}
       title={expanded ? "Taille initiale" : "Plein ecran"}
       style={{
@@ -253,6 +252,7 @@ function DocumentViewer({
   isMe: boolean
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const ext = (name ?? "").split(".").pop()?.toLowerCase() ?? ""
   const isImage =
     mime?.startsWith("image/") ||
@@ -292,7 +292,7 @@ function DocumentViewer({
           setLoadingText(false)
         })
         .catch(() => {
-          setTextContent("Impossible de charger le contenu du fichier.")
+          setTextContent(t("file_load_failed"))
           setLoadingText(false)
         })
     }
@@ -439,7 +439,7 @@ function DocumentViewer({
                       marginRight: 10,
                     }}
                   />
-                  <span>Chargement du document...</span>
+                  <span>{t("loading_document")}</span>
                 </div>
               ) : textContent !== null ? (
                 <textarea
@@ -482,7 +482,7 @@ function DocumentViewer({
                       textDecoration: "underline",
                     }}
                   >
-                    Ouvrir dans un nouvel onglet
+                    {t("open_new_tab")}
                   </a>
                 </div>
               )}
@@ -523,7 +523,7 @@ function DocumentViewer({
                   textDecoration: "underline",
                 }}
               >
-                Télécharger / Ouvrir
+                {t("download_open")}
               </a>
             </div>
           )}
@@ -545,6 +545,7 @@ function PdfViewer({
   full?: boolean
   fullHeight?: string
 }) {
+  const { t } = useTranslation()
   const host = useRef<HTMLDivElement>(null)
   const [state, setState] = useState("Chargement du PDF…")
   const [errorMessage, setErrorMessage] = useState("")
@@ -575,7 +576,7 @@ function PdfViewer({
       try {
         const sample = await blob.slice(0, 1000).text()
         if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(sample))
-          throw new Error("Le stockage du serveur a atteint son quota de téléchargement.")
+          throw new Error(t("storage_quota"))
         pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs")
         // Le worker indisponible ne dit rien du document : il est peut-etre
         // parfaitement lisible. On passe la main au lecteur natif au lieu
@@ -611,7 +612,7 @@ function PdfViewer({
       } catch (err: unknown) {
         if (!cancelled) {
           setState("")
-          setErrorMessage(err instanceof Error ? err.message : "Le PDF ne peut pas être chargé.")
+          setErrorMessage(err instanceof Error ? err.message : t("pdf_load_failed"))
         }
       }
     }
@@ -649,7 +650,7 @@ function PdfViewer({
             color: isMe ? "rgba(255,255,255,0.85)" : "var(--text-secondary)",
           }}
         >
-          Ouvrir dans un nouvel onglet
+          {t("open_new_tab")}
         </a>
       </div>
     )
@@ -678,6 +679,7 @@ function PdfViewer({
 /** Coche simple (envoye) / double blanche (recu) / double bleue (lu), comme sur WhatsApp.
     Affichee uniquement sur la bulle terracotta de l'expediteur -> teintes claires. */
 function StatusIcon({ status }: { status: MessageStatus }) {
+  const { t } = useTranslation()
   if (status === "sending") {
     return (
       <svg
@@ -1199,14 +1201,15 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
  * aligne a gauche (entrant) ou a droite (sortant), avec couleurs directionnelles.
  */
 function CallEventChip({ call }: { call: CallRecord }) {
+  const { t } = useTranslation()
   const isOutgoing = call.direction === "out"
   const outcome =
     call.status === "missed" || call.status === "no_answer"
-      ? "Appel manqué"
+      ? t("call_missed")
       : call.status === "declined"
-        ? "Appel rejeté"
+        ? t("call_declined")
         : call.status === "busy"
-          ? "Occupé"
+          ? t("call_busy")
           : ""
   const failed = Boolean(outcome)
 
@@ -1452,6 +1455,7 @@ const MSG_FLASH_MS = 1200
 
 /** Composant de preview natif pour fichiers texte/code. */
 function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name?: string }) {
+  const { t } = useTranslation()
   const [text, setText] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState("")
@@ -1467,7 +1471,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
       .then((blob) => blob.text())
       .then((content) => {
         if (/AccessDenied|cap exceeded|Caps & Alerts/i.test(content.slice(0, 1000)))
-          throw new Error("Stockage indisponible : quota de téléchargement atteint.")
+          throw new Error(t("storage_quota"))
         if (!cancelled) {
           setText(content.slice(0, 50000))
           setLoading(false)
@@ -1475,9 +1479,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setErrorMessage(
-            err instanceof Error ? err.message : "Le document ne peut pas être chargé."
-          )
+          setErrorMessage(err instanceof Error ? err.message : t("doc_load_failed"))
           setLoading(false)
         }
       })
@@ -1539,7 +1541,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
           {ext.toUpperCase()}
         </span>
         <input
-          aria-label="Rechercher dans le document"
+          aria-label={t("search_in_document")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher"
@@ -1557,7 +1559,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
         />
         <button
           onClick={copy}
-          title="Copier le contenu"
+          title={t("copy_content")}
           style={{
             border: "none",
             borderRadius: 4,
@@ -1586,7 +1588,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
             rel="noreferrer"
             style={{ display: "block", marginTop: 6, color: "inherit", opacity: 0.85 }}
           >
-            Ouvrir dans un nouvel onglet
+            {t("open_new_tab")}
           </a>
         </div>
       ) : isCsv ? (
@@ -1833,6 +1835,7 @@ function VideoPreview({
   size?: string
   durationMs?: number
 }) {
+  const { t } = useTranslation()
   const [failed, setFailed] = useState(false)
   if (failed)
     return (
@@ -1845,7 +1848,7 @@ function VideoPreview({
           fontSize: 11,
         }}
       >
-        <div style={{ fontWeight: 600 }}>{name ?? "Vidéo"}</div>
+        <div style={{ fontWeight: 600 }}>{name ?? t("video_label")}</div>
         <div style={{ opacity: 0.72, marginTop: 3 }}>
           {size ?? "Taille inconnue"} · {formatAudioDuration(durationMs)}
         </div>
@@ -1904,6 +1907,7 @@ function FullMediaPreview({
   subject: PreviewSubject
   maxHeight?: string
 }) {
+  const { t } = useTranslation()
   const name = subject.name ?? "Fichier"
   const ext = name.split(".").pop()?.toLowerCase() ?? ""
   const isPdf = subject.mime === "application/pdf" || ext === "pdf"
@@ -2338,6 +2342,7 @@ function MediaComposer({
   onCancel: () => void
   onSend: () => void
 }) {
+  const { t } = useTranslation()
   const current = items[index]
 
   useEffect(() => {
@@ -2525,7 +2530,7 @@ function MediaComposer({
               onSend()
             }
           }}
-          placeholder="Ajouter une legende..."
+          placeholder={t("add_caption")}
           rows={1}
           style={{
             flex: 1,
@@ -2609,7 +2614,7 @@ function quotedMediaLabel(msg: Message): string {
   if (caption) return caption
   if (msg.fileName) return msg.fileName
   if (msg.type === "image") return "Photo"
-  if (msg.type === "video") return "Vidéo"
+  if (msg.type === "video") return traduire(langueInitiale(), "video_label")
   if (msg.type === "audio") return "Message vocal"
   return "Fichier"
 }
@@ -2624,6 +2629,7 @@ function quotedMediaLabel(msg: Message): string {
  * ses octets sont hors de portee, l'icone reste affichee.
  */
 function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
+  const { t } = useTranslation()
   const src = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
   const mime = msg.mediaMime ?? ""
   const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
@@ -3252,7 +3258,7 @@ function MessageBubble({
                   e.stopPropagation()
                   setMenuOpen((v) => !v)
                 }}
-                aria-label="Actions du message"
+                aria-label={t("message_actions")}
                 aria-hidden={!actionsShown}
                 tabIndex={actionsShown ? 0 : -1}
                 style={{
@@ -3295,12 +3301,12 @@ function MessageBubble({
                       ? menuItem("Agrandir", openExpandedPreview)
                       : null}
                   {msg.type === "audio" && mediaSrc
-                    ? menuItem("Télécharger l’audio", downloadAudio)
+                    ? menuItem(t("download_audio"), downloadAudio)
                     : null}
                   {menuItem("Transferer", () => onForward(msg))}
-                  {menuItem("Supprimer pour moi", () => onDelete(msg, "me"), true)}
+                  {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
                   {isMe
-                    ? menuItem("Supprimer pour tous", () => onDelete(msg, "everyone"), true)
+                    ? menuItem(t("delete_for_all"), () => onDelete(msg, "everyone"), true)
                     : null}
                 </div>
               )}
@@ -3377,7 +3383,7 @@ function MessageBubble({
                     onJumpToMessage(originId)
                   }}
                   role={msg.replyTo && onJumpToMessage ? "button" : undefined}
-                  title={msg.replyTo && onJumpToMessage ? "Aller au message d'origine" : undefined}
+                  title={msg.replyTo && onJumpToMessage ? t("go_to_original") : undefined}
                   style={{
                     display: "flex",
                     borderRadius: 6,
@@ -3493,7 +3499,7 @@ function MessageBubble({
                         {isVoiceNote(msg) && (
                           <button
                             onClick={downloadAudio}
-                            aria-label="Telecharger le vocal"
+                            aria-label={t("download_audio")}
                             title="Telecharger"
                             style={{
                               width: 26,
@@ -3799,9 +3805,7 @@ function MessageBubble({
                                   color: isMe ? "rgba(255,255,255,0.9)" : "var(--text-secondary)",
                                 }}
                               >
-                                {mediaSrc
-                                  ? "Aperçu disponible — cliquer pour ouvrir"
-                                  : "Aperçu disponible après chargement"}
+                                {mediaSrc ? t("preview_click_open") : t("preview_after_load")}
                               </div>
                               {msg.status === "sending" && (
                                 <div
@@ -3901,11 +3905,7 @@ function MessageBubble({
                               if (canExpandMedia) openExpandedPreview()
                             }}
                             onPointerUp={canExpandMedia ? onPreviewPointerUp : undefined}
-                            title={
-                              canExpandMedia
-                                ? "Double-cliquez ou tapez deux fois pour agrandir"
-                                : undefined
-                            }
+                            title={canExpandMedia ? t("double_tap_zoom") : undefined}
                           >
                             {filePreview}
                           </div>
@@ -4641,7 +4641,7 @@ export default function ChatRoomPage() {
           }
           return prev.filter((m) => m.id !== tempId)
         })
-        const message = err instanceof Error ? err.message : "Envoi du fichier impossible."
+        const message = err instanceof Error ? err.message : t("send_file_failed")
         error("Fichier non envoye", message)
       }
     },
@@ -4765,7 +4765,7 @@ export default function ChatRoomPage() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
-      error("Micro inaccessible", "Autorisez le micro pour envoyer un vocal.")
+      error("Micro inaccessible", t("allow_mic"))
       return
     }
 
@@ -4833,8 +4833,8 @@ export default function ChatRoomPage() {
   const handleCopy = (msg: Message) => {
     void navigator.clipboard
       .writeText(msg.content)
-      .then(() => success("Copie", "Message copie dans le presse-papiers."))
-      .catch(() => error("Copie impossible", "Le presse-papiers est inaccessible."))
+      .then(() => success("Copie", t("message_copied")))
+      .catch(() => error("Copie impossible", t("clipboard_unavailable")))
   }
 
   const handleDelete = (msg: Message, scope: "me" | "everyone") => {
@@ -4856,7 +4856,7 @@ export default function ChatRoomPage() {
         navigate(`/calls/${newCallId}?type=${callType}&returnTo=${encodeURIComponent(returnTo)}`)
       })
       .catch((err) => {
-        const message = err instanceof Error ? err.message : "Impossible de demarrer l'appel."
+        const message = err instanceof Error ? err.message : t("call_start_failed")
         error("Appel impossible", message)
       })
   }
@@ -4894,7 +4894,7 @@ export default function ChatRoomPage() {
       `[data-message-id="${messageId}"]`
     )
     if (!target) {
-      error("Message introuvable", "Il est trop ancien pour etre affiche ici.")
+      error("Message introuvable", t("too_old_to_show"))
       return
     }
     target.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -5053,12 +5053,8 @@ export default function ChatRoomPage() {
           {!verrou.parUnAutre && (
             <button
               className={`action-btn${verrou.parMoi ? " action-btn-on" : ""}`}
-              aria-label={verrou.parMoi ? "Rendre la main" : "Reserver cette conversation"}
-              title={
-                verrou.parMoi
-                  ? "Vous avez la main — cliquez pour la rendre"
-                  : "Reserver : les autres appareils de ce compte ne pourront plus ecrire"
-              }
+              aria-label={verrou.parMoi ? t("release_hand") : t("reserve_conversation")}
+              title={verrou.parMoi ? t("you_have_hand") : t("reserve_hint")}
               aria-pressed={verrou.parMoi}
               onClick={basculerVerrou}
             >
@@ -5244,7 +5240,7 @@ export default function ChatRoomPage() {
           <button
             className="reply-cancel"
             onClick={() => setReplyTo(null)}
-            aria-label="Annuler la reponse"
+            aria-label={t("cancel_reply")}
           >
             <svg
               width="14"
@@ -5455,7 +5451,7 @@ export default function ChatRoomPage() {
               onMouseEnter={() => setShowAttach(true)}
               onClick={() => setShowAttach((v) => !v)}
               aria-expanded={showAttach}
-              aria-label="Joindre un fichier"
+              aria-label={t("attach_file")}
             >
               <svg
                 width="17"
@@ -5503,7 +5499,7 @@ export default function ChatRoomPage() {
                 </span>
                 <button
                   onClick={() => stopRecording(true)}
-                  aria-label="Annuler le vocal"
+                  aria-label={t("cancel_voice")}
                   style={{
                     background: "none",
                     border: "1px solid var(--border-default)",
@@ -5519,7 +5515,7 @@ export default function ChatRoomPage() {
                 <button
                   className="send-btn"
                   onClick={() => stopRecording(false)}
-                  aria-label="Envoyer le vocal"
+                  aria-label={t("send_voice")}
                 >
                   <svg
                     width="15"
@@ -5545,7 +5541,7 @@ export default function ChatRoomPage() {
                   onChange={handleInput}
                   onKeyDown={handleKeyDown}
                   rows={1}
-                  aria-label="Saisir un message"
+                  aria-label={t("type_message")}
                 />
 
                 {input.trim() ? (
@@ -5572,8 +5568,8 @@ export default function ChatRoomPage() {
                   <button
                     className="send-btn"
                     onClick={() => void startRecording()}
-                    aria-label="Enregistrer un vocal"
-                    title="Enregistrer un message vocal"
+                    aria-label={t("record_voice")}
+                    title={t("record_voice")}
                   >
                     <svg
                       width="15"
