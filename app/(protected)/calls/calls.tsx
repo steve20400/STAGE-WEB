@@ -15,16 +15,18 @@ import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { ApiError } from "../../../src/lib/api-client"
 import { Dialer } from "./dialer"
 import { AvatarCircle } from "../../../src/components/avatar-circle"
+import { useTranslation, type Cle } from "../../../src/i18n"
 
 type FilterType = "all" | "missed" | "audio" | "video"
 
 /** Ordres de tri de l'historique. */
 type SortType = "recent" | "oldest" | "name"
 
-const SORT_LABELS: Record<SortType, string> = {
-  recent: "Plus recents",
-  oldest: "Plus anciens",
-  name: "Nom (A-Z)",
+/** Cles de tri : le libelle se resout au rendu, la langue peut changer. */
+const SORT_KEYS: Record<SortType, Cle> = {
+  recent: "sort_recent",
+  oldest: "sort_oldest",
+  name: "sort_name",
 }
 
 function formatItemTime(date: Date): string {
@@ -65,6 +67,7 @@ function DirectionArrow({ direction }: { direction: CallDirection }) {
 }
 
 export default function CallsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<FilterType>("all")
   const [sort, setSort] = useState<SortType>("recent")
@@ -176,14 +179,14 @@ export default function CallsPage() {
     const inconnu = err instanceof ApiError && [400, 404, 422].includes(err.status)
     const reseau = err instanceof ApiError && err.status === 0
     error(
-      "Appel impossible",
+      t("call_failed"),
       inconnu
-        ? `Aucun compte ne correspond a ${cible}.`
+        ? t("no_account_matches").replace("{cible}", cible)
         : reseau
-          ? "Serveur injoignable : verifiez votre connexion."
+          ? t("server_unreachable")
           : err instanceof Error
             ? err.message
-            : "Appel impossible pour le moment."
+            : t("call_failed_now")
     )
   }
 
@@ -192,7 +195,7 @@ export default function CallsPage() {
       <div className="calls-root">
         <div className="calls-head">
           <div className="calls-title-row page-title-row">
-            <h1 className="calls-title">Appels</h1>
+            <h1 className="calls-title">{t("calls")}</h1>
           </div>
 
           {/* Les deux facons de lancer un appel, l'une sous l'autre : par le
@@ -245,7 +248,7 @@ export default function CallsPage() {
                 <path d="M21 21l-4.35-4.35" />
               </svg>
               <input
-                placeholder="Rechercher un contact..."
+                placeholder={t("search_contact")}
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 autoComplete="off"
@@ -260,7 +263,7 @@ export default function CallsPage() {
                   onClick={() => setFilter(current)}
                 >
                   {current === "all" ? (
-                    "Tous"
+                    t("filter_all")
                   ) : current === "missed" ? (
                     <>
                       Manques{" "}
@@ -280,25 +283,25 @@ export default function CallsPage() {
                       )}
                     </>
                   ) : current === "audio" ? (
-                    "Audio"
+                    t("filter_audio")
                   ) : (
-                    "Video"
+                    t("filter_video")
                   )}
                 </button>
               ))}
             </div>
 
             {/* Tri de l'historique, distinct des filtres de type au-dessus. */}
-            <div className="sort-group" role="group" aria-label="Trier l'historique">
+            <div className="sort-group" role="group" aria-label={t("sort_history")}>
               <span className="sort-label">Trier</span>
-              {(Object.keys(SORT_LABELS) as SortType[]).map((current) => (
+              {(Object.keys(SORT_KEYS) as SortType[]).map((current) => (
                 <button
                   key={current}
                   className={`filter-btn ${sort === current ? "on" : ""}`}
                   onClick={() => setSort(current)}
                   aria-pressed={sort === current}
                 >
-                  {SORT_LABELS[current]}
+                  {t(SORT_KEYS[current])}
                 </button>
               ))}
             </div>
@@ -397,7 +400,7 @@ export default function CallsPage() {
                   <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                 </svg>
               </div>
-              <div className="empty-txt">Aucun appel trouve</div>
+              <div className="empty-txt">{t("no_call_found")}</div>
             </div>
           ) : (
             grouped.map(({ header, calls }) => (
@@ -408,13 +411,13 @@ export default function CallsPage() {
                   const color = COLORS[call.contactColor]
                   const statusLabel =
                     call.status === "missed"
-                      ? "Appel manqué"
+                      ? t("call_missed")
                       : call.status === "no_answer"
-                        ? "Sans réponse"
+                        ? t("call_no_answer")
                         : call.status === "declined"
-                          ? "Appel rejeté"
+                          ? t("call_declined")
                           : call.status === "busy"
-                            ? "Occupé"
+                            ? t("call_busy")
                             : null
                   return (
                     <div
@@ -486,7 +489,7 @@ export default function CallsPage() {
                                 <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                               </svg>
                             )}
-                            {call.type === "video" ? "Video" : "Audio"}
+                            {call.type === "video" ? t("filter_video") : t("filter_audio")}
                           </div>
 
                           {call.duration && (
@@ -501,15 +504,15 @@ export default function CallsPage() {
                           ariaLabel={`Actions pour ${call.contactName}`}
                           actions={[
                             {
-                              label: "Rappeler en audio",
+                              label: t("call_back_audio"),
                               onSelect: () => void rappeler(call, "audio"),
                             },
                             {
-                              label: "Rappeler en video",
+                              label: t("call_back_video"),
                               onSelect: () => void rappeler(call, "video"),
                             },
                             {
-                              label: "Ouvrir la discussion",
+                              label: t("open_conversation"),
                               onSelect: () => navigate(`/chats/${call.contactId}`),
                             },
                           ]}
