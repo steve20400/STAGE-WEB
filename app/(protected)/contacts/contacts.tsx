@@ -14,6 +14,7 @@ import {
 } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
 import { RowActionsMenu } from "../../../src/components/row-actions-menu"
+import { useTranslation } from "../../../src/i18n"
 import {
   bloquer,
   debloquer,
@@ -28,6 +29,7 @@ import "../calls/calls-page.css"
  */
 export default function ContactsPage() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { contacts, addContact, removeContact } = useContacts()
   const { success, error } = useToast()
 
@@ -63,11 +65,11 @@ export default function ContactsPage() {
       if (existant) {
         await debloquer(existant.idBlock)
         setBloques((liste) => liste.filter((b) => b.idBlock !== existant.idBlock))
-        success("Debloque", `${nom} peut de nouveau vous ecrire.`)
+        success(t("unblocked_toast"), nom)
       } else {
         const ligne = await bloquer(numero)
         setBloques((liste) => [...liste, ligne])
-        success("Bloque", `${nom} ne peut plus vous ecrire.`)
+        success(t("blocked_toast"), nom)
       }
     } catch (err) {
       error(
@@ -93,7 +95,7 @@ export default function ContactsPage() {
     const number = normalizeAlanyaNumber(newNumber)
 
     if (contacts.some((contact) => contact.phone === number)) {
-      error("Contact existant", "Cet Alanya ID est deja dans votre repertoire.")
+      error(t("contact_exists"), t("contact_exists_detail"))
       return
     }
 
@@ -101,13 +103,13 @@ export default function ContactsPage() {
     try {
       const contact = await addContactByPhone(number, newAlias)
       addContact(contact)
-      success("Contact enregistre", `${contact.name} a ete ajoute a votre repertoire.`)
+      success(t("contact_saved"), contact.name)
       setNewNumber("")
       setNewAlias("")
       setShowAdd(false)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Impossible d'ajouter ce contact."
-      error("Ajout impossible", message)
+      const message = err instanceof Error ? err.message : t("add_failed")
+      error(t("add_failed"), message)
     } finally {
       setSaving(false)
     }
@@ -130,14 +132,14 @@ export default function ContactsPage() {
       navigate(`/calls/${callId}?type=${type}&returnTo=/contacts`)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Appel impossible."
-      error("Appel impossible", message)
+      error(t("call_failed"), message)
     }
   }
 
   const handleRemove = async (id: string) => {
     try {
       await removeContact(id)
-      success("Contact retire", "Le contact a ete supprime de votre repertoire.")
+      success(t("contact_removed"), t("contact_removed_detail"))
     } catch (err) {
       const message = err instanceof Error ? err.message : "Suppression impossible."
       error("Erreur", message)
@@ -150,9 +152,9 @@ export default function ContactsPage() {
     <div className="calls-root" style={{ padding: "20px 0" }}>
       <div className="calls-head" style={{ marginBottom: 14 }}>
         <div className="calls-title-row page-title-row">
-          <h1 className="calls-title">Contacts</h1>
+          <h1 className="calls-title">{t("contacts")}</h1>
           <button className="new-call-btn" onClick={() => setShowAdd((v) => !v)}>
-            {showAdd ? "Fermer" : "+ Nouveau contact"}
+            {showAdd ? t("close") : t("new_contact")}
           </button>
         </div>
 
@@ -173,7 +175,7 @@ export default function ContactsPage() {
           >
             <input
               className="input-base"
-              placeholder="Alanya ID (ex. 12 34 56 78)"
+              placeholder={t("alanya_id_placeholder")}
               value={formatAlanyaNumber(newNumber)}
               onChange={(e) => setNewNumber(formatAlanyaNumber(e.target.value))}
               inputMode="numeric"
@@ -182,7 +184,7 @@ export default function ContactsPage() {
             />
             <input
               className="input-base"
-              placeholder="Alias (optionnel)"
+              placeholder={t("alias_placeholder")}
               value={newAlias}
               onChange={(e) => setNewAlias(e.target.value)}
               maxLength={100}
@@ -191,9 +193,7 @@ export default function ContactsPage() {
             <button className="new-call-btn" type="submit" disabled={!canSave || saving}>
               {saving ? "Enregistrement..." : "Enregistrer"}
             </button>
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-              L'Alanya ID est affiche dans les parametres de chaque utilisateur.
-            </span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{t("alanya_id_hint")}</span>
           </form>
         )}
 
@@ -212,7 +212,7 @@ export default function ContactsPage() {
               <path d="M21 21l-4.35-4.35" />
             </svg>
             <input
-              placeholder="Rechercher un contact..."
+              placeholder={t("search_contact")}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -255,27 +255,27 @@ export default function ContactsPage() {
                 <RowActionsMenu
                   ariaLabel={`Actions pour ${contact.name}`}
                   actions={[
-                    { label: "Envoyer un message", onSelect: () => void openChat(contact.phone) },
+                    { label: t("send_message"), onSelect: () => void openChat(contact.phone) },
                     {
-                      label: "Appel audio",
+                      label: t("filter_audio"),
                       onSelect: () => void callContact(contact.phone, contact.name, "audio"),
                     },
                     {
-                      label: "Appel video",
+                      label: t("filter_video"),
                       onSelect: () => void callContact(contact.phone, contact.name, "video"),
                     },
                     blocageDe(contact.phone)
                       ? {
-                          label: "Debloquer",
+                          label: t("unblock"),
                           onSelect: () => void basculerBlocage(contact.phone, contact.name),
                         }
                       : {
-                          label: "Bloquer",
+                          label: t("block"),
                           onSelect: () => void basculerBlocage(contact.phone, contact.name),
                           danger: true,
                         },
                     {
-                      label: "Supprimer le contact",
+                      label: t("delete_contact"),
                       onSelect: () => setConfirmDelete(contact.id),
                       danger: true,
                     },
@@ -288,9 +288,7 @@ export default function ContactsPage() {
 
         {filtered.length === 0 && (
           <div className="empty-state">
-            <div className="empty-txt">
-              {query ? "Aucun contact trouve" : "Aucun contact enregistre pour le moment"}
-            </div>
+            <div className="empty-txt">{query ? t("no_contact_found") : t("no_contact_yet")}</div>
           </div>
         )}
       </div>
@@ -327,10 +325,10 @@ export default function ContactsPage() {
                 marginBottom: 8,
               }}
             >
-              Supprimer ce contact ?
+              {t("delete_contact_confirm")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-              Vos conversations existantes ne seront pas supprimees.
+              {t("delete_contact_detail")}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
@@ -345,7 +343,7 @@ export default function ContactsPage() {
                   cursor: "pointer",
                 }}
               >
-                Annuler
+                {t("cancel")}
               </button>
               <button
                 onClick={() => void handleRemove(confirmDelete)}
@@ -360,7 +358,7 @@ export default function ContactsPage() {
                   cursor: "pointer",
                 }}
               >
-                Supprimer
+                {t("delete")}
               </button>
             </div>
           </div>
