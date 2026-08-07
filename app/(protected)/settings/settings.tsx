@@ -2393,32 +2393,32 @@ export default function SettingsPage() {
           {section === "notifications" && (
             <>
               <div className="s-page-title">Notifications</div>
-              <p className="s-page-sub">Choisissez ce que vous voulez recevoir et comment.</p>
+              <p className="s-page-sub">{t("notif_sub")}</p>
               <div className="s-card">
                 <div className="s-card-title">Notifications push</div>
                 <Toggle
                   value={notifMessages}
                   onChange={updateNotifMessages}
                   label="Messages"
-                  description="Recevoir une notification pour chaque nouveau message."
+                  description={t("notif_new_message")}
                 />
                 <Toggle
                   value={notifCalls}
                   onChange={updateNotifCalls}
                   label="Appels entrants"
-                  description="Etre notifie des appels audio et video."
+                  description={t("notif_calls")}
                 />
                 <Toggle
                   value={notifSounds}
                   onChange={updateNotifSounds}
                   label="Sons"
-                  description="Jouer un son a la reception d'un message."
+                  description={t("notif_sound")}
                 />
                 <Toggle
                   value={notifPreview}
                   onChange={updateNotifPreview}
-                  label="Apercu du message"
-                  description="Afficher le debut du message dans la notification."
+                  label={t("notif_preview")}
+                  description={t("notif_preview_sub")}
                 />
                 <PushDiagnostic />
               </div>
@@ -2430,30 +2430,25 @@ export default function SettingsPage() {
           {section === "privacy" && (
             <>
               <div className="s-page-title">Confidentialite</div>
-              <p className="s-page-sub">Controlez ce que les autres peuvent voir sur vous.</p>
+              <p className="s-page-sub">{t("privacy_sub")}</p>
               <div className="s-card">
                 <div className="s-card-title">Visibilite</div>
                 <Toggle
                   value={privacy.readReceipts}
                   onChange={(v) => void updatePrivacy({ readReceipts: v })}
-                  label="Confirmations de lecture"
-                  description="Envoyer la confirmation de lecture quand vous lisez un message. Desactive, vous ne verrez pas non plus celles des autres."
+                  label={t("read_receipts")}
+                  description={t("read_receipts_sub")}
                 />
 
                 <div className="privacy-choice">
                   <div className="privacy-choice-head">
-                    <div className="privacy-choice-label">
-                      Derniere connexion et statut en ligne
-                    </div>
-                    <div className="privacy-choice-desc">
-                      Qui peut voir quand vous etes en ligne et quand vous avez ete vu pour la
-                      derniere fois.
-                    </div>
+                    <div className="privacy-choice-label">{t("last_seen")}</div>
+                    <div className="privacy-choice-desc">{t("last_seen_sub")}</div>
                   </div>
                   <div
                     className="privacy-choice-opts"
                     role="group"
-                    aria-label="Visibilite de la derniere connexion"
+                    aria-label={t("last_seen_visibility")}
                   >
                     {([2, 1, 0] as LastSeenVisibility[]).map((niveau) => (
                       <button
@@ -2469,10 +2464,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="s-hint">
-                  Ces deux reglages sont enregistres sur votre compte et s'appliquent aussi a
-                  l'application mobile.
-                </div>
+                <div className="s-hint">{t("settings_sync_note")}</div>
               </div>
 
               {/* Personnes bloquees. Sans cette liste, on ne peut debloquer que
@@ -2481,11 +2473,11 @@ export default function SettingsPage() {
               <div className="s-card">
                 <div className="s-card-title">Personnes bloquees</div>
                 <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
-                  Leurs messages ne vous parviennent pas. Debloquer retablit l'echange.
+                  {t("blocked_list_sub")}
                 </div>
                 {bloques.length === 0 ? (
                   <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "6px 0" }}>
-                    Vous n'avez bloque personne.
+                    {t("blocked_none")}
                   </div>
                 ) : (
                   bloques.map((personne) => (
@@ -2536,13 +2528,13 @@ export default function SettingsPage() {
           {section === "appearance" && (
             <>
               <div className="s-page-title">Apparence</div>
-              <p className="s-page-sub">Personnalisez l'interface selon vos preferences.</p>
+              <p className="s-page-sub">{t("appearance_sub")}</p>
               <div className="s-card">
                 <div className="s-card-title">Theme</div>
                 <ThemeSelector />
               </div>
               <div className="s-card">
-                <div className="s-card-title">Taille du texte</div>
+                <div className="s-card-title">{t("text_size")}</div>
                 <div className="font-opts">
                   {(["small", "medium", "large"] as const).map((size) => (
                     <button
@@ -2660,7 +2652,7 @@ export default function SettingsPage() {
                 {[
                   { label: "Front-end", value: "React + Vite (web)  -  Flutter (mobile)" },
                   { label: "Back-end", value: "Next.js (App Router, API Routes)" },
-                  { label: "Base de donnees", value: "PostgreSQL  -  Prisma" },
+                  { label: t("database"), value: "PostgreSQL  -  Prisma" },
                   { label: "Temps reel", value: "WebSocket (serveur Node dedie)" },
                   { label: "Appels A/V", value: "WebRTC + serveur TURN/STUN (Metered)" },
                   { label: "Auth", value: "JWT (Access 15 min  -  Refresh rotatif)" },
