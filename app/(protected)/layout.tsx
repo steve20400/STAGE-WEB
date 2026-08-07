@@ -450,6 +450,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 // Ecoute les appels entrants du backend et affiche l'overlay d'acceptation.
 function GlobalIncomingCall() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { incoming } = useCallState()
 
   if (!incoming) return null
@@ -470,9 +471,16 @@ function GlobalIncomingCall() {
       }}
       type={incoming.callType}
       onAccept={() => {
+        // On emporte la page ou l'on se trouve : un appel entrant arrive
+        // n'importe ou, et raccrocher doit y ramener. Le retour etait fige sur
+        // la liste des appels, qui n'a aucune raison d'etre l'endroit d'ou l'on
+        // vient — recevoir un appel en pleine discussion y deposait ensuite.
+        const depart = `${location.pathname}${location.search}`
         void acceptIncomingCall().then((callId) => {
           if (callId) {
-            navigate(`/calls/${callId}?type=${incoming.callType}&returnTo=/calls`)
+            navigate(
+              `/calls/${callId}?type=${incoming.callType}&returnTo=${encodeURIComponent(depart)}`
+            )
           }
         })
       }}
