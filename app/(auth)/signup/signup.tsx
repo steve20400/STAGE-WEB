@@ -225,7 +225,7 @@ export default function SignUpPage() {
           <img src={alanyaLogo} alt="Logo Alanya" className="auth-school-logo" />
           <div className="auth-brand-copy">
             <span className="logo-txt">Alanya</span>
-            <span className="auth-brand-subtitle">Messagerie ENSPY</span>
+            <span className="auth-brand-subtitle">Work</span>
           </div>
         </div>
 

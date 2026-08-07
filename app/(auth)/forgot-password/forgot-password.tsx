@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
           <img src={alanyaLogo} alt="Logo Alanya" className="fp-logo" />
           <span>
             <strong>Alanya</strong>
-            <small>Messagerie ENSPY</small>
+            <small>Work</small>
           </span>
         </Link>
 
