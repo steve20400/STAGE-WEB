@@ -1,3 +1,4 @@
+import { useTranslation } from "../../../src/i18n"
 import { useEffect, useRef, useState } from "react"
 import { useToast } from "../../../src/components/toast"
 import {
@@ -14,6 +15,7 @@ import "../chats/[chatId]/chat-room-page.css"
  * pour l'assistant.
  */
 export default function AiAssistantPage() {
+  const { t } = useTranslation()
   const { error } = useToast()
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [input, setInput] = useState("")
@@ -60,7 +62,7 @@ export default function AiAssistantPage() {
       const reply = await sendAiMessage(text)
       setMessages((prev) => [...prev, reply])
     } catch (err) {
-      const message = err instanceof Error ? err.message : "L'assistant est indisponible."
+      const message = err instanceof Error ? err.message : t("ai_unavailable")
       error("Assistant IA", message)
     } finally {
       setThinking(false)
@@ -109,15 +111,15 @@ export default function AiAssistantPage() {
         <div className="room-info">
           <div className="room-name">Assistant Alanya</div>
           <div className="room-sub" style={{ color: "var(--text-muted)" }}>
-            Propulse par Gemini — vos questions restent privees
+            {t("ai_powered_by")}
           </div>
         </div>
         <div className="room-actions">
           <button
             className="action-btn"
             onClick={() => setConfirmClear(true)}
-            title="Effacer la conversation"
-            aria-label="Effacer la conversation"
+            title={t("ai_clear")}
+            aria-label={t("ai_clear")}
           >
             <svg
               width="16"
@@ -138,7 +140,9 @@ export default function AiAssistantPage() {
       {/* Fil de discussion */}
       <div className="room-body">
         {loading && (
-          <div style={{ padding: 20, color: "var(--text-muted)", fontSize: 13 }}>Chargement...</div>
+          <div style={{ padding: 20, color: "var(--text-muted)", fontSize: 13 }}>
+            {t("loading")}
+          </div>
         )}
 
         {!loading && messages.length === 0 && (
@@ -153,13 +157,12 @@ export default function AiAssistantPage() {
                 marginBottom: 6,
               }}
             >
-              Posez-moi une question
+              {t("ai_ask_me")}
             </div>
             <div
               style={{ fontSize: 13, color: "var(--text-muted)", maxWidth: 380, margin: "0 auto" }}
             >
-              Idees de messages, aide aux devoirs, traductions, resumes... l'assistant repond en
-              quelques secondes.
+              {t("ai_intro")}
             </div>
           </div>
         )}
@@ -216,7 +219,7 @@ export default function AiAssistantPage() {
           <textarea
             ref={inputRef}
             className="room-textarea"
-            placeholder="Ecrivez a l'assistant..."
+            placeholder={t("ai_placeholder")}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -243,7 +246,7 @@ export default function AiAssistantPage() {
             </svg>
           </button>
         </div>
-        <div className="input-hint">Entree pour envoyer - Shift+Entree pour sauter une ligne</div>
+        <div className="input-hint">{t("ai_enter_hint")}</div>
       </div>
 
       {confirmClear && (
@@ -278,10 +281,10 @@ export default function AiAssistantPage() {
                 marginBottom: 8,
               }}
             >
-              Effacer la conversation ?
+              {t("ai_clear_confirm")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-              Tout l'historique avec l'assistant sera supprime.
+              {t("ai_clear_detail")}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
