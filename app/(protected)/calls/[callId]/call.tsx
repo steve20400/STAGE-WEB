@@ -397,14 +397,14 @@ export default function CallRoomPage() {
                   <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                 </svg>
               )}
-              Appel {isVideo ? "video" : "audio"}
+              {isVideo ? t("filter_video") : t("filter_audio")}
               {call.isGroup ? " (groupe)" : ""}
             </div>
           </div>
 
           {audioBlocked && (
             <button className="audio-unblock" onClick={unblockAudio}>
-              Le navigateur a bloque le son — appuyez pour l'activer
+              {t("audio_blocked")}
             </button>
           )}
 
@@ -446,7 +446,7 @@ export default function CallRoomPage() {
                   bougerait a l'ecran sans ce rappel. */}
               {call.transferPending && (
                 <div className="call-status" style={{ color: "var(--accent)", marginTop: 8 }}>
-                  Transfert en cours — en attente de la reponse du destinataire…
+                  {t("transfer_waiting")}
                 </div>
               )}
               {call.error && (
@@ -553,7 +553,7 @@ export default function CallRoomPage() {
               <button
                 className="ctrl-btn"
                 onClick={() => toggleMicrophone()}
-                aria-label={call.micOn ? "Couper le micro" : "Activer le micro"}
+                aria-label={call.micOn ? t("mute_mic") : t("unmute_mic")}
               >
                 <div className={`ctrl-btn-icon ${call.micOn ? "ctrl-on" : "ctrl-off"}`}>
                   {call.micOn ? (
@@ -592,7 +592,7 @@ export default function CallRoomPage() {
                 <button
                   className="ctrl-btn"
                   onClick={() => toggleCamera()}
-                  aria-label={call.camOn ? "Couper la camera" : "Activer la camera"}
+                  aria-label={call.camOn ? t("turn_off_camera") : t("turn_on_camera")}
                 >
                   <div className={`ctrl-btn-icon ${call.camOn ? "ctrl-on" : "ctrl-off"}`}>
                     {call.camOn ? (
@@ -631,7 +631,7 @@ export default function CallRoomPage() {
                 <button
                   className="ctrl-btn"
                   onClick={() => void switchCamera()}
-                  aria-label="Changer de caméra"
+                  aria-label={t("switch_camera")}
                 >
                   <div className="ctrl-btn-icon ctrl-on">↻</div>
                   <span className="ctrl-btn-label">Retourner</span>
@@ -697,7 +697,7 @@ export default function CallRoomPage() {
                   // les departs a la fois : bouton, menu lateral, retour
                   // navigateur.
                   onClick={() => navigate(`/chats/${call.activeConvId}`)}
-                  aria-label="Ouvrir le chat"
+                  aria-label={t("open_chat")}
                 >
                   <div className="ctrl-btn-icon ctrl-on">
                     <svg
@@ -722,7 +722,7 @@ export default function CallRoomPage() {
                   if (callState === "active") setShowEndConfirm(true)
                   else doHangUp()
                 }}
-                aria-label="Raccrocher"
+                aria-label={t("hang_up")}
               >
                 <div className="ctrl-btn-icon ctrl-end" style={{ width: 60, height: 60 }}>
                   <svg
@@ -741,7 +741,7 @@ export default function CallRoomPage() {
                   </svg>
                 </div>
                 <span className="ctrl-btn-label" style={{ color: "#fca5a5" }}>
-                  Raccrocher
+                  {t("hang_up")}
                 </span>
               </button>
 
@@ -765,7 +765,7 @@ export default function CallRoomPage() {
                       <circle cx="12" cy="19" r="2" />
                     </svg>
                   </div>
-                  <span className="ctrl-btn-label">Plus</span>
+                  <span className="ctrl-btn-label">{t("more")}</span>
                 </button>
                 <CallOptionsMenu
                   open={showMoreMenu}
@@ -792,30 +792,32 @@ export default function CallRoomPage() {
                 <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
               </svg>
             </div>
-            <div className="ended-title">Appel termine</div>
-            {elapsed > 0 && <div className="ended-duration">Duree: {formatElapsed(elapsed)}</div>}
+            <div className="ended-title">{t("call_ended_title")}</div>
+            {elapsed > 0 && (
+              <div className="ended-duration">{`${t("call_duration")}: ${formatElapsed(elapsed)}`}</div>
+            )}
           </div>
         )}
 
         {showEndConfirm && (
           <div className="confirm-overlay">
             <div className="confirm-card">
-              <div className="confirm-title">Raccrocher ?</div>
+              <div className="confirm-title">{t("hang_up_confirm")}</div>
               <div className="confirm-sub">
-                L'appel avec {peerName} sera termine.
+                {t("call_will_end").replace("{name}", peerName)}
                 {elapsed > 0 && (
                   <>
                     <br />
-                    Duree actuelle: {formatElapsed(elapsed)}
+                    {`${t("current_duration")}: ${formatElapsed(elapsed)}`}
                   </>
                 )}
               </div>
               <div className="confirm-btns">
                 <button className="confirm-cancel" onClick={() => setShowEndConfirm(false)}>
-                  Annuler
+                  {t("cancel")}
                 </button>
                 <button className="confirm-end" onClick={doHangUp}>
-                  Raccrocher
+                  {t("hang_up")}
                 </button>
               </div>
             </div>
