@@ -1,4 +1,5 @@
-﻿import { useMemo, useRef, useState } from "react"
+﻿import { useTranslation } from "../../../../src/i18n"
+import { useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
 import { CONTACT_COLORS, normalizePhone } from "../../../../src/data/contacts"
@@ -14,6 +15,7 @@ import {
 type Mode = "chat" | "group"
 
 export function NewChatModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { success, error } = useToast()
   const { contacts, addContact } = useContacts()
@@ -53,14 +55,14 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       const conversation = await createPrivateChat(contact.phone)
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Impossible de creer la conversation."
+      const message = e instanceof Error ? e.message : t("conv_create_failed")
       error("Conversation impossible", message)
     }
   }
 
   const createGroup = async () => {
     if (groupName.trim().length < 2 || selected.size < 2) {
-      error("Groupe incomplet", "Ajoutez un nom et au moins 2 membres.")
+      error("Groupe incomplet", t("group_needs_members"))
       return
     }
 
@@ -73,7 +75,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       success("Groupe cree", `${selected.size} membres ajoutes.`)
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Impossible de creer le groupe."
+      const message = e instanceof Error ? e.message : t("group_create_failed")
       error("Groupe impossible", message)
     } finally {
       setLoading(false)
@@ -84,13 +86,13 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
     const phone = normalizePhone(newPhone).replace(/\D/g, "")
 
     if (!isValidAlanyaNumber(phone)) {
-      error("Numero invalide", "Utilisez l'Alanya ID (6 ou 8 chiffres) du contact.")
+      error("Numero invalide", t("use_alanya_id"))
       return
     }
 
     const exists = contacts.some((contact) => normalizePhone(contact.phone) === phone)
     if (exists) {
-      error("Contact existant", "Ce numero est deja dans vos contacts.")
+      error("Contact existant", t("number_already_contact"))
       return
     }
 
@@ -103,7 +105,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       setNewPhone("")
       setShowAdd(false)
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Impossible d'ajouter ce contact."
+      const message = e instanceof Error ? e.message : t("add_failed")
       error("Ajout impossible", message)
     }
   }
@@ -157,9 +159,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
         <div className="ncm-card" role="dialog" aria-label="Nouveau chat">
           <div className="ncm-head">
             <div className="ncm-title-row page-title-row">
-              <h2 className="ncm-title">
-                {mode === "chat" ? "Nouveau message" : "Nouveau groupe"}
-              </h2>
+              <h2 className="ncm-title">{mode === "chat" ? t("new_message") : t("new_group")}</h2>
               <div className="ncm-actions">
                 <button className="ncm-add-btn" onClick={() => setShowAdd((value) => !value)}>
                   + Contact
@@ -181,14 +181,14 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
                 className={`ncm-tab ${mode === "group" ? "on" : ""}`}
                 onClick={() => setMode("group")}
               >
-                Nouveau groupe
+                {t("new_group")}
               </button>
             </div>
 
             <input
               ref={inputRef}
               className="ncm-search"
-              placeholder={mode === "chat" ? "Chercher un contact..." : "Ajouter des membres..."}
+              placeholder={mode === "chat" ? t("search_contact_short") : t("add_members")}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               autoFocus
@@ -205,7 +205,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
                   maxLength={ALANYA_NUMBER_FORMATTED_MAX_LENGTH}
                 />
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  Recherche dans les comptes Alanya.
+                  {t("search_alanya_accounts")}
                 </div>
                 <div className="ncm-add-row">
                   <button className="cancel" onClick={() => setShowAdd(false)}>
@@ -274,7 +274,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
               <input
                 className="ncm-search"
                 style={{ maxWidth: 180 }}
-                placeholder="Nom du groupe"
+                placeholder={t("group_name")}
                 value={groupName}
                 onChange={(event) => setGroupName(event.target.value)}
               />
@@ -294,6 +294,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function NewChatPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   return <NewChatModal onClose={() => navigate("/chats")} />
 }
