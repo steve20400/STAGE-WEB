@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
 import { ParticipantGrid } from "./participant-grid"
 
@@ -36,6 +36,7 @@ const PARTICIPANTS_POUR_DIVISER = 2
 export function ActiveCallFloating() {
   const call = useCallState()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const [menuOuvert, setMenuOuvert] = useState(false)
@@ -68,7 +69,17 @@ export function ActiveCallFloating() {
   const restore = () => {
     const id = call.activeCallId
     restoreActiveCall()
-    requestAnimationFrame(() => navigate(`/calls/${id}?type=${call.callType}`, { replace: true }))
+    // On emporte l'endroit d'ou l'on part : a la fin de l'appel, l'ecran y
+    // ramene au lieu de deposer tout le monde sur la liste des appels.
+    //
+    // `useLocation` et non `window.location` : sous /webapp/, l'adresse du
+    // navigateur porte le basename, que le routeur ajouterait une seconde fois.
+    const depart = `${location.pathname}${location.search}`
+    requestAnimationFrame(() =>
+      navigate(`/calls/${id}?type=${call.callType}&returnTo=${encodeURIComponent(depart)}`, {
+        replace: true,
+      })
+    )
   }
 
   return (

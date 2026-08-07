@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
 import { useContacts } from "../hooks/use-contacts"
 import { useToast } from "./toast"
@@ -65,6 +65,7 @@ interface CallOptionsMenuProps {
 export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOptionsMenuProps) {
   const call = useCallState()
   const navigate = useNavigate()
+  const location = useLocation()
   const { contacts } = useContacts()
   const toast = useToast()
 
@@ -137,7 +138,14 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
       const id = call.activeCallId
       restoreActiveCall()
       // Le grand ecran est une route a part entiere : il faut y aller.
-      requestAnimationFrame(() => navigate(`/calls/${id}?type=${call.callType}`, { replace: true }))
+      // On emporte l'endroit d'ou l'on part : a la fin de l'appel, l'ecran y
+      // ramene au lieu de deposer tout le monde sur la liste des appels.
+      const depart = `${location.pathname}${location.search}`
+      requestAnimationFrame(() =>
+        navigate(`/calls/${id}?type=${call.callType}&returnTo=${encodeURIComponent(depart)}`, {
+          replace: true,
+        })
+      )
       return
     }
 

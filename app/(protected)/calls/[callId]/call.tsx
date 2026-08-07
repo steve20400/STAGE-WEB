@@ -141,7 +141,10 @@ export default function CallRoomPage() {
     if (callState !== "ended") return
     leaveTimerRef.current = window.setTimeout(() => {
       acknowledgeCallEnded()
-      navigate(returnTo)
+      // `replace` : l'ecran d'appel disparait de l'historique. Sans cela, le
+      // bouton « retour » du navigateur ou du telephone y ramenait apres la fin
+      // de l'appel — sur un ecran qui ne correspond plus a rien.
+      navigate(returnTo, { replace: true })
     }, 1600)
     return () => {
       if (leaveTimerRef.current !== null) window.clearTimeout(leaveTimerRef.current)
@@ -348,7 +351,7 @@ export default function CallRoomPage() {
                 } else if (callState === "ringing") {
                   setShowEndConfirm(true)
                 } else {
-                  navigate(returnTo)
+                  navigate(returnTo, { replace: true })
                 }
               }}
             >
