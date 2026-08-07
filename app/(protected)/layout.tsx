@@ -229,9 +229,9 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
   const pathname = location.pathname
 
   const user = {
-    name: sessionUser?.name ?? t("default_user_name"),
+    name: sessionUser?.name ?? "Utilisateur Alanya",
     email: sessionUser?.email ?? "",
-    initials: toInitials(sessionUser?.name ?? t("default_user_name")),
+    initials: toInitials(sessionUser?.name ?? "Utilisateur Alanya"),
     status: t("online"),
   }
 
@@ -247,14 +247,14 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
         <img src={alanyaLogo} alt="Logo Alanya" className="sb-school-logo" />
         <div className="sb-brand-copy">
           <span className="sb-logo-txt">Alanya</span>
-          <span className="sb-logo-subtitle">{t("brand_subtitle")}</span>
+          <span className="sb-logo-subtitle">Work</span>
         </div>
         {onToggleCollapse && (
           <button
             className="sb-collapse"
             onClick={onToggleCollapse}
-            aria-label={collapsed ? t("sidebar_expand") : t("sidebar_collapse")}
-            title={collapsed ? t("sidebar_expand") : t("sidebar_collapse")}
+            aria-label={collapsed ? "Deplier le menu" : "Replier le menu"}
+            title={collapsed ? "Deplier" : "Replier"}
           >
             <svg
               width="16"
@@ -281,7 +281,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
 
       {/* Navigation principale */}
       <nav className="sb-nav">
-        <div className="sb-nav-section">{t("nav_section_navigation")}</div>
+        <div className="sb-nav-section">Navigation</div>
 
         {NAV_ITEMS.map(({ href, labelKey, icon }) => {
           const isActive = pathname.startsWith(href)
@@ -303,7 +303,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           )
         })}
 
-        <div className="sb-nav-section">{t("nav_section_account")}</div>
+        <div className="sb-nav-section">Compte</div>
 
         <Link
           to="/settings"
@@ -319,7 +319,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
       {/* Profil + deconnexion */}
       <div className="sb-footer">
         <div className="sb-theme-row">
-          <span className="sb-theme-label">{t("theme")}</span>
+          <span className="sb-theme-label">Theme</span>
           <ThemeToggle />
         </div>
         <div className="sb-profile" onClick={() => navigate("/settings")}>
@@ -359,7 +359,6 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
 // LAYOUT PROTEGE
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const { t } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
   // Navigation repliee par defaut (plus de place pour les discussions).
   const [collapsed, setCollapsed] = useState(() => {
@@ -419,7 +418,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           <button
             className="topbar-menu"
             onClick={() => setMobileOpen(true)}
-            aria-label={t("open_menu")}
+            aria-label="Ouvrir le menu"
           >
             <Icons.Menu />
           </button>
@@ -427,7 +426,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             <img src={alanyaLogo} alt="Logo Alanya" className="topbar-school-logo" />
             <div className="topbar-brand-copy">
               <span className="topbar-title">Alanya</span>
-              <span className="topbar-subtitle">{t("brand_subtitle")}</span>
+              <span className="topbar-subtitle">Work</span>
             </div>
           </div>
           <ThemeToggle />
@@ -450,7 +449,6 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 // Ecoute les appels entrants du backend et affiche l'overlay d'acceptation.
 function GlobalIncomingCall() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { incoming } = useCallState()
 
   if (!incoming) return null
@@ -471,16 +469,9 @@ function GlobalIncomingCall() {
       }}
       type={incoming.callType}
       onAccept={() => {
-        // On emporte la page ou l'on se trouve : un appel entrant arrive
-        // n'importe ou, et raccrocher doit y ramener. Le retour etait fige sur
-        // la liste des appels, qui n'a aucune raison d'etre l'endroit d'ou l'on
-        // vient — recevoir un appel en pleine discussion y deposait ensuite.
-        const depart = `${location.pathname}${location.search}`
         void acceptIncomingCall().then((callId) => {
           if (callId) {
-            navigate(
-              `/calls/${callId}?type=${incoming.callType}&returnTo=${encodeURIComponent(depart)}`
-            )
+            navigate(`/calls/${callId}?type=${incoming.callType}&returnTo=/calls`)
           }
         })
       }}
