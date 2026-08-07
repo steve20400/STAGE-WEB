@@ -259,7 +259,7 @@ export default function StatusPage() {
     <div className="calls-root" style={{ padding: "20px 0" }}>
       <div className="calls-head" style={{ marginBottom: 18 }}>
         <div className="calls-title-row page-title-row">
-          <h1 className="calls-title">Statuts</h1>
+          <h1 className="calls-title">{t("status")}</h1>
           <button className="new-call-btn" onClick={() => setComposerOpen((v) => !v)}>
             {composerOpen ? "Fermer" : t("publish_status")}
           </button>

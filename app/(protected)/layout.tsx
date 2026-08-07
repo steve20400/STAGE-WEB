@@ -247,7 +247,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
         <img src={alanyaLogo} alt="Logo Alanya" className="sb-school-logo" />
         <div className="sb-brand-copy">
           <span className="sb-logo-txt">Alanya</span>
-          <span className="sb-logo-subtitle">Messagerie ENSPY</span>
+          <span className="sb-logo-subtitle">{t("brand_subtitle")}</span>
         </div>
         {onToggleCollapse && (
           <button
@@ -427,7 +427,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             <img src={alanyaLogo} alt="Logo Alanya" className="topbar-school-logo" />
             <div className="topbar-brand-copy">
               <span className="topbar-title">Alanya</span>
-              <span className="topbar-subtitle">Messagerie ENSPY</span>
+              <span className="topbar-subtitle">{t("brand_subtitle")}</span>
             </div>
           </div>
           <ThemeToggle />
