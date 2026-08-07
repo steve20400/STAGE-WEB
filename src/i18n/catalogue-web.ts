@@ -214,12 +214,41 @@ export const WEB_TRANSLATION_KEYS = [
   "not_found_line2",
   "dashboard",
   "messages_label",
+  "loading_preview",
+  "first_lines_shown",
+  "office_warning",
+  "preview_downloadable",
+  "message_deleted",
+  "download",
+  "loading_conversation",
+  "conversation_unavailable",
+  "locked_detail",
+  "recording_voice",
+  "no_conversation_available",
+  "the_media",
+  "has_the_hand",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    has_the_hand: "{name} a la main sur cette conversation.",
+    loading_preview: "Chargement de l'apercu…",
+    first_lines_shown: "30 premieres lignes affichees",
+    office_warning:
+      "Non rendu par Alanya. L'afficher l'envoie a Microsoft Office Online, avec le jeton de votre session.",
+    preview_downloadable: "Apercu indisponible — le fichier reste telechargeable.",
+    message_deleted: "Ce message a ete supprime",
+    download: "Telecharger",
+    loading_conversation: "Chargement de la conversation...",
+    conversation_unavailable:
+      "Conversation temporairement indisponible. Verifiez la connexion puis revenez a la liste des discussions.",
+    locked_detail:
+      "Vous suivez le fil en direct. Ecriture et appels reprendront des qu'il rendra la main.",
+    recording_voice: "Enregistrement du vocal...",
+    no_conversation_available: "Aucune conversation disponible.",
+    the_media: "le media",
     not_found_title: "Page introuvable",
     not_found_line1: "Cette page n'existe pas ou a ete deplacee.",
     not_found_line2: "Verifiez l'URL ou retournez a l'accueil.",
@@ -428,6 +457,22 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    has_the_hand: "{name} has the hand on this conversation.",
+    loading_preview: "Loading the preview…",
+    first_lines_shown: "First 30 lines shown",
+    office_warning:
+      "Not rendered by Alanya. Displaying it sends the file to Microsoft Office Online, along with your session token.",
+    preview_downloadable: "Preview unavailable — the file can still be downloaded.",
+    message_deleted: "This message was deleted",
+    download: "Download",
+    loading_conversation: "Loading the conversation...",
+    conversation_unavailable:
+      "Conversation temporarily unavailable. Check your connection, then go back to the conversation list.",
+    locked_detail:
+      "You are following the thread live. Writing and calls will resume as soon as they give back the hand.",
+    recording_voice: "Recording the voice message...",
+    no_conversation_available: "No conversation available.",
+    the_media: "the media",
     not_found_title: "Page not found",
     not_found_line1: "This page does not exist or has been moved.",
     not_found_line2: "Check the URL or go back to the home page.",
@@ -634,6 +679,22 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    has_the_hand: "{name} tiene el control de esta conversación.",
+    loading_preview: "Cargando la vista previa…",
+    first_lines_shown: "Primeras 30 líneas mostradas",
+    office_warning:
+      "No lo muestra Alanya. Verlo envía el archivo a Microsoft Office Online, junto con el token de tu sesión.",
+    preview_downloadable: "Vista previa no disponible — el archivo sigue descargable.",
+    message_deleted: "Este mensaje fue eliminado",
+    download: "Descargar",
+    loading_conversation: "Cargando la conversación...",
+    conversation_unavailable:
+      "Conversación no disponible temporalmente. Comprueba la conexión y vuelve a la lista de conversaciones.",
+    locked_detail:
+      "Sigues el hilo en directo. La escritura y las llamadas se reanudarán en cuanto devuelva el control.",
+    recording_voice: "Grabando el mensaje de voz...",
+    no_conversation_available: "No hay ninguna conversación disponible.",
+    the_media: "el archivo",
     not_found_title: "Página no encontrada",
     not_found_line1: "Esta página no existe o ha sido movida.",
     not_found_line2: "Comprueba la URL o vuelve al inicio.",
@@ -841,6 +902,22 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    has_the_hand: "{name} hat die Steuerung dieser Unterhaltung.",
+    loading_preview: "Vorschau wird geladen…",
+    first_lines_shown: "Erste 30 Zeilen angezeigt",
+    office_warning:
+      "Nicht von Alanya dargestellt. Beim Anzeigen wird die Datei mit deinem Sitzungstoken an Microsoft Office Online gesendet.",
+    preview_downloadable: "Vorschau nicht verfügbar — die Datei bleibt herunterladbar.",
+    message_deleted: "Diese Nachricht wurde gelöscht",
+    download: "Herunterladen",
+    loading_conversation: "Unterhaltung wird geladen...",
+    conversation_unavailable:
+      "Unterhaltung vorübergehend nicht verfügbar. Prüfe die Verbindung und kehre zur Übersicht zurück.",
+    locked_detail:
+      "Du verfolgst den Verlauf live. Schreiben und Anrufe sind wieder möglich, sobald die Steuerung zurückgegeben wird.",
+    recording_voice: "Sprachnachricht wird aufgenommen...",
+    no_conversation_available: "Keine Unterhaltung verfügbar.",
+    the_media: "das Medium",
     not_found_title: "Seite nicht gefunden",
     not_found_line1: "Diese Seite existiert nicht oder wurde verschoben.",
     not_found_line2: "Prüfe die URL oder kehre zur Startseite zurück.",
@@ -1049,6 +1126,22 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    has_the_hand: "{name} tem o controlo desta conversa.",
+    loading_preview: "A carregar a pré-visualização…",
+    first_lines_shown: "Primeiras 30 linhas apresentadas",
+    office_warning:
+      "Não é apresentado pelo Alanya. Vê-lo envia o ficheiro para o Microsoft Office Online, com o token da sua sessão.",
+    preview_downloadable: "Pré-visualização indisponível — o ficheiro continua transferível.",
+    message_deleted: "Esta mensagem foi eliminada",
+    download: "Transferir",
+    loading_conversation: "A carregar a conversa...",
+    conversation_unavailable:
+      "Conversa temporariamente indisponível. Verifique a ligação e volte à lista de conversas.",
+    locked_detail:
+      "Está a seguir a conversa em direto. A escrita e as chamadas retomam assim que devolver o controlo.",
+    recording_voice: "A gravar a mensagem de voz...",
+    no_conversation_available: "Nenhuma conversa disponível.",
+    the_media: "o ficheiro",
     not_found_title: "Página não encontrada",
     not_found_line1: "Esta página não existe ou foi movida.",
     not_found_line2: "Verifique o URL ou volte à página inicial.",
@@ -1256,6 +1349,22 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    has_the_hand: "{name} управляет этой беседой.",
+    loading_preview: "Загрузка предпросмотра…",
+    first_lines_shown: "Показаны первые 30 строк",
+    office_warning:
+      "Не отображается Alanya. Просмотр отправит файл в Microsoft Office Online вместе с токеном вашей сессии.",
+    preview_downloadable: "Предпросмотр недоступен — файл можно скачать.",
+    message_deleted: "Это сообщение удалено",
+    download: "Скачать",
+    loading_conversation: "Загрузка беседы...",
+    conversation_unavailable:
+      "Беседа временно недоступна. Проверьте соединение и вернитесь к списку бесед.",
+    locked_detail:
+      "Вы следите за перепиской в реальном времени. Отправка и звонки возобновятся, как только управление будет возвращено.",
+    recording_voice: "Идёт запись голосового...",
+    no_conversation_available: "Нет доступных бесед.",
+    the_media: "медиа",
     not_found_title: "Страница не найдена",
     not_found_line1: "Эта страница не существует или была перемещена.",
     not_found_line2: "Проверьте адрес или вернитесь на главную.",
@@ -1462,6 +1571,20 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    has_the_hand: "{name} 正在处理此会话。",
+    loading_preview: "正在加载预览…",
+    first_lines_shown: "显示前 30 行",
+    office_warning:
+      "并非由 Alanya 呈现。查看会将文件连同您的会话令牌发送至 Microsoft Office Online。",
+    preview_downloadable: "无法预览 — 文件仍可下载。",
+    message_deleted: "此消息已删除",
+    download: "下载",
+    loading_conversation: "正在加载会话…",
+    conversation_unavailable: "会话暂时不可用。请检查网络后返回会话列表。",
+    locked_detail: "您正在实时查看对话。一旦对方交还控制权，即可发送消息和通话。",
+    recording_voice: "正在录制语音…",
+    no_conversation_available: "没有可用的会话。",
+    the_media: "该媒体",
     not_found_title: "页面未找到",
     not_found_line1: "该页面不存在或已被移动。",
     not_found_line2: "请检查网址或返回首页。",
@@ -1666,6 +1789,23 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    has_the_hand: "{name} har kontrollen över den här konversationen.",
+    loading_preview: "Läser in förhandsvisningen…",
+    first_lines_shown: "De första 30 raderna visas",
+    office_warning:
+      "Visas inte av Alanya. Att öppna den skickar filen till Microsoft Office Online, tillsammans med din sessionstoken.",
+    preview_downloadable:
+      "Förhandsvisning är inte tillgänglig — filen går fortfarande att ladda ner.",
+    message_deleted: "Det här meddelandet har tagits bort",
+    download: "Ladda ner",
+    loading_conversation: "Läser in konversationen...",
+    conversation_unavailable:
+      "Konversationen är tillfälligt otillgänglig. Kontrollera anslutningen och gå tillbaka till listan.",
+    locked_detail:
+      "Du följer tråden live. Skrivande och samtal återupptas så snart kontrollen lämnas tillbaka.",
+    recording_voice: "Spelar in röstmeddelandet...",
+    no_conversation_available: "Ingen konversation tillgänglig.",
+    the_media: "mediet",
     not_found_title: "Sidan hittades inte",
     not_found_line1: "Den här sidan finns inte eller har flyttats.",
     not_found_line2: "Kontrollera adressen eller gå tillbaka till startsidan.",
@@ -1873,6 +2013,22 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    has_the_hand: "{name} har kontrollen over denne samtalen.",
+    loading_preview: "Laster forhåndsvisningen…",
+    first_lines_shown: "De første 30 linjene vises",
+    office_warning:
+      "Vises ikke av Alanya. Å åpne den sender filen til Microsoft Office Online, sammen med økttokenet ditt.",
+    preview_downloadable: "Forhåndsvisning er utilgjengelig — filen kan fortsatt lastes ned.",
+    message_deleted: "Denne meldingen er slettet",
+    download: "Last ned",
+    loading_conversation: "Laster samtalen...",
+    conversation_unavailable:
+      "Samtalen er midlertidig utilgjengelig. Sjekk tilkoblingen og gå tilbake til listen.",
+    locked_detail:
+      "Du følger samtalen direkte. Skriving og anrop gjenopptas så snart kontrollen gis tilbake.",
+    recording_voice: "Tar opp talemeldingen...",
+    no_conversation_available: "Ingen samtale tilgjengelig.",
+    the_media: "mediet",
     not_found_title: "Fant ikke siden",
     not_found_line1: "Denne siden finnes ikke eller er flyttet.",
     not_found_line2: "Sjekk adressen eller gå tilbake til startsiden.",

@@ -471,7 +471,7 @@ function DocumentViewer({
                     gap: 12,
                   }}
                 >
-                  <span>Impossible de charger le contenu.</span>
+                  <span>{t("doc_load_failed")}</span>
                   <a
                     href={url}
                     target="_blank"
@@ -547,7 +547,7 @@ function PdfViewer({
 }) {
   const { t } = useTranslation()
   const host = useRef<HTMLDivElement>(null)
-  const [state, setState] = useState("Chargement du PDF…")
+  const [state, setState] = useState(t("loading_pdf"))
   const [errorMessage, setErrorMessage] = useState("")
   // PDF.js a besoin des octets. Quand ils sont illisibles — le backend redirige
   // vers Backblaze B2, qui n'envoie pas les en-tetes CORS, et le proxy
@@ -559,7 +559,7 @@ function PdfViewer({
     let cancelled = false
     let task: PDFDocumentLoadingTask | undefined
     const render = async () => {
-      setState("Chargement du PDF…")
+      setState(t("loading_pdf"))
       setErrorMessage("")
       setNativeFallback(false)
       let blob: Blob
@@ -1575,7 +1575,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
       </div>
       {loading ? (
         <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11 }}>
-          Chargement de l’aperçu…
+          {t("loading_preview")}
         </div>
       ) : errorMessage ? (
         // Le visionneur a besoin du texte : sans les octets il n'a rien a rendre.
@@ -1614,9 +1614,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
             </tbody>
           </table>
           {text.split(/\r?\n/).filter(Boolean).length > 30 && (
-            <div style={{ padding: 6, fontSize: 10, opacity: 0.65 }}>
-              30 premières lignes affichées
-            </div>
+            <div style={{ padding: 6, fontSize: 10, opacity: 0.65 }}>{t("first_lines_shown")}</div>
           )}
         </div>
       ) : (
@@ -1737,6 +1735,7 @@ function OfficePreview({
   height: number | string
   compact?: boolean
 }) {
+  const { t } = useTranslation()
   const [accepted, setAccepted] = useState(false)
 
   if (accepted) {
@@ -1774,8 +1773,7 @@ function OfficePreview({
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 11, fontWeight: 600 }}>Apercu {label}</div>
         <div style={{ fontSize: 9.5, opacity: 0.78, marginTop: 2, lineHeight: 1.4 }}>
-          Non rendu par Alanya. L'afficher l'envoie a Microsoft Office Online, avec le jeton de
-          votre session.
+          {t("office_warning")}
         </div>
       </div>
       <button
@@ -1852,9 +1850,7 @@ function VideoPreview({
         <div style={{ opacity: 0.72, marginTop: 3 }}>
           {size ?? "Taille inconnue"} · {formatAudioDuration(durationMs)}
         </div>
-        <div style={{ opacity: 0.72, marginTop: 4 }}>
-          Aperçu indisponible — le fichier reste téléchargeable.
-        </div>
+        <div style={{ opacity: 0.72, marginTop: 4 }}>{t("preview_downloadable")}</div>
       </div>
     )
   return (
@@ -2819,6 +2815,7 @@ const ALBUM_VISIBLE_TILES = 4
 
 /** Grille d'un lot de medias, facon WhatsApp : un seul cadre pour tout l'envoi. */
 function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: number) => void }) {
+  const { t } = useTranslation()
   const visible = msgs.slice(0, ALBUM_VISIBLE_TILES)
   const hidden = msgs.length - visible.length
   // Deux tuiles tiennent cote a cote ; trois ou plus passent en carre.
@@ -2841,7 +2838,7 @@ function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: num
             e.stopPropagation()
             onOpen(index)
           }}
-          aria-label={`Ouvrir ${item.fileName ?? "le media"} (${index + 1} sur ${msgs.length})`}
+          aria-label={`Ouvrir ${item.fileName ?? t("the_media")} (${index + 1} sur ${msgs.length})`}
           style={{
             position: "relative",
             padding: 0,
@@ -3456,7 +3453,7 @@ function MessageBubble({
 
               {msg.isDeleted ? (
                 <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: 12 }}>
-                  Ce message a ete supprime
+                  {t("message_deleted")}
                 </span>
               ) : albumMsgs ? (
                 // Lot envoye d'un bloc : une seule grille, comme sur WhatsApp. Le
@@ -3886,7 +3883,7 @@ function MessageBubble({
                                     display: "inline-block",
                                   }}
                                 >
-                                  Télécharger
+                                  {t("download")}
                                 </a>
                               </div>
                             </div>
@@ -4915,9 +4912,7 @@ export default function ChatRoomPage() {
 
   if (chatLoading && !chat) {
     return (
-      <div style={{ padding: 24, color: "var(--text-muted)" }}>
-        Chargement de la conversation...
-      </div>
+      <div style={{ padding: 24, color: "var(--text-muted)" }}>{t("loading_conversation")}</div>
     )
   }
 
@@ -4926,8 +4921,7 @@ export default function ChatRoomPage() {
     // « disparaître » la discussion quelques secondes après son ouverture.
     return (
       <div className="room-root" style={{ padding: 24, color: "var(--text-muted)" }}>
-        Conversation temporairement indisponible. Vérifiez la connexion puis revenez à la liste des
-        discussions.
+        {t("conversation_unavailable")}
       </div>
     )
   }
@@ -5280,15 +5274,12 @@ export default function ChatRoomPage() {
             </svg>
             <span>
               {verrou.detenteur
-                ? `${verrou.detenteur} a la main sur cette conversation.`
-                : "Un autre appareil de ce compte a la main sur cette conversation."}
+                ? t("has_the_hand").replace("{name}", verrou.detenteur)
+                : t("locked_by_device")}
               {/* On dit ce qui est reserve, pas seulement qu'il l'est : sans
                   cette precision, on chercherait pourquoi les boutons d'appel
                   ont disparu. */}
-              <span className="room-locked-detail">
-                Vous suivez le fil en direct. Ecriture et appels reprendront des qu'il rendra la
-                main.
-              </span>
+              <span className="room-locked-detail">{t("locked_detail")}</span>
             </span>
           </div>
         </div>
@@ -5495,7 +5486,7 @@ export default function ChatRoomPage() {
                   {formatAudioDuration(recordSec * 1000)}
                 </span>
                 <span style={{ color: "var(--text-muted)", fontSize: 12, flex: 1 }}>
-                  Enregistrement du vocal...
+                  {t("recording_voice")}
                 </span>
                 <button
                   onClick={() => stopRecording(true)}
@@ -5651,6 +5642,7 @@ function ForwardDialog({
   onClose: () => void
   onForward: (convIds: string[]) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const [conversations, setConversations] = useState<
     Array<{ id: string; name: string; initials: string }>
   >([])
@@ -5728,7 +5720,7 @@ function ForwardDialog({
           )}
           {!loading && conversations.length === 0 && (
             <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
-              Aucune conversation disponible.
+              {t("no_conversation_available")}
             </div>
           )}
           {conversations.map((conv) => (
