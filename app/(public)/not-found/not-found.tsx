@@ -1,6 +1,8 @@
 ﻿import { Link } from "react-router-dom"
+import { useTranslation } from "../../../src/i18n"
 
 export default function NotFound() {
+  const { t } = useTranslation()
   return (
     <>
       <style>{`
@@ -79,11 +81,11 @@ export default function NotFound() {
           404
         </div>
         <div className="hex" />
-        <h1 className="title">Page introuvable</h1>
+        <h1 className="title">{t("not_found_title")}</h1>
         <p className="sub">
-          Cette page n'existe pas ou a ete deplacee.
+          {t("not_found_line1")}
           <br />
-          Verifiez l'URL ou retournez a l'accueil.
+          {t("not_found_line2")}
         </p>
         <div className="actions">
           <Link to="/chats" className="btn-primary">
@@ -99,7 +101,7 @@ export default function NotFound() {
               <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
               <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
-            Tableau de bord
+            {t("dashboard")}
           </Link>
           <Link to="/chats" className="btn-ghost">
             <svg
@@ -113,7 +115,7 @@ export default function NotFound() {
             >
               <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
             </svg>
-            Messages
+            {t("messages_label")}
           </Link>
         </div>
       </div>

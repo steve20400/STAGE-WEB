@@ -209,12 +209,22 @@ export const WEB_TRANSLATION_KEYS = [
   "welcome_demo_r",
   "welcome_demo_read",
   "welcome_demo_input",
+  "not_found_title",
+  "not_found_line1",
+  "not_found_line2",
+  "dashboard",
+  "messages_label",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    not_found_title: "Page introuvable",
+    not_found_line1: "Cette page n'existe pas ou a ete deplacee.",
+    not_found_line2: "Verifiez l'URL ou retournez a l'accueil.",
+    dashboard: "Tableau de bord",
+    messages_label: "Messages",
     welcome_nav_features: "Fonctionnalites",
     brand_subtitle: "Messagerie ENSPY",
     welcome_demo_status: "en ligne",
@@ -418,6 +428,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    not_found_title: "Page not found",
+    not_found_line1: "This page does not exist or has been moved.",
+    not_found_line2: "Check the URL or go back to the home page.",
+    dashboard: "Dashboard",
+    messages_label: "Messages",
     welcome_nav_features: "Features",
     brand_subtitle: "ENSPY Messaging",
     welcome_demo_status: "online",
@@ -619,6 +634,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    not_found_title: "Página no encontrada",
+    not_found_line1: "Esta página no existe o ha sido movida.",
+    not_found_line2: "Comprueba la URL o vuelve al inicio.",
+    dashboard: "Panel",
+    messages_label: "Mensajes",
     welcome_nav_features: "Funciones",
     brand_subtitle: "Mensajería ENSPY",
     welcome_demo_status: "en línea",
@@ -821,6 +841,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    not_found_title: "Seite nicht gefunden",
+    not_found_line1: "Diese Seite existiert nicht oder wurde verschoben.",
+    not_found_line2: "Prüfe die URL oder kehre zur Startseite zurück.",
+    dashboard: "Übersicht",
+    messages_label: "Nachrichten",
     welcome_nav_features: "Funktionen",
     brand_subtitle: "ENSPY Messenger",
     welcome_demo_status: "online",
@@ -1024,6 +1049,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    not_found_title: "Página não encontrada",
+    not_found_line1: "Esta página não existe ou foi movida.",
+    not_found_line2: "Verifique o URL ou volte à página inicial.",
+    dashboard: "Painel",
+    messages_label: "Mensagens",
     welcome_nav_features: "Funcionalidades",
     brand_subtitle: "Mensagens ENSPY",
     welcome_demo_status: "online",
@@ -1226,6 +1256,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    not_found_title: "Страница не найдена",
+    not_found_line1: "Эта страница не существует или была перемещена.",
+    not_found_line2: "Проверьте адрес или вернитесь на главную.",
+    dashboard: "Панель",
+    messages_label: "Сообщения",
     welcome_nav_features: "Возможности",
     brand_subtitle: "Мессенджер ENSPY",
     welcome_demo_status: "в сети",
@@ -1427,6 +1462,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    not_found_title: "页面未找到",
+    not_found_line1: "该页面不存在或已被移动。",
+    not_found_line2: "请检查网址或返回首页。",
+    dashboard: "仪表板",
+    messages_label: "消息",
     welcome_nav_features: "功能",
     brand_subtitle: "ENSPY 通讯",
     welcome_demo_status: "在线",
@@ -1626,6 +1666,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    not_found_title: "Sidan hittades inte",
+    not_found_line1: "Den här sidan finns inte eller har flyttats.",
+    not_found_line2: "Kontrollera adressen eller gå tillbaka till startsidan.",
+    dashboard: "Översikt",
+    messages_label: "Meddelanden",
     welcome_nav_features: "Funktioner",
     brand_subtitle: "ENSPY-meddelanden",
     welcome_demo_status: "online",
@@ -1828,6 +1873,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    not_found_title: "Fant ikke siden",
+    not_found_line1: "Denne siden finnes ikke eller er flyttet.",
+    not_found_line2: "Sjekk adressen eller gå tilbake til startsiden.",
+    dashboard: "Oversikt",
+    messages_label: "Meldinger",
     welcome_nav_features: "Funksjoner",
     brand_subtitle: "ENSPY-meldinger",
     welcome_demo_status: "pålogget",
