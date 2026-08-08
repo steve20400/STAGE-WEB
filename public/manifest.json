@@ -3,12 +3,12 @@
   "name": "Alanya Messenger",
   "icons": [
     {
-      "src": "/alanya-logo.jpeg",
+      "src": "alanya-logo.jpeg",
       "type": "image/jpeg",
       "sizes": "192x192"
     },
     {
-      "src": "/alanya-logo.jpeg",
+      "src": "alanya-logo.jpeg",
       "type": "image/jpeg",
       "sizes": "512x512"
     }
