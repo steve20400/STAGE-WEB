@@ -10,6 +10,7 @@ import {
 } from "../../../../src/services/meetings-service"
 import { joinMeetingRoom } from "../../../../src/services/call-manager"
 import { useCallState } from "../../../../src/hooks/use-call"
+import { toInitials } from "../../../../src/data/session-user"
 import { useTranslation } from "../../../../src/i18n"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
 import type { Reunion } from "../../../../src/services/meetings-service"
@@ -163,6 +164,18 @@ export default function MeetingRoomPage() {
             <div className="participants-grid">
               {meeting.participants.map((p) => (
                 <div key={p.id} className="participant-box">
+                  {/* Un rond a la place du nom en clair : c'est la convention
+                      partout ailleurs, et une tuile se balaie du regard bien
+                      plus vite qu'une liste de noms. Sans photo, l'initiale —
+                      jamais un vide. */}
+                  <div className="participant-vignette">
+                    {p.avatarUrl ? (
+                      <img src={p.avatarUrl} alt="" />
+                    ) : (
+                      <span>{toInitials(p.nom)}</span>
+                    )}
+                    {p.connecte && <span className="participant-pastille" aria-hidden="true" />}
+                  </div>
                   <div className="participant-ligne">
                     <div className="participant-name">{p.nom}</div>
                     {/* L'exclusion n'apparait qu'a l'organisateur, et jamais sur

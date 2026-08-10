@@ -99,18 +99,58 @@
   gap: 8px;
 }
 .meeting-room-root .participant-box {
-  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 12px;
   border: 1px solid var(--border-subtle);
   border-radius: 12px;
   background: var(--bg-elevated);
+  text-align: center;
+}
+/* La vignette occupe la tuile : c'est elle qu'on regarde, le nom vient apres. */
+.meeting-room-root .participant-vignette {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.meeting-room-root .participant-vignette img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+/* Presence : une pastille sur le rond, lisible sans lire. */
+.meeting-room-root .participant-pastille {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--success);
+  border: 2px solid var(--bg-elevated);
 }
 /* Le nom et la croix partagent la ligne : la croix ne pousse pas le nom, elle
    se retire quand il n'y a rien a exclure. */
 .meeting-room-root .participant-ligne {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
 }
 .meeting-room-root .participant-exclure {
   flex: none;
