@@ -225,13 +225,116 @@
 @media (max-width: 900px) {
   .meeting-room-root {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) minmax(180px, 40%) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "entete"
       "infos"
-      "fil"
       "actions";
     padding: 16px;
     gap: 12px;
+  }
+
+  /* Le fil devient un panneau qui glisse PAR-DESSUS la reunion, laquelle reste
+     dessous, visible et active. On n'a donc jamais a la quitter pour ecrire, ni
+     a chercher un retour pour y revenir. */
+  .meeting-room-root .salle-fil {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    height: min(70vh, 520px);
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+    transform: translateY(100%);
+    transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.26);
+  }
+  .meeting-room-root.fil-ouvert .salle-fil {
+    transform: translateY(0);
+  }
+
+  /* Poignee : elle dit que le panneau se referme, et sert de zone de saisie du
+     pouce, la ou l'entete seul serait une cible trop mince. */
+  .meeting-room-root .salle-fil-tete {
+    position: relative;
+    padding-top: 16px;
+  }
+  .meeting-room-root .salle-fil-tete::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-default);
+  }
+
+  /* Voile : il assombrit la reunion sans la cacher, et un appui dessus referme
+     le panneau — le geste attendu, plutot qu'un bouton a viser. */
+  .salle-voile {
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: var(--overlay);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.24s;
+  }
+  .salle-voile.ouvert {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .salle-fil-bascule {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 41;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--accent-text);
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+    transition:
+      transform 0.24s cubic-bezier(0.32, 0.72, 0, 1),
+      filter 0.15s;
+  }
+  .salle-fil-bascule:hover {
+    filter: brightness(1.08);
+  }
+  /* Ouvert, le bouton monte avec le panneau : il reste sous le pouce et devient
+     la fermeture, au lieu de disparaitre derriere le fil. */
+  .salle-fil-bascule.ouvert {
+    transform: translateY(calc(-1 * min(70vh, 520px)));
+  }
+  .salle-fil-compte {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    padding: 1px 5px;
+    border-radius: 20px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border: 2px solid var(--bg-base);
+  }
+}
+
+/* Au-dela de 900 px le panneau n'existe pas : le fil est en colonne. */
+@media (min-width: 901px) {
+  .salle-voile,
+  .salle-fil-bascule {
+    display: none;
   }
 }

@@ -30,12 +30,31 @@ interface MessageSalle {
  * On n'affiche pas non plus le message avant sa confirmation : le serveur le
  * renvoie a son auteur comme aux autres, et c'est son ordre qui fait foi.
  */
-export function MeetingChat({ meetingId }: { meetingId: number }) {
+interface FilProps {
+  meetingId: number
+  /**
+   * Le fil est-il sous les yeux ? Faux quand le panneau est referme sur petit
+   * ecran. Il reste MONTE dans les deux cas : le demonter perdrait le fil, qui
+   * n'existe nulle part ailleurs.
+   */
+  visible?: boolean
+  /** Appele a chaque message recu alors que le fil n'est pas visible. */
+  onMessageMasque?: () => void
+}
+
+export function MeetingChat({ meetingId, visible = true, onMessageMasque }: FilProps) {
   const { t, language } = useTranslation()
   const monId = useMemo(() => getMyUserId(), [])
   const [messages, setMessages] = useState<MessageSalle[]>([])
   const [brouillon, setBrouillon] = useState("")
   const basRef = useRef<HTMLDivElement>(null)
+
+  // Lu par l'abonnement sans le reabonner : changer de visibilite ne doit pas
+  // couper puis rouvrir l'ecoute, au risque de perdre un message entre les deux.
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
+  const signalerRef = useRef(onMessageMasque)
+  signalerRef.current = onMessageMasque
 
   useEffect(() => {
     return subscribeToMeetingEvents((event) => {
@@ -53,14 +72,16 @@ export function MeetingChat({ meetingId }: { meetingId: number }) {
           envoyeA,
         },
       ])
+      if (!visibleRef.current) signalerRef.current?.()
     })
   }, [meetingId])
 
   // Le fil suit toujours le dernier message : il est court et se lit d'un bloc,
   // personne ne remonte dans un fil qui disparaitra a la fin de la reunion.
   useEffect(() => {
+    if (!visible) return
     basRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  }, [messages, visible])
 
   const envoyer = () => {
     const texte = brouillon.trim()

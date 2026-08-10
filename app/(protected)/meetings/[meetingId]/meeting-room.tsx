@@ -9,6 +9,20 @@ import { MeetingChat } from "../../../../src/components/meeting-chat"
 import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
+/** Vrai sous 900 px, la largeur ou la colonne du fil cesse d'etre lisible. */
+function useEcranEtroit(): boolean {
+  const [etroit, setEtroit] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches
+  )
+  useEffect(() => {
+    const requete = window.matchMedia("(max-width: 900px)")
+    const suivre = () => setEtroit(requete.matches)
+    requete.addEventListener("change", suivre)
+    return () => requete.removeEventListener("change", suivre)
+  }, [])
+  return etroit
+}
+
 export default function MeetingRoomPage() {
   const { meetingId } = useParams()
   const navigate = useNavigate()
@@ -19,6 +33,19 @@ export default function MeetingRoomPage() {
   const [meeting, setMeeting] = useState<Reunion | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  /**
+   * Le panneau n'existe que sur ecran etroit : au-dela, le fil est en colonne
+   * et toujours visible. On lit la largeur plutot que de deviner l'appareil —
+   * la meme fenetre peut passer d'un cas a l'autre en la redimensionnant.
+   */
+  const etroit = useEcranEtroit()
+  const [filOuvert, setFilOuvert] = useState(false)
+  const [nonLus, setNonLus] = useState(0)
+
+  // Ouvrir le fil solde ce qui a ete rate pendant qu'il etait ferme.
+  useEffect(() => {
+    if (filOuvert) setNonLus(0)
+  }, [filOuvert])
 
   useEffect(() => {
     if (!meetingId) return
@@ -69,7 +96,7 @@ export default function MeetingRoomPage() {
 
   if (loading) {
     return (
-      <div className="meeting-room-root">
+      <div className={`meeting-room-root${filOuvert ? " fil-ouvert" : ""}`}>
         <div className="loading">{t("loading")}</div>
       </div>
     )
@@ -77,7 +104,7 @@ export default function MeetingRoomPage() {
 
   if (!meeting) {
     return (
-      <div className="meeting-room-root">
+      <div className={`meeting-room-root${filOuvert ? " fil-ouvert" : ""}`}>
         <div className="error">{error || t("meet_not_found")}</div>
         <button className="btn-back" onClick={() => navigate("/meetings")}>
           {t("back")}
@@ -87,7 +114,7 @@ export default function MeetingRoomPage() {
   }
 
   return (
-    <div className="meeting-room-root">
+    <div className={`meeting-room-root${filOuvert ? " fil-ouvert" : ""}`}>
       <div className="meeting-header">
         <h1>{meeting.objet}</h1>
         <button className="btn-back" onClick={() => navigate("/meetings")} aria-label={t("close")}>
@@ -123,8 +150,61 @@ export default function MeetingRoomPage() {
         )}
       </div>
 
-      {/* Le fil accompagne la salle : on ecrit sans quitter la reunion. */}
-      <MeetingChat meetingId={Number(meetingId)} />
+      {/*
+        Le fil accompagne la salle, il ne s'y substitue jamais.
+
+        Assez large, les deux tiennent cote a cote : rien a ouvrir, rien a
+        fermer, on ecrit en regardant la reunion. Trop etroit, le fil devient un
+        panneau qui glisse PAR-DESSUS — la reunion reste dessous, visible et
+        active. C'est la difference avec un ecran a part : on ne quitte pas la
+        reunion pour ecrire, et il n'y a donc pas de bouton de retour a chercher
+        pour y revenir. Un appui hors du panneau, ou sur la poignee, le referme.
+      */}
+      {etroit && (
+        <div
+          className={`salle-voile${filOuvert ? " ouvert" : ""}`}
+          onClick={() => setFilOuvert(false)}
+          aria-hidden="true"
+        />
+      )}
+      <MeetingChat
+        meetingId={Number(meetingId)}
+        visible={!etroit || filOuvert}
+        onMessageMasque={() => setNonLus((n) => n + 1)}
+      />
+
+      {/* Le compteur dit ce qui s'est dit pendant que le panneau etait ferme :
+          sans lui, on n'ouvrirait le fil que par hasard. */}
+      {etroit && (
+        <button
+          className={`salle-fil-bascule${filOuvert ? " ouvert" : ""}`}
+          onClick={() => setFilOuvert((ouvert) => !ouvert)}
+          aria-expanded={filOuvert}
+          aria-label={t("meet_chat_title")}
+          title={t("meet_chat_title")}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            {filOuvert ? (
+              <path d="M18 6L6 18M6 6l12 12" />
+            ) : (
+              <path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.5 8.5 0 01-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 0112 3a8.4 8.4 0 019 8.5z" />
+            )}
+          </svg>
+          {!filOuvert && nonLus > 0 && (
+            <span className="salle-fil-compte">{nonLus > 99 ? "99+" : nonLus}</span>
+          )}
+        </button>
+      )}
 
       <div className="meeting-actions">
         {!callState.activeCallId && (
