@@ -11,6 +11,24 @@ interface CreateMeetingModalProps {
   onSuccess: () => void
 }
 
+/**
+ * Duree en secondes, deduite des deux horaires.
+ *
+ * Le formulaire demandait une duree en secondes — une question a laquelle
+ * personne ne repond en pensant « 3600 ». On saisit un debut et une fin ; la
+ * duree s'en deduit. Sans les deux, on laisse le serveur poser sa valeur par
+ * defaut plutot que d'en inventer une.
+ *
+ * Bornee comme le serveur la borne : une fin anterieure au debut, ou au-dela
+ * de vingt-quatre heures, ferait rejeter la creation entiere.
+ */
+function dureeDeduite(debut: string, fin: string): number | undefined {
+  if (!debut || !fin) return undefined
+  const secondes = Math.round((new Date(fin).getTime() - new Date(debut).getTime()) / 1000)
+  if (!Number.isFinite(secondes) || secondes < 1) return undefined
+  return Math.min(secondes, 86400)
+}
+
 export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeetingModalProps) {
   const { t } = useTranslation()
   const { success, error: showError } = useToast()
@@ -41,10 +59,6 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
       showError(t("meet_subject_required"), t("meet_subject_required_detail"))
       return
     }
-    if (!startTime) {
-      showError(t("meet_start_required"), t("meet_start_required_detail"))
-      return
-    }
 
     setLoading(true)
     try {
@@ -52,8 +66,12 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
       await createMeeting({
         objet: objet.trim(),
         type: typeMedia === 2 ? "video" : "audio",
-        dureeSecondes: parseInt(duree, 10) || 3600,
-        debut: startTime,
+        // Le champ datetime-local rend « 2026-08-10T14:30 » : ni secondes, ni
+        // fuseau. Le serveur exige un ISO complet et refusait la creation avec
+        // un laconique « donnees invalides ». La conversion regle aussi le
+        // fuseau : on saisit une heure locale, le serveur stocke de l'UTC.
+        debut: startTime ? new Date(startTime).toISOString() : undefined,
+        dureeSecondes: dureeDeduite(startTime, endTime),
         numerosInvites: numeros.length > 0 ? numeros : undefined,
       })
       success(t("meet_created"))
@@ -123,19 +141,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
             </div>
 
             <div className="form-group">
-              <label>{t("meet_duration")}</label>
-              <input
-                type="number"
-                value={duree}
-                onChange={(e) => setDuree(e.target.value)}
-                min="300"
-                max="28800"
-              />
-              <small>{t("meet_duration_hint")}</small>
-            </div>
-
-            <div className="form-group">
-              <label>{t("meet_start_time")} *</label>
+              <label>{t("meet_start_time")}</label>
               <input
                 type="datetime-local"
                 value={startTime}

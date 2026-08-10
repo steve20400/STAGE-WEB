@@ -138,8 +138,11 @@ export async function fetchMeeting(id: number): Promise<Reunion> {
 export interface NouvelleReunion {
   objet: string
   type: "audio" | "video"
-  /** Duree prevue, en secondes. */
-  dureeSecondes: number
+  /**
+   * Duree prevue, en secondes. Absente, le serveur pose la sienne : mieux vaut
+   * le laisser decider que d'inventer un chiffre a sa place.
+   */
+  dureeSecondes?: number
   /** Numeros Alanya des invites. Le serveur refuse la creation si l'un est inconnu. */
   numerosInvites?: string[]
   /** Debut prevu, au format ISO. Le serveur prend l'instant present s'il manque. */
@@ -153,7 +156,7 @@ export async function createMeeting(donnees: NouvelleReunion): Promise<number> {
     body: {
       objet: donnees.objet,
       type_media: donnees.type === "video" ? 2 : 1,
-      duree: donnees.dureeSecondes,
+      ...(donnees.dureeSecondes ? { duree: donnees.dureeSecondes } : {}),
       ...(donnees.debut ? { start_time: donnees.debut } : {}),
       ...(donnees.numerosInvites?.length ? { participantNumbers: donnees.numerosInvites } : {}),
     },
