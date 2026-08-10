@@ -575,6 +575,7 @@ const MEETING_EVENT_TYPES = new Set([
   "meeting_user_left",
   "meeting_user_joined",
   "meeting_extended",
+  "meeting_message",
 ])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
@@ -636,6 +637,20 @@ export function sendMeetingLeave(meetingId: number) {
  */
 export function sendMeetingExtend(meetingId: number, dureeSecondes: number) {
   sendRaw({ type: "meeting_extend", meetingId, duree: dureeSecondes })
+}
+
+/**
+ * Ecrit dans le fil de la salle.
+ *
+ * On n'affiche rien localement en attendant : le serveur renvoie le message a
+ * son auteur comme aux autres, et c'est son ordre qui fait foi. Poser la bulle
+ * tout de suite la placerait ailleurs chez soi que chez les autres.
+ *
+ * Le fil est ephemere — rien n'est conserve, et qui arrive en cours de route ne
+ * voit pas ce qui a ete dit avant.
+ */
+export function sendMeetingMessage(meetingId: number, texte: string) {
+  sendRaw({ type: "meeting_message", meetingId, text: texte })
 }
 
 /** Diffuse un changement d'etat d'appel (joined / left / rejected / ended...). */

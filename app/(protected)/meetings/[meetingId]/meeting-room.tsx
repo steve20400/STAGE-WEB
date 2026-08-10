@@ -5,6 +5,7 @@ import { fetchMeeting, joinMeeting, leaveMeeting } from "../../../../src/service
 import { startMeetingCall } from "../../../../src/services/call-manager"
 import { useCallState } from "../../../../src/hooks/use-call"
 import { useTranslation } from "../../../../src/i18n"
+import { MeetingChat } from "../../../../src/components/meeting-chat"
 import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
@@ -120,6 +121,9 @@ export default function MeetingRoomPage() {
           </div>
         )}
       </div>
+
+      {/* Le fil accompagne la salle : on ecrit sans quitter la reunion. */}
+      <MeetingChat meetingId={Number(meetingId)} />
 
       <div className="meeting-actions">
         {!callState.activeCallId && (

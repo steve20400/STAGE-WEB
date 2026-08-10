@@ -1,0 +1,120 @@
+/*
+ * Fil de la salle de reunion.
+ *
+ * Reprend la grammaire du fil des discussions — bulles a droite pour soi, a
+ * gauche pour les autres — mais dans une colonne etroite posee a cote de la
+ * salle : le fil accompagne la reunion, il ne la remplace pas.
+ */
+.salle-fil {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.salle-fil-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.salle-fil-tete small {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-faint);
+}
+.salle-fil-corps {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.salle-fil-vide {
+  margin: auto;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.salle-msg {
+  align-self: flex-start;
+  max-width: 82%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px 5px;
+  border-radius: 12px 12px 12px 3px;
+  background: var(--bubble-them-bg);
+  color: var(--bubble-them-text);
+  border: 1px solid var(--bubble-them-border);
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.salle-msg.de-moi {
+  align-self: flex-end;
+  border-radius: 12px 12px 3px 12px;
+  background: var(--bubble-me-bg);
+  color: var(--bubble-me-text);
+  border-color: transparent;
+}
+.salle-msg-auteur {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--agent-name);
+}
+.salle-msg-heure {
+  align-self: flex-end;
+  font-size: 9px;
+  opacity: 0.7;
+}
+.salle-fil-saisie {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+.salle-fil-saisie input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+}
+.salle-fil-saisie input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.salle-fil-saisie button {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.salle-fil-saisie button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

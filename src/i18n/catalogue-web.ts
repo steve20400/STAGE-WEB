@@ -708,12 +708,20 @@ export const WEB_TRANSLATION_KEYS = [
   "turn_candidates",
   "turn_first_relay",
   "turn_test_label",
+  "meet_chat_title",
+  "meet_chat_ephemeral",
+  "meet_chat_empty",
+  "meet_chat_placeholder",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    meet_chat_title: "Fil de la réunion",
+    meet_chat_ephemeral: "effacé à la fin",
+    meet_chat_empty: "Aucun message. Ce fil disparaît à la fin de la réunion.",
+    meet_chat_placeholder: "Écrire à la réunion…",
     turn_title: "Test des serveurs TURN (appels)",
     turn_explain:
       "Compare des fournisseurs TURN sans modifier le code : si le test obtient un candidat relay, les appels passeront entre réseaux différents avec ce fournisseur.",
@@ -1439,6 +1447,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    meet_chat_title: "Meeting chat",
+    meet_chat_ephemeral: "cleared at the end",
+    meet_chat_empty: "No messages yet. This chat disappears when the meeting ends.",
+    meet_chat_placeholder: "Message the meeting…",
     turn_title: "TURN server test (calls)",
     turn_explain:
       "Compare TURN providers without touching the code: if the test obtains a relay candidate, calls will work across different networks with that provider.",
@@ -2158,6 +2170,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    meet_chat_title: "Chat de la reunión",
+    meet_chat_ephemeral: "se borra al terminar",
+    meet_chat_empty: "Sin mensajes. Este chat desaparece al terminar la reunión.",
+    meet_chat_placeholder: "Escribe a la reunión…",
     turn_title: "Prueba de servidores TURN (llamadas)",
     turn_explain:
       "Compara proveedores TURN sin tocar el código: si la prueba obtiene un candidato relay, las llamadas funcionarán entre redes distintas con ese proveedor.",
@@ -2881,6 +2897,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    meet_chat_title: "Besprechungs-Chat",
+    meet_chat_ephemeral: "wird am Ende gelöscht",
+    meet_chat_empty: "Noch keine Nachrichten. Dieser Chat verschwindet am Ende der Besprechung.",
+    meet_chat_placeholder: "Nachricht an die Besprechung…",
     turn_title: "TURN-Server-Test (Anrufe)",
     turn_explain:
       "Vergleiche TURN-Anbieter ohne Codeänderung: Liefert der Test einen Relay-Kandidaten, funktionieren Anrufe mit diesem Anbieter auch netzwerkübergreifend.",
@@ -3612,6 +3632,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    meet_chat_title: "Chat da reunião",
+    meet_chat_ephemeral: "apagado no final",
+    meet_chat_empty: "Sem mensagens. Este chat desaparece no fim da reunião.",
+    meet_chat_placeholder: "Escrever para a reunião…",
     turn_title: "Teste de servidores TURN (chamadas)",
     turn_explain:
       "Compare fornecedores TURN sem alterar o código: se o teste obtiver um candidato relay, as chamadas passarão entre redes diferentes com esse fornecedor.",
@@ -4335,6 +4359,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    meet_chat_title: "Чат встречи",
+    meet_chat_ephemeral: "удаляется по окончании",
+    meet_chat_empty: "Сообщений нет. Этот чат исчезнет после встречи.",
+    meet_chat_placeholder: "Написать всем…",
     turn_title: "Проверка TURN-серверов (звонки)",
     turn_explain:
       "Сравните TURN-провайдеров без изменения кода: если тест получит relay-кандидата, звонки будут проходить между разными сетями.",
@@ -5052,6 +5080,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    meet_chat_title: "会议聊天",
+    meet_chat_ephemeral: "结束后清除",
+    meet_chat_empty: "暂无消息。会议结束后此聊天将消失。",
+    meet_chat_placeholder: "发送给会议…",
     turn_title: "TURN 服务器测试（通话）",
     turn_explain:
       "无需改动代码即可比较 TURN 服务商：若测试获得 relay 候选，则使用该服务商时可跨网络通话。",
@@ -5756,6 +5788,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    meet_chat_title: "Mötets chatt",
+    meet_chat_ephemeral: "raderas vid slutet",
+    meet_chat_empty: "Inga meddelanden. Chatten försvinner när mötet slutar.",
+    meet_chat_placeholder: "Skriv till mötet…",
     turn_title: "Test av TURN-servrar (samtal)",
     turn_explain:
       "Jämför TURN-leverantörer utan att ändra koden: om testet får en relay-kandidat fungerar samtal mellan olika nätverk med den leverantören.",
@@ -6476,6 +6512,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    meet_chat_title: "Møtechat",
+    meet_chat_ephemeral: "slettes til slutt",
+    meet_chat_empty: "Ingen meldinger. Denne chatten forsvinner når møtet er slutt.",
+    meet_chat_placeholder: "Skriv til møtet …",
     turn_title: "Test av TURN-servere (anrop)",
     turn_explain:
       "Sammenlign TURN-leverandører uten å endre koden: får testen en relay-kandidat, går anrop mellom ulike nettverk med den leverandøren.",
