@@ -762,6 +762,11 @@ function suisJeSeul(): boolean {
  */
 function verifierSolitude() {
   annulerSolitude()
+  // Une REUNION ne se ferme pas parce qu'on y reste seul : elle a une heure, un
+  // objet, et des gens qui arrivent en retard. Un appel n'a que ses deux bouts —
+  // sans personne en face, il n'a plus d'objet. La regle ne vaut donc que pour
+  // les appels, et la salle attend son monde.
+  if (salleReunion !== null) return
   if (!salleAEteHabitee || state.activeCallId === null || !suisJeSeul()) return
   solitudeTimer = setTimeout(() => {
     solitudeTimer = null
@@ -1349,8 +1354,8 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     if (!id) return
     removePeer(id)
     nePlusAttendre(id)
-    // Meme regle qu'en appel : on ne reste pas seul dans une salle.
-    verifierSolitude()
+    // Pas de fermeture automatique : rester seul dans une reunion est un cas
+    // ordinaire — on arrive en avance, les autres partent avant la fin.
     return
   }
 
