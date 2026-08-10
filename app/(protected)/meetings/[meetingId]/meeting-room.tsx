@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
 import {
   endMeeting,
+  exclureDeReunion,
   fetchMeeting,
   joinMeeting,
   leaveMeeting,
@@ -87,6 +88,19 @@ export default function MeetingRoomPage() {
     }
   }
 
+  const handleExclure = async (participantId: string, nom: string) => {
+    if (!meetingId || !confirm(t("meet_exclude_confirm", { name: nom }))) return
+    try {
+      await exclureDeReunion(parseInt(meetingId, 10), participantId)
+      // On relit la reunion plutot que de retirer la ligne localement : le
+      // serveur est seul a savoir ce qu'il a reellement efface.
+      setMeeting(await fetchMeeting(parseInt(meetingId, 10)))
+      success(t("meet_excluded", { name: nom }))
+    } catch (err) {
+      showError(t("error"), err instanceof Error ? err.message : t("meet_exclude_failed"))
+    }
+  }
+
   const handleEndMeeting = async () => {
     if (!meetingId || !confirm(t("meet_end_confirm"))) return
     try {
@@ -149,7 +163,34 @@ export default function MeetingRoomPage() {
             <div className="participants-grid">
               {meeting.participants.map((p) => (
                 <div key={p.id} className="participant-box">
-                  <div className="participant-name">{p.nom}</div>
+                  <div className="participant-ligne">
+                    <div className="participant-name">{p.nom}</div>
+                    {/* L'exclusion n'apparait qu'a l'organisateur, et jamais sur
+                        lui-meme : le serveur refuse les deux, et un bouton qui
+                        promet un refus ne vaut pas mieux que pas de bouton. */}
+                    {meeting.jeSuisOrganisateur && p.id !== meeting.organisateur.id && (
+                      <button
+                        className="participant-exclure"
+                        onClick={() => void handleExclure(p.id, p.nom)}
+                        aria-label={t("meet_exclude")}
+                        title={t("meet_exclude")}
+                      >
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          aria-hidden="true"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                   <div className={`participant-status ${p.connecte ? "connected" : "pending"}`}>
                     {p.connecte ? t("meet_connected") : t("meet_pending")}
                   </div>

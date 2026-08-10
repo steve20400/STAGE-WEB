@@ -104,6 +104,35 @@
   border-radius: 12px;
   background: var(--bg-elevated);
 }
+/* Le nom et la croix partagent la ligne : la croix ne pousse pas le nom, elle
+   se retire quand il n'y a rien a exclure. */
+.meeting-room-root .participant-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.meeting-room-root .participant-exclure {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.meeting-room-root .participant-exclure:hover {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
 .meeting-room-root .participant-name {
   font-size: 13px;
   font-weight: 600;
@@ -111,7 +140,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 4px;
+  flex: 1;
+  min-width: 0;
 }
 /* La presence se lit a la pastille, pas au texte : on balaie la grille des
    yeux sans lire chaque ligne. */

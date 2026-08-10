@@ -230,6 +230,24 @@ export async function trancherDemandeInvitation(
   })
 }
 
+/**
+ * DELETE /api/meetings/:id/participants — exclut quelqu'un de la reunion.
+ *
+ * Organisateur seul, et jamais lui-meme : la reunion se retrouverait sans
+ * personne pour la fermer. L'exclusion efface la ligne plutot que de la passer
+ * a « decline », faute de quoi l'exclu rentrerait par la porte du join.
+ *
+ * Le flux de l'exclu n'est pas coupe dans l'instant : l'API et le serveur temps
+ * reel sont deux process distincts. Il reste jusqu'a ce qu'il parte ou que la
+ * reunion se termine.
+ */
+export async function exclureDeReunion(id: number, participantId: string): Promise<void> {
+  await apiRequest(`/api/meetings/${id}/participants`, {
+    method: "DELETE",
+    body: { participantId },
+  })
+}
+
 /** POST /api/meetings/:id/join — entre dans la salle (status accepte, connecte). */
 export async function joinMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/join`, { method: "POST", body: {} })

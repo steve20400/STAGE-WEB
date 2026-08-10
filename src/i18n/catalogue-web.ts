@@ -713,12 +713,20 @@ export const WEB_TRANSLATION_KEYS = [
   "meet_chat_empty",
   "meet_chat_placeholder",
   "meet_end",
+  "meet_exclude",
+  "meet_exclude_confirm",
+  "meet_excluded",
+  "meet_exclude_failed",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    meet_exclude: "Exclure de la réunion",
+    meet_exclude_confirm: "Exclure {name} de la réunion ?",
+    meet_excluded: "{name} a été exclu de la réunion",
+    meet_exclude_failed: "Exclusion impossible",
     meet_end: "Terminer",
     meet_chat_title: "Fil de la réunion",
     meet_chat_ephemeral: "effacé à la fin",
@@ -1449,6 +1457,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    meet_exclude: "Remove from the meeting",
+    meet_exclude_confirm: "Remove {name} from the meeting?",
+    meet_excluded: "{name} was removed from the meeting",
+    meet_exclude_failed: "Could not remove",
     meet_end: "End",
     meet_chat_title: "Meeting chat",
     meet_chat_ephemeral: "cleared at the end",
@@ -2173,6 +2185,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    meet_exclude: "Expulsar de la reunión",
+    meet_exclude_confirm: "¿Expulsar a {name} de la reunión?",
+    meet_excluded: "{name} ha sido expulsado de la reunión",
+    meet_exclude_failed: "No se pudo expulsar",
     meet_end: "Finalizar",
     meet_chat_title: "Chat de la reunión",
     meet_chat_ephemeral: "se borra al terminar",
@@ -2901,6 +2917,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    meet_exclude: "Aus der Besprechung entfernen",
+    meet_exclude_confirm: "{name} aus der Besprechung entfernen?",
+    meet_excluded: "{name} wurde aus der Besprechung entfernt",
+    meet_exclude_failed: "Entfernen fehlgeschlagen",
     meet_end: "Beenden",
     meet_chat_title: "Besprechungs-Chat",
     meet_chat_ephemeral: "wird am Ende gelöscht",
@@ -3637,6 +3657,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    meet_exclude: "Remover da reunião",
+    meet_exclude_confirm: "Remover {name} da reunião?",
+    meet_excluded: "{name} foi removido da reunião",
+    meet_exclude_failed: "Não foi possível remover",
     meet_end: "Terminar",
     meet_chat_title: "Chat da reunião",
     meet_chat_ephemeral: "apagado no final",
@@ -4365,6 +4389,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    meet_exclude: "Исключить из встречи",
+    meet_exclude_confirm: "Исключить {name} из встречи?",
+    meet_excluded: "{name} исключён из встречи",
+    meet_exclude_failed: "Не удалось исключить",
     meet_end: "Завершить",
     meet_chat_title: "Чат встречи",
     meet_chat_ephemeral: "удаляется по окончании",
@@ -5087,6 +5115,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    meet_exclude: "移出会议",
+    meet_exclude_confirm: "要将 {name} 移出会议吗？",
+    meet_excluded: "{name} 已被移出会议",
+    meet_exclude_failed: "移出失败",
     meet_end: "结束",
     meet_chat_title: "会议聊天",
     meet_chat_ephemeral: "结束后清除",
@@ -5796,6 +5828,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    meet_exclude: "Ta bort från mötet",
+    meet_exclude_confirm: "Ta bort {name} från mötet?",
+    meet_excluded: "{name} togs bort från mötet",
+    meet_exclude_failed: "Kunde inte ta bort",
     meet_end: "Avsluta",
     meet_chat_title: "Mötets chatt",
     meet_chat_ephemeral: "raderas vid slutet",
@@ -6521,6 +6557,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    meet_exclude: "Fjern fra møtet",
+    meet_exclude_confirm: "Fjerne {name} fra møtet?",
+    meet_excluded: "{name} ble fjernet fra møtet",
+    meet_exclude_failed: "Kunne ikke fjerne",
     meet_end: "Avslutt",
     meet_chat_title: "Møtechat",
     meet_chat_ephemeral: "slettes til slutt",
