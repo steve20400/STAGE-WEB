@@ -563,6 +563,7 @@ const MEETING_EVENT_TYPES = new Set([
   "meeting_joined",
   "meeting_user_left",
   "meeting_user_joined",
+  "meeting_extended",
 ])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
@@ -594,14 +595,36 @@ export function sendMeetingSignal(meetingId: number, toUserId: string, signal: o
   sendRaw({ type: "meeting_signal", meetingId, toUserId, signal })
 }
 
-/** Notifie que l'utilisateur a rejoint une réunion. */
-export function sendMeetingJoined(meetingId: number) {
-  sendRaw({ type: "meeting_joined", meetingId })
+/**
+ * Entre dans le salon de la reunion.
+ *
+ * Le verbe compte : le serveur n'accepte que `meeting_join`. Le client envoyait
+ * `meeting_joined` — qui est la REPONSE du serveur, pas une demande. La trame
+ * ne trouvait donc aucun traitement et tombait dans le vide : le web n'entrait
+ * jamais reellement dans le salon, et restait invisible des autres
+ * participants, mobile compris.
+ *
+ * En reponse, le serveur renvoie `meeting_joined` avec la liste de ceux qui
+ * sont deja la, et previent les autres par `meeting_user_joined`.
+ */
+export function sendMeetingJoin(meetingId: number) {
+  sendRaw({ type: "meeting_join", meetingId })
 }
 
-/** Notifie que l'utilisateur a quitté une réunion. */
-export function sendMeetingLeft(meetingId: number) {
-  sendRaw({ type: "meeting_left", meetingId })
+/** Quitte le salon : le serveur clot la duree du participant et previent les autres. */
+export function sendMeetingLeave(meetingId: number) {
+  sendRaw({ type: "meeting_leave", meetingId })
+}
+
+/**
+ * Prolonge la duree prevue de la reunion.
+ *
+ * Reserve a l'organisateur, et le serveur refuse toute valeur qui la
+ * raccourcirait : deux appareils de l'organisateur, ou un message rejoue apres
+ * une reconnexion, ramèneraient sinon la reunion a une duree deja depassee.
+ */
+export function sendMeetingExtend(meetingId: number, dureeSecondes: number) {
+  sendRaw({ type: "meeting_extend", meetingId, duree: dureeSecondes })
 }
 
 /** Diffuse un changement d'etat d'appel (joined / left / rejected / ended...). */

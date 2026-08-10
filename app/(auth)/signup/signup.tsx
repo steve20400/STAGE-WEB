@@ -223,7 +223,6 @@ export default function SignUpPage() {
           <img src={alanyaLogo} alt="Logo Alanya Work" className="auth-school-logo" />
           <div className="auth-brand-copy">
             <BrandName className="logo-txt" />
-            <span className="auth-brand-subtitle">{t("brand_subtitle")}</span>
           </div>
         </div>
 

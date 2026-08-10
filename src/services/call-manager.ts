@@ -21,8 +21,6 @@ import {
   subscribeToCallEvents,
   subscribeToMeetingEvents,
   sendMeetingSignal,
-  sendMeetingJoined,
-  sendMeetingLeft,
   type CallServerEvent,
 } from "./websocket-service"
 import { isValidAlanyaNumber, normalizeAlanyaNumber } from "../lib/alanya-number"

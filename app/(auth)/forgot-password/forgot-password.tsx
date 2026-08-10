@@ -32,7 +32,6 @@ export default function ForgotPasswordPage() {
           <img src={alanyaLogo} alt="Logo Alanya Work" className="fp-logo" />
           <span>
             <BrandName className="fp-brand-name" />
-            <small>{t("brand_subtitle")}</small>
           </span>
         </Link>
 

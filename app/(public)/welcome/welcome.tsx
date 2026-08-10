@@ -16,7 +16,6 @@ export default function WelcomePage() {
             <img src={alanyaLogo} alt="Logo Alanya Work" className="school-logo" />
             <div className="brand-copy">
               <BrandName className="display-font brand-name" />
-              <span className="brand-subtitle">{t("brand_subtitle")}</span>
             </div>
           </div>
           <div className="nav-links">
