@@ -167,7 +167,39 @@ export default function MeetingsPage() {
           </div>
         ) : filteredMeetings.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">📅</div>
+            {/* L'emoji 📅 portait un « 17 » grave dans la police : impossible a
+                dater, et faux 364 jours sur 365. Un vrai calendrier, lui, sait
+                quel jour on est. */}
+            <div className="empty-icon" aria-hidden="true">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+                <rect
+                  x="3"
+                  y="5"
+                  width="18"
+                  height="16"
+                  rx="3"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                />
+                <path d="M3 10h18" stroke="currentColor" strokeWidth="1.6" />
+                <path
+                  d="M8 3v4M16 3v4"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+                <text
+                  x="12"
+                  y="18"
+                  textAnchor="middle"
+                  fill="currentColor"
+                  fontSize="7"
+                  fontWeight="700"
+                >
+                  {new Date().getDate()}
+                </text>
+              </svg>
+            </div>
             <p>
               {tab === "ongoing" && t("meet_none_ongoing")}
               {tab === "upcoming" && t("meet_none_upcoming")}
