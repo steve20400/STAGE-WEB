@@ -51,7 +51,6 @@ import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media
 import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
 import { appareilCourantId } from "../../../../src/services/appareils-service"
 import { composerMessageSysteme } from "../../../../src/i18n/messages-systeme"
-import { lireVerrou, useVerrou } from "../../../../src/hooks/use-verrou"
 import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
 import {
   publishTyping,
@@ -4139,15 +4138,6 @@ export default function ChatRoomPage() {
   const [showAttach, setShowAttach] = useState(false)
   const [infoPanelOpen, setInfoPanelOpen] = useState(false)
 
-  /**
-   * Verrou de conversation, entre appareils d'un meme compte.
-   *
-   * L'etat initial vient de la conversation chargee : sans lui, l'ecran
-   * s'ouvrirait deverrouille jusqu'au premier evenement temps reel et
-   * laisserait croire une seconde qu'on peut ecrire.
-   */
-  const verrouInitial = useMemo(() => lireVerrou(chat?.lock), [chat?.lock])
-  const { verrou, basculer: basculerVerrou } = useVerrou(chatId, verrouInitial)
   // Visionneuse d'image plein ecran
   const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null)
   /** Fichiers choisis mais pas encore envoyes : l'ecran de confirmation les porte. */
@@ -4511,9 +4501,7 @@ export default function ChatRoomPage() {
    */
   const revenirEnBas = () => {
     const corps = messagesBodyRef.current
-    const cible = frontiereNonLus
-      ? corps?.querySelector('[data-separateur-non-lus="1"]')
-      : null
+    const cible = frontiereNonLus ? corps?.querySelector('[data-separateur-non-lus="1"]') : null
     // Si la frontiere est deja sous les yeux, y sauter ne bougerait rien : le
     // geste suivant attendu est d'aller au bout. Un seul bouton, deux etapes.
     if (cible && corps) {
@@ -5101,90 +5089,45 @@ export default function ChatRoomPage() {
         </div>
 
         <div className="room-actions">
-          {/* Appels. Retires — pas seulement desactives — quand un AUTRE
-              appareil du compte a reserve la conversation : la reservation
-              couvre toute la relation avec ce correspondant, pas seulement
-              l'ecriture. Le serveur ne fait de toute facon pas sonner ce poste
-              et refuserait l'appel sortant ; un bouton visible ne ferait que
-              promettre une action impossible. */}
-          {!verrou.parUnAutre && (
-            <>
-              {/* Appel audio */}
-              <button
-                className="action-btn"
-                aria-label="Appel audio"
-                title="Appel audio"
-                onClick={() => startCallFromChat("audio")}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                >
-                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-                </svg>
-              </button>
-              {/* Appel video */}
-              <button
-                className="action-btn"
-                aria-label="Appel video"
-                title="Appel video"
-                onClick={() => startCallFromChat("video")}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                >
-                  <polygon points="23 7 16 12 23 17 23 7" />
-                  <rect x="1" y="5" width="15" height="14" rx="2" />
-                </svg>
-              </button>
-            </>
-          )}
-          {/* Verrou de conversation. Absent — pas seulement desactive — quand un
-              AUTRE appareil du compte a la main : il n'y a rien a reprendre, et
-              un bouton grise inviterait a essayer.
-
-              La reservation couvre TOUTE la relation avec ce correspondant :
-              les boutons d'appel disparaissent aussi (voir plus haut), et le
-              serveur ne fait meme pas sonner ce poste. Il suit le fil en
-              lecture, et retrouve tous ses droits quand le detenteur rend la
-              main. */}
-          {!verrou.parUnAutre && (
-            <button
-              className={`action-btn${verrou.parMoi ? " action-btn-on" : ""}`}
-              aria-label={verrou.parMoi ? t("release_hand") : t("reserve_conversation")}
-              title={verrou.parMoi ? t("you_have_hand") : t("reserve_hint")}
-              aria-pressed={verrou.parMoi}
-              onClick={basculerVerrou}
+          {/* Appel audio */}
+          <button
+            className="action-btn"
+            aria-label="Appel audio"
+            title="Appel audio"
+            onClick={() => startCallFromChat("audio")}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
             >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              >
-                <rect x="4" y="11" width="16" height="10" rx="2" />
-                {verrou.parMoi ? (
-                  <path d="M8 11V7a4 4 0 018 0v4" />
-                ) : (
-                  <path d="M8 11V7a4 4 0 017.5-2" />
-                )}
-              </svg>
-            </button>
-          )}
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+            </svg>
+          </button>
+          {/* Appel video */}
+          <button
+            className="action-btn"
+            aria-label="Appel video"
+            title="Appel video"
+            onClick={() => startCallFromChat("video")}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+          </button>
           {!infoPanelOpen && (
             <button
               className="action-btn"
@@ -5409,261 +5352,254 @@ export default function ChatRoomPage() {
         </div>
       )}
 
-      {/* Un autre appareil du compte a la main : on remplace la zone de saisie
-          plutot que de la desactiver. Un champ grise laisse chercher pourquoi ;
-          une phrase qui nomme le detenteur repond avant qu'on se pose la
-          question. Le fil, lui, reste entierement lisible. */}
-      {verrou.parUnAutre ? (
-        <div className="room-input-wrap">
-          <div className="room-locked">
+      <div className="room-input-wrap">
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          style={{ display: "none" }}
+          onChange={handleFileSelect}
+        />
+
+        <div
+          ref={attachRef}
+          className="room-input-row"
+          style={{ position: "relative" }}
+          onMouseLeave={() => setShowAttach(false)}
+        >
+          {/* Popup attachement */}
+          {showAttach && (
+            <div className="attach-menu">
+              <button
+                className="attach-opt"
+                onClick={() => {
+                  fileRef.current!.accept = "image/*"
+                  fileRef.current!.click()
+                }}
+              >
+                <div className="attach-icon" style={{ background: "#a78bfa20", color: "#a78bfa" }}>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                </div>
+                Photo / image
+              </button>
+              <button
+                className="attach-opt"
+                onClick={() => {
+                  fileRef.current!.accept = ".mp4,.mov,.avi,.mkv,.webm"
+                  fileRef.current!.click()
+                }}
+              >
+                <div className="attach-icon" style={{ background: "#8b5cf620", color: "#8b5cf6" }}>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" />
+                  </svg>
+                </div>
+                Vidéo
+              </button>
+              <button
+                className="attach-opt"
+                onClick={() => {
+                  fileRef.current!.accept =
+                    ".pdf,.doc,.docx,.txt,.tsx,.css,.json,.py,.java,.cpp,.h,.md,.yaml,.yml,.properties,.xml,.php"
+                  fileRef.current!.click()
+                }}
+              >
+                <div
+                  className="attach-icon"
+                  style={{ background: "var(--info)20", color: "var(--info)" }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                </div>
+                Document
+              </button>
+              <button
+                className="attach-opt"
+                onClick={() => {
+                  fileRef.current!.accept = ".mp3,.aac,.acc,.wav,.ogg,.m4a,.flac,.webm"
+                  fileRef.current!.click()
+                }}
+              >
+                <div
+                  className="attach-icon"
+                  style={{ background: "var(--success)20", color: "var(--success)" }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+                Audio
+              </button>
+              <button
+                className="attach-opt"
+                onClick={() => {
+                  fileRef.current!.accept = "*/*"
+                  fileRef.current!.click()
+                }}
+              >
+                <div className="attach-icon" style={{ background: "#6b728020", color: "#6b7280" }}>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                  </svg>
+                </div>
+                Tout fichier
+              </button>
+            </div>
+          )}
+
+          <button
+            className="attach-btn"
+            onMouseEnter={() => setShowAttach(true)}
+            onClick={() => setShowAttach((v) => !v)}
+            aria-expanded={showAttach}
+            aria-label={t("attach_file")}
+          >
             <svg
-              width="15"
-              height="15"
+              width="17"
+              height="17"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.8"
               strokeLinecap="round"
-              aria-hidden="true"
             >
-              <rect x="4" y="11" width="16" height="10" rx="2" />
-              <path d="M8 11V7a4 4 0 018 0v4" />
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
             </svg>
-            <span>
-              {verrou.detenteur
-                ? t("has_the_hand").replace("{name}", verrou.detenteur)
-                : t("locked_by_device")}
-              {/* On dit ce qui est reserve, pas seulement qu'il l'est : sans
-                  cette precision, on chercherait pourquoi les boutons d'appel
-                  ont disparu. */}
-              <span className="room-locked-detail">{t("locked_detail")}</span>
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="room-input-wrap">
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            style={{ display: "none" }}
-            onChange={handleFileSelect}
-          />
+          </button>
 
-          <div
-            ref={attachRef}
-            className="room-input-row"
-            style={{ position: "relative" }}
-            onMouseLeave={() => setShowAttach(false)}
-          >
-            {/* Popup attachement */}
-            {showAttach && (
-              <div className="attach-menu">
-                <button
-                  className="attach-opt"
-                  onClick={() => {
-                    fileRef.current!.accept = "image/*"
-                    fileRef.current!.click()
-                  }}
-                >
-                  <div
-                    className="attach-icon"
-                    style={{ background: "#a78bfa20", color: "#a78bfa" }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                  </div>
-                  Photo / image
-                </button>
-                <button
-                  className="attach-opt"
-                  onClick={() => {
-                    fileRef.current!.accept = ".mp4,.mov,.avi,.mkv,.webm"
-                    fileRef.current!.click()
-                  }}
-                >
-                  <div
-                    className="attach-icon"
-                    style={{ background: "#8b5cf620", color: "#8b5cf6" }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <polygon points="23 7 16 12 23 17 23 7" />
-                      <rect x="1" y="5" width="15" height="14" rx="2" />
-                    </svg>
-                  </div>
-                  Vidéo
-                </button>
-                <button
-                  className="attach-opt"
-                  onClick={() => {
-                    fileRef.current!.accept =
-                      ".pdf,.doc,.docx,.txt,.tsx,.css,.json,.py,.java,.cpp,.h,.md,.yaml,.yml,.properties,.xml,.php"
-                    fileRef.current!.click()
-                  }}
-                >
-                  <div
-                    className="attach-icon"
-                    style={{ background: "var(--info)20", color: "var(--info)" }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                    </svg>
-                  </div>
-                  Document
-                </button>
-                <button
-                  className="attach-opt"
-                  onClick={() => {
-                    fileRef.current!.accept = ".mp3,.aac,.acc,.wav,.ogg,.m4a,.flac,.webm"
-                    fileRef.current!.click()
-                  }}
-                >
-                  <div
-                    className="attach-icon"
-                    style={{ background: "var(--success)20", color: "var(--success)" }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M9 18V5l12-2v13" />
-                      <circle cx="6" cy="18" r="3" />
-                      <circle cx="18" cy="16" r="3" />
-                    </svg>
-                  </div>
-                  Audio
-                </button>
-                <button
-                  className="attach-opt"
-                  onClick={() => {
-                    fileRef.current!.accept = "*/*"
-                    fileRef.current!.click()
-                  }}
-                >
-                  <div
-                    className="attach-icon"
-                    style={{ background: "#6b728020", color: "#6b7280" }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-                    </svg>
-                  </div>
-                  Tout fichier
-                </button>
-              </div>
-            )}
-
-            <button
-              className="attach-btn"
-              onMouseEnter={() => setShowAttach(true)}
-              onClick={() => setShowAttach((v) => !v)}
-              aria-expanded={showAttach}
-              aria-label={t("attach_file")}
+          {recording ? (
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "8px 12px",
+              }}
             >
-              <svg
-                width="17"
-                height="17"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              >
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-              </svg>
-            </button>
-
-            {recording ? (
-              <div
+              <span
                 style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "8px 12px",
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  background: "var(--danger)",
+                  animation: "pulse 1.2s ease-in-out infinite",
+                }}
+              />
+              <span
+                style={{
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    background: "var(--danger)",
-                    animation: "pulse 1.2s ease-in-out infinite",
-                  }}
-                />
-                <span
-                  style={{
-                    color: "var(--text-primary)",
-                    fontSize: 13,
-                    fontVariantNumeric: "tabular-nums",
-                  }}
+                {formatAudioDuration(recordSec * 1000)}
+              </span>
+              <span style={{ color: "var(--text-muted)", fontSize: 12, flex: 1 }}>
+                {t("recording_voice")}
+              </span>
+              <button
+                onClick={() => stopRecording(true)}
+                aria-label={t("cancel_voice")}
+                style={{
+                  background: "none",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: 8,
+                  padding: "6px 12px",
+                  color: "var(--text-secondary)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                className="send-btn"
+                onClick={() => stopRecording(false)}
+                aria-label={t("send_voice")}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--bg-base)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
                 >
-                  {formatAudioDuration(recordSec * 1000)}
-                </span>
-                <span style={{ color: "var(--text-muted)", fontSize: 12, flex: 1 }}>
-                  {t("recording_voice")}
-                </span>
-                <button
-                  onClick={() => stopRecording(true)}
-                  aria-label={t("cancel_voice")}
-                  style={{
-                    background: "none",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: 8,
-                    padding: "6px 12px",
-                    color: "var(--text-secondary)",
-                    fontSize: 12,
-                    cursor: "pointer",
-                  }}
-                >
-                  Annuler
-                </button>
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <textarea
+                ref={inputRef}
+                className="room-textarea"
+                placeholder="Message..."
+                value={input}
+                onChange={handleInput}
+                onKeyDown={handleKeyDown}
+                rows={1}
+                aria-label={t("type_message")}
+              />
+
+              {input.trim() ? (
                 <button
                   className="send-btn"
-                  onClick={() => stopRecording(false)}
-                  aria-label={t("send_voice")}
+                  onClick={sendMessage}
+                  disabled={sending}
+                  aria-label="Envoyer"
                 >
                   <svg
                     width="15"
@@ -5678,66 +5614,31 @@ export default function ChatRoomPage() {
                     <polygon points="22 2 15 22 11 13 2 9 22 2" />
                   </svg>
                 </button>
-              </div>
-            ) : (
-              <>
-                <textarea
-                  ref={inputRef}
-                  className="room-textarea"
-                  placeholder="Message..."
-                  value={input}
-                  onChange={handleInput}
-                  onKeyDown={handleKeyDown}
-                  rows={1}
-                  aria-label={t("type_message")}
-                />
-
-                {input.trim() ? (
-                  <button
-                    className="send-btn"
-                    onClick={sendMessage}
-                    disabled={sending}
-                    aria-label="Envoyer"
+              ) : (
+                <button
+                  className="send-btn"
+                  onClick={() => void startRecording()}
+                  aria-label={t("record_voice")}
+                  title={t("record_voice")}
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--bg-base)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
                   >
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="var(--bg-base)"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    >
-                      <line x1="22" y1="2" x2="11" y2="13" />
-                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                    </svg>
-                  </button>
-                ) : (
-                  <button
-                    className="send-btn"
-                    onClick={() => void startRecording()}
-                    aria-label={t("record_voice")}
-                    title={t("record_voice")}
-                  >
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="var(--bg-base)"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    >
-                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-                      <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
-                    </svg>
-                  </button>
-                )}
-              </>
-            )}
-          </div>
+                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                    <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
+                  </svg>
+                </button>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {infoPanelOpen && (
         <aside className="chat-info-drawer">

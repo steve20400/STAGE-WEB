@@ -671,43 +671,8 @@ textarea.room-textarea::placeholder {
 /* Bouton actif : la conversation est reservee PAR CET APPAREIL. L'accent suffit
    a le dire — le cadenas ferme de l'icone porte deja le sens, un aplat vif en
    plus ferait passer une reservation de travail pour une alerte. */
-.action-btn-on {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-.action-btn-on:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-}
 
 /* Bandeau qui remplace la zone de saisie chez les appareils qui subissent le
    verrou. Meme hauteur qu'un champ de saisie : la barre du bas ne doit pas
    sauter quand la main passe d'un appareil a l'autre. */
-.room-locked {
-  display: flex;
-  /* Deux lignes : le detenteur, puis ce qui est reserve. On aligne en haut
-     pour que l'icone reste au niveau de la premiere. */
-  align-items: flex-start;
-  gap: 10px;
-  min-height: 44px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: var(--bg-muted);
-  border: 1px dashed var(--border-default);
-  color: var(--text-muted);
-  font-size: 12.5px;
-  line-height: 1.35;
-}
-.room-locked svg {
-  flex-shrink: 0;
-  color: var(--accent);
-  margin-top: 1px;
-}
 /* La precision passe apres le fait : plus petite, plus discrete. */
-.room-locked-detail {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--text-ghost);
-}

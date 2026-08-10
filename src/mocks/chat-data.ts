@@ -22,7 +22,6 @@ export interface ConversationMock {
    * conversation : savoir qu'elle est deja prise en charge par un collegue est
    * precisement ce qu'on veut voir avant de cliquer.
    */
-  lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null
   /** Photo de profil de l'interlocuteur (data-URL miniature ou URL). */
   avatar?: string | null
 }
@@ -38,7 +37,6 @@ export interface ChatInfoMock {
   membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string; role?: string }>
   typing?: boolean
   /** Verrou pose par un appareil de mon compte, ou null. Voir ConversationMock. */
-  lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null
 }
 
 export interface ChatMessageMock {

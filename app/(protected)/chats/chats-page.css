@@ -302,19 +302,3 @@
 /* Pastille « conversation reservee » sur une ligne de la liste. Discrete : elle
    informe, elle n'alerte pas — un collegue qui traite une conversation est le
    fonctionnement normal d'un numero partage, pas un incident. */
-.conv-lock {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  flex-shrink: 0;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 9px;
-  font-weight: 500;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: var(--accent-dim);
-  color: var(--accent);
-}

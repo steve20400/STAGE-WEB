@@ -149,9 +149,8 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
    * Ligne de blocage visant ce correspondant, ou null. On garde la ligne et non
    * un simple booleen : c'est son identifiant qui sert a debloquer.
    *
-   * Bloquer n'est PAS verrouiller : ici on empeche les messages de cette
-   * personne d'arriver chez soi ; le verrou, lui, empechera les autres
-   * appareils de son propre compte d'ecrire. Deux fonctions, deux emplacements.
+   * Bloquer vise le CORRESPONDANT : on empeche ses messages d'arriver chez
+   * soi. Les autres appareils de son propre compte ne sont pas concernes.
    */
   const [blocage, setBlocage] = useState<PersonneBloquee | null>(null)
   const [blocageEnCours, setBlocageEnCours] = useState(false)
