@@ -176,6 +176,60 @@ export async function inviterAReunion(id: number, numeros: string[]): Promise<vo
   })
 }
 
+/* ----------------- Demandes d'invitation ----------------- */
+
+export interface DemandeInvitation {
+  id: number
+  /** Qui demande. */
+  demandeur: Personne
+  /** Qui l'on souhaite convier. */
+  invite: Personne
+  demandeeA: string | null
+}
+
+/**
+ * Qui peut convier quelqu'un, et a quelle condition.
+ *
+ * L'organisateur ajoute DIRECTEMENT — le serveur refuse meme qu'il passe par
+ * une demande, puisqu'il serait le sien propre destinataire. Un participant,
+ * lui, ne peut que demander : c'est l'organisateur qui tranche. La reunion
+ * reste ainsi celle de qui l'a convoquee, sans que personne n'y fasse entrer
+ * qui il veut.
+ */
+
+/** GET — la file des demandes en attente. Organisateur seul. */
+export async function listerDemandesInvitation(id: number): Promise<DemandeInvitation[]> {
+  const res = await apiRequest<{ demandes?: Array<Record<string, unknown>> }>(
+    `/api/meetings/${id}/invite-requests`
+  )
+  return (res.demandes ?? []).map((d) => ({
+    id: Number(d.id),
+    demandeur: versPersonne(d.demandeur as PersonneBrute),
+    invite: versPersonne(d.invite as PersonneBrute),
+    demandeeA: (d.createdAt as string) ?? null,
+  }))
+}
+
+/** POST — demande que ce numero soit convie. Reserve aux participants. */
+export async function demanderInvitation(id: number, numero: string): Promise<void> {
+  await apiRequest(`/api/meetings/${id}/invite-requests`, {
+    method: "POST",
+    body: { publicNumber: numero },
+  })
+}
+
+/** PATCH — l'organisateur accepte ou refuse une demande. */
+export async function trancherDemandeInvitation(
+  id: number,
+  demandeId: number,
+  accepter: boolean
+): Promise<void> {
+  await apiRequest(`/api/meetings/${id}/invite-requests/${demandeId}`, {
+    method: "PATCH",
+    body: { accepter },
+  })
+}
+
 /** POST /api/meetings/:id/join — entre dans la salle (status accepte, connecte). */
 export async function joinMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/join`, { method: "POST", body: {} })
