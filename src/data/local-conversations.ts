@@ -1,5 +1,6 @@
 import { type Contact } from "./contacts"
 import { type ChatMessageMock, type ConversationMock, type MessageType } from "../mocks/chat-data"
+import { langueInitiale, traduire } from "../i18n"
 
 interface StoredMessage extends Omit<ChatMessageMock, "timestamp"> {
   timestamp: string
@@ -78,7 +79,7 @@ export function ensureDirectConversation(contact: Contact) {
     name: contact.name,
     initials: contact.initials,
     colorIdx,
-    lastMessage: "Nouvelle conversation",
+    lastMessage: traduire(langueInitiale(), "core_new_conversation"),
     lastMessageType: "text",
     time: "Maintenant",
     unread: 0,
@@ -148,7 +149,9 @@ export function syncConversationFromMessages(
 
   saveLocalConversation({
     ...conversation,
-    lastMessage: latest ? toPreviewContent(latest) : "Nouvelle conversation",
+    lastMessage: latest
+      ? toPreviewContent(latest)
+      : traduire(langueInitiale(), "core_new_conversation"),
     lastMessageType: (latest?.type ?? "text") as MessageType,
     time: latest ? formatConversationTime(latest.timestamp) : "Maintenant",
     unread: 0,

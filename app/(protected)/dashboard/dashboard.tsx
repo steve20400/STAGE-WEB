@@ -7,6 +7,7 @@ import {
 } from "../../../src/services/dashboard-service"
 import { subscribeToAllMessages } from "../../../src/services/websocket-service"
 import "./dashboard-page.css"
+import { useTranslation } from "../../../src/i18n"
 
 // TYPES
 
@@ -89,6 +90,7 @@ function CallDirectionIcon({ direction }: { direction: DashboardCall["direction"
 // PAGE PRINCIPALE
 
 export default function DashboardPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [data, setData] = useState<DashboardData | null>(null)
 
@@ -144,18 +146,26 @@ export default function DashboardPage() {
 
       <div className="stats-grid">
         <StatCard
-          label="Messages non lus"
+          label={t("dash_unread")}
           value={String(totalUnread)}
-          sub="dans 2 conversations"
+          sub={t("dash_in_conversations", { n: recentChats.length })}
           accent
         />
-        <StatCard label="Conversations" value={String(recentChats.length)} sub="actives ce mois" />
         <StatCard
-          label="Appels recents"
-          value={String(recentCalls.length)}
-          sub="les 7 derniers jours"
+          label={t("dash_conversations")}
+          value={String(recentChats.length)}
+          sub={t("dash_active_this_month")}
         />
-        <StatCard label="Contacts" value={String(contacts.length)} sub="dans votre reseau" />
+        <StatCard
+          label={t("dash_recent_calls")}
+          value={String(recentCalls.length)}
+          sub={t("dash_last_7_days")}
+        />
+        <StatCard
+          label={t("contacts")}
+          value={String(contacts.length)}
+          sub={t("dash_in_your_network")}
+        />
       </div>
 
       <div className="dash-grid">
@@ -226,12 +236,14 @@ export default function DashboardPage() {
             <span className="profile-row-val">{currentUser.memberSince}</span>
           </div>
           <div className="profile-row">
-            <span className="profile-row-label">Contacts</span>
-            <span className="profile-row-val">{contacts.length} contacts</span>
+            <span className="profile-row-label">{t("contacts")}</span>
+            <span className="profile-row-val">
+              {t("dash_contacts_count", { n: contacts.length })}
+            </span>
           </div>
 
           <button className="profile-edit" onClick={() => navigate("/settings")}>
-            Modifier le profil
+            {t("dash_edit_profile")}
           </button>
         </div>
       </div>

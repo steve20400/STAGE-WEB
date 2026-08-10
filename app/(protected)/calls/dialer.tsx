@@ -6,6 +6,7 @@ import {
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
 import { useContacts } from "../../../src/hooks/use-contacts"
+import { useTranslation } from "../../../src/i18n"
 import "./dialer.css"
 
 /** Disposition d'un clavier de telephone, celle du composeur mobile. */
@@ -28,6 +29,7 @@ export function Dialer({
   /** Recoit les chiffres seuls, sans les espaces d'affichage, et le type d'appel. */
   onCall: (number: string, type: "audio" | "video") => void
 }) {
+  const { t } = useTranslation()
   const { contacts } = useContacts()
   const [digits, setDigits] = useState("")
   const valide = isValidAlanyaNumber(digits)
@@ -94,10 +96,10 @@ export function Dialer({
         </div>
         <div className="dialer-hint">
           {digits.length === 0
-            ? "Composez un Alanya ID de 6 ou 8 chiffres"
+            ? t("dial_hint_6_or_8")
             : valide
-              ? "Pret a appeler"
-              : `${digits.length} chiffre${digits.length > 1 ? "s" : ""} — il en faut 6 ou 8`}
+              ? t("dial_ready")
+              : t("digits_need_6_or_8", { n: digits.length })}
         </div>
         {digits.length >= 6 && (
           <div
@@ -107,7 +109,7 @@ export function Dialer({
             {foundContact ? (
               <span className="contact-name">{foundContact.name}</span>
             ) : (
-              <span className="contact-error">Numero introuvable ou non attribue</span>
+              <span className="contact-error">{t("dial_unknown_number")}</span>
             )}
           </div>
         )}
@@ -137,8 +139,8 @@ export function Dialer({
             className="dialer-call audio"
             onClick={() => call("audio")}
             disabled={!valide}
-            aria-label="Appel audio"
-            title={valide ? "Appel audio" : "Composez 6 ou 8 chiffres"}
+            aria-label={t("audio_call")}
+            title={valide ? t("audio_call") : t("dial_6_or_8")}
           >
             <svg
               width="24"
@@ -156,8 +158,8 @@ export function Dialer({
             className="dialer-call video"
             onClick={() => call("video")}
             disabled={!valide}
-            aria-label="Appel video"
-            title={valide ? "Appel video" : "Composez 6 ou 8 chiffres"}
+            aria-label={t("video_call")}
+            title={valide ? t("video_call") : t("dial_6_or_8")}
           >
             <svg
               width="24"
@@ -178,8 +180,8 @@ export function Dialer({
           className="dialer-erase"
           onClick={erase}
           disabled={digits.length === 0}
-          aria-label="Effacer le dernier chiffre"
-          title="Effacer"
+          aria-label={t("erase_last_digit")}
+          title={t("erase")}
         >
           <svg
             width="22"

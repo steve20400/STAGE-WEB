@@ -3,6 +3,7 @@ import { loadSessionToken } from "../data/session-auth"
 import { tryRefreshTokens } from "../lib/api-client"
 import { ringtoneUrl } from "./ringtones"
 import { appareilCourantId } from "./appareils-service"
+import { langueInitiale, traduire } from "../i18n"
 
 /**
  * Client WebSocket pour le serveur temps reel d'Alanya (ws-server.mjs) :
@@ -295,7 +296,9 @@ function connect() {
       const pending = pendingAcks.get(event.tempId)!
       pendingAcks.delete(event.tempId)
       clearTimeout(pending.timer)
-      pending.reject(new Error(String(event.message ?? "Envoi refuse par le serveur.")))
+      pending.reject(
+        new Error(String(event.message ?? traduire(langueInitiale(), "core_send_refused")))
+      )
       return
     }
 
@@ -693,7 +696,7 @@ export function sendMessageOverSocket(
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       pendingAcks.delete(tempId)
-      reject(new Error("Pas de reponse du serveur temps reel."))
+      reject(new Error(traduire(langueInitiale(), "core_no_realtime_reply")))
     }, SEND_ACK_TIMEOUT_MS)
 
     pendingAcks.set(tempId, { resolve, reject, timer })
@@ -753,7 +756,7 @@ export function forwardMessageOverSocket(
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       unsubscribe()
-      reject(new Error("Pas de confirmation du transfert."))
+      reject(new Error(traduire(langueInitiale(), "core_no_transfer_ack")))
     }, SEND_ACK_TIMEOUT_MS)
 
     const unsubscribe = addListener((event) => {

@@ -1,4 +1,5 @@
 import { resolveMediaUrl, uploadMedia } from "../services/media-service"
+import { langueInitiale, traduire } from "../i18n"
 
 /**
  * Avatars : le backend stocke avatarUrl et n'accepte que deux formes
@@ -23,7 +24,7 @@ export async function fileToAvatarDataUrl(file: File): Promise<string> {
     canvas.width = AVATAR_SIZE
     canvas.height = AVATAR_SIZE
     const ctx = canvas.getContext("2d")
-    if (!ctx) throw new Error("Canvas indisponible dans ce navigateur.")
+    if (!ctx) throw new Error(traduire(langueInitiale(), "core_canvas_unavailable"))
 
     // Recadrage carre centre (comme un avatar classique).
     const side = Math.min(bitmap.width, bitmap.height)

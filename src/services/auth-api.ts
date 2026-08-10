@@ -15,6 +15,10 @@ import {
   restorePrototypeSession,
 } from "../data/prototype-auth"
 import { ApiError, apiRequest } from "../lib/api-client"
+import { langueInitiale, traduire, type Cle } from "../i18n"
+
+/** Traduction hors composant : la langue est relue a chaque message. */
+const tr = (cle: Cle) => traduire(langueInitiale(), cle)
 
 export interface LoginPayload {
   /** Email ou numero Alanya (6 ou 8 chiffres). */
@@ -174,15 +178,15 @@ export async function requestRegistrationOtp(draft: RegistrationDraft) {
     if (!shouldUsePrototypeFallback(error)) throw error
 
     if (!normalizedEmail) {
-      throw new Error("Une adresse email est requise pour creer un compte.")
+      throw new Error(tr("auth_email_required_signup"))
     }
 
     if (draft.phone && findPrototypeAccount(draft.phone)) {
-      throw new Error("Ce numero est deja lie a un compte. Connectez-vous a la place.")
+      throw new Error(tr("auth_phone_taken"))
     }
 
     if (findPrototypeAccountByEmail(normalizedEmail)) {
-      throw new Error("Cette adresse email est deja liee a un compte. Connectez-vous a la place.")
+      throw new Error(tr("auth_email_taken"))
     }
 
     return {
@@ -203,7 +207,7 @@ export async function completeRegistration(draft: RegistrationDraft, otp: string
     name: draft.name.trim(),
     phone: draft.phone.trim(),
     email: normalizedEmail,
-    statusMsg: "Disponible",
+    statusMsg: tr("set_status_available"),
     avatar: null,
   }
 
@@ -214,11 +218,11 @@ export async function completeRegistration(draft: RegistrationDraft, otp: string
     })
 
     if (!verifyResponse.setupToken) {
-      throw new Error("Verification impossible : reponse inattendue du serveur.")
+      throw new Error(tr("auth_verify_unexpected"))
     }
 
     if (verifyResponse.needsSetup === false) {
-      throw new Error("Ce compte est deja configure. Connectez-vous a la place.")
+      throw new Error(tr("auth_already_setup"))
     }
 
     const setupResponse = await apiRequest<AuthTokensResponse>("/api/auth/setup", {

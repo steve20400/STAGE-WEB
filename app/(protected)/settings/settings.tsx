@@ -216,20 +216,20 @@ function RingtonePicker() {
       <div className="s-card-title">{t("set_ringtones")}</div>
       {events.map((event) => (
         <div key={event} className="ringtone-row">
-          <div className="ringtone-row-label">{RINGTONE_LABELS[event]}</div>
+          <div className="ringtone-row-label">{t(RINGTONE_LABELS[event])}</div>
           <div className="ringtone-row-controls">
             <select
               className="ringtone-select"
               value={choices[event]}
               onChange={(e) => choose(event, e.target.value)}
               aria-label={t("set_ringtone_for", {
-                evenement: RINGTONE_LABELS[event].toLowerCase(),
+                evenement: t(RINGTONE_LABELS[event]).toLowerCase(),
               })}
             >
               {RINGTONES.map((ringtone) => (
                 <option key={ringtone.file} value={ringtone.file}>
                   {ringtone.label}
-                  {ringtone.note ? ` — ${ringtone.note}` : ""}
+                  {ringtone.note ? ` — ${t(ringtone.note)}` : ""}
                 </option>
               ))}
               {imported.length > 0 && (
@@ -2480,7 +2480,7 @@ export default function SettingsPage() {
                         disabled={!privacyLoaded}
                         onClick={() => void updatePrivacy({ lastSeenVisibility: niveau })}
                       >
-                        {LAST_SEEN_LABELS[niveau]}
+                        {t(LAST_SEEN_LABELS[niveau])}
                       </button>
                     ))}
                   </div>

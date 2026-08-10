@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { fetchIceServers } from "../services/calls-service"
+import { useTranslation, type Cle } from "../i18n"
 
 /**
  * Testeur de serveurs TURN — pour comparer des fournisseurs (Metered, Cloudflare,
@@ -56,14 +57,15 @@ async function gatherCandidates(servers: RTCIceServer[], timeoutMs = 8000): Prom
 }
 
 export default function TurnTester() {
+  const { t } = useTranslation()
   const [urls, setUrls] = useState("")
   const [username, setUsername] = useState("")
   const [credential, setCredential] = useState("")
   const [testing, setTesting] = useState<"current" | "custom" | null>(null)
-  const [result, setResult] = useState<{ label: string; data: TestResult } | null>(null)
+  const [result, setResult] = useState<{ label: Cle; data: TestResult } | null>(null)
   const [error, setError] = useState("")
 
-  const runTest = async (label: string, servers: RTCIceServer[], kind: "current" | "custom") => {
+  const runTest = async (label: Cle, servers: RTCIceServer[], kind: "current" | "custom") => {
     setTesting(kind)
     setResult(null)
     setError("")
@@ -71,7 +73,7 @@ export default function TurnTester() {
       const data = await gatherCandidates(servers)
       setResult({ label, data })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Test impossible dans ce navigateur.")
+      setError(err instanceof Error ? err.message : t("turn_test_unsupported"))
     } finally {
       setTesting(null)
     }
@@ -79,7 +81,7 @@ export default function TurnTester() {
 
   const testCurrent = async () => {
     const servers = await fetchIceServers()
-    await runTest("Configuration actuelle de l'application", servers, "current")
+    await runTest("turn_current_config", servers, "current")
   }
 
   const testCustom = async () => {
@@ -88,11 +90,11 @@ export default function TurnTester() {
       .map((u) => u.trim())
       .filter(Boolean)
     if (list.length === 0) {
-      setError("Renseignez au moins une URL turn: ou turns:")
+      setError(t("turn_need_url"))
       return
     }
     await runTest(
-      "Fournisseur teste manuellement",
+      "turn_manual_provider",
       [{ urls: list, username: username.trim() || undefined, credential: credential || undefined }],
       "custom"
     )
@@ -125,16 +127,15 @@ export default function TurnTester() {
 
   return (
     <div className="s-card">
-      <div className="s-card-title">Test des serveurs TURN (appels)</div>
+      <div className="s-card-title">{t("turn_title")}</div>
       <p
         style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6, margin: "6px 0 14px" }}
       >
-        Compare des fournisseurs TURN sans modifier le code : si le test obtient un candidat
-        <strong> relay</strong>, les appels passeront entre reseaux differents avec ce fournisseur.
+        {t("turn_explain")}
       </p>
 
       <button style={btnStyle} onClick={() => void testCurrent()} disabled={testing !== null}>
-        {testing === "current" ? "Test en cours..." : "Tester la configuration actuelle"}
+        {testing === "current" ? t("turn_testing") : t("turn_test_current")}
       </button>
 
       <div
@@ -148,12 +149,12 @@ export default function TurnTester() {
             marginBottom: 10,
           }}
         >
-          Tester un autre fournisseur
+          {t("turn_test_other")}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <input
             style={inputStyle}
-            placeholder="URLs separees par des virgules (turn:serveur:80,turns:serveur:443?transport=tcp)"
+            placeholder={t("turn_urls_placeholder")}
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
           />
@@ -176,7 +177,7 @@ export default function TurnTester() {
             onClick={() => void testCustom()}
             disabled={testing !== null}
           >
-            {testing === "custom" ? "Test en cours..." : "Tester ces serveurs"}
+            {testing === "custom" ? t("turn_testing") : t("turn_test_these")}
           </button>
         </div>
       </div>
@@ -197,24 +198,21 @@ export default function TurnTester() {
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: 4 }}>
-            {verdictOk ? "✓ Relais TURN operationnel" : "✗ Aucun relais obtenu"}
+            {verdictOk ? t("turn_ok") : t("turn_ko")}
           </div>
           <div style={{ color: "var(--text-secondary)" }}>
-            {result.label} — candidats : {result.data.relay} relay, {result.data.srflx} srflx,{" "}
-            {result.data.host} host
+            {t(result.label)} — {t("turn_candidates")} : {result.data.relay} relay,{" "}
+            {result.data.srflx} srflx, {result.data.host} host
             {result.data.firstRelayMs !== null && (
               <>
                 {" "}
-                — premier relay en <strong>{result.data.firstRelayMs} ms</strong>
+                — {t("turn_first_relay")} <strong>{result.data.firstRelayMs} ms</strong>
               </>
             )}{" "}
-            (test : {(result.data.elapsedMs / 1000).toFixed(1)} s)
+            ({t("turn_test_label")} : {(result.data.elapsedMs / 1000).toFixed(1)} s)
           </div>
           {!verdictOk && (
-            <div style={{ color: "var(--text-muted)", marginTop: 4 }}>
-              Identifiants invalides, serveur injoignable, ou offre sans TURN (STUN seul). Les
-              appels entre reseaux differents ne passeront pas avec cette configuration.
-            </div>
+            <div style={{ color: "var(--text-muted)", marginTop: 4 }}>{t("turn_ko_detail")}</div>
           )}
         </div>
       )}

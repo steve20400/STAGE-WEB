@@ -6,6 +6,7 @@ import {
   saveRefreshToken,
   saveSessionToken,
 } from "../data/session-auth"
+import { langueInitiale, traduire } from "../i18n"
 
 export class ApiError extends Error {
   status: number
@@ -137,7 +138,7 @@ async function rawRequest(path: string, options: ApiRequestOptions) {
     // Un depassement de delai arrive ici comme une panne reseau, donc en statut
     // 0 : les appels facultatifs (revocation, desinscription push, repli
     // prototype) le tolerent deja.
-    throw new ApiError("Impossible de joindre le serveur.", 0, error)
+    throw new ApiError(traduire(langueInitiale(), "core_server_unreachable"), 0, error)
   }
 }
 

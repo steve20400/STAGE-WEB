@@ -7,8 +7,10 @@ import { createPrivateChat } from "../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../src/services/call-manager"
 import "./calls-page.css"
 import { AvatarCircle } from "../../../src/components/avatar-circle"
+import { useTranslation } from "../../../src/i18n"
 
 export default function NewCallPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { contacts } = useContacts()
@@ -54,8 +56,8 @@ export default function NewCallPage() {
       })
       .catch((e) => {
         if (cancelled) return
-        const message = e instanceof Error ? e.message : "Impossible de demarrer l'appel."
-        error("Appel impossible", message)
+        const message = e instanceof Error ? e.message : t("call_start_failed")
+        error(t("call_failed"), message)
       })
 
     return () => {
@@ -73,8 +75,8 @@ export default function NewCallPage() {
       const callId = await launchCall(contact.phone, contact.name, type)
       navigate(`/calls/${callId}?type=${type}&returnTo=${encodeURIComponent(returnTo)}`)
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Impossible de demarrer l'appel."
-      error("Appel impossible", message)
+      const message = e instanceof Error ? e.message : t("call_start_failed")
+      error(t("call_failed"), message)
       setStarting(false)
     }
   }
@@ -101,7 +103,7 @@ export default function NewCallPage() {
               <path d="M21 21l-4.35-4.35" />
             </svg>
             <input
-              placeholder="Rechercher un contact..."
+              placeholder={t("search_a_contact")}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
@@ -161,7 +163,7 @@ export default function NewCallPage() {
 
         {filtered.length === 0 && (
           <div className="empty-state">
-            <div className="empty-txt">Aucun contact trouve</div>
+            <div className="empty-txt">{t("meet_no_contact_found")}</div>
           </div>
         )}
       </div>

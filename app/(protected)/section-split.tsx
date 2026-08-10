@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { useTranslation, type Cle } from "../../src/i18n"
 import "./section-split.css"
 
 /**
@@ -10,18 +11,22 @@ import "./section-split.css"
 interface SectionSplitProps {
   children: ReactNode
   icon: ReactNode
-  title: string
-  subtitle: string
+  /* Des CLES, pas des libelles : l'arbre de routes est construit une seule fois
+     au demarrage. Un texte deja traduit y resterait fige dans la langue du
+     chargement, et ne suivrait pas un changement de langue. */
+  title: Cle
+  subtitle: Cle
 }
 
 export default function SectionSplit({ children, icon, title, subtitle }: SectionSplitProps) {
+  const { t } = useTranslation()
   return (
     <div className="section-split">
       <div className="section-split-list">{children}</div>
       <div className="section-split-panel">
         <div className="section-split-badge">{icon}</div>
-        <div className="section-split-title">{title}</div>
-        <div className="section-split-sub">{subtitle}</div>
+        <div className="section-split-title">{t(title)}</div>
+        <div className="section-split-sub">{t(subtitle)}</div>
       </div>
     </div>
   )

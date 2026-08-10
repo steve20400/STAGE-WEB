@@ -134,9 +134,9 @@ export default function SignUpPage() {
     event.preventDefault()
     setError("")
     // Le backend impose un pseudo d'au moins 2 caracteres (setupSchema).
-    if (form.name.trim().length < 2) return setError("Le nom doit faire au moins 2 caracteres.")
-    if (!form.email.trim()) return setError("L'adresse email est requise.")
-    if (!validEmail(form.email)) return setError("Adresse email invalide.")
+    if (form.name.trim().length < 2) return setError(t("auth_name_min_2"))
+    if (!form.email.trim()) return setError(t("auth_email_required"))
+    if (!validEmail(form.email)) return setError(t("auth_email_invalid"))
 
     setForm((prev) => ({
       ...prev,
@@ -152,10 +152,9 @@ export default function SignUpPage() {
 
     // Le backend (POST /api/auth/setup) refuse tout mot de passe de moins de
     // 8 caracteres : autant le dire ici plutot qu'apres la saisie du code OTP.
-    if (form.password.length < 8)
-      return setError("Le mot de passe doit faire au moins 8 caracteres.")
-    if (strength.score < 2) return setError("Mot de passe trop faible.")
-    if (!match) return setError("Les mots de passe ne correspondent pas.")
+    if (form.password.length < 8) return setError(t("password_min_8"))
+    if (strength.score < 2) return setError(t("auth_password_weak"))
+    if (!match) return setError(t("passwords_differ"))
 
     setLoading(true)
 
@@ -172,9 +171,7 @@ export default function SignUpPage() {
       setCountdown(60)
       setStep(3)
     } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : "Impossible d'envoyer le code OTP."
-      )
+      setError(submitError instanceof Error ? submitError.message : t("auth_otp_send_failed"))
     } finally {
       setLoading(false)
     }
@@ -421,7 +418,7 @@ export default function SignUpPage() {
                   className="btn-submit"
                   disabled={loading || strength.score < 2 || !match}
                 >
-                  {loading ? "Creation..." : "Creer le compte ->"}
+                  {loading ? t("auth_creating") : t("auth_create_account_cta")}
                 </button>
               </div>
             </form>
@@ -431,8 +428,8 @@ export default function SignUpPage() {
             <div>
               <StepHeader
                 step={3}
-                title="Verification."
-                subtitle={`Code envoye a ${form.email.trim().toLowerCase()}`}
+                title={t("auth_verification")}
+                subtitle={t("auth_code_sent_to", { email: form.email.trim().toLowerCase() })}
               />
 
               <div className="otp-wrap">
@@ -440,17 +437,17 @@ export default function SignUpPage() {
                 <div className="resend-row">
                   {demoOtp ? (
                     <>
-                      Code fictif (prototype):{" "}
-                      <strong className="countdown-accent">{demoOtp}</strong>
+                      {t("auth_demo_code")} <strong className="countdown-accent">{demoOtp}</strong>
                     </>
                   ) : (
-                    <>Consultez votre boite mail pour recuperer le code.</>
+                    <>{t("auth_check_mailbox")}</>
                   )}
                 </div>
                 <div className="resend-row">
                   {countdown > 0 ? (
                     <span>
-                      Renvoyer dans <strong className="countdown-accent">{countdown}s</strong>
+                      {t("auth_resend_in")}{" "}
+                      <strong className="countdown-accent">{countdown}s</strong>
                     </span>
                   ) : (
                     <button
@@ -470,12 +467,12 @@ export default function SignUpPage() {
                           setError(
                             submitError instanceof Error
                               ? submitError.message
-                              : "Impossible de regenerer le code."
+                              : t("auth_otp_regen_failed")
                           )
                         }
                       }}
                     >
-                      Generer un nouveau code
+                      {t("auth_new_code")}
                     </button>
                   )}
                 </div>

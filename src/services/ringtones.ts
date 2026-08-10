@@ -1,5 +1,6 @@
 import { publicAsset } from "../lib/asset-url"
 import { resolveMediaUrl, uploadMedia } from "./media-service"
+import { langueInitiale, traduire, type Cle } from "../i18n"
 
 /**
  * Les trois moments sonores de l'application, nommes par le sens de l'evenement
@@ -14,7 +15,7 @@ export interface Ringtone {
   /** Libelle affiche a l'utilisateur. */
   label: string
   /** Precision affichee sous le libelle. */
-  note?: string
+  note?: Cle
 }
 
 /**
@@ -23,9 +24,9 @@ export interface Ringtone {
  * empreinte, donc meme son sur les deux plateformes.
  */
 export const RINGTONES: Ringtone[] = [
-  { file: "incoming_ring.mp3", label: "Sonnerie Alanya", note: "celle de l'application mobile" },
-  { file: "outgoing_ring.mp3", label: "Tonalite Alanya", note: "celle de l'application mobile" },
-  { file: "notification.mp3", label: "Notification Alanya", note: "celle de l'application mobile" },
+  { file: "incoming_ring.mp3", label: "Sonnerie Alanya", note: "ring_note_mobile" },
+  { file: "outgoing_ring.mp3", label: "Tonalite Alanya", note: "ring_note_mobile" },
+  { file: "notification.mp3", label: "Notification Alanya", note: "ring_note_mobile" },
   { file: "ringtone.mp3", label: "Sonnerie classique" },
   { file: "message.mp3", label: "Bip message" },
 ]
@@ -41,10 +42,12 @@ export const RINGTONE_DEFAULTS: Record<RingtoneEvent, string> = {
   message: "notification.mp3",
 }
 
-export const RINGTONE_LABELS: Record<RingtoneEvent, string> = {
-  incoming: "Appel entrant",
-  outgoing: "Appel sortant",
-  message: "Nouveau message",
+/* Des CLES : ce tableau est construit a l'import, un libelle deja traduit y
+   resterait fige dans la langue du chargement. */
+export const RINGTONE_LABELS: Record<RingtoneEvent, Cle> = {
+  incoming: "ring_incoming_call",
+  outgoing: "ring_outgoing_call",
+  message: "new_message",
 }
 
 /**
@@ -111,7 +114,7 @@ export function isCustomRingtone(id: string): boolean {
  */
 export async function importRingtone(file: File): Promise<CustomRingtone> {
   if (!file.type.startsWith("audio/") && !/\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(file.name)) {
-    throw new Error("Ce fichier n'est pas un son.")
+    throw new Error(traduire(langueInitiale(), "ring_not_a_sound"))
   }
   if (file.size > MAX_CUSTOM_RINGTONE_BYTES) {
     throw new Error(

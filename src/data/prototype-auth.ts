@@ -1,4 +1,8 @@
 import { normalizePhoneNumber, type SessionUser } from "./session-user"
+import { langueInitiale, traduire, type Cle } from "../i18n"
+
+/** Traduction hors composant : la langue est relue a chaque message. */
+const tr = (cle: Cle) => traduire(langueInitiale(), cle)
 
 interface PrototypeAuthAccount extends SessionUser {
   passwordHash: string
@@ -28,7 +32,7 @@ async function hashPassword(password: string) {
   const cryptoApi = globalThis.crypto?.subtle
 
   if (!cryptoApi) {
-    throw new Error("Le hachage du mot de passe est indisponible sur cet appareil.")
+    throw new Error(tr("auth_hash_unavailable"))
   }
 
   const buffer = await cryptoApi.digest("SHA-256", new TextEncoder().encode(password))
@@ -130,17 +134,17 @@ export async function registerPrototypeAccount(user: SessionUser, password: stri
   const normalizedEmail = normalizeEmail(user.email ?? "")
 
   if (!normalizedEmail) {
-    throw new Error("Une adresse email est requise pour creer un compte.")
+    throw new Error(tr("auth_email_required_signup"))
   }
 
   const phoneOwner = findPrototypeAccount(normalizedPhone)
   if (phoneOwner) {
-    throw new Error("Ce numero de telephone est deja lie a un compte existant.")
+    throw new Error(tr("auth_phone_taken_local"))
   }
 
   const emailOwner = findPrototypeAccountByEmail(normalizedEmail)
   if (emailOwner) {
-    throw new Error("Cette adresse email est deja liee a un compte existant.")
+    throw new Error(tr("auth_email_taken_local"))
   }
 
   const accounts = loadAccounts()
@@ -166,7 +170,7 @@ export async function loginPrototypeAccount(phone: string, password: string) {
   const accountIndex = accounts.findIndex((account) => account.phone === normalizedPhone)
 
   if (accountIndex === -1) {
-    throw new Error("Aucun compte ne correspond a ce numero. Creez un compte d'abord.")
+    throw new Error(tr("auth_no_account_for_number"))
   }
 
   const account = accounts[accountIndex]
@@ -176,7 +180,7 @@ export async function loginPrototypeAccount(phone: string, password: string) {
     : account.password === password
 
   if (!matchesPassword) {
-    throw new Error("Mot de passe incorrect.")
+    throw new Error(tr("auth_wrong_password"))
   }
 
   if (!hasPasswordHash(account) && hasLegacyPassword(account)) {
@@ -204,7 +208,7 @@ export function updatePrototypeAccountProfile(user: SessionUser) {
   )
 
   if (emailOwner) {
-    throw new Error("Cette adresse email est deja liee a un autre compte.")
+    throw new Error(tr("auth_email_taken_other"))
   }
 
   accounts[index] = {

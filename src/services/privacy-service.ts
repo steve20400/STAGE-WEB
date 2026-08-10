@@ -1,4 +1,5 @@
 import { apiRequest } from "../lib/api-client"
+import type { Cle } from "../i18n"
 
 /**
  * Reglages de confidentialite du compte, tels que le backend les expose.
@@ -18,10 +19,10 @@ import { apiRequest } from "../lib/api-client"
 export type LastSeenVisibility = 0 | 1 | 2
 
 /** Libelles du mobile, reprisa l'identique pour que les deux clients concordent. */
-export const LAST_SEEN_LABELS: Record<LastSeenVisibility, string> = {
-  2: "Tout le monde",
-  1: "Mes contacts",
-  0: "Personne",
+export const LAST_SEEN_LABELS: Record<LastSeenVisibility, Cle> = {
+  2: "privacy_everyone",
+  1: "privacy_my_contacts",
+  0: "privacy_nobody",
 }
 
 export interface PrivacySettings {

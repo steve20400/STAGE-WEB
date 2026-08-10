@@ -34,243 +34,243 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <AppErrorBoundary>
       <ThemeProvider>
         <LanguageProvider>
-        <ToastProvider>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
-          <AuthProvider>
-            <Routes>
-              <Route path="/" element={<WelcomePage />} />
-              <Route path="/welcome" element={<WelcomePage />} />
-              <Route
-                path="/login"
-                element={
-                  <PublicOnlyRoute>
-                    <LoginPage />
-                  </PublicOnlyRoute>
-                }
-              />
-              <Route
-                path="/signup"
-                element={
-                  <PublicOnlyRoute>
-                    <SignUpPage />
-                  </PublicOnlyRoute>
-                }
-              />
-              <Route
-                path="/sign-in"
-                element={
-                  <PublicOnlyRoute>
-                    <Navigate to="/signup" replace />
-                  </PublicOnlyRoute>
-                }
-              />
-              <Route
-                path="/forgot-password"
-                element={
-                  <PublicOnlyRoute>
-                    <ForgotPasswordPage />
-                  </PublicOnlyRoute>
-                }
-              />
+          <ToastProvider>
+            <BrowserRouter basename={import.meta.env.BASE_URL}>
+              <AuthProvider>
+                <Routes>
+                  <Route path="/" element={<WelcomePage />} />
+                  <Route path="/welcome" element={<WelcomePage />} />
+                  <Route
+                    path="/login"
+                    element={
+                      <PublicOnlyRoute>
+                        <LoginPage />
+                      </PublicOnlyRoute>
+                    }
+                  />
+                  <Route
+                    path="/signup"
+                    element={
+                      <PublicOnlyRoute>
+                        <SignUpPage />
+                      </PublicOnlyRoute>
+                    }
+                  />
+                  <Route
+                    path="/sign-in"
+                    element={
+                      <PublicOnlyRoute>
+                        <Navigate to="/signup" replace />
+                      </PublicOnlyRoute>
+                    }
+                  />
+                  <Route
+                    path="/forgot-password"
+                    element={
+                      <PublicOnlyRoute>
+                        <ForgotPasswordPage />
+                      </PublicOnlyRoute>
+                    }
+                  />
 
-              {/* L'ecran d'accueil est la liste des discussions, comme sur mobile. */}
-              <Route path="/dashboard" element={<Navigate to="/chats" replace />} />
-              <Route
-                path="/ai"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <AiAssistantPage />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              {/* Nouveau chat et fiche info : plein ecran (hors vue deux colonnes) */}
-              <Route
-                path="/chats/new"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <NewChatPage />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/chats/:chatId/info"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <ConvInfoPage />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              {/* Vue deux colonnes facon WhatsApp Web : liste (persistante) + conversation.
+                  {/* L'ecran d'accueil est la liste des discussions, comme sur mobile. */}
+                  <Route path="/dashboard" element={<Navigate to="/chats" replace />} />
+                  <Route
+                    path="/ai"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <AiAssistantPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Nouveau chat et fiche info : plein ecran (hors vue deux colonnes) */}
+                  <Route
+                    path="/chats/new"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <NewChatPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/chats/:chatId/info"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <ConvInfoPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Vue deux colonnes facon WhatsApp Web : liste (persistante) + conversation.
                   Le routage imbrique garde la liste montee quand on change de conversation. */}
-              <Route
-                path="/chats"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <ChatsSplit />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<ChatEmptyState />} />
-                <Route path=":chatId" element={<ChatRoomPage />} />
-              </Route>
+                  <Route
+                    path="/chats"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <ChatsSplit />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route index element={<ChatEmptyState />} />
+                    <Route path=":chatId" element={<ChatRoomPage />} />
+                  </Route>
 
-              <Route
-                path="/contacts"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <ContactsPage />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/status"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <SectionSplit
-                        title="Statuts"
-                        subtitle="Selectionnez un statut a gauche, ou publiez le votre pour vos contacts."
-                        icon={
-                          <svg
-                            width="34"
-                            height="34"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
+                  <Route
+                    path="/contacts"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <ContactsPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/status"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <SectionSplit
+                            title="status"
+                            subtitle="core_status_sub"
+                            icon={
+                              <svg
+                                width="34"
+                                height="34"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                              >
+                                <circle cx="12" cy="12" r="9" strokeDasharray="4 3" />
+                                <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
+                              </svg>
+                            }
                           >
-                            <circle cx="12" cy="12" r="9" strokeDasharray="4 3" />
-                            <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
-                          </svg>
-                        }
-                      >
-                        <StatusPage />
-                      </SectionSplit>
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/calls"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <SectionSplit
-                        title="Appels"
-                        subtitle="Passez un appel audio ou video depuis vos contacts, ou rappelez depuis l'historique."
-                        icon={
-                          <svg
-                            width="34"
-                            height="34"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
+                            <StatusPage />
+                          </SectionSplit>
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/calls"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <SectionSplit
+                            title="calls"
+                            subtitle="core_calls_sub"
+                            icon={
+                              <svg
+                                width="34"
+                                height="34"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                              >
+                                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                              </svg>
+                            }
                           >
-                            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-                          </svg>
-                        }
-                      >
-                        <CallsPage />
-                      </SectionSplit>
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/calls/new"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <NewCallPage />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/calls/:callId"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <CallRoomPage />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
+                            <CallsPage />
+                          </SectionSplit>
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/calls/new"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <NewCallPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/calls/:callId"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <CallRoomPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
 
-              <Route
-                path="/meetings"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <SectionSplit
-                        title="Réunions"
-                        subtitle="Rejoignez vos réunions programmées et collaborez en direct."
-                        icon={
-                          <svg
-                            width="34"
-                            height="34"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                  <Route
+                    path="/meetings"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <SectionSplit
+                            title="meetings"
+                            subtitle="core_meetings_sub"
+                            icon={
+                              <svg
+                                width="34"
+                                height="34"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                <line x1="16" y1="2" x2="16" y2="6" />
+                                <line x1="8" y1="2" x2="8" y2="6" />
+                                <line x1="3" y1="10" x2="21" y2="10" />
+                                <circle cx="8" cy="16" r="1" />
+                                <circle cx="12" cy="16" r="1" />
+                                <circle cx="16" cy="16" r="1" />
+                              </svg>
+                            }
                           >
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                            <line x1="16" y1="2" x2="16" y2="6" />
-                            <line x1="8" y1="2" x2="8" y2="6" />
-                            <line x1="3" y1="10" x2="21" y2="10" />
-                            <circle cx="8" cy="16" r="1" />
-                            <circle cx="12" cy="16" r="1" />
-                            <circle cx="16" cy="16" r="1" />
-                          </svg>
-                        }
-                      >
-                        <MeetingsPage />
-                      </SectionSplit>
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/meetings/:meetingId"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <MeetingRoomPage />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
+                            <MeetingsPage />
+                          </SectionSplit>
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/meetings/:meetingId"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <MeetingRoomPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
 
-              <Route
-                path="/settings"
-                element={
-                  <ProtectedRoute>
-                    <ProtectedLayout>
-                      <SettingsPage />
-                    </ProtectedLayout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-        </ToastProvider>
+                  <Route
+                    path="/settings"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <SettingsPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </AuthProvider>
+            </BrowserRouter>
+          </ToastProvider>
         </LanguageProvider>
       </ThemeProvider>
     </AppErrorBoundary>

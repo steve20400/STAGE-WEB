@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
+import { useTranslation } from "../../../src/i18n"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./forgot-password-page.css"
 
@@ -11,6 +12,7 @@ function isValidIdentifier(value: string) {
 }
 
 export default function ForgotPasswordPage() {
+  const { t } = useTranslation()
   const [identifier, setIdentifier] = useState("")
   const [submitted, setSubmitted] = useState(false)
 
@@ -25,30 +27,24 @@ export default function ForgotPasswordPage() {
   return (
     <div className="fp-root">
       <main className="fp-card">
-        <Link to="/" className="fp-brand" aria-label="Retour a l'accueil">
+        <Link to="/" className="fp-brand" aria-label={t("auth_back_home")}>
           <img src={alanyaLogo} alt="Logo Alanya" className="fp-logo" />
           <span>
             <strong>Alanya</strong>
-            <small>Work</small>
+            <small>{t("brand_subtitle")}</small>
           </span>
         </Link>
 
         <div className="fp-copy">
-          <div className="fp-pretitle">Recuperation</div>
-          <h1>Recuperation du compte.</h1>
-          <p>
-            Entrez l'email ou le numero associe au compte. Pour ce prototype, aucun vrai lien n'est
-            envoye, mais le parcours reste pret pour le futur service serveur.
-          </p>
+          <div className="fp-pretitle">{t("auth_recovery")}</div>
+          <h1>{t("auth_recover_account")}</h1>
+          <p>{t("auth_recover_explain")}</p>
         </div>
 
         {submitted ? (
           <div className="fp-success" role="status">
-            <strong>Compte retrouve.</strong>
-            <span>
-              La prochaine version pourra envoyer un lien ou un code a{` ${identifier.trim()}`} pour
-              changer le mot de passe.
-            </span>
+            <strong>{t("auth_account_found")}</strong>
+            <span>{t("auth_recover_next", { identifiant: identifier.trim() })}</span>
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate>
@@ -61,18 +57,18 @@ export default function ForgotPasswordPage() {
                 onChange={(event) => setIdentifier(event.target.value)}
                 autoComplete="username"
               />
-              <label htmlFor="identifier">Email ou numero de telephone</label>
+              <label htmlFor="identifier">{t("auth_email_or_phone")}</label>
             </div>
 
             <button type="submit" className="fp-submit" disabled={!canSubmit}>
-              Verifier le compte -&gt;
+              {t("auth_check_account")}
             </button>
           </form>
         )}
 
         <div className="fp-actions">
-          <Link to="/login">Retour a la connexion</Link>
-          <Link to="/signup">Creer un compte</Link>
+          <Link to="/login">{t("auth_back_to_login")}</Link>
+          <Link to="/signup">{t("create_account")}</Link>
         </div>
       </main>
     </div>

@@ -1,5 +1,6 @@
 import { initIndexedDB } from "../indexedDB/schema"
 import { loadSessionToken } from "../data/session-auth"
+import { langueInitiale, traduire } from "../i18n"
 
 /** Taille maximale volontaire pour éviter de remplir le stockage du téléphone. */
 const MAX_CACHED_PREVIEW_BYTES = 30 * 1024 * 1024
@@ -142,7 +143,7 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
   // le cache est une optimisation et ne doit jamais empêcher l'aperçu réseau.
   try {
     const db = await initIndexedDB()
-    const cached = await db.get("previewMedia", key) as CachedPreview | undefined
+    const cached = (await db.get("previewMedia", key)) as CachedPreview | undefined
     if (cached?.blob) return cached.blob
   } catch {
     // Continuer avec le téléchargement réseau.
@@ -184,7 +185,7 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
       // cross-origin : le navigateur bloque la lecture si B2 n'envoie pas les
       // en-tetes CORS. C'est le cas typique quand `api/media-proxy` n'est pas
       // deploye sur l'hebergement (voir MEDIA_PREVIEW_PROXY.md).
-      throw new Error("Aperçu indisponible : le fichier n'a pas pu être lu depuis le stockage.")
+      throw new Error(traduire(langueInitiale(), "core_preview_unreadable"))
     }
   }
   if (!response.ok) throw new Error(`Chargement échoué (${response.status})`)
