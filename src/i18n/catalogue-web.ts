@@ -1239,7 +1239,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dashboard: "Tableau de bord",
     messages_label: "Messages",
     welcome_nav_features: "Fonctionnalites",
-    brand_subtitle: "Work",
+    brand_subtitle: "Messagerie ENSPY",
     welcome_demo_status: "en ligne",
     welcome_demo_r: "Merci frere, tu geres vraiment",
     welcome_demo_read: "lu",
