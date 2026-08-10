@@ -16,7 +16,7 @@ import {
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { getMyUserId } from "../../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
-import { useTranslation } from "../../../../src/i18n"
+import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import {
   bloquer,
@@ -168,17 +168,17 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
     if (!member) return
 
     setPendingAction({
-      title: "Exclure ce membre ?",
-      description: `${member.name} sera retire du groupe.`,
-      confirmLabel: "Exclure",
+      title: t("cinfo_remove_member_title"),
+      description: t("cinfo_remove_member_detail", { name: member.name }),
+      confirmLabel: t("cinfo_remove"),
       tone: "danger",
       onConfirm: () => {
         void removeGroupMember(conv.id, id)
           .then(() => {
             setMembers((prev) => prev.filter((entry) => entry.id !== id))
-            warning(`${member.name} retire du groupe`)
+            warning(t("cinfo_member_removed", { name: member.name }))
           })
-          .catch(() => warning("Retrait impossible"))
+          .catch(() => warning(t("cinfo_remove_failed")))
       },
     })
   }
@@ -206,14 +206,20 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
       if (blocage) {
         await debloquer(blocage.idBlock)
         setBlocage(null)
-        info("Debloque", `${conv?.name ?? "Ce contact"} peut de nouveau vous ecrire.`)
+        info(
+          t("unblocked_toast"),
+          t("cinfo_unblocked_detail", { name: conv?.name ?? t("cinfo_this_contact") })
+        )
       } else {
         setBlocage(await bloquer(numeroDuPair))
-        info("Bloque", `${conv?.name ?? "Ce contact"} ne peut plus vous ecrire.`)
+        info(
+          t("blocked_toast"),
+          t("cinfo_blocked_detail", { name: conv?.name ?? t("cinfo_this_contact") })
+        )
       }
     } catch (err) {
       warning(
-        blocage ? "Deblocage impossible" : "Blocage impossible",
+        blocage ? t("cinfo_unblock_failed") : t("cinfo_block_failed"),
         err instanceof Error ? err.message : undefined
       )
     } finally {
@@ -223,34 +229,34 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
   const leaveGroup = () => {
     setPendingAction({
-      title: "Quitter le groupe ?",
-      description: "Vous ne recevrez plus les messages de cette conversation.",
-      confirmLabel: "Quitter",
+      title: t("cinfo_leave_group_title"),
+      description: t("cinfo_leave_group_detail"),
+      confirmLabel: t("cinfo_leave"),
       tone: "warning",
       onConfirm: () => {
         void leaveGroupApi(conv.id)
           .then(() => {
-            success("Vous avez quitte le groupe")
+            success(t("cinfo_left_group"))
             navigate("/chats")
           })
-          .catch(() => warning("Impossible de quitter le groupe"))
+          .catch(() => warning(t("cinfo_leave_failed")))
       },
     })
   }
 
   const deleteConv = () => {
     setPendingAction({
-      title: conv.isGroup ? "Supprimer ce groupe ?" : "Supprimer cette conversation ?",
-      description: "Cette action est irreversible.",
-      confirmLabel: conv.isGroup ? "Supprimer le groupe" : "Supprimer",
+      title: conv.isGroup ? t("cinfo_delete_group_title") : t("cinfo_delete_conversation_title"),
+      description: t("cinfo_irreversible_detail"),
+      confirmLabel: conv.isGroup ? t("cinfo_delete_group") : t("delete"),
       tone: "danger",
       onConfirm: () => {
         void deleteGroupConversation(conv.id)
           .then(() => {
-            warning("Groupe supprimé")
+            warning(t("cinfo_group_deleted"))
             navigate("/chats")
           })
-          .catch(() => warning("Suppression impossible"))
+          .catch(() => warning(t("cinfo_delete_failed")))
       },
     })
   }
@@ -262,10 +268,10 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           prev.map((member) => (member.id === id ? { ...member, role: "admin" } : member))
         )
       )
-      .catch(() => warning("Promotion impossible"))
+      .catch(() => warning(t("cinfo_promote_failed")))
     const member = members.find((entry) => entry.id === id)
     if (!member) return
-    info(`${member.name} est maintenant administrateur`)
+    info(t("cinfo_now_admin", { name: member.name }))
     // TODO : PATCH /api/chats/:convId/members/:memberId { role:"admin" }
   }
 
@@ -450,7 +456,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
       <div className="cip-root">
         <div className="cip-head">
           {onClose && (
-            <button className="cip-back" onClick={onClose} aria-label="Fermer">
+            <button className="cip-back" onClick={onClose} aria-label={t("close")}>
               <svg
                 width="15"
                 height="15"
@@ -465,7 +471,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </svg>
             </button>
           )}
-          <span className="cip-head-title">Infos de la conversation</span>
+          <span className="cip-head-title">{t("cinfo_title")}</span>
         </div>
 
         <div className="cip-body">
@@ -489,15 +495,23 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </div>
             )}
             {conv.isGroup && (
-              <div className="cip-sub">{conv.description ?? `${members.length} membres`}</div>
+              <div className="cip-sub">
+                {conv.description ?? t("cinfo_members_count", { count: members.length })}
+              </div>
             )}
-            {!conv.isGroup && conv.statusMsg && <div className="cip-sub">{conv.statusMsg}</div>}
+            {/* Le statut derive de la presence : on le compose au rendu, pour
+                qu'il suive un changement de langue sans recharger la page. */}
+            {!conv.isGroup && (
+              <div className="cip-sub">
+                {conv.statusMsg ?? (conv.online ? t("online") : t("cinfo_status_unknown"))}
+              </div>
+            )}
 
             <div className="cip-actions">
               <button
                 className="ca-btn"
                 onClick={() => navigate(`/chats/${conv.id}`)}
-                aria-label="Message"
+                aria-label={t("cinfo_message")}
               >
                 <div className="ca-icon">
                   <svg
@@ -512,7 +526,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                   </svg>
                 </div>
-                <span className="ca-label">Message</span>
+                <span className="ca-label">{t("cinfo_message")}</span>
               </button>
               <button
                 className="ca-btn"
@@ -525,12 +539,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     )
                     .catch((err) =>
                       warning(
-                        "Appel impossible",
-                        err instanceof Error ? err.message : "Reessayez plus tard."
+                        t("call_failed"),
+                        err instanceof Error ? err.message : t("cinfo_try_later")
                       )
                     )
                 }}
-                aria-label="Audio"
+                aria-label={t("audio_call")}
               >
                 <div className="ca-icon">
                   <svg
@@ -545,7 +559,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                   </svg>
                 </div>
-                <span className="ca-label">Audio</span>
+                <span className="ca-label">{t("cinfo_audio")}</span>
               </button>
               <button
                 className="ca-btn"
@@ -558,12 +572,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     )
                     .catch((err) =>
                       warning(
-                        "Appel impossible",
-                        err instanceof Error ? err.message : "Reessayez plus tard."
+                        t("call_failed"),
+                        err instanceof Error ? err.message : t("cinfo_try_later")
                       )
                     )
                 }}
-                aria-label="Video"
+                aria-label={t("video_call")}
               >
                 <div className="ca-icon">
                   <svg
@@ -579,9 +593,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <rect x="1" y="5" width="15" height="14" rx="2" />
                   </svg>
                 </div>
-                <span className="ca-label">Video</span>
+                <span className="ca-label">{t("video_label")}</span>
               </button>
-              <button className="ca-btn" aria-label="Rechercher">
+              <button className="ca-btn" aria-label={t("cinfo_search")}>
                 <div className="ca-icon">
                   <svg
                     width="16"
@@ -596,20 +610,20 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <path d="M21 21l-4.35-4.35" />
                   </svg>
                 </div>
-                <span className="ca-label">Recherche</span>
+                <span className="ca-label">{t("cinfo_search")}</span>
               </button>
             </div>
           </div>
 
           <div className="cip-section">
             <div className="notif-row">
-              <span className="notif-label">Mettre en sourdine</span>
+              <span className="notif-label">{t("cinfo_mute")}</span>
               <button
                 className="tgl"
                 style={{ background: muteNotifs ? "var(--accent)" : "var(--border-default)" }}
                 onClick={() => {
                   setMute((value) => !value)
-                  info(muteNotifs ? "Notifications reactivees" : "Conversation mise en sourdine")
+                  info(muteNotifs ? t("cinfo_unmuted_toast") : t("cinfo_muted_toast"))
                 }}
                 aria-checked={muteNotifs}
                 role="switch"
@@ -630,7 +644,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
             {!conv.isGroup && conv.alanyaId && (
               <div className="notif-row" style={{ marginTop: 14, alignItems: "flex-start" }}>
                 <span className="notif-label">
-                  Bloquer ce contact
+                  {t("cinfo_block_contact")}
                   <span
                     style={{
                       display: "block",
@@ -639,7 +653,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                       marginTop: 2,
                     }}
                   >
-                    Ses messages ne vous parviendront plus
+                    {t("cinfo_block_contact_sub")}
                   </span>
                 </span>
                 <button
@@ -653,7 +667,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                   disabled={blocageEnCours}
                   aria-checked={blocage !== null}
                   role="switch"
-                  aria-label="Bloquer ce contact"
+                  aria-label={t("cinfo_block_contact")}
                 >
                   <div
                     className="tgl-knob"
@@ -673,20 +687,20 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 className={`cip-tab ${tab === "membres" ? "on" : ""}`}
                 onClick={() => setTab("membres")}
               >
-                Membres ({members.length})
+                {t("cinfo_tab_members", { count: members.length })}
               </button>
               <button
                 className={`cip-tab ${tab === "fichiers" ? "on" : ""}`}
                 onClick={() => setTab("fichiers")}
               >
-                Fichiers ({conv.files.length})
+                {t("cinfo_tab_files", { count: conv.files.length })}
               </button>
             </div>
           )}
 
           {(tab === "membres" || !conv.isGroup) && (
             <div className="cip-section">
-              {!conv.isGroup && <div className="cip-section-title">Fichiers partages</div>}
+              {!conv.isGroup && <div className="cip-section-title">{t("cinfo_shared_files")}</div>}
               {conv.isGroup &&
                 members.map((member) => {
                   const memberColor = COLORS[member.color]
@@ -711,11 +725,11 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                           {member.name}
                           {member.role === "admin" && (
                             <span className={`m-role ${isMe ? "me-badge" : ""}`}>
-                              {isMe ? "Vous (admin)" : "Admin"}
+                              {isMe ? t("cinfo_you_admin") : t("cinfo_admin")}
                             </span>
                           )}
                           {isMe && member.role !== "admin" && (
-                            <span className="m-role me-badge">Vous</span>
+                            <span className="m-role me-badge">{t("you")}</span>
                           )}
                         </div>
                         {/* Sous le nom, pas a cote : c'est la disposition
@@ -729,7 +743,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                           {member.role !== "admin" && (
                             <button
                               className="m-action"
-                              title="Nommer administrateur"
+                              title={t("cinfo_make_admin")}
                               onClick={() => promoteAdmin(member.id)}
                             >
                               <svg
@@ -747,7 +761,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                           )}
                           <button
                             className="m-action danger"
-                            title="Exclure du groupe"
+                            title={t("cinfo_remove_from_group")}
                             onClick={() => removeMember(member.id)}
                           >
                             <svg
@@ -798,7 +812,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     event.currentTarget.style.transform = "translateY(0)"
                   }}
                   onClick={() => setShowAddMember(true)}
-                  aria-label="Ajouter un ou plusieurs membres au groupe"
+                  aria-label={t("cinfo_add_members_cta")}
                 >
                   <svg
                     width="16"
@@ -812,7 +826,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
-                  Ajouter un ou plusieurs membres au groupe
+                  {t("cinfo_add_members_cta")}
                 </button>
               )}
             </div>
@@ -820,12 +834,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
           {(tab === "fichiers" || !conv.isGroup) && (
             <div className="cip-section">
-              {!conv.isGroup && <div className="cip-section-title">Fichiers partages</div>}
+              {!conv.isGroup && <div className="cip-section-title">{t("cinfo_shared_files")}</div>}
               {conv.files.map((file) => (
                 <div
                   className="file-item"
                   key={file.id}
-                  onClick={() => info("Telechargement", file.name)}
+                  onClick={() => info(t("cinfo_download_title"), file.name)}
                 >
                   <div className="f-icon">
                     <FileIcon type={file.type} />
@@ -836,7 +850,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                       {file.size} · {file.sender} · {file.ts}
                     </div>
                   </div>
-                  <button className="f-dl" aria-label="Telecharger">
+                  <button className="f-dl" aria-label={t("download")}>
                     <svg
                       width="14"
                       height="14"
@@ -860,7 +874,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     padding: "20px 0",
                   }}
                 >
-                  Aucun fichier partage
+                  {t("cinfo_no_shared_file")}
                 </div>
               )}
             </div>
@@ -868,14 +882,14 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
           {conv.isGroup && (
             <div className="cip-section">
-              <div className="cip-section-title">Informations</div>
+              <div className="cip-section-title">{t("cinfo_information")}</div>
               <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span style={{ color: "var(--text-ghost)" }}>Cree le</span>
+                  <span style={{ color: "var(--text-ghost)" }}>{t("cinfo_created_on")}</span>
                   <span>{conv.createdAt}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                  <span style={{ color: "var(--text-ghost)" }}>Membres</span>
+                  <span style={{ color: "var(--text-ghost)" }}>{t("cinfo_members")}</span>
                   <span>{members.length} / 256</span>
                 </div>
               </div>
@@ -883,7 +897,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           )}
 
           <div className="cip-section">
-            <div className="cip-section-title">Actions</div>
+            <div className="cip-section-title">{t("cinfo_actions")}</div>
             {conv.isGroup && (
               <div className="danger-item" onClick={leaveGroup}>
                 <div className="di-icon" style={{ background: "var(--warning-dim,#fbbf2415)" }}>
@@ -901,9 +915,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 </div>
                 <div>
                   <div className="danger-label" style={{ color: "var(--warning,#fbbf24)" }}>
-                    Quitter le groupe
+                    {t("cinfo_leave_group")}
                   </div>
-                  <div className="danger-sub">Vous ne recevrez plus les messages</div>
+                  <div className="danger-sub">{t("cinfo_leave_group_sub")}</div>
                 </div>
               </div>
             )}
@@ -926,9 +940,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </div>
               <div>
                 <div className="danger-label" style={{ color: "var(--danger)" }}>
-                  {conv.isGroup ? "Supprimer le groupe" : "Supprimer la conversation"}
+                  {conv.isGroup ? t("cinfo_delete_group") : t("cinfo_delete_conversation")}
                 </div>
-                <div className="danger-sub">Action irreversible</div>
+                <div className="danger-sub">{t("cinfo_irreversible")}</div>
               </div>
             </div>
           </div>
@@ -947,7 +961,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
             <div className="cip-confirm-text">{pendingAction.description}</div>
             <div className="cip-confirm-actions">
               <button className="cip-confirm-btn cancel" onClick={() => setPendingAction(null)}>
-                Annuler
+                {t("cancel")}
               </button>
               <button
                 className={`cip-confirm-btn confirm ${pendingAction.tone}`}
@@ -972,7 +986,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           onAdded={(newMembers) => {
             setMembers((prev) => [...prev, ...newMembers])
             setShowAddMember(false)
-            success(`${newMembers.length} membre(s) ajoute(s)`)
+            success(t("cinfo_members_added", { count: newMembers.length }))
           }}
         />
       )}
@@ -1008,7 +1022,10 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
       const contact = contacts.find((c) => c.id === memberId || c.phone === publicNumber)
       return {
         id: memberId,
-        name: contact?.name ?? pseudoName ?? `Membre ${index + 1}`,
+        name:
+          contact?.name ??
+          pseudoName ??
+          traduire(langueInitiale(), "cinfo_member_n", { n: index + 1 }),
         initials:
           contact?.initials ??
           (pseudoName
@@ -1036,7 +1053,8 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
       members,
       files: [],
       createdAt: "",
-      description: `${members.length} membres`,
+      // Pas de description ici : le nombre de membres se compose au rendu, donc
+      // il suit la langue choisie meme apres coup.
     }
   }
 
@@ -1056,7 +1074,8 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
     isGroup: false,
     online: conv.online,
     alanyaId: alanyaIdPair,
-    statusMsg: conv.online ? "En ligne" : "Statut inconnu",
+    // statusMsg reste vide : la mention de presence se compose au rendu, donc
+    // elle suit la langue choisie.
     members: [
       {
         id: conv.id,
@@ -1096,7 +1115,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
 
         return {
           id: memberId,
-          name: contact?.name ?? `Membre ${index + 1}`,
+          name: contact?.name ?? traduire(langueInitiale(), "cinfo_member_n", { n: index + 1 }),
           initials: contact?.initials ?? memberId.slice(0, 2).toUpperCase(),
           color: contact?.color ?? colorNames[index % colorNames.length],
           role: index === 0 ? "admin" : "member",
@@ -1106,12 +1125,13 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
         }
       }),
       files: [],
-      createdAt: new Date(group.createdAt).toLocaleDateString("fr-FR", {
+      // La date se lit : le mois s'ecrit en toutes lettres, donc dans la langue
+      // choisie et non en francais fige.
+      createdAt: new Date(group.createdAt).toLocaleDateString(langueInitiale(), {
         day: "numeric",
         month: "long",
         year: "numeric",
       }),
-      description: `${group.memberIds.length} membres`,
     }
   }
 
@@ -1127,7 +1147,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
     isGroup: false,
     online: contact.online,
     alanyaId: contact.phone,
-    statusMsg: contact.online ? "En ligne" : "Statut inconnu",
+    // statusMsg reste vide : voir plus haut, la presence se compose au rendu.
     members: [
       {
         id: contact.id,
@@ -1141,7 +1161,7 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
       },
     ],
     files: [],
-    createdAt: "Date inconnue",
+    createdAt: traduire(langueInitiale(), "cinfo_unknown_date"),
   }
 }
 
@@ -1171,6 +1191,7 @@ function AddMemberDialog({
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const { error } = useToast()
+  const { t } = useTranslation()
 
   useEffect(() => {
     let cancelled = false
@@ -1226,8 +1247,8 @@ function AddMemberDialog({
         }))
       onAdded(newMembers)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Impossible d'ajouter les membres."
-      error("Erreur", message)
+      const message = err instanceof Error ? err.message : t("cinfo_add_members_failed")
+      error(t("error"), message)
     } finally {
       setSending(false)
     }
@@ -1258,17 +1279,17 @@ function AddMemberDialog({
             color: "var(--text-primary)",
           }}
         >
-          Ajouter des membres
+          {t("cinfo_add_members_title")}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
           {loading && (
             <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
-              Chargement des contacts...
+              {t("cinfo_loading_contacts")}
             </div>
           )}
           {!loading && allContacts.length === 0 && (
             <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
-              Aucun contact disponible a ajouter.
+              {t("cinfo_no_contact_to_add")}
             </div>
           )}
           {allContacts.map((contact) => {
@@ -1349,7 +1370,7 @@ function AddMemberDialog({
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
-            Annuler
+            {t("cancel")}
           </button>
           <button
             disabled={selected.size === 0 || sending}
@@ -1367,7 +1388,7 @@ function AddMemberDialog({
               opacity: selected.size === 0 || sending ? 0.6 : 1,
             }}
           >
-            {sending ? "Ajout..." : `Ajouter (${selected.size})`}
+            {sending ? t("cinfo_adding") : t("cinfo_add_count", { count: selected.size })}
           </button>
         </div>
       </div>
@@ -1380,6 +1401,7 @@ export default function ConvInfoPage({
   onEmbeddedClose,
 }: { embedded?: boolean; onEmbeddedClose?: () => void } = {}) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { chatId } = useParams<{ chatId: string }>()
   const [convInfo, setConvInfo] = useState<ConvInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1422,7 +1444,7 @@ export default function ConvInfoPage({
           color: "var(--text-muted)",
         }}
       >
-        Chargement...
+        {t("loading")}
       </div>
     )
   }
@@ -1441,9 +1463,9 @@ export default function ConvInfoPage({
       >
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>?</div>
-          <div>Conversation introuvable</div>
+          <div>{t("cinfo_conversation_not_found")}</div>
           <button onClick={() => navigate("/chats")} style={{ marginTop: 16, padding: "8px 16px" }}>
-            Retour aux chats
+            {t("cinfo_back_to_chats")}
           </button>
         </div>
       </div>

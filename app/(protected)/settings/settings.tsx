@@ -21,9 +21,11 @@ import {
 import {
   LANGUAGE_CODES,
   LANGUAGE_NAMES,
+  langueInitiale,
   libelleLangue,
   traduire,
   useTranslation,
+  type Cle,
   type LanguageCode,
 } from "../../../src/i18n"
 import {
@@ -100,32 +102,38 @@ interface ConfirmState {
 }
 
 function getInitialProfile(sessionUser: SessionUser | null): Profile {
+  const langue = langueInitiale()
   return {
-    name: sessionUser?.name ?? "Utilisateur Alanya",
+    name: sessionUser?.name ?? traduire(langue, "default_user_name"),
     email: sessionUser?.email ?? "",
     // Pas de numero factice en repli : « Enregistrer » recopie draft.phone dans la
     // session locale (updateUser), le faux numero devenait donc l'Alanya ID affiche.
     phone: sessionUser?.phone ?? "",
-    statusMsg: sessionUser?.statusMsg ?? "Disponible",
+    statusMsg: sessionUser?.statusMsg ?? traduire(langue, "set_status_available"),
     avatar: sessionUser?.avatar ?? null,
   }
 }
 
-function analyzePassword(pwd: string): { score: number; label: string; color: string } {
-  if (!pwd) return { score: 0, label: "", color: "var(--border-subtle)" }
+/**
+ * Force du mot de passe. Le libelle est rendu sous forme de CLE : il est
+ * traduit au moment de l'affichage, sinon il resterait fige dans la langue
+ * active au moment du calcul.
+ */
+function analyzePassword(pwd: string): { score: number; labelKey: Cle | null; color: string } {
+  if (!pwd) return { score: 0, labelKey: null, color: "var(--border-subtle)" }
   let score = 0
   if (pwd.length >= 8) score++
   if (pwd.length >= 14) score++
   if (/[A-Z]/.test(pwd)) score++
   if (/[0-9]/.test(pwd)) score++
   if (/[^A-Za-z0-9]/.test(pwd)) score++
-  const levels = [
-    { label: "Tres faible", color: "var(--danger)" },
-    { label: "Faible", color: "#f97316" },
-    { label: "Moyen", color: "#eab308" },
-    { label: "Bon", color: "#84cc16" },
-    { label: "Fort", color: "var(--success)" },
-    { label: "Tres fort", color: "var(--accent)" },
+  const levels: { labelKey: Cle; color: string }[] = [
+    { labelKey: "strength_very_weak", color: "var(--danger)" },
+    { labelKey: "strength_weak", color: "#f97316" },
+    { labelKey: "strength_medium", color: "#eab308" },
+    { labelKey: "strength_good", color: "#84cc16" },
+    { labelKey: "strength_strong", color: "var(--success)" },
+    { labelKey: "strength_very_strong", color: "var(--accent)" },
   ]
   return { score, ...levels[Math.min(5, score)] }
 }
@@ -137,6 +145,7 @@ function analyzePassword(pwd: string): { score: number; label: string; color: st
  * deconnexion.
  */
 function RingtonePicker() {
+  const { t } = useTranslation()
   const events: RingtoneEvent[] = ["incoming", "outgoing", "message"]
   const [choices, setChoices] = useState<Record<RingtoneEvent, string>>(() => ({
     incoming: ringtoneFile("incoming"),
@@ -159,11 +168,11 @@ function RingtonePicker() {
     try {
       const entree = await importRingtone(file)
       setImported(customRingtones())
-      success("Sonnerie importee", `« ${entree.label} » est disponible pour les trois evenements.`)
+      success(t("set_ringtone_imported"), t("set_ringtone_imported_detail", { nom: entree.label }))
     } catch (err) {
       toastError(
-        "Import impossible",
-        err instanceof Error ? err.message : "Le fichier n'a pas pu etre televerse."
+        t("set_ringtone_import_failed"),
+        err instanceof Error ? err.message : t("set_ringtone_upload_failed")
       )
     } finally {
       setImporting(false)
@@ -180,10 +189,7 @@ function RingtonePicker() {
       outgoing: ringtoneFile("outgoing"),
       message: ringtoneFile("message"),
     })
-    success(
-      "Sonnerie retiree",
-      `Les evenements qui utilisaient « ${entree.label} » reprennent leur son par defaut.`
-    )
+    success(t("set_ringtone_removed"), t("set_ringtone_removed_detail", { nom: entree.label }))
   }
 
   const choose = (event: RingtoneEvent, file: string) => {
@@ -207,7 +213,7 @@ function RingtonePicker() {
 
   return (
     <div className="s-card">
-      <div className="s-card-title">Sonneries</div>
+      <div className="s-card-title">{t("set_ringtones")}</div>
       {events.map((event) => (
         <div key={event} className="ringtone-row">
           <div className="ringtone-row-label">{RINGTONE_LABELS[event]}</div>
@@ -216,7 +222,9 @@ function RingtonePicker() {
               className="ringtone-select"
               value={choices[event]}
               onChange={(e) => choose(event, e.target.value)}
-              aria-label={`Sonnerie pour ${RINGTONE_LABELS[event].toLowerCase()}`}
+              aria-label={t("set_ringtone_for", {
+                evenement: RINGTONE_LABELS[event].toLowerCase(),
+              })}
             >
               {RINGTONES.map((ringtone) => (
                 <option key={ringtone.file} value={ringtone.file}>
@@ -225,7 +233,7 @@ function RingtonePicker() {
                 </option>
               ))}
               {imported.length > 0 && (
-                <optgroup label="Importees">
+                <optgroup label={t("set_ringtones_imported_group")}>
                   {imported.map((entree) => (
                     <option key={entree.url} value={entree.url}>
                       {entree.label}
@@ -238,8 +246,8 @@ function RingtonePicker() {
               type="button"
               className="ringtone-listen"
               onClick={() => listen(choices[event])}
-              aria-label={playing === choices[event] ? "Arreter l'ecoute" : "Ecouter"}
-              title={playing === choices[event] ? "Arreter" : "Ecouter"}
+              aria-label={playing === choices[event] ? t("set_stop_listening") : t("set_listen")}
+              title={playing === choices[event] ? t("set_stop") : t("set_listen")}
             >
               {playing === choices[event] ? (
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -257,14 +265,10 @@ function RingtonePicker() {
       ))}
       <div className="privacy-choice">
         <div className="privacy-choice-head">
-          <div className="privacy-choice-label">Sortie audio des appels</div>
-          <div className="privacy-choice-desc">
-            Mode a la prise d'un appel audio. Un appel video reste toujours au haut-parleur.
-            L'ecoute a l'oreille correspond a un volume reduit : le navigateur ne choisit pas la
-            sortie physique, contrairement a l'application mobile.
-          </div>
+          <div className="privacy-choice-label">{t("set_audio_output")}</div>
+          <div className="privacy-choice-desc">{t("set_audio_output_desc")}</div>
         </div>
-        <div className="privacy-choice-opts" role="group" aria-label="Sortie audio par defaut">
+        <div className="privacy-choice-opts" role="group" aria-label={t("set_audio_output_group")}>
           {(["earpiece", "speaker"] as AudioOutputMode[]).map((mode) => (
             <button
               key={mode}
@@ -295,7 +299,7 @@ function RingtonePicker() {
           onClick={() => fileInput.current?.click()}
           disabled={importing}
         >
-          {importing ? "Import en cours…" : "Importer une sonnerie"}
+          {importing ? t("set_importing") : t("set_import_ringtone")}
         </button>
         {imported.length > 0 && (
           <ul className="ringtone-imported-list">
@@ -307,9 +311,11 @@ function RingtonePicker() {
                   className="ringtone-listen"
                   onClick={() => listen(entree.url)}
                   aria-label={
-                    playing === entree.url ? "Arreter l'ecoute" : `Ecouter ${entree.label}`
+                    playing === entree.url
+                      ? t("set_stop_listening")
+                      : t("set_listen_named", { nom: entree.label })
                   }
-                  title={playing === entree.url ? "Arreter" : "Ecouter"}
+                  title={playing === entree.url ? t("set_stop") : t("set_listen")}
                 >
                   {playing === entree.url ? (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -326,8 +332,8 @@ function RingtonePicker() {
                   type="button"
                   className="ringtone-remove"
                   onClick={() => onRemove(entree)}
-                  aria-label={`Retirer ${entree.label}`}
-                  title="Retirer"
+                  aria-label={t("set_remove_named", { nom: entree.label })}
+                  title={t("set_remove")}
                 >
                   <svg
                     width="14"
@@ -348,20 +354,23 @@ function RingtonePicker() {
         )}
       </div>
 
-      <div className="s-hint">
-        Les sons proposes en premier sont ceux de l'application mobile. Un son importe est televerse
-        sur votre compte, donc reutilisable, et se choisit pour n'importe lequel des trois
-        evenements. Cinq megaoctets au maximum. L'ecoute s'arrete au bout de quatre secondes.
-      </div>
+      <div className="s-hint">{t("set_ringtones_hint")}</div>
     </div>
   )
 }
 
+/** Etat du service worker de notification, independant de la langue d'affichage. */
+type EtatServiceWorker = "unchecked" | "active" | "unregistered" | "unsupported"
+
 function PushDiagnostic() {
+  const { t } = useTranslation()
   const [permission, setPermission] = useState<string>("default")
-  const [swStatus, setSwStatus] = useState<string>("Non verifie")
+  // L'etat est garde sous forme de code, pas de phrase : le libelle est traduit
+  // au rendu, il suit donc un changement de langue sans nouvelle verification.
+  const [swStatus, setSwStatus] = useState<EtatServiceWorker>("unchecked")
+  const [swScope, setSwScope] = useState<string>("")
   const [vapidKeyExists, setVapidKeyExists] = useState<boolean>(false)
-  const [configStatus, setConfigStatus] = useState<string>("")
+  const [configValide, setConfigValide] = useState<boolean | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
 
   const checkStatus = useCallback(() => {
@@ -388,21 +397,22 @@ function PushDiagnostic() {
       !messagingSenderId ||
       !appId
     ) {
-      setConfigStatus("Configuration Firebase incomplete")
+      setConfigValide(false)
     } else {
-      setConfigStatus("Configuration Firebase valide")
+      setConfigValide(true)
     }
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL).then((reg) => {
         if (reg) {
-          setSwStatus(`Actif (Scope: ${reg.scope})`)
+          setSwScope(reg.scope)
+          setSwStatus("active")
         } else {
-          setSwStatus("Non enregistre")
+          setSwStatus("unregistered")
         }
       })
     } else {
-      setSwStatus("Non supporte")
+      setSwStatus("unsupported")
     }
   }, [])
 
@@ -418,10 +428,10 @@ function PushDiagnostic() {
       const { initPushNotifications } = await import("../../../src/services/push-service")
       await initPushNotifications()
       checkStatus()
-      alert("Demande d'initialisation terminee. Verifiez les statuts ci-dessous.")
+      alert(t("set_push_init_done"))
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erreur inconnue"
-      alert(`Erreur d'initialisation : ${message}`)
+      const message = err instanceof Error ? err.message : t("set_unknown_error")
+      alert(t("set_push_init_error", { message }))
     } finally {
       setLoading(false)
     }
@@ -448,7 +458,7 @@ function PushDiagnostic() {
           justifyContent: "space-between",
         }}
       >
-        <span>Diagnostic Push FCM</span>
+        <span>{t("set_push_diag")}</span>
         <button
           onClick={handleRegister}
           disabled={loading}
@@ -464,7 +474,7 @@ function PushDiagnostic() {
             opacity: loading ? 0.6 : 1,
           }}
         >
-          {loading ? "Activation..." : "Activer / Tester"}
+          {loading ? t("set_activating") : t("set_activate_test")}
         </button>
       </div>
 
@@ -478,7 +488,7 @@ function PushDiagnostic() {
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span>Permission :</span>
+          <span>{t("set_permission_label")}</span>
           <span
             style={{
               fontWeight: 700,
@@ -491,43 +501,53 @@ function PushDiagnostic() {
             }}
           >
             {permission === "granted"
-              ? "Accordee ✓"
+              ? t("set_permission_granted")
               : permission === "denied"
-                ? "Bloquee ✗"
-                : "Non demandee (default)"}
+                ? t("set_permission_denied")
+                : t("set_permission_default")}
           </span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span>Service Worker Push :</span>
+          <span>{t("set_sw_push_label")}</span>
           <span
             style={{
               fontWeight: 700,
-              color: swStatus.includes("Actif") ? "var(--success)" : "var(--danger)",
+              color: swStatus === "active" ? "var(--success)" : "var(--danger)",
             }}
           >
-            {swStatus}
+            {swStatus === "active"
+              ? t("set_sw_active", { scope: swScope })
+              : swStatus === "unregistered"
+                ? t("set_sw_unregistered")
+                : swStatus === "unsupported"
+                  ? t("set_sw_unsupported")
+                  : t("set_sw_unchecked")}
           </span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span>Variables Firebase Client :</span>
+          <span>{t("set_firebase_vars_label")}</span>
           <span
             style={{
               fontWeight: 700,
-              color: configStatus.includes("valide") ? "var(--success)" : "var(--danger)",
+              color: configValide ? "var(--success)" : "var(--danger)",
             }}
           >
-            {configStatus}
+            {configValide === null
+              ? ""
+              : configValide
+                ? t("set_firebase_config_ok")
+                : t("set_firebase_config_ko")}
           </span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span>Cle VAPID configuree :</span>
+          <span>{t("set_vapid_label")}</span>
           <span
             style={{ fontWeight: 700, color: vapidKeyExists ? "var(--success)" : "var(--danger)" }}
           >
-            {vapidKeyExists ? "Oui ✓" : "Non ✗ (VITE_FIREBASE_VAPID_KEY manquant/invalide)"}
+            {vapidKeyExists ? t("set_vapid_yes") : t("set_vapid_no")}
           </span>
         </div>
       </div>
@@ -641,6 +661,7 @@ function Field({
   /** Sert surtout a dire au navigateur de NE PAS remplir un champ. */
   autoComplete?: string
 }) {
+  const { t } = useTranslation()
   const [focused, setFocused] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
 
@@ -715,7 +736,7 @@ function Field({
             onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-faint)")}
           >
-            {showPwd ? "Masquer" : "Afficher"}
+            {showPwd ? t("hide") : t("show")}
           </button>
         )}
       </div>
@@ -892,6 +913,7 @@ function DangerZoneItem({
 }
 
 function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () => void }) {
+  const { t } = useTranslation()
   return (
     <div
       onClick={onCancel}
@@ -949,7 +971,7 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
-            Annuler
+            {t("cancel")}
           </button>
           <button
             onClick={() => {
@@ -992,14 +1014,17 @@ interface SessionAffichee {
 
 /** Derniere activite en clair : « Maintenant », « Il y a 3 h », puis la date. */
 function derniereActivite(iso: string | null): string {
-  if (!iso) return "Jamais connecte"
+  // Hors composant : la langue est relue a chaque appel, jamais figee a l'import.
+  const langue = langueInitiale()
+  if (!iso) return traduire(langue, "set_never_connected")
   const date = new Date(iso)
   const minutes = Math.floor((Date.now() - date.getTime()) / 60000)
-  if (minutes < 2) return "Maintenant"
-  if (minutes < 60) return `Il y a ${minutes} min`
-  if (minutes < 24 * 60) return `Il y a ${Math.floor(minutes / 60)} h`
-  if (minutes < 7 * 24 * 60) return `Il y a ${Math.floor(minutes / 1440)} j`
-  return date.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+  if (minutes < 2) return traduire(langue, "set_now")
+  if (minutes < 60) return traduire(langue, "set_ago_minutes", { n: minutes })
+  if (minutes < 24 * 60) return traduire(langue, "set_ago_hours", { n: Math.floor(minutes / 60) })
+  if (minutes < 7 * 24 * 60)
+    return traduire(langue, "set_ago_days", { n: Math.floor(minutes / 1440) })
+  return date.toLocaleDateString(langue, { day: "numeric", month: "long", year: "numeric" })
 }
 
 function versSession(a: Appareil): SessionAffichee {
@@ -1022,6 +1047,7 @@ function versSession(a: Appareil): SessionAffichee {
 }
 
 export default function SettingsPage() {
+  const { language, setLanguage, t } = useTranslation()
   const navigate = useNavigate()
   const { deleteAccount: removeAccount, logoutEverywhere, updateUser, user } = useAuth()
   const { success, error: toastError, info, warning } = useToast()
@@ -1066,12 +1092,12 @@ export default function SettingsPage() {
         // autres sessions du compte recoivent l annonce et celle qui se
         // reconnait se deconnecte immediatement.
         if (cookiesWebId) sendSessionRevoked(cookiesWebId)
-        warning("Session fermee", `${libelle} a ete deconnecte.`)
+        warning(t("set_session_closed"), t("set_session_closed_detail", { appareil: libelle }))
       } catch {
-        toastError("Deconnexion impossible", "Reessaie dans un instant.")
+        toastError(t("set_disconnect_failed"), t("set_try_again_soon"))
       }
     },
-    [warning, toastError]
+    [warning, toastError, t]
   )
   const [profile, setProfile] = useState<Profile>(() => getInitialProfile(user))
   const [draft, setDraft] = useState<Profile>(() => getInitialProfile(user))
@@ -1152,8 +1178,8 @@ export default function SettingsPage() {
     } catch (err) {
       setPrivacy(precedent)
       toastError(
-        "Reglage non enregistre",
-        err instanceof Error ? err.message : "Le serveur n'a pas accepte la modification."
+        t("set_setting_not_saved"),
+        err instanceof Error ? err.message : t("set_server_refused")
       )
     }
   }
@@ -1161,7 +1187,6 @@ export default function SettingsPage() {
   // Apparence. La langue vit dans le fournisseur d'internationalisation : elle
   // pilote toute l'interface, pas seulement cet ecran.
   const [fontSize, setFontSize] = useState<"small" | "medium" | "large">("medium")
-  const { language, setLanguage, t } = useTranslation()
 
   /**
    * Pseudo de CET appareil pour ce compte, modifiable ici.
@@ -1185,9 +1210,9 @@ export default function SettingsPage() {
     try {
       const enregistre = await enregistrerPseudo(propre)
       setPseudoAppareil(enregistre)
-      success("Nom de l'appareil enregistre", enregistre)
+      success(t("set_device_name_saved"), enregistre)
     } catch (err) {
-      toastError("Enregistrement impossible", err instanceof Error ? err.message : undefined)
+      toastError(t("set_save_failed"), err instanceof Error ? err.message : undefined)
     } finally {
       setPseudoEnregistre(false)
     }
@@ -1204,16 +1229,16 @@ export default function SettingsPage() {
   const envoyerReinitialisation = async () => {
     const email = user?.email?.trim()
     if (!email) {
-      toastError("Aucune adresse email", "Ajoutez une adresse a votre profil d'abord.")
+      toastError(t("set_no_email_title"), t("set_no_email_detail"))
       return
     }
     if (reinitEnvoi) return
     setReinitEnvoi(true)
     try {
       await demanderReinitialisation(email)
-      success("Code envoye", `Consultez ${email} pour reinitialiser votre mot de passe.`)
+      success(t("set_code_sent"), t("set_code_sent_detail", { email }))
     } catch (err) {
-      toastError("Envoi impossible", err instanceof Error ? err.message : undefined)
+      toastError(t("set_send_failed"), err instanceof Error ? err.message : undefined)
     } finally {
       setReinitEnvoi(false)
     }
@@ -1235,9 +1260,9 @@ export default function SettingsPage() {
     try {
       await debloquer(personne.idBlock)
       setBloques((liste) => liste.filter((b) => b.idBlock !== personne.idBlock))
-      success("Debloque", `${nomDuBloque(personne)} peut de nouveau vous ecrire.`)
+      success(t("unblocked_toast"), t("set_unblocked_detail", { nom: nomDuBloque(personne) }))
     } catch (err) {
-      toastError("Deblocage impossible", err instanceof Error ? err.message : undefined)
+      toastError(t("set_unblock_failed"), err instanceof Error ? err.message : undefined)
     }
   }
 
@@ -1248,9 +1273,9 @@ export default function SettingsPage() {
   const setD = (k: keyof Profile) => (v: string) => setDraft((prev) => ({ ...prev, [k]: v }))
 
   const saveProfile = async () => {
-    if (!draft.name.trim()) return toastError("Nom invalide", "Le nom ne peut pas etre vide.")
+    if (!draft.name.trim()) return toastError(t("set_invalid_name"), t("set_name_empty"))
     if (draft.statusMsg.length > 100)
-      return toastError("Message trop long", "Maximum 100 caracteres.")
+      return toastError(t("set_message_too_long"), t("set_max_100_chars"))
     setSaving(true)
     try {
       // Une photo fraichement choisie est encore une data-URL locale : le
@@ -1277,10 +1302,10 @@ export default function SettingsPage() {
         statusMsg: saved.statusMsg ?? draft.statusMsg,
         avatar: nextAvatar,
       })
-      success("Profil mis a jour", "Vos informations ont bien ete enregistrees.")
+      success(t("profile_updated"), t("set_profile_saved_detail"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Impossible de sauvegarder. Reessayez."
-      toastError("Erreur", message)
+      const message = err instanceof Error ? err.message : t("set_save_impossible")
+      toastError(t("error"), message)
     } finally {
       setSaving(false)
     }
@@ -1291,35 +1316,35 @@ export default function SettingsPage() {
     e.target.value = ""
     if (!file) return
     if (file.size > 10 * 1024 * 1024)
-      return toastError("Fichier trop volumineux", "L'avatar ne doit pas depasser 10 Mo.")
+      return toastError(t("set_file_too_large"), t("set_avatar_max_10mb"))
     if (!file.type.startsWith("image/"))
-      return toastError("Format invalide", "Choisissez une image (JPEG, PNG, WebP).")
+      return toastError(t("set_invalid_format"), t("set_choose_image"))
     try {
       // Apercu local : la miniature n'est televersee qu'a l'enregistrement.
       const dataUrl = await fileToAvatarDataUrl(file)
       setDraft((prev) => ({ ...prev, avatar: dataUrl }))
-      info("Avatar selectionne", "Cliquez sur 'Sauvegarder' pour confirmer.")
+      info(t("set_avatar_selected"), t("set_avatar_confirm_hint", { action: t("save") }))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Image illisible."
-      toastError("Avatar refuse", message)
+      const message = err instanceof Error ? err.message : t("set_image_unreadable")
+      toastError(t("set_avatar_rejected"), message)
     }
   }
 
   const changePassword = async () => {
-    if (!security.currentPwd) return toastError("Mot de passe actuel requis")
+    if (!security.currentPwd) return toastError(t("set_current_password_required"))
     if (security.newPwd.length < 8)
-      return toastError("Mot de passe trop court", "Le backend exige au moins 8 caracteres.")
+      return toastError(t("set_password_too_short"), t("password_min_8"))
     if (security.newPwd !== security.confirmPwd) return toastError(t("passwords_differ"))
     if (security.newPwd === security.currentPwd)
-      return toastError("Mot de passe identique", "Choisissez un mot de passe different.")
+      return toastError(t("set_password_same"), t("set_choose_different_password"))
     setSaving(true)
     try {
       await changePasswordApi(security.currentPwd, security.newPwd)
       setSecurity({ currentPwd: "", newPwd: "", confirmPwd: "" })
-      success("Mot de passe modifie", "Votre nouveau mot de passe est actif.")
+      success(t("set_password_changed"), t("set_password_changed_detail"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Mot de passe actuel incorrect."
-      toastError("Erreur", message)
+      const message = err instanceof Error ? err.message : t("set_current_password_wrong")
+      toastError(t("error"), message)
     } finally {
       setSaving(false)
     }
@@ -1327,9 +1352,9 @@ export default function SettingsPage() {
 
   const logoutAll = async () => {
     setConfirmState({
-      title: "Deconnecter tous vos appareils ?",
-      description: "Toutes vos sessions actives seront fermees et vous devrez vous reconnecter.",
-      confirmLabel: "Tout deconnecter",
+      title: t("set_logout_all_confirm"),
+      description: t("set_logout_all_confirm_detail"),
+      confirmLabel: t("set_logout_all_confirm_btn"),
       tone: "warning",
       onConfirm: async () => {
         await logoutEverywhere()
@@ -1339,22 +1364,24 @@ export default function SettingsPage() {
   }
 
   const deleteAccount = async () => {
-    const confirm1 = window.prompt(
-      'Tapez "SUPPRIMER" pour confirmer la suppression definitive de votre compte.'
-    )
-    if (confirm1 !== "SUPPRIMER") return toastError("Suppression annulee")
+    // Le mot a recopier est traduit lui aussi : on ne peut pas demander a un
+    // utilisateur russophone de taper un mot francais.
+    const mot = t("set_delete_word")
+    const confirm1 = window.prompt(t("set_delete_prompt", { mot }))
+    if (confirm1?.trim().toUpperCase() !== mot.toUpperCase())
+      return toastError(t("set_delete_cancelled"))
 
     // Le backend (DELETE /api/account) exige le mot de passe pour confirmer.
-    const password = window.prompt("Saisissez votre mot de passe pour confirmer la suppression.")
-    if (!password) return toastError("Suppression annulee")
+    const password = window.prompt(t("set_delete_password_prompt"))
+    if (!password) return toastError(t("set_delete_cancelled"))
 
     try {
       await removeAccount(password)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Suppression impossible."
-      return toastError("Suppression refusee", message)
+      const message = err instanceof Error ? err.message : t("set_delete_failed_detail")
+      return toastError(t("set_delete_refused"), message)
     }
-    warning("Compte supprime", "Votre compte et vos donnees ont ete effaces.")
+    warning(t("set_account_deleted"), t("set_account_deleted_detail"))
     navigate("/welcome", { replace: true })
   }
 
@@ -1846,18 +1873,16 @@ export default function SettingsPage() {
 
           {section === "profile" && (
             <>
-              <div className="s-page-title">Mon profil</div>
-              <p className="s-page-sub">
-                Ces informations sont visibles par vos contacts sur Alanya.
-              </p>
+              <div className="s-page-title">{t("my_profile")}</div>
+              <p className="s-page-sub">{t("set_profile_sub")}</p>
 
               {/* Barre de sauvegarde */}
               {isDirty && (
                 <div className="save-bar">
-                  <span className="save-bar-txt">Modifications non sauvegardees</span>
+                  <span className="save-bar-txt">{t("set_unsaved_changes")}</span>
                   <div className="save-btns">
                     <button className="btn-discard" onClick={() => setDraft(profile)}>
-                      Annuler
+                      {t("cancel")}
                     </button>
                     <button className="btn-save" onClick={saveProfile} disabled={saving}>
                       {saving && (
@@ -1872,7 +1897,7 @@ export default function SettingsPage() {
                           }}
                         />
                       )}
-                      {saving ? "Sauvegarde..." : "Sauvegarder"}
+                      {saving ? t("set_saving") : t("save")}
                     </button>
                   </div>
                 </div>
@@ -1886,7 +1911,7 @@ export default function SettingsPage() {
                       {avatarDisplaySrc(draft.avatar) ? (
                         <img
                           src={avatarDisplaySrc(draft.avatar)!}
-                          alt="avatar"
+                          alt={t("set_avatar_alt")}
                           style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />
                       ) : (
@@ -1934,7 +1959,7 @@ export default function SettingsPage() {
                 </div>
 
                 <Field
-                  label="Nom complet"
+                  label={t("full_name")}
                   value={draft.name}
                   onChange={setD("name")}
                   maxLength={60}
@@ -1952,19 +1977,19 @@ export default function SettingsPage() {
 
               <div className="s-card">
                 <div className="s-card-title">
-                  Informations de contact{" "}
-                  <span className="s-card-title-badge">Non modifiables ici</span>
+                  {t("set_contact_info")}{" "}
+                  <span className="s-card-title-badge">{t("set_not_editable_here")}</span>
                 </div>
                 {draft.email ? (
                   <Field
-                    label="Adresse email"
+                    label={t("set_email_address")}
                     value={draft.email}
                     disabled
                     helper={t("email_support_note")}
                   />
                 ) : (
                   <Field
-                    label="Adresse email"
+                    label={t("set_email_address")}
                     value={t("no_email")}
                     disabled
                     helper={t("email_required_note")}
@@ -1985,7 +2010,7 @@ export default function SettingsPage() {
 
           {section === "security" && (
             <>
-              <div className="s-page-title">Securite</div>
+              <div className="s-page-title">{t("settings_security")}</div>
               <p className="s-page-sub">{t("security_sub")}</p>
 
               <div className="s-card">
@@ -2011,7 +2036,7 @@ export default function SettingsPage() {
                     onClick={() => void envoyerReinitialisation()}
                     disabled={reinitEnvoi}
                   >
-                    {reinitEnvoi ? "Envoi..." : "Mot de passe oublie ?"}
+                    {reinitEnvoi ? t("set_sending") : t("forgot_password")}
                   </button>
                 </div>
                 <Field
@@ -2035,7 +2060,7 @@ export default function SettingsPage() {
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
                       <span style={{ color: pwdStrength.color, fontWeight: 500 }}>
-                        {pwdStrength.label}
+                        {pwdStrength.labelKey ? t(pwdStrength.labelKey) : ""}
                       </span>
                     </div>
                   </div>
@@ -2089,7 +2114,7 @@ export default function SettingsPage() {
                     transition: "opacity .15s",
                   }}
                 >
-                  {saving ? "Modification..." : "Modifier le mot de passe"}
+                  {saving ? t("set_modifying") : t("modify_password")}
                 </button>
               </div>
 
@@ -2099,8 +2124,7 @@ export default function SettingsPage() {
               <div className="s-card">
                 <div className="s-card-title">{t("device_name_section")}</div>
                 <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
-                  Affiche au-dessus des messages envoyes depuis cet appareil, et uniquement pour les
-                  autres appareils de ce compte. Vos correspondants ne le voient jamais.
+                  {t("device_name_explain")}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
@@ -2110,7 +2134,7 @@ export default function SettingsPage() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void sauverPseudo()
                     }}
-                    placeholder="Poste accueil, Bureau d'Awa..."
+                    placeholder={t("device_name_placeholder")}
                     aria-label={t("device_name_label")}
                     style={{
                       flex: 1,
@@ -2142,16 +2166,16 @@ export default function SettingsPage() {
                       opacity: pseudoAppareil.trim() && !pseudoEnregistre ? 1 : 0.5,
                     }}
                   >
-                    {pseudoEnregistre ? "..." : "Enregistrer"}
+                    {pseudoEnregistre ? "…" : t("device_name_save")}
                   </button>
                 </div>
               </div>
 
               <div className="s-card">
-                <div className="s-card-title">Sessions actives</div>
+                <div className="s-card-title">{t("set_active_sessions")}</div>
                 {sessions === null && (
                   <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
-                    Chargement…
+                    {t("loading")}
                   </div>
                 )}
                 {sessions !== null && sessions.length === 0 && (
@@ -2242,7 +2266,7 @@ export default function SettingsPage() {
                                 fontWeight: 600,
                               }}
                             >
-                              Appareil actuel
+                              {t("set_current_device")}
                             </span>
                           )}
                         </div>
@@ -2276,7 +2300,7 @@ export default function SettingsPage() {
                           (e.currentTarget.style.background = "var(--danger-dim)")
                         }
                       >
-                        Deconnecter
+                        {t("set_disconnect")}
                       </button>
                     )}
                   </div>
@@ -2286,13 +2310,12 @@ export default function SettingsPage() {
               <div className="s-card">
                 <div className="s-card-title">{t("login_history")}</div>
                 <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 10 }}>
-                  Chaque ouverture de session est enregistree. Une connexion que tu ne reconnais pas
-                  ? Change ton mot de passe et deconnecte l appareil concerne.
+                  {t("login_history_sub")}
                 </div>
 
                 {historique === null && (
                   <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
-                    Chargement…
+                    {t("loading")}
                   </div>
                 )}
                 {historique !== null && historique.length === 0 && (
@@ -2329,7 +2352,7 @@ export default function SettingsPage() {
                           {quand(a.dateLogin)}
                         </div>
                         <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                          {details.length > 0 ? details.join(" - ") : "Origine inconnue"}
+                          {details.length > 0 ? details.join(" - ") : t("set_unknown_origin")}
                         </div>
                       </div>
                       {i === 0 && (
@@ -2370,18 +2393,18 @@ export default function SettingsPage() {
                     <line x1="12" y1="9" x2="12" y2="13" />
                     <line x1="12" y1="17" x2="12.01" y2="17" />
                   </svg>
-                  Zone dangereuse
+                  {t("set_danger_zone")}
                 </div>
                 <DangerZoneItem
-                  label="Deconnecter tous les appareils"
-                  description="Invalide tous les refresh tokens actifs sur tous vos appareils."
-                  buttonLabel="Deconnecter tout"
+                  label={t("logout_all")}
+                  description={t("logout_all_sub")}
+                  buttonLabel={t("set_logout_all_btn")}
                   onClick={logoutAll}
                 />
                 <DangerZoneItem
-                  label="Supprimer mon compte"
-                  description="Action irreversible. Toutes vos donnees seront effacees definitivement apres 30 jours."
-                  buttonLabel="Supprimer le compte"
+                  label={t("set_delete_my_account")}
+                  description={t("delete_account_sub")}
+                  buttonLabel={t("delete_account")}
                   onClick={deleteAccount}
                   destructive
                 />
@@ -2391,26 +2414,26 @@ export default function SettingsPage() {
 
           {section === "notifications" && (
             <>
-              <div className="s-page-title">Notifications</div>
+              <div className="s-page-title">{t("settings_notifications")}</div>
               <p className="s-page-sub">{t("notif_sub")}</p>
               <div className="s-card">
-                <div className="s-card-title">Notifications push</div>
+                <div className="s-card-title">{t("set_push_notifications")}</div>
                 <Toggle
                   value={notifMessages}
                   onChange={updateNotifMessages}
-                  label="Messages"
+                  label={t("messages_label")}
                   description={t("notif_new_message")}
                 />
                 <Toggle
                   value={notifCalls}
                   onChange={updateNotifCalls}
-                  label="Appels entrants"
+                  label={t("set_incoming_calls")}
                   description={t("notif_calls")}
                 />
                 <Toggle
                   value={notifSounds}
                   onChange={updateNotifSounds}
-                  label="Sons"
+                  label={t("set_sounds")}
                   description={t("notif_sound")}
                 />
                 <Toggle
@@ -2428,10 +2451,10 @@ export default function SettingsPage() {
 
           {section === "privacy" && (
             <>
-              <div className="s-page-title">Confidentialite</div>
+              <div className="s-page-title">{t("settings_privacy")}</div>
               <p className="s-page-sub">{t("privacy_sub")}</p>
               <div className="s-card">
-                <div className="s-card-title">Visibilite</div>
+                <div className="s-card-title">{t("set_visibility")}</div>
                 <Toggle
                   value={privacy.readReceipts}
                   onChange={(v) => void updatePrivacy({ readReceipts: v })}
@@ -2470,7 +2493,7 @@ export default function SettingsPage() {
                   quelqu'un dont on retrouve la fiche contact — or on peut
                   parfaitement bloquer un numero qu'on n'a jamais enregistre. */}
               <div className="s-card">
-                <div className="s-card-title">Personnes bloquees</div>
+                <div className="s-card-title">{t("set_blocked_people")}</div>
                 <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
                   {t("blocked_list_sub")}
                 </div>
@@ -2515,7 +2538,7 @@ export default function SettingsPage() {
                           cursor: "pointer",
                         }}
                       >
-                        Debloquer
+                        {t("unblock")}
                       </button>
                     </div>
                   ))
@@ -2526,10 +2549,10 @@ export default function SettingsPage() {
 
           {section === "appearance" && (
             <>
-              <div className="s-page-title">Apparence</div>
+              <div className="s-page-title">{t("settings_appearance")}</div>
               <p className="s-page-sub">{t("appearance_sub")}</p>
               <div className="s-card">
-                <div className="s-card-title">Theme</div>
+                <div className="s-card-title">{t("theme")}</div>
                 <ThemeSelector />
               </div>
               <div className="s-card">
@@ -2542,7 +2565,11 @@ export default function SettingsPage() {
                       onClick={() => {
                         setFontSize(size)
                         info(
-                          `Taille ${size === "small" ? "petite" : size === "medium" ? "normale" : "grande"} activee`
+                          size === "small"
+                            ? t("set_text_size_small_applied")
+                            : size === "medium"
+                              ? t("set_text_size_medium_applied")
+                              : t("set_text_size_large_applied")
                         )
                       }}
                     >
@@ -2558,7 +2585,11 @@ export default function SettingsPage() {
                         Aa
                       </div>
                       <div className="font-opt-label">
-                        {size === "small" ? "Petite" : size === "medium" ? "Normale" : "Grande"}
+                        {size === "small"
+                          ? t("set_size_small")
+                          : size === "medium"
+                            ? t("set_size_medium")
+                            : t("set_size_large")}
                       </div>
                     </button>
                   ))}
@@ -2601,23 +2632,23 @@ export default function SettingsPage() {
 
           {section === "about" && (
             <>
-              <div className="s-page-title">A propos</div>
+              <div className="s-page-title">{t("settings_about")}</div>
               <p className="s-page-sub">{t("about_sub")}</p>
               <div className="s-card">
                 {[
-                  { label: "Application", value: "Alanya" },
-                  { label: "Version", value: "1.0.0-beta" },
-                  { label: "Environnement", value: "Production" },
+                  { label: t("set_about_app"), value: "Alanya" },
+                  { label: t("set_about_version"), value: "1.0.0-beta" },
+                  { label: t("set_about_env"), value: t("set_about_env_value") },
                   {
-                    label: "Relais TURN (appels)",
+                    label: t("set_about_turn"),
                     // Diagnostic visible depuis un telephone : dit si ce build
                     // embarque les variables VITE_TURN_* (necessaires pour les
                     // appels entre reseaux differents).
-                    value: isTurnConfigured() ? "Configure ✓" : "Absent — appels limites",
+                    value: isTurnConfigured() ? t("set_turn_configured") : t("set_turn_missing"),
                   },
-                  { label: "Projet", value: "Projet BD - ENSPY 2025-2026" },
-                  { label: "Encadrant", value: "Dr. NANA BINKEU" },
-                  { label: "Groupe", value: "Alanya II" },
+                  { label: t("set_about_project"), value: t("set_about_project_value") },
+                  { label: t("set_about_supervisor"), value: "Dr. NANA BINKEU" },
+                  { label: t("set_about_group"), value: "Alanya II" },
                 ].map(({ label, value }) => (
                   <div
                     className="about-row"
@@ -2647,15 +2678,15 @@ export default function SettingsPage() {
                 ))}
               </div>
               <div className="s-card">
-                <div className="s-card-title">Stack technique</div>
+                <div className="s-card-title">{t("set_tech_stack")}</div>
                 {[
-                  { label: "Front-end", value: "React + Vite (web)  -  Flutter (mobile)" },
-                  { label: "Back-end", value: "Next.js (App Router, API Routes)" },
+                  { label: t("set_stack_frontend"), value: t("set_stack_frontend_value") },
+                  { label: t("set_stack_backend"), value: "Next.js (App Router, API Routes)" },
                   { label: t("database"), value: "PostgreSQL  -  Prisma" },
-                  { label: "Temps reel", value: "WebSocket (serveur Node dedie)" },
-                  { label: "Appels A/V", value: "WebRTC + serveur TURN/STUN (Metered)" },
-                  { label: "Auth", value: "JWT (Access 15 min  -  Refresh rotatif)" },
-                  { label: "Deploiement", value: "Vercel (API + web)  -  Render (WebSocket)" },
+                  { label: t("set_stack_realtime"), value: t("set_stack_realtime_value") },
+                  { label: t("set_stack_calls"), value: t("set_stack_calls_value") },
+                  { label: t("set_stack_auth"), value: t("set_stack_auth_value") },
+                  { label: t("set_stack_deploy"), value: t("set_stack_deploy_value") },
                 ].map(({ label, value }) => (
                   <div
                     className="stack-row"
@@ -2689,7 +2720,7 @@ export default function SettingsPage() {
 
               {/* Diagnostic en direct de la connexion temps reel (messages) */}
               <div className="s-card">
-                <div className="s-card-title">Diagnostic temps reel</div>
+                <div className="s-card-title">{t("set_realtime_diagnostic")}</div>
                 <RealtimeStatus />
               </div>
 
