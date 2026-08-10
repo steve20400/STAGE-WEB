@@ -712,12 +712,14 @@ export const WEB_TRANSLATION_KEYS = [
   "meet_chat_ephemeral",
   "meet_chat_empty",
   "meet_chat_placeholder",
+  "meet_end",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    meet_end: "Terminer",
     meet_chat_title: "Fil de la réunion",
     meet_chat_ephemeral: "effacé à la fin",
     meet_chat_empty: "Aucun message. Ce fil disparaît à la fin de la réunion.",
@@ -1447,6 +1449,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    meet_end: "End",
     meet_chat_title: "Meeting chat",
     meet_chat_ephemeral: "cleared at the end",
     meet_chat_empty: "No messages yet. This chat disappears when the meeting ends.",
@@ -2170,6 +2173,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    meet_end: "Finalizar",
     meet_chat_title: "Chat de la reunión",
     meet_chat_ephemeral: "se borra al terminar",
     meet_chat_empty: "Sin mensajes. Este chat desaparece al terminar la reunión.",
@@ -2897,6 +2901,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    meet_end: "Beenden",
     meet_chat_title: "Besprechungs-Chat",
     meet_chat_ephemeral: "wird am Ende gelöscht",
     meet_chat_empty: "Noch keine Nachrichten. Dieser Chat verschwindet am Ende der Besprechung.",
@@ -3632,6 +3637,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    meet_end: "Terminar",
     meet_chat_title: "Chat da reunião",
     meet_chat_ephemeral: "apagado no final",
     meet_chat_empty: "Sem mensagens. Este chat desaparece no fim da reunião.",
@@ -4359,6 +4365,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    meet_end: "Завершить",
     meet_chat_title: "Чат встречи",
     meet_chat_ephemeral: "удаляется по окончании",
     meet_chat_empty: "Сообщений нет. Этот чат исчезнет после встречи.",
@@ -5080,6 +5087,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    meet_end: "结束",
     meet_chat_title: "会议聊天",
     meet_chat_ephemeral: "结束后清除",
     meet_chat_empty: "暂无消息。会议结束后此聊天将消失。",
@@ -5788,6 +5796,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    meet_end: "Avsluta",
     meet_chat_title: "Mötets chatt",
     meet_chat_ephemeral: "raderas vid slutet",
     meet_chat_empty: "Inga meddelanden. Chatten försvinner när mötet slutar.",
@@ -6512,6 +6521,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    meet_end: "Avslutt",
     meet_chat_title: "Møtechat",
     meet_chat_ephemeral: "slettes til slutt",
     meet_chat_empty: "Ingen meldinger. Denne chatten forsvinner når møtet er slutt.",

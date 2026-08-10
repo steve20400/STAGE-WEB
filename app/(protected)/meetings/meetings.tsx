@@ -191,20 +191,31 @@ export default function MeetingsPage() {
                 </span>
               </div>
               <div className="meeting-actions">
+                {/* Organisateur et invite n'ont pas les memes gestes : l'un
+                    ferme la reunion pour tout le monde, l'autre decline une
+                    invitation. Le serveur refuse deja le premier aux invites —
+                    montrer le bouton ne ferait que promettre un refus. Et on ne
+                    decline pas sa propre reunion. */}
                 {!meeting.terminee && (
                   <>
                     <button className="btn-primary" onClick={() => void handleJoin(meeting.id)}>
                       {t("meet_join")}
                     </button>
-                    <button
-                      className="btn-secondary"
-                      onClick={() => void handleDecline(meeting.id)}
-                    >
-                      {t("meet_decline")}
-                    </button>
+                    {meeting.jeSuisOrganisateur ? (
+                      <button className="btn-danger" onClick={() => void handleEnd(meeting.id)}>
+                        {t("meet_end")}
+                      </button>
+                    ) : (
+                      <button
+                        className="btn-secondary"
+                        onClick={() => void handleDecline(meeting.id)}
+                      >
+                        {t("meet_decline")}
+                      </button>
+                    )}
                   </>
                 )}
-                {meeting.terminee && (
+                {meeting.terminee && meeting.jeSuisOrganisateur && (
                   <button className="btn-danger" onClick={() => void handleDelete(meeting.id)}>
                     {t("delete")}
                   </button>

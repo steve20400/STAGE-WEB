@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
-import { fetchMeeting, joinMeeting, leaveMeeting } from "../../../../src/services/meetings-service"
+import {
+  endMeeting,
+  fetchMeeting,
+  joinMeeting,
+  leaveMeeting,
+} from "../../../../src/services/meetings-service"
 import { joinMeetingRoom } from "../../../../src/services/call-manager"
 import { useCallState } from "../../../../src/hooks/use-call"
 import { useTranslation } from "../../../../src/i18n"
@@ -79,6 +84,17 @@ export default function MeetingRoomPage() {
       await joinMeetingRoom(parseInt(meetingId, 10), meeting.type, meeting.objet)
     } catch (err) {
       showError(t("error"), err instanceof Error ? err.message : t("meet_join_failed"))
+    }
+  }
+
+  const handleEndMeeting = async () => {
+    if (!meetingId || !confirm(t("meet_end_confirm"))) return
+    try {
+      await endMeeting(parseInt(meetingId, 10))
+      success(t("meet_ended_toast"))
+      navigate("/meetings")
+    } catch (err) {
+      showError(t("error"), err instanceof Error ? err.message : t("meet_end_failed"))
     }
   }
 
@@ -215,6 +231,14 @@ export default function MeetingRoomPage() {
         {callState.activeCallId && (
           <button className="btn-leave" onClick={() => void handleLeaveMeeting()}>
             {t("meet_leave_room")}
+          </button>
+        )}
+        {/* Quitter, tout le monde le peut : la reunion continue sans nous.
+            Terminer la ferme pour tous — le serveur le reserve a
+            l'organisateur, l'ecran ne le propose donc qu'a lui. */}
+        {meeting.jeSuisOrganisateur && !meeting.terminee && (
+          <button className="btn-leave" onClick={() => void handleEndMeeting()}>
+            {t("meet_end")}
           </button>
         )}
       </div>
