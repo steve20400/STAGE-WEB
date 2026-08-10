@@ -262,17 +262,18 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   }
 
   const promoteAdmin = (id: string) => {
-    void setGroupMemberRole(conv.id, id, "ADMIN")
-      .then(() =>
-        setMembers((prev) =>
-          prev.map((member) => (member.id === id ? { ...member, role: "admin" } : member))
-        )
-      )
-      .catch(() => warning(t("cinfo_promote_failed")))
     const member = members.find((entry) => entry.id === id)
-    if (!member) return
-    info(t("cinfo_now_admin", { name: member.name }))
-    // TODO : PATCH /api/chats/:convId/members/:memberId { role:"admin" }
+    // L'annonce attend la reponse du serveur. Elle partait avant, donc aussi
+    // quand la promotion echouait : on lisait « X est maintenant
+    // administrateur » suivi de « Promotion impossible ».
+    void setGroupMemberRole(conv.id, id, "ADMIN")
+      .then(() => {
+        setMembers((prev) =>
+          prev.map((entry) => (entry.id === id ? { ...entry, role: "admin" } : entry))
+        )
+        if (member) info(t("cinfo_now_admin", { name: member.name }))
+      })
+      .catch(() => warning(t("cinfo_promote_failed")))
   }
 
   return (
@@ -1034,7 +1035,10 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
               ? memberId.slice(0, 2).toUpperCase()
               : "??"),
         color: contact?.color ?? COLOR_NAMES[index % COLOR_NAMES.length],
-        role: index === 0 ? "admin" : "member",
+        // Le role vient du serveur, jamais de la position dans la liste : rien
+        // ne garantit un ordre stable, et deviner faisait designer a chaque
+        // membre un administrateur different — dont aucun n'etait le createur.
+        role: typeof m !== "string" && m.role?.toUpperCase() === "ADMIN" ? "admin" : "member",
         online: contact?.online ?? false,
         avatar: contact?.avatar ?? null,
         // Le backend fournit publicNumber ; le repertoire local sert de repli
@@ -1118,7 +1122,9 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
           name: contact?.name ?? traduire(langueInitiale(), "cinfo_member_n", { n: index + 1 }),
           initials: contact?.initials ?? memberId.slice(0, 2).toUpperCase(),
           color: contact?.color ?? colorNames[index % colorNames.length],
-          role: index === 0 ? "admin" : "member",
+          // Groupe purement local, sans serveur pour trancher : son createur est
+          // le seul dont on soit sur, et c'est lui qui l'administre.
+          role: memberId === getMyUserId() ? "admin" : "member",
           online: contact?.online ?? false,
           avatar: contact?.avatar ?? null,
           alanyaId: contact?.phone ?? "",
