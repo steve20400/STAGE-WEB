@@ -4,6 +4,7 @@ import { useCallState } from "../../../../src/hooks/use-call"
 import { useHasLiveVideo } from "../../../../src/hooks/use-remote-video"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
 import { CallOptionsMenu } from "../../../../src/components/call-options-menu"
+import { IvrPanel } from "../../../../src/components/ivr-panel"
 import {
   acknowledgeCallEnded,
   hangUp as hangUpCall,
@@ -263,7 +264,15 @@ export default function CallRoomPage() {
 
   const stateLabel: Record<CallScreenState, string> = {
     // Les trois états demandés sont fondés sur les évènements réels de signalisation.
-    ringing: call.progress === "ringing" ? t("call_ringing") : t("call_connecting"),
+    // Standard : personne ne sonne tant que l'appelant n'a pas choisi. Laisser
+    // « Sonnerie… » dirait exactement le contraire de ce qui se passe.
+    ringing: call.ivr
+      ? call.ivr.step === "menu"
+        ? "Serveur vocal"
+        : `Mise en relation — ${call.ivr.serviceChoisi ?? "votre service"}`
+      : call.progress === "ringing"
+        ? t("call_ringing")
+        : t("call_connecting"),
     active:
       call.progress === "ongoing"
         ? `${t("call_ongoing")} — ${formatElapsed(elapsed)}`
@@ -454,6 +463,11 @@ export default function CallRoomPage() {
                   {call.error}
                 </div>
               )}
+              {/* SERVEUR VOCAL — affiche DANS l'ecran d'appel, et non sur un
+                  ecran a part. Le contrat est le meme que sur mobile : rien a
+                  ouvrir, rien a preparer, et quand l'agent decroche le panneau
+                  disparait sous un ecran d'appel qui etait deja la. */}
+              {call.ivr && <IvrPanel session={call.ivr} />}
             </div>
           )}
 

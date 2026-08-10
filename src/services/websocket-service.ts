@@ -557,7 +557,18 @@ export interface CallServerEvent {
   [key: string]: unknown
 }
 
-const CALL_EVENT_TYPES = new Set(["incoming_call", "call_signal", "call_state"])
+// ⚠️ Liste FILTRANTE : un type absent d'ici n'atteint jamais le gestionnaire
+// d'appels, sans le moindre message d'erreur. Les trois evenements du standard
+// (centre d'appels) doivent donc y figurer, sinon l'appelant reste sur
+// « Sonnerie » alors que le serveur lui a envoye le menu.
+const CALL_EVENT_TYPES = new Set([
+  "incoming_call",
+  "call_signal",
+  "call_state",
+  "ivr_menu",
+  "ivr_hold",
+  "ivr_error",
+])
 const MEETING_EVENT_TYPES = new Set([
   "meeting_signal",
   "meeting_joined",
@@ -694,6 +705,11 @@ export function subscribeToConversationLocks(handler: (etat: EtatVerrou) => void
  */
 export function sendCallInvite(callId: string, publicNumber: string) {
   sendRaw({ type: "call_invite", callId, publicNumber })
+}
+
+/** Touche tapee dans le menu d'un standard (centre d'appels). */
+export function sendIvrDtmf(callId: string, digit: number) {
+  sendRaw({ type: "ivr_dtmf", callId, digit })
 }
 
 // 8 s : sur une 4G lente, l'aller-retour peut depasser 5 s ; un timeout trop

@@ -18,6 +18,7 @@ import {
   sendCallRing,
   sendCallSignal,
   sendCallState,
+  sendIvrDtmf,
   subscribeToCallEvents,
   subscribeToMeetingEvents,
   sendMeetingSignal,
@@ -61,6 +62,47 @@ export interface IncomingCallInfo {
   memberCount: number
 }
 
+/**
+ * Etape d'un appel passe a un standard (centre d'appels). Deux seulement : des
+ * que l'agent decroche, la session disparait et l'appel redevient ordinaire.
+ */
+export type IvrStep = "menu" | "attente"
+
+/**
+ * Une touche du menu. `disponible` vient du serveur : un service peut etre
+ * ANNONCE par l'invite vocale sans qu'aucun agent ne le desserve encore.
+ */
+export interface IvrOption {
+  digit: number
+  label: string
+  disponible: boolean
+}
+
+/**
+ * Ce que le client sait d'un appel vers un standard.
+ *
+ * On n'y trouvera JAMAIS l'identite d'un agent : le serveur n'en envoie aucune,
+ * et c'est la seule garantie qui tienne — un identifiant qui arrive jusqu'au
+ * client est un identifiant public, meme s'il n'est pas affiche.
+ */
+export interface IvrSession {
+  callId: string
+  centerId: string
+  centerName: string
+  centerNumber: string | null
+  /** Les deux peuvent etre nuls : l'ecran reste utilisable en silence. */
+  promptUrl: string | null
+  holdUrl: string | null
+  options: IvrOption[]
+  step: IvrStep
+  /** Libelle du service choisi, pendant que l'agent sonne. */
+  serviceChoisi: string | null
+  /** Dernier message du serveur (« … n'est pas encore disponible »). */
+  message: string | null
+  /** Touche envoyee, reponse pas encore arrivee -> clavier verrouille. */
+  envoiEnCours: boolean
+}
+
 export type CallRole = "outgoing" | "ongoing" | null
 export type CallProgress = "ringtone" | "ringing" | "ongoing" | null
 
@@ -69,6 +111,11 @@ export type CallDisplayMode = "small" | "medium" | "full"
 
 export interface CallManagerState {
   incoming: IncomingCallInfo | null
+  /**
+   * Standard en cours, ou nul. Non nul ⇒ l'appel sortant a ete intercepte par
+   * un centre d'appels et l'ecran d'appel affiche le menu a la place.
+   */
+  ivr: IvrSession | null
   activeCallId: string | null
   activeConvId: string | null
   peerName: string
@@ -323,6 +370,7 @@ async function backfillPeerAvatar(callId: string, convId: string | null) {
 function initialState(): CallManagerState {
   return {
     incoming: null,
+    ivr: null,
     activeCallId: null,
     activeConvId: null,
     peerName: "",
@@ -385,6 +433,53 @@ function stopOutgoingRingtone() {
   }
 }
 
+/* ----------------- Audio du standard (centre d'appels) ----------------- */
+
+// Element DISTINCT des sonneries : l'invite vocale remplace le bip d'attente,
+// mais partager le meme element reviendrait a couper l'un en arretant l'autre.
+let ivrAudio: HTMLAudioElement | null = null
+
+function playIvrAudio(url: string, loop: boolean) {
+  stopIvrAudio()
+  if (typeof window === "undefined") return
+  const audio = new Audio(url)
+  audio.loop = loop
+  ivrAudio = audio
+  // Echec silencieux, et deux raisons de s'y attendre : le fichier peut ne pas
+  // exister, et un navigateur refuse la lecture automatique tant que
+  // l'utilisateur n'a rien clique dans l'onglet. L'ecran du standard affiche les
+  // options : il reste parfaitement utilisable sans le son.
+  audio.play().catch((err) => {
+    console.warn("[CallManager] audio du standard injouable :", err)
+  })
+}
+
+function stopIvrAudio() {
+  if (!ivrAudio) return
+  ivrAudio.pause()
+  ivrAudio.currentTime = 0
+  ivrAudio = null
+}
+
+function parseIvrOptions(brut: unknown): IvrOption[] {
+  if (!Array.isArray(brut)) return []
+  const options: IvrOption[] = []
+  for (const item of brut) {
+    if (!item || typeof item !== "object") continue
+    const o = item as Record<string, unknown>
+    const digit = Number(o.digit)
+    if (!Number.isFinite(digit)) continue
+    options.push({
+      digit,
+      label: typeof o.label === "string" ? o.label : `Service ${digit}`,
+      // Absent = disponible : un serveur anterieur ne connait pas ce champ, et
+      // tout griser serait pire que de laisser essayer.
+      disponible: o.disponible !== false,
+    })
+  }
+  return options
+}
+
 function startIncomingRingtone() {
   if (typeof window === "undefined") return
   const callsEnabled = localStorage.getItem("notif_calls") !== "false"
@@ -438,6 +533,27 @@ export function subscribeToCallState(listener: () => void): () => void {
   return () => {
     stateListeners.delete(listener)
   }
+}
+
+/**
+ * Envoie une touche au standard.
+ *
+ * Le clavier se verrouille jusqu'a la reponse du serveur : sur un reseau lent
+ * l'utilisateur insiste, et deux appuis feraient sonner deux agents pour une
+ * seule intention. Le serveur tient la meme garde de son cote — celle-ci n'est
+ * que le confort qui evite d'en arriver la.
+ *
+ * On envoie meme une touche marquee indisponible : c'est le serveur qui dit
+ * pourquoi, et son message est plus juste que tout ce qu'on devinerait ici.
+ */
+export function sendIvrChoice(digit: number) {
+  const session = state.ivr
+  if (!session || session.step !== "menu" || session.envoiEnCours) return
+  setState({ ivr: { ...session, envoiEnCours: true, message: null } })
+  // L'invite s'arrete a l'appui : la laisser courir sous la musique d'attente
+  // donnerait deux sons superposes.
+  stopIvrAudio()
+  sendIvrDtmf(session.callId, digit)
 }
 
 /* ----------------- Mesh + signalisation ----------------- */
@@ -671,6 +787,9 @@ function clearCall(markEnded: boolean) {
   stopMesh()
   stopOutgoingRingtone()
   stopIncomingRingtone()
+  // Le standard meurt avec l'appel. Ce nettoyage etant le point de passage de
+  // TOUTES les fins d'appel, c'est le seul endroit ou l'oubli est impossible.
+  stopIvrAudio()
   const ended = markEnded && (state.activeCallId !== null || state.role !== null)
   state = {
     ...initialState(),
@@ -767,6 +886,99 @@ async function handleServerEvent(event: CallServerEvent) {
     return
   }
 
+  if (event.type === "ivr_menu") {
+    // Le serveur repond « voici le menu » au lieu de faire sonner : ce numero
+    // etait un centre d'appels. Le client ne l'avait pas demande et n'a aucun
+    // controle a faire avant d'appeler — c'est le serveur qui decide.
+    const callId = String(event.callId ?? "")
+    if (!callId || callId !== state.activeCallId) return
+    // ⚠️ COUPER LE MINUTEUR DE SONNERIE. Il est arme pour un appel que personne
+    // ne decroche ; laisse en place, il raccroche l'appelant en plein milieu de
+    // son choix.
+    if (ringTimeoutId) {
+      clearTimeout(ringTimeoutId)
+      ringTimeoutId = null
+    }
+    // Le bip d'attente sortant n'a plus lieu d'etre : personne ne sonne.
+    stopOutgoingRingtone()
+
+    const session: IvrSession = {
+      callId,
+      centerId: String(event.centerId ?? ""),
+      centerName: String(event.centerName ?? state.peerName ?? "Standard"),
+      centerNumber: (event.centerNumber as string | null) ?? null,
+      promptUrl: (event.promptUrl as string | null) ?? null,
+      holdUrl: (event.holdUrl as string | null) ?? null,
+      options: parseIvrOptions(event.options),
+      step: "menu",
+      serviceChoisi: null,
+      message: null,
+      envoiEnCours: false,
+    }
+    setState({
+      ivr: session,
+      peerName: session.centerName,
+      peerAvatarUrl: (event.centerAvatarUrl as string | null) ?? state.peerAvatarUrl,
+    })
+    if (session.promptUrl) playIvrAudio(session.promptUrl, false)
+    return
+  }
+
+  if (event.type === "ivr_hold") {
+    const session = state.ivr
+    if (!session || String(event.callId ?? "") !== session.callId) return
+    setState({
+      ivr: {
+        ...session,
+        step: "attente",
+        serviceChoisi: (event.label as string | null) ?? null,
+        message: null,
+        envoiEnCours: false,
+      },
+    })
+    // L'URL est arrivee des `ivr_menu` : le navigateur a eu toute la duree de
+    // l'invite pour la mettre en cache, la musique demarre donc a l'instant de
+    // l'appui au lieu de laisser trois secondes de silence.
+    const hold = (event.holdUrl as string | null) ?? session.holdUrl
+    if (hold) playIvrAudio(hold, true)
+    return
+  }
+
+  if (event.type === "ivr_error") {
+    const callId = String(event.callId ?? "")
+    const retry = event.retry === true
+    const message = String(event.message ?? "Le standard n'a pas pu aboutir")
+    stopIvrAudio()
+    const session = state.ivr
+    if (!session || callId !== session.callId) {
+      // Refus AVANT toute session : le centre n'a aucun service joignable.
+      setState({ error: message })
+      void hangUp()
+      return
+    }
+    const options = parseIvrOptions(event.options)
+    setState({
+      ivr: {
+        ...session,
+        options: options.length > 0 ? options : session.options,
+        message,
+        envoiEnCours: false,
+        // Un agent occupe, absent ou qui refuse ne raccroche PAS au nez de
+        // l'appelant : il revient au menu et choisit un autre service.
+        step: retry ? "menu" : session.step,
+        serviceChoisi: retry ? null : session.serviceChoisi,
+      },
+    })
+    if (retry) return
+    // Fin sans retour possible. Le message reste affiche : le serveur n'envoie
+    // volontairement AUCUN `call_ended` avec, sinon l'ecran se fermerait dans la
+    // meme milliseconde et le texte serait illisible.
+    setTimeout(() => {
+      if (state.ivr?.callId === callId) void hangUp()
+    }, 4000)
+    return
+  }
+
   if (event.type === "call_signal") {
     const callId = String(event.callId ?? "")
     const from = String(event.from ?? "")
@@ -825,6 +1037,14 @@ async function handleServerEvent(event: CallServerEvent) {
           await acheverLeTransfert(callId)
           return
         }
+      }
+      // Standard : quelqu'un a decroche. La session n'a plus de raison d'etre,
+      // l'ecran redevient un ecran d'appel ordinaire — au nom du CENTRE. Le
+      // serveur a reecrit `userId` pour nous : le pair qu'on s'apprete a
+      // connecter est le centre, jamais l'agent.
+      if (state.ivr && callId === state.ivr.callId) {
+        stopIvrAudio()
+        setState({ ivr: null })
       }
       if (callId === state.activeCallId || callId === state.incoming?.callId) {
         await onPeerJoined(userId ?? "", displayName)
