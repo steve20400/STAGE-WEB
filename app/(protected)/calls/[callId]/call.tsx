@@ -268,8 +268,8 @@ export default function CallRoomPage() {
     // « Sonnerie… » dirait exactement le contraire de ce qui se passe.
     ringing: call.ivr
       ? call.ivr.step === "menu"
-        ? "Serveur vocal"
-        : `Mise en relation — ${call.ivr.serviceChoisi ?? "votre service"}`
+        ? t("ivr_title")
+        : t("ivr_connecting_to", { service: call.ivr.serviceChoisi ?? t("ivr_your_service") })
       : call.progress === "ringing"
         ? t("call_ringing")
         : t("call_connecting"),

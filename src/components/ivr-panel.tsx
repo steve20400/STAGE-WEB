@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { sendIvrChoice, type IvrSession } from "../services/call-manager"
+import { useTranslation } from "../i18n"
 
 /** Delai au-dela duquel un appui devient un appui MAINTENU (revelation). */
 const DELAI_APPUI_LONG_MS = 450
@@ -26,6 +27,7 @@ const DELAI_APPUI_LONG_MS = 450
  * au-dessus du pave. Miroir exact du client mobile.
  */
 export function IvrPanel({ session }: { session: IvrSession }) {
+  const { t } = useTranslation()
   const [maintenue, setMaintenue] = useState<number | null>(null)
   const minuteur = useRef<number | null>(null)
   /** L'appui a-t-il DEJA revele ? Si oui, le relachement n'envoie pas. */
@@ -83,10 +85,10 @@ export function IvrPanel({ session }: { session: IvrSession }) {
   let titre: string | null = null
   let sous: string | null = null
   if (maintenue !== null) {
-    if (!optionRevelee) titre = "Aucun service sur cette touche"
+    if (!optionRevelee) titre = t("ivr_no_service")
     else {
       titre = optionRevelee.label
-      if (!optionRevelee.disponible) sous = "Bientôt disponible"
+      if (!optionRevelee.disponible) sous = t("ivr_soon")
     }
   }
 
@@ -169,9 +171,7 @@ export function IvrPanel({ session }: { session: IvrSession }) {
       </div>
 
       <div style={{ marginTop: 12, fontSize: 12, opacity: 0.6, textAlign: "center" }}>
-        {session.envoiEnCours
-          ? "Envoi de votre choix…"
-          : "Maintenez une touche pour voir le service"}
+        {session.envoiEnCours ? t("ivr_sending") : t("ivr_hold_hint")}
       </div>
     </div>
   )
@@ -245,14 +245,13 @@ function IvrTouche({
 }
 
 function IvrAttente({ session }: { session: IvrSession }) {
+  const { t } = useTranslation()
   return (
     <div style={{ marginTop: 18, textAlign: "center" }}>
       <div style={{ fontSize: 16, fontWeight: 600 }}>
-        {session.serviceChoisi ?? "Mise en relation"}
+        {session.serviceChoisi ?? t("ivr_connecting")}
       </div>
-      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.65 }}>
-        Nous vous mettons en relation. Merci de patienter.
-      </div>
+      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.65 }}>{t("ivr_connecting_you")}</div>
     </div>
   )
 }

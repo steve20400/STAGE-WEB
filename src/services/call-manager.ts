@@ -975,7 +975,7 @@ async function handleServerEvent(event: CallServerEvent) {
   if (event.type === "ivr_error") {
     const callId = String(event.callId ?? "")
     const retry = event.retry === true
-    const message = String(event.message ?? "Le standard n'a pas pu aboutir")
+    const message = String(event.message ?? tr("ivr_failed"))
     stopIvrAudio()
     const session = state.ivr
     if (!session || callId !== session.callId) {
