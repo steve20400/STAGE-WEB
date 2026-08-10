@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useTranslation } from "../i18n"
 
 interface IncomingCaller {
   id: string
@@ -25,6 +26,7 @@ export default function IncomingCallOverlay({
   onDecline,
   onTimeout,
 }: IncomingCallOverlayProps) {
+  const { t } = useTranslation()
   const [remaining, setRemaining] = useState(30)
 
   useEffect(() => {
@@ -199,10 +201,12 @@ export default function IncomingCallOverlay({
             </div>
           </div>
 
-          <div className="ical-type">Appel {type === "video" ? "video" : "audio"} entrant</div>
+          <div className="ical-type">
+            {type === "video" ? t("incoming_video_call") : t("incoming_audio_call")}
+          </div>
           <div className="ical-name">{caller.name}</div>
           <div className="ical-sub">
-            {type === "video" ? "Souhaite un appel video" : "Vous appelle"}
+            {type === "video" ? t("wants_a_video_call") : t("is_calling_you")}
           </div>
 
           <div className="ical-actions">
@@ -223,7 +227,7 @@ export default function IncomingCallOverlay({
                   />
                 </svg>
               </div>
-              <span className="ical-action-label">Refuser</span>
+              <span className="ical-action-label">{t("decline")}</span>
             </button>
 
             <button className="ical-action accept" onClick={onAccept}>
@@ -240,7 +244,7 @@ export default function IncomingCallOverlay({
                   <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                 </svg>
               </div>
-              <span className="ical-action-label">Accepter</span>
+              <span className="ical-action-label">{t("accept")}</span>
             </button>
           </div>
 

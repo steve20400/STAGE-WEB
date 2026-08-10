@@ -4,12 +4,14 @@ import { useToast } from "../../../../src/components/toast"
 import { fetchMeeting, joinMeeting, leaveMeeting } from "../../../../src/services/meetings-service"
 import { startMeetingCall } from "../../../../src/services/call-manager"
 import { useCallState } from "../../../../src/hooks/use-call"
+import { useTranslation } from "../../../../src/i18n"
 import type { Meeting } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
 export default function MeetingRoomPage() {
   const { meetingId } = useParams()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const { success, error: showError } = useToast()
   const callState = useCallState()
 
@@ -26,23 +28,23 @@ export default function MeetingRoomPage() {
         const m = await fetchMeeting(parseInt(meetingId, 10))
         setMeeting(m)
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Impossible de charger la réunion"
+        const msg = err instanceof Error ? err.message : t("meet_room_load_failed")
         setError(msg)
-        showError("Erreur", msg)
+        showError(t("error"), msg)
       } finally {
         setLoading(false)
       }
     }
 
     void loadMeeting()
-  }, [meetingId, showError])
+  }, [meetingId, showError, t])
 
   const handleJoinMeeting = async () => {
     if (!meeting || !meetingId) return
 
     try {
       await joinMeeting(parseInt(meetingId, 10))
-      success("Réunion rejointe!")
+      success(t("meet_joined"))
 
       const participantIds = meeting.participants?.map((p) => p.userId) || []
       await startMeetingCall(
@@ -52,7 +54,7 @@ export default function MeetingRoomPage() {
         meeting.objet
       )
     } catch (err) {
-      showError("Erreur", err instanceof Error ? err.message : "Impossible de rejoindre")
+      showError(t("error"), err instanceof Error ? err.message : t("meet_join_failed"))
     }
   }
 
@@ -62,16 +64,16 @@ export default function MeetingRoomPage() {
     try {
       await leaveMeeting(parseInt(meetingId, 10))
       navigate("/meetings")
-      success("Réunion quittée")
+      success(t("meet_left"))
     } catch (err) {
-      showError("Erreur", err instanceof Error ? err.message : "Impossible de quitter")
+      showError(t("error"), err instanceof Error ? err.message : t("meet_leave_failed"))
     }
   }
 
   if (loading) {
     return (
       <div className="meeting-room-root">
-        <div className="loading">Chargement...</div>
+        <div className="loading">{t("loading")}</div>
       </div>
     )
   }
@@ -79,9 +81,9 @@ export default function MeetingRoomPage() {
   if (!meeting) {
     return (
       <div className="meeting-room-root">
-        <div className="error">{error || "Réunion introuvable"}</div>
+        <div className="error">{error || t("meet_not_found")}</div>
         <button className="btn-back" onClick={() => navigate("/meetings")}>
-          Retour
+          {t("back")}
         </button>
       </div>
     )
@@ -91,23 +93,25 @@ export default function MeetingRoomPage() {
     <div className="meeting-room-root">
       <div className="meeting-header">
         <h1>{meeting.objet}</h1>
-        <button className="btn-back" onClick={() => navigate("/meetings")}>
+        <button className="btn-back" onClick={() => navigate("/meetings")} aria-label={t("close")}>
           ✕
         </button>
       </div>
 
       <div className="meeting-info">
-        <p>Type: {meeting.type_media === 2 ? "Vidéo" : "Audio"}</p>
-        <p>Durée: {Math.floor((meeting.duree || 3600) / 60)} minutes</p>
+        <p>
+          {t("meet_type")} : {meeting.type_media === 2 ? t("video_label") : t("cinfo_audio")}
+        </p>
+        <p>{t("meet_duration_minutes", { n: Math.floor((meeting.duree || 3600) / 60) })}</p>
         {meeting.participants && meeting.participants.length > 0 && (
           <>
-            <p>Participants ({meeting.participants.length}):</p>
+            <p>{t("meet_participants", { count: meeting.participants.length })}</p>
             <div className="participants-grid">
               {meeting.participants.map((p) => (
                 <div key={p.userId} className="participant-box">
                   <div className="participant-name">{p.displayName}</div>
                   <div className={`participant-status ${p.connecte ? "connected" : "pending"}`}>
-                    {p.connecte ? "Connecté" : "En attente"}
+                    {p.connecte ? t("meet_connected") : t("meet_pending")}
                   </div>
                 </div>
               ))}
@@ -117,7 +121,7 @@ export default function MeetingRoomPage() {
         {callState.activeCallId && (
           <div className="call-status">
             <div className="status-indicator active" />
-            <span>Appel en cours</span>
+            <span>{t("call_in_progress")}</span>
           </div>
         )}
       </div>
@@ -125,12 +129,12 @@ export default function MeetingRoomPage() {
       <div className="meeting-actions">
         {!callState.activeCallId && (
           <button className="btn-join" onClick={() => void handleJoinMeeting()}>
-            Rejoindre la réunion
+            {t("meet_join_room")}
           </button>
         )}
         {callState.activeCallId && (
           <button className="btn-leave" onClick={() => void handleLeaveMeeting()}>
-            Quitter la réunion
+            {t("meet_leave_room")}
           </button>
         )}
       </div>

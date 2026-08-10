@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
 import { useContacts } from "../hooks/use-contacts"
 import { useToast } from "./toast"
+import { useTranslation, type Cle } from "../i18n"
 import {
   inviteToCall,
   restoreActiveCall,
@@ -19,10 +20,11 @@ import {
 } from "../lib/alanya-number"
 import "./call-options-menu.css"
 
-const LIBELLE_TAILLE: Record<CallDisplayMode, string> = {
-  small: "Petit ecran",
-  medium: "Ecran moyen",
-  full: "Grand ecran",
+/** Cles, pas libelles : le menu se traduit au rendu, pas au chargement du module. */
+const LIBELLE_TAILLE: Record<CallDisplayMode, Cle> = {
+  small: "size_small_screen",
+  medium: "size_medium_screen",
+  full: "size_large_screen",
 }
 
 /** Disposition d'un clavier de telephone, la meme que celle du composeur. */
@@ -63,6 +65,7 @@ interface CallOptionsMenuProps {
  * <body> : la petite fenetre flottante est en overflow:hidden et les rognerait.
  */
 export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOptionsMenuProps) {
+  const { t } = useTranslation()
   const call = useCallState()
   const navigate = useNavigate()
   const location = useLocation()
@@ -240,7 +243,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
           {vue === "racine" ? (
             <>
               <button className="call-opt-item" role="menuitem" onClick={() => setVue("taille")}>
-                <span>Taille de la fenetre</span>
+                <span>{t("window_size")}</span>
                 <span className="call-opt-chevron" aria-hidden="true">
                   ›
                 </span>
@@ -250,20 +253,20 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                 role="menuitem"
                 onClick={() => ouvrirDialogue("inviter")}
               >
-                Inviter une personne
+                {t("invite_person")}
               </button>
               <button
                 className="call-opt-item"
                 role="menuitem"
                 onClick={() => ouvrirDialogue("transferer")}
               >
-                Transferer l'appel
+                {t("transfer_call")}
               </button>
             </>
           ) : (
             <>
               <button className="call-opt-retour" onClick={() => setVue("racine")}>
-                <span aria-hidden="true">‹</span> Taille de la fenetre
+                <span aria-hidden="true">‹</span> {t("window_size")}
               </button>
               {AUTRES_TAILLES[call.displayMode].map((mode) => (
                 <button
@@ -272,7 +275,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                   role="menuitem"
                   onClick={() => changerTaille(mode)}
                 >
-                  {LIBELLE_TAILLE[mode]}
+                  {t(LIBELLE_TAILLE[mode])}
                 </button>
               ))}
             </>
@@ -291,7 +294,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
           >
             <div className="call-opt-dialog" role="dialog" aria-modal="true">
               <div className="call-opt-dialog-title">
-                {dialogue === "inviter" ? "Inviter une personne" : "Transferer l'appel"}
+                {dialogue === "inviter" ? t("invite_person") : t("transfer_call")}
               </div>
 
               {/* Deux entrees pour la meme action : la liste des contacts, ou le
@@ -303,7 +306,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                   aria-selected={onglet === "contacts"}
                   onClick={() => setOnglet("contacts")}
                 >
-                  Contacts
+                  {t("contacts")}
                 </button>
                 <button
                   className={onglet === "numero" ? "call-opt-onglet on" : "call-opt-onglet"}
@@ -311,7 +314,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                   aria-selected={onglet === "numero"}
                   onClick={() => setOnglet("numero")}
                 >
-                  Composer un ID
+                  {t("dial_an_id")}
                 </button>
               </div>
 
@@ -321,7 +324,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                     className="call-opt-search"
                     type="text"
                     autoFocus
-                    placeholder="Rechercher par nom ou numero..."
+                    placeholder={t("search_name_or_number")}
                     value={recherche}
                     onChange={(e) => setRecherche(e.target.value)}
                   />
@@ -339,7 +342,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                         </button>
                       ))
                     ) : (
-                      <div className="call-opt-vide">Aucun contact trouve</div>
+                      <div className="call-opt-vide">{t("meet_no_contact_found")}</div>
                     )}
                   </div>
                 </>
@@ -354,12 +357,12 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                   </div>
                   <div className="call-opt-numero-aide" aria-live="polite">
                     {chiffres.length === 0
-                      ? "Composez un Alanya ID de 6 ou 8 chiffres"
+                      ? t("dial_hint_6_or_8")
                       : contactDuNumero
                         ? contactDuNumero.name
                         : numeroValide
-                          ? "Numero complet"
-                          : `${chiffres.length} chiffre${chiffres.length > 1 ? "s" : ""} — il en faut 6 ou 8`}
+                          ? t("number_complete")
+                          : t("digits_need_6_or_8", { n: chiffres.length })}
                   </div>
 
                   <div className="call-opt-touches">
@@ -385,24 +388,26 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                     className="call-opt-effacer"
                     onClick={effacer}
                     disabled={chiffres.length === 0}
-                    aria-label="Effacer le dernier chiffre"
+                    aria-label={t("erase_last_digit")}
                   >
-                    ⌫ Effacer
+                    ⌫ {t("erase")}
                   </button>
 
                   <button
                     className="call-opt-valider"
                     onClick={validerLeNumero}
                     disabled={!numeroValide}
-                    title={numeroValide ? undefined : "Composez 6 ou 8 chiffres"}
+                    title={numeroValide ? undefined : t("dial_6_or_8")}
                   >
-                    {dialogue === "inviter" ? "Inviter ce numero" : "Transferer vers ce numero"}
+                    {dialogue === "inviter"
+                      ? t("invite_this_number")
+                      : t("transfer_to_this_number")}
                   </button>
                 </div>
               )}
 
               <button className="call-opt-annuler" onClick={fermerDialogue}>
-                Annuler
+                {t("cancel")}
               </button>
             </div>
           </div>,

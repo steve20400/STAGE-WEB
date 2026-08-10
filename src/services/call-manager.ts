@@ -26,6 +26,15 @@ import {
   type CallServerEvent,
 } from "./websocket-service"
 import { isValidAlanyaNumber, normalizeAlanyaNumber } from "../lib/alanya-number"
+import { langueInitiale, traduire, type Cle } from "../i18n"
+
+/**
+ * Traduction dans un service : la langue est relue a chaque appel, jamais
+ * capturee a l'import — sinon un changement de langue en cours de session
+ * laisserait les messages d'appel dans l'ancienne.
+ */
+const tr = (cle: Cle, variables?: Record<string, string | number>) =>
+  traduire(langueInitiale(), cle, variables)
 
 /**
  * Gestion des appels WebRTC — miroir du CallController de l'app mobile Flutter
@@ -171,9 +180,7 @@ class PeerSession {
           return urls.some((url) => typeof url === "string" && url.startsWith("turn"))
         })
         setState({
-          error: hasTurn
-            ? "Flux audio/video bloque malgre le relais TURN : reessayez ou changez de reseau."
-            : "Aucun relais TURN dans ce deploiement : ajoutez les variables VITE_TURN_* sur Vercel puis redeployez.",
+          error: hasTurn ? tr("call_turn_blocked") : tr("call_turn_missing"),
         })
       }
     }
@@ -529,7 +536,7 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
     stream = await ensureLocalStream(isVideo)
   } catch {
     setState({
-      error: isVideo ? "Micro et camera requis pour l'appel." : "Micro requis pour l'appel.",
+      error: isVideo ? tr("call_need_mic_cam") : tr("call_need_mic"),
     })
     return
   }
@@ -831,7 +838,7 @@ export async function startOutgoingCall(
 
   // Un appel entrant sonne a l'ecran : l'utilisateur doit d'abord repondre.
   if (state.incoming) {
-    throw new Error("Un appel entrant est en cours. Repondez-y d'abord.")
+    throw new Error(tr("call_answer_incoming_first"))
   }
   // Appel local residuel (ecran quitte sans raccrocher) : on le remplace.
   if (state.activeCallId !== null || state.role !== null) {
@@ -850,7 +857,7 @@ export async function startOutgoingCall(
         started = await startCallRest(convId, type)
       } catch (retryError) {
         if (retryError instanceof ApiError && retryError.status === 409) {
-          throw new Error("Occupé : un appel est déjà en cours. Réessayez plus tard.")
+          throw new Error(tr("call_busy_detail"))
         }
         throw retryError
       }
@@ -908,8 +915,7 @@ export async function startOutgoingCall(
     await ensureLocalStream(type === "video")
   } catch {
     setState({
-      error:
-        type === "video" ? "Micro et camera requis pour l'appel." : "Micro requis pour l'appel.",
+      error: type === "video" ? tr("call_need_mic_cam") : tr("call_need_mic"),
     })
   }
 
@@ -926,7 +932,7 @@ export async function startMeetingCall(
   ensureEventSubscription()
 
   if (state.incoming) {
-    throw new Error("Un appel entrant est en cours. Répondez-y d'abord.")
+    throw new Error(tr("call_answer_incoming_first"))
   }
   if (state.activeCallId !== null || state.role !== null) {
     await hangUp()
@@ -942,7 +948,7 @@ export async function startMeetingCall(
         started = await startCallRest(`meeting_${meetingId}`, type)
       } catch (retryError) {
         if (retryError instanceof ApiError && retryError.status === 409) {
-          throw new Error("Occupé : un appel est déjà en cours. Réessayez plus tard.")
+          throw new Error(tr("call_busy_detail"))
         }
         throw retryError
       }
@@ -979,8 +985,7 @@ export async function startMeetingCall(
     await ensureLocalStream(type === "video")
   } catch {
     setState({
-      error:
-        type === "video" ? "Micro et caméra requis pour l'appel." : "Micro requis pour l'appel.",
+      error: type === "video" ? tr("call_need_mic_cam") : tr("call_need_mic"),
     })
   }
 
@@ -1026,10 +1031,7 @@ export async function acceptIncomingCall(): Promise<string | null> {
     await ensureLocalStream(incoming.callType === "video")
   } catch {
     setState({
-      error:
-        incoming.callType === "video"
-          ? "Micro et camera requis pour l'appel."
-          : "Micro requis pour l'appel.",
+      error: incoming.callType === "video" ? tr("call_need_mic_cam") : tr("call_need_mic"),
     })
   }
 
@@ -1160,7 +1162,7 @@ export async function switchCamera(): Promise<boolean> {
   )
   const suivante = cameras.find((appareil) => appareil.deviceId !== idCourant)
   if (!suivante && cameras.length <= 1) {
-    setState({ error: "Cet appareil n'a qu'une seule camera." })
+    setState({ error: tr("call_single_camera") })
     return false
   }
 
@@ -1205,7 +1207,7 @@ export async function switchCamera(): Promise<boolean> {
   } catch {
     // meme la camera de depart est perdue : l'erreur ci-dessous le dira
   }
-  setState({ error: "Changement de camera impossible sur cet appareil." })
+  setState({ error: tr("call_switch_camera_failed") })
   return false
 }
 
@@ -1249,16 +1251,16 @@ export function acknowledgeCallEnded() {
  * Alanya normalise. Inviter et transferer ont exactement les memes prerequis :
  * un appel en cours, et un numero valide qui n'est pas le sien.
  */
-function cibleDeLaDemande(numeroSaisi: string, action: string): string {
+function cibleDeLaDemande(numeroSaisi: string, sansAppel: Cle): string {
   if (!state.activeCallId) {
-    throw new Error(`Aucun appel en cours : impossible de ${action}.`)
+    throw new Error(tr(sansAppel))
   }
   const numero = normalizeAlanyaNumber(numeroSaisi)
   if (!isValidAlanyaNumber(numero)) {
-    throw new Error("Numero Alanya invalide : il faut 6 ou 8 chiffres.")
+    throw new Error(tr("call_invalid_alanya_number"))
   }
   if (numero === normalizeAlanyaNumber(loadSessionUser()?.phone ?? "")) {
-    throw new Error("C'est votre propre numero.")
+    throw new Error(tr("call_own_number"))
   }
   return numero
 }
@@ -1272,7 +1274,7 @@ function cibleDeLaDemande(numeroSaisi: string, action: string): string {
  * le flux WebRTC sans traitement particulier. L'appel devient multi-partie.
  */
 export async function inviteToCall(publicNumber: string): Promise<void> {
-  const numero = cibleDeLaDemande(publicNumber, "inviter quelqu'un")
+  const numero = cibleDeLaDemande(publicNumber, "call_no_call_to_invite")
   setState({ isGroup: true })
   sendCallInvite(state.activeCallId as string, numero)
 }
@@ -1286,7 +1288,7 @@ export async function inviteToCall(publicNumber: string): Promise<void> {
  * le monde en plan. C'est le meme protocole que l'application mobile.
  */
 export async function transferCall(publicNumber: string): Promise<void> {
-  const numero = cibleDeLaDemande(publicNumber, "transferer l'appel")
+  const numero = cibleDeLaDemande(publicNumber, "call_no_call_to_transfer")
   cibleDuTransfert = null
   setState({ transferPending: true, error: null })
   sendCallInvite(state.activeCallId as string, numero)

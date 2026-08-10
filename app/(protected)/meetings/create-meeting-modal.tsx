@@ -3,6 +3,7 @@ import { useToast } from "../../../src/components/toast"
 import { loadContacts } from "../../../src/data/contacts"
 import { normalizePhoneNumber } from "../../../src/data/session-user"
 import { createMeeting } from "../../../src/services/meetings-service"
+import { useTranslation } from "../../../src/i18n"
 
 interface CreateMeetingModalProps {
   isOpen: boolean
@@ -11,6 +12,7 @@ interface CreateMeetingModalProps {
 }
 
 export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeetingModalProps) {
+  const { t } = useTranslation()
   const { success, error: showError } = useToast()
 
   const [step, setStep] = useState<"details" | "participants">("details")
@@ -36,11 +38,11 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
 
   const handleCreate = async () => {
     if (!objet.trim()) {
-      showError("Objet requis", "Veuillez entrer un objet pour la réunion")
+      showError(t("meet_subject_required"), t("meet_subject_required_detail"))
       return
     }
     if (!startTime) {
-      showError("Heure de début requise", "Veuillez entrer une heure de début")
+      showError(t("meet_start_required"), t("meet_start_required_detail"))
       return
     }
 
@@ -55,7 +57,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
         ...(endTime && { end_time: endTime }),
         participantNumbers: participantNumbers.length > 0 ? participantNumbers : undefined,
       })
-      success("Réunion créée!")
+      success(t("meet_created"))
       setObjet("")
       setTypeMedia(1)
       setDuree("3600")
@@ -66,9 +68,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
       onClose()
       onSuccess()
     } catch (err) {
-      showError(
-        err instanceof Error ? err.message : "Impossible de créer la réunion"
-      )
+      showError(err instanceof Error ? err.message : t("meet_create_failed"))
     } finally {
       setLoading(false)
     }
@@ -80,17 +80,19 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Créer une réunion</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <h2>{t("meet_create")}</h2>
+          <button className="modal-close" onClick={onClose} aria-label={t("close")}>
+            ✕
+          </button>
         </div>
 
         {step === "details" ? (
           <div className="modal-body">
             <div className="form-group">
-              <label>Objet *</label>
+              <label>{t("meet_subject")} *</label>
               <input
                 type="text"
-                placeholder="Ex: Réunion d'équipe"
+                placeholder={t("meet_subject_placeholder")}
                 value={objet}
                 onChange={(e) => setObjet(e.target.value)}
                 maxLength={100}
@@ -98,7 +100,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
             </div>
 
             <div className="form-group">
-              <label>Type</label>
+              <label>{t("meet_type")}</label>
               <div className="radio-group">
                 <label>
                   <input
@@ -107,7 +109,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
                     checked={typeMedia === 1}
                     onChange={() => setTypeMedia(1)}
                   />
-                  Audio
+                  {t("cinfo_audio")}
                 </label>
                 <label>
                   <input
@@ -116,13 +118,13 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
                     checked={typeMedia === 2}
                     onChange={() => setTypeMedia(2)}
                   />
-                  Vidéo
+                  {t("video_label")}
                 </label>
               </div>
             </div>
 
             <div className="form-group">
-              <label>Durée (secondes)</label>
+              <label>{t("meet_duration")}</label>
               <input
                 type="number"
                 value={duree}
@@ -130,11 +132,11 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
                 min="300"
                 max="28800"
               />
-              <small>5 min min, 8 h max</small>
+              <small>{t("meet_duration_hint")}</small>
             </div>
 
             <div className="form-group">
-              <label>Heure de début *</label>
+              <label>{t("meet_start_time")} *</label>
               <input
                 type="datetime-local"
                 value={startTime}
@@ -143,7 +145,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
             </div>
 
             <div className="form-group">
-              <label>Heure de fin (optionnel)</label>
+              <label>{t("meet_end_time")}</label>
               <input
                 type="datetime-local"
                 value={endTime}
@@ -152,12 +154,9 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
             </div>
 
             <div className="form-group">
-              <label>Participants ({selectedParticipants.size})</label>
-              <button
-                className="btn-secondary"
-                onClick={() => setStep("participants")}
-              >
-                Ajouter participants
+              <label>{t("meet_participants", { count: selectedParticipants.size })}</label>
+              <button className="btn-secondary" onClick={() => setStep("participants")}>
+                {t("meet_add_participants")}
               </button>
             </div>
           </div>
@@ -165,7 +164,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
           <div className="modal-body">
             <input
               type="text"
-              placeholder="Rechercher par nom ou Alanya ID"
+              placeholder={t("meet_search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
@@ -196,7 +195,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
               ))}
               {filteredContacts.length === 0 && (
                 <div className="empty-search">
-                  {searchQuery ? "Aucun contact trouvé" : "Aucun contact"}
+                  {searchQuery ? t("meet_no_contact_found") : t("meet_no_contact")}
                 </div>
               )}
             </div>
@@ -206,7 +205,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
         <div className="modal-footer">
           {step === "participants" && (
             <button className="btn-secondary" onClick={() => setStep("details")}>
-              Retour
+              {t("back")}
             </button>
           )}
           <button
@@ -214,7 +213,11 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
             onClick={step === "details" ? () => setStep("participants") : handleCreate}
             disabled={loading || (step === "details" && !objet.trim())}
           >
-            {loading ? "Création..." : step === "details" ? "Suivant" : "Créer"}
+            {loading
+              ? t("meet_creating")
+              : step === "details"
+                ? t("meet_next")
+                : t("meet_create_btn")}
           </button>
         </div>
       </div>

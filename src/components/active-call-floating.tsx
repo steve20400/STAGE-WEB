@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { useCallState } from "../hooks/use-call"
+import { useTranslation } from "../i18n"
 import { ParticipantGrid } from "./participant-grid"
 
 import { useHasLiveVideo } from "../hooks/use-remote-video"
@@ -34,6 +35,7 @@ const PARTICIPANTS_POUR_DIVISER = 2
  * L'apercu local reste disponible sur l'ecran d'appel plein format.
  */
 export function ActiveCallFloating() {
+  const { t } = useTranslation()
   const call = useCallState()
   const navigate = useNavigate()
   const location = useLocation()
@@ -48,7 +50,7 @@ export function ActiveCallFloating() {
   const participants = remoteEntries.map(([id, stream]) => ({
     id,
     stream,
-    name: call.participantNames[id] ?? call.peerName ?? "Participant",
+    name: call.participantNames[id] ?? call.peerName ?? t("participant"),
   }))
   const remote = remoteEntries[0]?.[1]
   // Hook appele avant tout retour anticipe : l'ordre des hooks doit rester stable.
@@ -63,7 +65,7 @@ export function ActiveCallFloating() {
   // piste video pas encore recue, camera du correspondant coupee) on montre sa
   // photo : c'est ce qui remplace l'ancien rectangle noir.
   const showRemoteVideo = call.callType === "video" && remoteHasVideo
-  const peerName = call.peerName || "Appel"
+  const peerName = call.peerName || t("call")
   const peerAvatar = avatarDisplaySrc(call.peerAvatarUrl)
 
   const restore = () => {
@@ -87,7 +89,7 @@ export function ActiveCallFloating() {
       className={`active-call-floating ${reduite ? "taille-petite" : "taille-moyenne"}`}
       style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
       role="dialog"
-      aria-label={`Appel en cours avec ${peerName}`}
+      aria-label={t("call_with", { name: peerName })}
       onPointerDown={(e) => {
         drag.current = { x: e.clientX, y: e.clientY, ox: pos.x, oy: pos.y, on: true }
         e.currentTarget.setPointerCapture(e.pointerId)
@@ -151,10 +153,10 @@ export function ActiveCallFloating() {
             <b>{peerName}</b>
             <span>
               {call.callType !== "video"
-                ? "Appel en cours"
+                ? t("call_in_progress")
                 : remote
-                  ? "Camera desactivee"
-                  : "Connexion…"}
+                  ? t("camera_off")
+                  : t("connecting")}
             </span>
           </div>
         )}
@@ -167,18 +169,18 @@ export function ActiveCallFloating() {
           vers les autres actions, pas une commande d'appel — il ne se melange
           donc pas aux boutons micro / raccrocher, qui restent a sa gauche. */}
       <div className="active-call-controls" onPointerDown={(e) => e.stopPropagation()}>
-        <button onClick={restore} title="Revenir a l'ecran d'appel">
-          Retour appel
+        <button onClick={restore} title={t("back_to_call_screen")}>
+          {t("back_to_call")}
         </button>
         <button
           onClick={() => toggleMicrophone()}
           aria-pressed={!call.micOn}
-          title={call.micOn ? "Couper le micro" : "Reactiver le micro"}
+          title={call.micOn ? t("mute_mic") : t("unmute_mic")}
         >
-          {call.micOn ? "Muet" : "Micro"}
+          {call.micOn ? t("muted_short") : t("mic_short")}
         </button>
-        <button className="end" onClick={() => void hangUp()} title="Raccrocher">
-          Raccrocher
+        <button className="end" onClick={() => void hangUp()} title={t("hang_up")}>
+          {t("hang_up")}
         </button>
         <div className="call-opt-anchor">
           <button
@@ -186,8 +188,8 @@ export function ActiveCallFloating() {
             onClick={() => setMenuOuvert((ouvert) => !ouvert)}
             aria-expanded={menuOuvert}
             aria-haspopup="menu"
-            aria-label="Autres actions"
-            title="Autres actions"
+            aria-label={t("more_actions")}
+            title={t("more_actions")}
           >
             ⋮
           </button>

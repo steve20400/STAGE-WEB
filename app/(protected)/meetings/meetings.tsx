@@ -16,7 +16,7 @@ import "./meetings.css"
 type MeetingTab = "ongoing" | "upcoming" | "ended"
 
 export default function MeetingsPage() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const navigate = useNavigate()
   const { success, error: showError } = useToast()
 
@@ -34,8 +34,10 @@ export default function MeetingsPage() {
     return meetings.filter((m) => {
       const isEnded = m.isEnd === 1
       if (tab === "ended") return isEnded
-      if (tab === "ongoing") return !isEnded && m.startTime && new Date(m.startTime).getTime() <= now
-      if (tab === "upcoming") return !isEnded && m.startTime && new Date(m.startTime).getTime() > now
+      if (tab === "ongoing")
+        return !isEnded && m.startTime && new Date(m.startTime).getTime() <= now
+      if (tab === "upcoming")
+        return !isEnded && m.startTime && new Date(m.startTime).getTime() > now
       return false
     })
   }, [meetings, tab, now])
@@ -46,12 +48,12 @@ export default function MeetingsPage() {
       setMeetings(data)
       setError("")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur de chargement")
-      showError(err instanceof Error ? err.message : "Impossible de charger les réunions")
+      setError(err instanceof Error ? err.message : t("meet_load_error"))
+      showError(err instanceof Error ? err.message : t("meet_load_failed"))
     } finally {
       setLoading(false)
     }
-  }, [showError])
+  }, [showError, t])
 
   useEffect(() => {
     void loadMeetings()
@@ -68,7 +70,7 @@ export default function MeetingsPage() {
       await joinMeeting(id)
       navigate(`/meetings/${id}`)
     } catch (err) {
-      showError(err instanceof Error ? err.message : "Impossible de rejoindre la réunion")
+      showError(err instanceof Error ? err.message : t("meet_join_failed"))
     }
   }
 
@@ -76,37 +78,45 @@ export default function MeetingsPage() {
     try {
       await declineMeeting(id)
       await loadMeetings()
-      success("Réunion déclinée")
+      success(t("meet_declined"))
     } catch (err) {
-      showError(err instanceof Error ? err.message : "Impossible de décliner la réunion")
+      showError(err instanceof Error ? err.message : t("meet_decline_failed"))
     }
   }
 
   const handleEnd = async (id: number) => {
-    if (!confirm("Terminer cette réunion ?")) return
+    if (!confirm(t("meet_end_confirm"))) return
     try {
       await endMeeting(id)
       await loadMeetings()
-      success("Réunion terminée")
+      success(t("meet_ended_toast"))
     } catch (err) {
-      showError(err instanceof Error ? err.message : "Impossible de terminer la réunion")
+      showError(err instanceof Error ? err.message : t("meet_end_failed"))
     }
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Supprimer cette réunion ?")) return
+    if (!confirm(t("meet_delete_confirm"))) return
     try {
       await deleteMeeting(id)
       await loadMeetings()
-      success("Réunion supprimée")
+      success(t("meet_deleted_toast"))
     } catch (err) {
-      showError(err instanceof Error ? err.message : "Impossible de supprimer la réunion")
+      showError(err instanceof Error ? err.message : t("meet_delete_failed"))
     }
   }
 
-  const getBadgeCount = (t: MeetingTab) => {
-    if (t === "ongoing") return meetings.filter((m) => !m.isEnd && m.startTime && new Date(m.startTime).getTime() <= now).length
-    if (t === "upcoming") return meetings.filter((m) => !m.isEnd && m.startTime && new Date(m.startTime).getTime() > now).length
+  // `onglet` et non `t` : le parametre masquait la fonction de traduction, et
+  // aucun libelle de cette portee n'aurait pu suivre la langue choisie.
+  const getBadgeCount = (onglet: MeetingTab) => {
+    if (onglet === "ongoing")
+      return meetings.filter(
+        (m) => !m.isEnd && m.startTime && new Date(m.startTime).getTime() <= now
+      ).length
+    if (onglet === "upcoming")
+      return meetings.filter(
+        (m) => !m.isEnd && m.startTime && new Date(m.startTime).getTime() > now
+      ).length
     return meetings.filter((m) => m.isEnd === 1).length
   }
 
@@ -115,23 +125,25 @@ export default function MeetingsPage() {
       <div className="meetings-head">
         <div className="page-title-row">
           <div>
-            <h1 className="page-title">Réunions</h1>
-            <p className="page-sub">Rejoignez vos réunions programmées et collaborez.</p>
+            <h1 className="page-title">{t("meetings")}</h1>
+            <p className="page-sub">{t("meet_page_sub")}</p>
           </div>
         </div>
 
         <div className="meetings-tabs">
-          {(["ongoing", "upcoming", "ended"] as const).map((t) => (
+          {(["ongoing", "upcoming", "ended"] as const).map((onglet) => (
             <button
-              key={t}
-              className={`filter-btn ${tab === t ? "on" : ""}`}
-              onClick={() => setTab(t)}
-              aria-pressed={tab === t}
+              key={onglet}
+              className={`filter-btn ${tab === onglet ? "on" : ""}`}
+              onClick={() => setTab(onglet)}
+              aria-pressed={tab === onglet}
             >
-              {t === "ongoing" && "En cours"}
-              {t === "upcoming" && "À venir"}
-              {t === "ended" && "Terminée"}
-              {getBadgeCount(t) > 0 && <span className="stat-chip">{getBadgeCount(t)}</span>}
+              {onglet === "ongoing" && t("meet_tab_ongoing")}
+              {onglet === "upcoming" && t("meet_tab_upcoming")}
+              {onglet === "ended" && t("meet_tab_ended")}
+              {getBadgeCount(onglet) > 0 && (
+                <span className="stat-chip">{getBadgeCount(onglet)}</span>
+              )}
             </button>
           ))}
         </div>
@@ -141,23 +153,23 @@ export default function MeetingsPage() {
         {loading ? (
           <div className="empty-state">
             <div className="empty-icon">⏳</div>
-            <p>Chargement des réunions...</p>
+            <p>{t("meet_loading")}</p>
           </div>
         ) : error ? (
           <div className="empty-state">
             <div className="empty-icon">⚠️</div>
             <p>{error}</p>
             <button className="empty-retry" onClick={() => void loadMeetings()}>
-              Réessayer
+              {t("retry")}
             </button>
           </div>
         ) : filteredMeetings.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">📅</div>
             <p>
-              {tab === "ongoing" && "Aucune réunion en cours"}
-              {tab === "upcoming" && "Aucune réunion à venir"}
-              {tab === "ended" && "Aucune réunion terminée"}
+              {tab === "ongoing" && t("meet_none_ongoing")}
+              {tab === "upcoming" && t("meet_none_upcoming")}
+              {tab === "ended" && t("meet_none_ended")}
             </p>
           </div>
         ) : (
@@ -165,30 +177,36 @@ export default function MeetingsPage() {
             <div key={meeting.id} className="meeting-card">
               <div className="meeting-head">
                 <div className="meeting-title">{meeting.objet}</div>
-                {meeting.isEnd === 1 && <span className="meeting-ended">Terminée</span>}
+                {meeting.isEnd === 1 && (
+                  <span className="meeting-ended">{t("meet_tab_ended")}</span>
+                )}
               </div>
               <div className="meeting-info">
                 <span className="meeting-type">
-                  {meeting.type_media === 1 ? "Audio" : "Vidéo"}
+                  {meeting.type_media === 1 ? t("cinfo_audio") : t("video_label")}
                 </span>
                 <span className="meeting-time">
-                  {meeting.startTime ? new Date(meeting.startTime).toLocaleString("fr-FR") : "-"}
+                  {/* La date se lit : elle suit la langue choisie, pas un fr-FR fige. */}
+                  {meeting.startTime ? new Date(meeting.startTime).toLocaleString(language) : "-"}
                 </span>
               </div>
               <div className="meeting-actions">
                 {meeting.isEnd !== 1 && (
                   <>
                     <button className="btn-primary" onClick={() => void handleJoin(meeting.id)}>
-                      Rejoindre
+                      {t("meet_join")}
                     </button>
-                    <button className="btn-secondary" onClick={() => void handleDecline(meeting.id)}>
-                      Décliner
+                    <button
+                      className="btn-secondary"
+                      onClick={() => void handleDecline(meeting.id)}
+                    >
+                      {t("meet_decline")}
                     </button>
                   </>
                 )}
                 {meeting.isEnd === 1 && (
                   <button className="btn-danger" onClick={() => void handleDelete(meeting.id)}>
-                    Supprimer
+                    {t("delete")}
                   </button>
                 )}
               </div>
@@ -197,7 +215,12 @@ export default function MeetingsPage() {
         )}
       </div>
 
-      <button className="meetings-fab" onClick={() => setShowCreateModal(true)}>
+      <button
+        className="meetings-fab"
+        onClick={() => setShowCreateModal(true)}
+        aria-label={t("meet_create")}
+        title={t("meet_create")}
+      >
         +
       </button>
 
