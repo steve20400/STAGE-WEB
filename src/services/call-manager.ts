@@ -445,6 +445,36 @@ export function subscribeToCallState(listener: () => void): () => void {
 /* ----------------- Mesh + signalisation ----------------- */
 
 const peers = new Map<string, PeerSession>()
+
+/**
+ * Occupation de la salle, au-dela des connexions WebRTC.
+ *
+ * `peers` ne connait que les gens DEJA connectes. Pour decider si l'on est
+ * seul, il faut aussi savoir qui sonne encore : sinon, inviter quelqu'un puis
+ * voir partir le dernier participant raccrocherait avant meme que l'invite ait
+ * eu le temps de decrocher.
+ */
+/** Participants dont on attend la reponse, connus par leur identifiant. */
+const attendus = new Set<string>()
+/**
+ * Invitations lancees par NUMERO : le serveur ne nous renvoie pas d'identifiant
+ * avant que la personne rejoigne, on ne peut donc que les compter. Chacune se
+ * perime d'elle-meme au bout du temps de sonnerie, faute de quoi une invitation
+ * restee sans reponse maintiendrait la salle ouverte indefiniment.
+ */
+let invitationsEnVol = 0
+/**
+ * Quelqu'un a-t-il rejoint depuis le debut de cet appel ?
+ *
+ * Sans cette memoire, un appel sortant serait raccroche des la premiere
+ * verification : au moment ou il part, personne n'est encore connecte. La regle
+ * « on raccroche quand il ne reste personne » ne vaut qu'une fois la salle
+ * peuplee au moins une fois.
+ */
+let salleAEteHabitee = false
+/** Un depart peut en preceder une arrivee de quelques centaines de millisecondes. */
+const SOLITUDE_MS = 2000
+let solitudeTimer: ReturnType<typeof setTimeout> | null = null
 // callId -> (userId -> signaux recus avant que la session soit prete)
 const signalBuffer = new Map<string, Map<string, WebrtcSignal[]>>()
 let localStream: MediaStream | null = null
@@ -530,6 +560,13 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
   const callId = state.activeCallId
   if (!me || !callId || peerId === me || peers.has(peerId)) return
 
+  // Quelqu'un entre : la salle a ete habitee, il ne l'attend plus, et le
+  // minuteur de solitude n'a plus lieu d'etre. Ce point de passage est unique —
+  // qu'on rejoigne un appel en cours ou qu'on voie arriver un nouveau venu.
+  salleAEteHabitee = true
+  nePlusAttendre(peerId)
+  annulerSolitude()
+
   const isVideo = state.callType === "video"
   let stream: MediaStream
   try {
@@ -564,6 +601,49 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
   }
 }
 
+function annulerSolitude() {
+  if (solitudeTimer) {
+    clearTimeout(solitudeTimer)
+    solitudeTimer = null
+  }
+}
+
+/** Plus personne d'autre : ni connecte, ni en train de sonner. */
+function suisJeSeul(): boolean {
+  return peers.size === 0 && attendus.size === 0 && invitationsEnVol === 0
+}
+
+/**
+ * Raccroche des qu'il ne reste plus qu'une personne dans la salle.
+ *
+ * Un appel a deux se terminait deja ainsi, mais pas un appel devenu multiple
+ * par invitation : les autres partis, le dernier restait seul dans un appel
+ * qui continuait de tourner, micro ouvert, sans plus personne au bout.
+ *
+ * Le raccrochage est differe de deux secondes, et annule si quelqu'un arrive
+ * entre-temps. Ce delai couvre le transfert supervise : le correspondant
+ * d'origine voit parfois partir celui qui transfere avant de voir arriver la
+ * cible, et raccrocherait sur cette fraction de seconde ou la salle parait
+ * vide. Il laisse aussi au serveur — qui termine l'appel des qu'il reste moins
+ * de deux personnes — le temps de le faire lui-meme : dans le cas normal, son
+ * `ended` arrive le premier et ce minuteur ne sert jamais.
+ */
+function verifierSolitude() {
+  annulerSolitude()
+  if (!salleAEteHabitee || state.activeCallId === null || !suisJeSeul()) return
+  solitudeTimer = setTimeout(() => {
+    solitudeTimer = null
+    if (state.activeCallId !== null && suisJeSeul()) void hangUp()
+  }, SOLITUDE_MS)
+}
+
+/** Une personne cesse d'etre attendue : elle a rejoint, refuse, ou disparu. */
+function nePlusAttendre(userId: string) {
+  if (attendus.delete(userId)) return
+  // Arrivee non nominative : c'est une invitation lancee par numero qui aboutit.
+  if (invitationsEnVol > 0) invitationsEnVol -= 1
+}
+
 function removePeer(peerId: string) {
   peers.get(peerId)?.close()
   peers.delete(peerId)
@@ -586,6 +666,10 @@ function clearCall(markEnded: boolean) {
   // l'appel suivant partirait des l'arrivee du premier participant.
   // (transferPending repart a faux avec initialState.)
   cibleDuTransfert = null
+  annulerSolitude()
+  attendus.clear()
+  invitationsEnVol = 0
+  salleAEteHabitee = false
   stopMesh()
   stopOutgoingRingtone()
   stopIncomingRingtone()
@@ -766,12 +850,9 @@ async function handleServerEvent(event: CallServerEvent) {
       }
       if (callId === state.activeCallId && userId) {
         removePeer(userId)
-        // Un appel direct peut devenir un transfert à trois participants.
-        // Ne terminons que lorsqu'aucun pair WebRTC ne reste après ce départ.
-        // Sinon, le correspondant transféré continuerait à être coupé.
-        if (!state.isGroup && peers.size === 0) {
-          void hangUp()
-        }
+        nePlusAttendre(userId)
+        // Meme regle a deux comme a dix : on ne reste pas seul dans une salle.
+        verifierSolitude()
       }
       return
     }
@@ -868,8 +949,10 @@ export async function startOutgoingCall(
   sendCallRing(started.id)
 
   const participantNames: Record<string, string> = {}
+  attendus.clear()
   for (const callee of started.callees ?? []) {
     participantNames[callee.userId] = callee.pseudo ?? callee.publicNumber ?? "Membre"
+    attendus.add(callee.userId)
   }
 
   setState({
@@ -959,8 +1042,10 @@ export async function startMeetingCall(
   sendCallRing(started.id)
 
   const participantNames: Record<string, string> = {}
+  attendus.clear()
   for (const p of participants) {
     participantNames[p] = p
+    attendus.add(p)
   }
 
   setState({
@@ -1001,6 +1086,7 @@ export async function acceptIncomingCall(): Promise<string | null> {
   const result = await acceptCallRest(incoming.callId)
 
   const participantNames: Record<string, string> = { ...state.participantNames }
+  attendus.clear()
   for (const participant of result.activeParticipants ?? []) {
     participantNames[participant.userId] = participant.displayName
   }
@@ -1276,7 +1362,19 @@ function cibleDeLaDemande(numeroSaisi: string, sansAppel: Cle): string {
 export async function inviteToCall(publicNumber: string): Promise<void> {
   const numero = cibleDeLaDemande(publicNumber, "call_no_call_to_invite")
   setState({ isGroup: true })
-  sendCallInvite(state.activeCallId as string, numero)
+  // L'invite sonne : la salle n'est plus consideree comme vide, meme si tous
+  // les autres raccrochent avant qu'il decroche. La reservation se perime au
+  // bout du temps de sonnerie, sans quoi une invitation sans reponse tiendrait
+  // l'appel ouvert indefiniment.
+  invitationsEnVol += 1
+  annulerSolitude()
+  const appel = state.activeCallId as string
+  setTimeout(() => {
+    if (state.activeCallId !== appel) return
+    if (invitationsEnVol > 0) invitationsEnVol -= 1
+    verifierSolitude()
+  }, RING_TIMEOUT_MS)
+  sendCallInvite(appel, numero)
 }
 
 /**
