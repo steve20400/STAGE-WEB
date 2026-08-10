@@ -241,6 +241,44 @@
 
 /* ---------- Actions ---------- */
 
+/* Commandes de la salle : posees au-dessus des actions, elles se manipulent
+   pendant la reunion la ou « Quitter » se decide une fois. */
+.meeting-room-root .meeting-controles {
+  grid-area: actions;
+  display: flex;
+  gap: 8px;
+  align-self: end;
+  justify-self: end;
+}
+.meeting-room-root .meeting-controle {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.meeting-room-root .meeting-controle:hover {
+  border-color: var(--border-default);
+}
+/* Coupe : l'etat se voit sans lire, comme sur un tableau de bord. */
+.meeting-room-root .meeting-controle.coupe {
+  background: var(--danger-dim);
+  border-color: var(--danger-border);
+}
+.meeting-room-root .meeting-controle.actif {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+}
+
 .meeting-room-root .meeting-actions {
   grid-area: actions;
   display: flex;

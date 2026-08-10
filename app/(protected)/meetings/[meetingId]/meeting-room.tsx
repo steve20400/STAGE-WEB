@@ -8,7 +8,12 @@ import {
   joinMeeting,
   leaveMeeting,
 } from "../../../../src/services/meetings-service"
-import { joinMeetingRoom } from "../../../../src/services/call-manager"
+import {
+  joinMeetingRoom,
+  setCallAudioOutput,
+  toggleCamera,
+  toggleMicrophone,
+} from "../../../../src/services/call-manager"
 import { useCallState } from "../../../../src/hooks/use-call"
 import { toInitials } from "../../../../src/data/session-user"
 import { useTranslation } from "../../../../src/i18n"
@@ -274,6 +279,50 @@ export default function MeetingRoomPage() {
             <span className="salle-fil-compte">{nonLus > 99 ? "99+" : nonLus}</span>
           )}
         </button>
+      )}
+
+      {/* Commandes de la salle. Elles n'existent qu'une fois dedans : proposer
+          de couper un micro qui n'est pas ouvert n'aurait aucun sens. La camera
+          n'apparait qu'en video, et la sortie audio qu'en audio — au haut-parleur
+          de toute facon des qu'il y a de l'image. */}
+      {callState.activeCallId && (
+        <div className="meeting-controles">
+          <button
+            className={`meeting-controle${callState.micOn ? "" : " coupe"}`}
+            onClick={() => toggleMicrophone()}
+            aria-pressed={!callState.micOn}
+            title={callState.micOn ? t("mute_mic") : t("unmute_mic")}
+            aria-label={callState.micOn ? t("mute_mic") : t("unmute_mic")}
+          >
+            {callState.micOn ? "🎙" : "🔇"}
+          </button>
+
+          {meeting.type === "video" && (
+            <button
+              className={`meeting-controle${callState.camOn ? "" : " coupe"}`}
+              onClick={() => toggleCamera()}
+              aria-pressed={!callState.camOn}
+              title={callState.camOn ? t("camera_off") : t("video_label")}
+              aria-label={callState.camOn ? t("camera_off") : t("video_label")}
+            >
+              {callState.camOn ? "🎥" : "🚫"}
+            </button>
+          )}
+
+          {meeting.type !== "video" && (
+            <button
+              className={`meeting-controle${callState.audioOutput === "speaker" ? " actif" : ""}`}
+              onClick={() =>
+                setCallAudioOutput(callState.audioOutput === "speaker" ? "earpiece" : "speaker")
+              }
+              aria-pressed={callState.audioOutput === "speaker"}
+              title={t("set_audio_output")}
+              aria-label={t("set_audio_output")}
+            >
+              {callState.audioOutput === "speaker" ? "🔊" : "🎧"}
+            </button>
+          )}
+        </div>
       )}
 
       <div className="meeting-actions">
