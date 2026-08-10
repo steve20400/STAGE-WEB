@@ -1,0 +1,50 @@
+/*
+ * Logotype « Alanya Work ».
+ *
+ * Un seul mot composé de deux : « Alanya » porte le nom, « Work » porte la
+ * couleur. Le second mot reprend toujours celle des deux teintes du logo qui
+ * tranche sur le fond — le vert sur les surfaces claires ou sombres, l'orange
+ * sur la barre terracotta. Le logotype fait ainsi echo au symbole pose juste a
+ * cote, au lieu d'etre un simple texte a cote d'une image.
+ *
+ * La taille et la graisse ne sont pas fixees ici : elles restent au contexte
+ * (18 px dans la barre laterale, 20 px sur l'accueil). Ce fichier ne decide que
+ * de la couleur, de l'approche et de la soudure entre les deux mots.
+ */
+.marque {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+/* Une demi-chasse plutot qu'une espace pleine : les deux mots forment un bloc. */
+.marque-second {
+  margin-left: 0.24em;
+  letter-spacing: -0.01em;
+  color: var(--marque-second);
+}
+
+/* Vert du logo, assombri sur fond creme pour rester lisible en petit corps. */
+:root,
+:root[data-theme="light"] {
+  --marque-second: #0e7a78;
+}
+
+/* Sur le chocolat, le meme vert s'enfonce : on l'eclaircit. */
+:root[data-theme="dark"] {
+  --marque-second: #3bb6b0;
+}
+
+/*
+ * Sur la barre de marque, le vert disparaitrait dans la terracotta. Le second
+ * mot prend alors l'orange du combine, eclairci pour tenir le contraste des
+ * gros caracteres, et le premier passe en blanc comme le reste de la barre.
+ */
+.marque.sur-marque {
+  color: var(--brand-text);
+}
+.marque.sur-marque .marque-second {
+  color: #ff8a4c;
+}

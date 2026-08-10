@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { ThemeToggle } from "../../../src/components/theme-toggle"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./welcome-page.css"
+import { BrandName } from "../../../src/components/brand-name"
 
 export default function WelcomePage() {
   const { t } = useTranslation()
@@ -12,9 +13,9 @@ export default function WelcomePage() {
         {/* Navbar */}
         <nav className="nav">
           <div className="nav-logo">
-            <img src={alanyaLogo} alt="Logo Alanya" className="school-logo" />
+            <img src={alanyaLogo} alt="Logo Alanya Work" className="school-logo" />
             <div className="brand-copy">
-              <span className="display-font brand-name">Alanya</span>
+              <BrandName className="display-font brand-name" />
               <span className="brand-subtitle">{t("brand_subtitle")}</span>
             </div>
           </div>

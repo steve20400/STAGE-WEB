@@ -17,6 +17,7 @@ import { useDrawerSwipe } from "../../src/hooks/use-drawer-swipe"
 import { useTranslation, type Cle } from "../../src/i18n"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./layout.css"
+import { BrandName } from "../../src/components/brand-name"
 
 // TYPES
 
@@ -244,10 +245,10 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* Logo + bouton fermeture (mobile) / repli (desktop) */}
       <div className="sb-logo">
-        <img src={alanyaLogo} alt="Logo Alanya" className="sb-school-logo" />
+        <img src={alanyaLogo} alt="Logo Alanya Work" className="sb-school-logo" />
         <div className="sb-brand-copy">
-          <span className="sb-logo-txt">Alanya</span>
-          <span className="sb-logo-subtitle">Work</span>
+          <BrandName sur="marque" className="sb-logo-txt" />
+          <span className="sb-logo-subtitle">{t("brand_subtitle")}</span>
         </div>
         {onToggleCollapse && (
           <button
@@ -423,10 +424,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             <Icons.Menu />
           </button>
           <div className="topbar-brand">
-            <img src={alanyaLogo} alt="Logo Alanya" className="topbar-school-logo" />
+            <img src={alanyaLogo} alt="Logo Alanya Work" className="topbar-school-logo" />
             <div className="topbar-brand-copy">
-              <span className="topbar-title">Alanya</span>
-              <span className="topbar-subtitle">Work</span>
+              <BrandName sur="marque" className="topbar-title" />
+              <span className="topbar-subtitle">{t("brand_subtitle")}</span>
             </div>
           </div>
           <ThemeToggle />

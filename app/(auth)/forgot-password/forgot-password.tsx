@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { useTranslation } from "../../../src/i18n"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./forgot-password-page.css"
+import { BrandName } from "../../../src/components/brand-name"
 
 function isValidIdentifier(value: string) {
   const trimmed = value.trim()
@@ -28,9 +29,9 @@ export default function ForgotPasswordPage() {
     <div className="fp-root">
       <main className="fp-card">
         <Link to="/" className="fp-brand" aria-label={t("auth_back_home")}>
-          <img src={alanyaLogo} alt="Logo Alanya" className="fp-logo" />
+          <img src={alanyaLogo} alt="Logo Alanya Work" className="fp-logo" />
           <span>
-            <strong>Alanya</strong>
+            <BrandName className="fp-brand-name" />
             <small>{t("brand_subtitle")}</small>
           </span>
         </Link>

@@ -10,6 +10,7 @@ import {
 } from "../../../src/lib/alanya-number"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./login-page.css"
+import { BrandName } from "../../../src/components/brand-name"
 
 function isNumberLikeIdentifier(value: string) {
   const compact = value.trim().replace(/\s+/g, "")
@@ -71,10 +72,10 @@ export default function LoginPage() {
     <div className="login-root">
       <div className="left-panel">
         <div className="logo">
-          <img src={alanyaLogo} alt="Logo Alanya" className="auth-school-logo" />
+          <img src={alanyaLogo} alt="Logo Alanya Work" className="auth-school-logo" />
           <div className="auth-brand-copy">
-            <span className="logo-name">Alanya</span>
-            <span className="auth-brand-subtitle">Work</span>
+            <BrandName className="logo-name" />
+            <span className="auth-brand-subtitle">{t("brand_subtitle")}</span>
           </div>
         </div>
 

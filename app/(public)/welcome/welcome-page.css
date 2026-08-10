@@ -48,9 +48,7 @@
   align-items: center;
   gap: 10px;
 }
-.nav-logo .display-font {
-  color: var(--accent);
-}
+/* La couleur du logotype lui appartient : voir brand-name.css. */
 .brand-copy {
   display: flex;
   flex-direction: column;

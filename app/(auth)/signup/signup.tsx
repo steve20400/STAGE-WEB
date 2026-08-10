@@ -5,6 +5,7 @@ import { requestRegistrationOtp } from "../../../src/services/auth-api"
 import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from "../../../src/i18n"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./signup-page.css"
+import { BrandName } from "../../../src/components/brand-name"
 
 type Step = 1 | 2 | 3
 
@@ -219,10 +220,10 @@ export default function SignUpPage() {
     <div className="si-root">
       <aside className="si-left">
         <div className="logo">
-          <img src={alanyaLogo} alt="Logo Alanya" className="auth-school-logo" />
+          <img src={alanyaLogo} alt="Logo Alanya Work" className="auth-school-logo" />
           <div className="auth-brand-copy">
-            <span className="logo-txt">Alanya</span>
-            <span className="auth-brand-subtitle">Work</span>
+            <BrandName className="logo-txt" />
+            <span className="auth-brand-subtitle">{t("brand_subtitle")}</span>
           </div>
         </div>
 

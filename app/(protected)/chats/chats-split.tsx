@@ -2,6 +2,7 @@ import { useTranslation } from "../../../src/i18n"
 import { Outlet, useMatch } from "react-router-dom"
 import ChatsPage from "./chats"
 import "./chats-split.css"
+import { BrandName } from "../../../src/components/brand-name"
 
 /**
  * Vue deux colonnes facon WhatsApp Web : la liste des discussions reste
@@ -44,7 +45,9 @@ export function ChatEmptyState() {
           <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
         </svg>
       </div>
-      <div className="chats-empty-title">Alanya Web</div>
+      <div className="chats-empty-title">
+        <BrandName />
+      </div>
       <div className="chats-empty-sub">{t("select_conversation")}</div>
     </div>
   )
