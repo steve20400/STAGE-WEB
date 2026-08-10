@@ -1305,15 +1305,21 @@ export async function joinMeetingRoom(
     error: null,
   })
 
-  // Le flux local AVANT d'annoncer son arrivee : les autres vont offrir des
-  // reception de `meeting_user_joined`, et une offre qui arrive sans micro ni
-  // camera prets se negocie sans piste.
+  // Le flux local AVANT d'annoncer son arrivee : les autres offrent des
+  // reception de `meeting_user_joined`, et une offre negociee sans piste
+  // etablit une connexion parfaitement muette.
+  //
+  // L'echec INTERROMPT l'entree, au lieu de la poursuivre avec un message
+  // d'erreur pose dans l'etat. Entrer sans micro donnait une salle ou l'on
+  // entend tout le monde sans que personne ne vous entende — et rien a l'ecran
+  // ne le disait, l'ecran de reunion n'affichant l'erreur que faute de charger
+  // la reunion. Mieux vaut ne pas entrer et le dire.
   try {
     await ensureLocalStream(type === "video")
   } catch {
-    setState({
-      error: type === "video" ? tr("call_need_mic_cam") : tr("call_need_mic"),
-    })
+    salleReunion = null
+    clearCall(false)
+    throw new Error(type === "video" ? tr("call_need_mic_cam") : tr("call_need_mic"))
   }
 
   desabonnementSalle?.()
