@@ -132,6 +132,23 @@
   object-fit: cover;
 }
 /* Presence : une pastille sur le rond, lisible sans lire. */
+/* La main se pose en haut du rond, la ou l'oeil ne la confond pas avec la
+   pastille de presence, en bas. */
+.meeting-room-root .participant-main {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--warning, #c04d29);
+  font-size: 11px;
+  line-height: 1;
+  border: 2px solid var(--bg-elevated);
+}
 .meeting-room-root .participant-pastille {
   position: absolute;
   right: 1px;

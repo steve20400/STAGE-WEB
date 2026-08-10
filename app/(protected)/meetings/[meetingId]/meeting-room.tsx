@@ -15,7 +15,11 @@ import {
   toggleMicrophone,
 } from "../../../../src/services/call-manager"
 import { useCallState } from "../../../../src/hooks/use-call"
-import { toInitials } from "../../../../src/data/session-user"
+import { getMyUserId, toInitials } from "../../../../src/data/session-user"
+import {
+  sendMeetingHand,
+  subscribeToMeetingEvents,
+} from "../../../../src/services/websocket-service"
 import { useTranslation } from "../../../../src/i18n"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
 import type { Reunion } from "../../../../src/services/meetings-service"
@@ -52,6 +56,8 @@ export default function MeetingRoomPage() {
    */
   const etroit = useEcranEtroit()
   const [filOuvert, setFilOuvert] = useState(false)
+  /** Identifiants dont la main est levee, tels que le serveur les diffuse. */
+  const [mainsLevees, setMainsLevees] = useState<Set<string>>(new Set())
   const [nonLus, setNonLus] = useState(0)
 
   // Ouvrir le fil solde ce qui a ete rate pendant qu'il etait ferme.
@@ -93,6 +99,25 @@ export default function MeetingRoomPage() {
       showError(t("error"), err instanceof Error ? err.message : t("meet_join_failed"))
     }
   }
+
+  // Les mains viennent du serveur, jamais d'un etat local : sans quoi chacun
+  // verrait la sienne levee et pas celle des autres.
+  useEffect(() => {
+    return subscribeToMeetingEvents((event) => {
+      if (event.type !== "meeting_hand") return
+      if (Number(event.meetingId) !== Number(meetingId)) return
+      const id = String(event.fromUserId ?? "")
+      if (!id) return
+      setMainsLevees((precedentes) => {
+        const suivantes = new Set(precedentes)
+        if (event.levee === true) suivantes.add(id)
+        else suivantes.delete(id)
+        return suivantes
+      })
+    })
+  }, [meetingId])
+
+  const maMain = mainsLevees.has(getMyUserId() ?? "")
 
   const handleExclure = async (participantId: string, nom: string) => {
     if (!meetingId || !confirm(t("meet_exclude_confirm", { name: nom }))) return
@@ -180,6 +205,11 @@ export default function MeetingRoomPage() {
                       <span>{toInitials(p.nom)}</span>
                     )}
                     {p.connecte && <span className="participant-pastille" aria-hidden="true" />}
+                    {mainsLevees.has(p.id) && (
+                      <span className="participant-main" title={t("meet_raise_hand")}>
+                        ✋
+                      </span>
+                    )}
                   </div>
                   <div className="participant-ligne">
                     <div className="participant-name">{p.nom}</div>
@@ -308,6 +338,16 @@ export default function MeetingRoomPage() {
               {callState.camOn ? "🎥" : "🚫"}
             </button>
           )}
+
+          <button
+            className={`meeting-controle${maMain ? " actif" : ""}`}
+            onClick={() => sendMeetingHand(Number(meetingId), !maMain)}
+            aria-pressed={maMain}
+            title={t("meet_raise_hand")}
+            aria-label={t("meet_raise_hand")}
+          >
+            ✋
+          </button>
 
           {meeting.type !== "video" && (
             <button

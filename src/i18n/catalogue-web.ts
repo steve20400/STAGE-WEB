@@ -717,12 +717,14 @@ export const WEB_TRANSLATION_KEYS = [
   "meet_exclude_confirm",
   "meet_excluded",
   "meet_exclude_failed",
+  "meet_raise_hand",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    meet_raise_hand: "Lever la main",
     meet_exclude: "Exclure de la réunion",
     meet_exclude_confirm: "Exclure {name} de la réunion ?",
     meet_excluded: "{name} a été exclu de la réunion",
@@ -1457,6 +1459,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nom (A-Z)",
   },
   en: {
+    meet_raise_hand: "Raise hand",
     meet_exclude: "Remove from the meeting",
     meet_exclude_confirm: "Remove {name} from the meeting?",
     meet_excluded: "{name} was removed from the meeting",
@@ -2185,6 +2188,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   es: {
+    meet_raise_hand: "Levantar la mano",
     meet_exclude: "Expulsar de la reunión",
     meet_exclude_confirm: "¿Expulsar a {name} de la reunión?",
     meet_excluded: "{name} ha sido expulsado de la reunión",
@@ -2917,6 +2921,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nombre (A-Z)",
   },
   de: {
+    meet_raise_hand: "Hand heben",
     meet_exclude: "Aus der Besprechung entfernen",
     meet_exclude_confirm: "{name} aus der Besprechung entfernen?",
     meet_excluded: "{name} wurde aus der Besprechung entfernt",
@@ -3657,6 +3662,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Name (A-Z)",
   },
   pt: {
+    meet_raise_hand: "Levantar a mão",
     meet_exclude: "Remover da reunião",
     meet_exclude_confirm: "Remover {name} da reunião?",
     meet_excluded: "{name} foi removido da reunião",
@@ -4389,6 +4395,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Nome (A-Z)",
   },
   ru: {
+    meet_raise_hand: "Поднять руку",
     meet_exclude: "Исключить из встречи",
     meet_exclude_confirm: "Исключить {name} из встречи?",
     meet_excluded: "{name} исключён из встречи",
@@ -5115,6 +5122,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Имя (А-Я)",
   },
   zh: {
+    meet_raise_hand: "举手",
     meet_exclude: "移出会议",
     meet_exclude_confirm: "要将 {name} 移出会议吗？",
     meet_excluded: "{name} 已被移出会议",
@@ -5828,6 +5836,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "名称 (A-Z)",
   },
   sv: {
+    meet_raise_hand: "Räck upp handen",
     meet_exclude: "Ta bort från mötet",
     meet_exclude_confirm: "Ta bort {name} från mötet?",
     meet_excluded: "{name} togs bort från mötet",
@@ -6557,6 +6566,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     sort_name: "Namn (A-Ö)",
   },
   no: {
+    meet_raise_hand: "Rekk opp hånden",
     meet_exclude: "Fjern fra møtet",
     meet_exclude_confirm: "Fjerne {name} fra møtet?",
     meet_excluded: "{name} ble fjernet fra møtet",

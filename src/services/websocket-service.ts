@@ -576,6 +576,7 @@ const MEETING_EVENT_TYPES = new Set([
   "meeting_user_joined",
   "meeting_extended",
   "meeting_message",
+  "meeting_hand",
 ])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
@@ -637,6 +638,18 @@ export function sendMeetingLeave(meetingId: number) {
  */
 export function sendMeetingExtend(meetingId: number, dureeSecondes: number) {
   sendRaw({ type: "meeting_extend", meetingId, duree: dureeSecondes })
+}
+
+/**
+ * Leve ou baisse la main.
+ *
+ * Rien n'est affiche localement en attendant : le serveur renvoie l'etat a
+ * l'auteur comme aux autres, donc tout le monde voit la meme main au meme
+ * moment. L'etat n'est pas conserve — qui arrive ensuite ne voit pas les mains
+ * deja levees.
+ */
+export function sendMeetingHand(meetingId: number, levee: boolean) {
+  sendRaw({ type: "meeting_hand", meetingId, levee })
 }
 
 /**
