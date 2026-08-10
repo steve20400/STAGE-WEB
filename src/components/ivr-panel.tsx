@@ -1,7 +1,11 @@
-import { sendIvrChoice, type IvrOption, type IvrSession } from "../services/call-manager"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { sendIvrChoice, type IvrSession } from "../services/call-manager"
+
+/** Delai au-dela duquel un appui devient un appui MAINTENU (revelation). */
+const DELAI_APPUI_LONG_MS = 450
 
 /**
- * Menu d'un standard telephonique, affiche DANS l'ecran d'appel.
+ * Pave numerique d'un standard telephonique, affiche DANS l'ecran d'appel.
  *
  * ```
  * menu ──(appui)──► envoi ──(ivr_hold)──► attente ──(decrochage)──► appel
@@ -9,24 +13,90 @@ import { sendIvrChoice, type IvrOption, type IvrSession } from "../services/call
  *   └──(erreur avec retour possible)──┘
  * ```
  *
- * L'etat « appel » n'apparait pas ici : quand l'agent decroche, la session
- * disparait du gestionnaire d'appels et ce panneau avec elle. L'ecran qui le
- * portait etait deja affiche — il n'y a rien a ouvrir, rien a preparer.
+ * ⚠️ POURQUOI UN PAVE ET NON LA LISTE DES SERVICES.
  *
- * Styles en ligne, sur les variables de theme deja utilisees par l'ecran
- * d'appel : le panneau vit le temps d'un menu, il ne merite pas d'entree
- * permanente dans la feuille de styles.
+ * La premiere version affichait les options en liste. C'etait plus lisible,
+ * mais cela liait la FORME de l'ecran au CONTENU du menu : un standard a
+ * sous-menus, une invite demandant un numero de dossier, ou simplement un menu
+ * plus long auraient demande de retoucher le client a chaque evolution d'un
+ * vocal. Un pave numerique ne depend de rien : dix touches, quel que soit le
+ * standard appele.
+ *
+ * Le libelle n'est pas perdu : **maintenir une touche l'affiche**, juste
+ * au-dessus du pave. Miroir exact du client mobile.
  */
 export function IvrPanel({ session }: { session: IvrSession }) {
+  const [maintenue, setMaintenue] = useState<number | null>(null)
+  const minuteur = useRef<number | null>(null)
+  /** L'appui a-t-il DEJA revele ? Si oui, le relachement n'envoie pas. */
+  const aRevele = useRef(false)
+
+  // Un composant demonte pendant un appui laisserait son minuteur courir et
+  // appellerait `setMaintenue` sur un composant disparu.
+  useEffect(() => {
+    return () => {
+      if (minuteur.current !== null) window.clearTimeout(minuteur.current)
+    }
+  }, [])
+
+  const optionPour = useCallback(
+    (digit: number) => session.options.find((o) => o.digit === digit) ?? null,
+    [session.options]
+  )
+
+  const arreteMinuteur = () => {
+    if (minuteur.current !== null) {
+      window.clearTimeout(minuteur.current)
+      minuteur.current = null
+    }
+  }
+
+  const debutAppui = (digit: number) => {
+    aRevele.current = false
+    arreteMinuteur()
+    minuteur.current = window.setTimeout(() => {
+      aRevele.current = true
+      setMaintenue(digit)
+    }, DELAI_APPUI_LONG_MS)
+  }
+
+  /** Relachement SUR la touche : c'est le seul cas qui envoie. */
+  const finAppui = (digit: number) => {
+    arreteMinuteur()
+    setMaintenue(null)
+    // L'appui long REVELE, il n'envoie pas — sinon consulter un libelle
+    // declencherait l'appel d'un agent.
+    if (!aRevele.current && !session.envoiEnCours) sendIvrChoice(digit)
+    aRevele.current = false
+  }
+
+  /** Doigt ou souris parti ailleurs : on annule, sans rien envoyer. */
+  const annuleAppui = () => {
+    arreteMinuteur()
+    setMaintenue(null)
+    aRevele.current = false
+  }
+
   if (session.step === "attente") return <IvrAttente session={session} />
 
+  const optionRevelee = maintenue === null ? null : optionPour(maintenue)
+  let titre: string | null = null
+  let sous: string | null = null
+  if (maintenue !== null) {
+    if (!optionRevelee) titre = "Aucun service sur cette touche"
+    else {
+      titre = optionRevelee.label
+      if (!optionRevelee.disponible) sous = "Bientôt disponible"
+    }
+  }
+
   return (
-    <div style={{ width: "100%", maxWidth: 420, margin: "18px auto 0" }}>
+    <div style={{ width: "100%", maxWidth: 320, margin: "16px auto 0" }}>
       {session.message && (
         <div
           style={{
             padding: "10px 14px",
-            marginBottom: 14,
+            marginBottom: 12,
             borderRadius: 12,
             background: "color-mix(in srgb, var(--danger) 14%, transparent)",
             color: "var(--danger)",
@@ -38,78 +108,138 @@ export function IvrPanel({ session }: { session: IvrSession }) {
         </div>
       )}
 
-      {session.options.length === 0 ? (
-        <div style={{ opacity: 0.7, fontSize: 14, textAlign: "center" }}>
-          Aucun service disponible.
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {session.options.map((option) => (
-            <IvrTouche key={option.digit} option={option} verrouille={session.envoiEnCours} />
-          ))}
-        </div>
-      )}
+      {/* Hauteur FIXE : sans elle, le pave sauterait a chaque appui maintenu et
+          la touche glisserait sous le doigt. */}
+      <div
+        style={{
+          height: 46,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: titre ? 1 : 0,
+          transition: "opacity 120ms",
+        }}
+      >
+        {titre && (
+          <div
+            style={{
+              padding: "6px 16px",
+              borderRadius: 20,
+              textAlign: "center",
+              background: "color-mix(in srgb, var(--text) 14%, transparent)",
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{titre}</div>
+            {sous && <div style={{ fontSize: 11, opacity: 0.65 }}>{sous}</div>}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 12,
+          marginTop: 8,
+        }}
+      >
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
+          <IvrTouche
+            key={d}
+            digit={d}
+            option={optionPour(d)}
+            maintenue={maintenue === d}
+            verrouille={session.envoiEnCours}
+            onDebut={debutAppui}
+            onFin={finAppui}
+            onAnnule={annuleAppui}
+          />
+        ))}
+        <span />
+        <IvrTouche
+          digit={0}
+          option={optionPour(0)}
+          maintenue={maintenue === 0}
+          verrouille={session.envoiEnCours}
+          onDebut={debutAppui}
+          onFin={finAppui}
+          onAnnule={annuleAppui}
+        />
+        <span />
+      </div>
 
       <div style={{ marginTop: 12, fontSize: 12, opacity: 0.6, textAlign: "center" }}>
-        {session.envoiEnCours ? "Envoi de votre choix…" : "Choisissez un service"}
+        {session.envoiEnCours
+          ? "Envoi de votre choix…"
+          : "Maintenez une touche pour voir le service"}
       </div>
     </div>
   )
 }
 
-/**
- * Une touche du menu.
- *
- * Une option indisponible reste CLIQUABLE, et c'est delibere : l'invite vocale
- * vient de l'annoncer, la desactiver laisserait l'appelant sans explication. Le
- * serveur, lui, repond precisement pourquoi — et c'est lui qui fait autorite,
- * pas ce qu'on devinerait ici.
- */
-function IvrTouche({ option, verrouille }: { option: IvrOption; verrouille: boolean }) {
-  const grise = !option.disponible
+function IvrTouche({
+  digit,
+  option,
+  maintenue,
+  verrouille,
+  onDebut,
+  onFin,
+  onAnnule,
+}: {
+  digit: number
+  option: { disponible: boolean } | null
+  maintenue: boolean
+  verrouille: boolean
+  onDebut: (digit: number) => void
+  onFin: (digit: number) => void
+  onAnnule: () => void
+}) {
   return (
     <button
       type="button"
-      // Verrouille pendant l'envoi : sur un reseau lent l'utilisateur insiste, et
-      // deux appuis feraient sonner deux agents pour une seule intention.
-      disabled={verrouille}
-      onClick={() => sendIvrChoice(option.digit)}
+      onPointerDown={() => onDebut(digit)}
+      onPointerUp={() => onFin(digit)}
+      onPointerLeave={onAnnule}
+      onPointerCancel={onAnnule}
+      // Sur mobile, un appui maintenu ouvre le menu contextuel du navigateur et
+      // selectionne le texte : les deux passeraient par-dessus la revelation.
+      onContextMenu={(e) => e.preventDefault()}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        width: "100%",
-        padding: "12px 14px",
-        borderRadius: 14,
+        position: "relative",
+        aspectRatio: "1.7",
         border: "none",
-        textAlign: "left",
+        borderRadius: 16,
         cursor: verrouille ? "default" : "pointer",
-        background: "color-mix(in srgb, var(--text) 10%, transparent)",
-        color: "inherit",
-        opacity: grise ? 0.55 : 1,
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        touchAction: "manipulation",
+        fontSize: 24,
+        fontWeight: 600,
+        color: verrouille ? "color-mix(in srgb, var(--text) 40%, transparent)" : "inherit",
+        background: `color-mix(in srgb, var(--text) ${maintenue ? 26 : 12}%, transparent)`,
+        transition: "background 120ms",
       }}
     >
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 38,
-          height: 38,
-          borderRadius: "50%",
-          flex: "0 0 auto",
-          fontSize: 18,
-          fontWeight: 700,
-          color: "#fff",
-          background: grise ? "color-mix(in srgb, var(--text) 25%, transparent)" : "var(--accent)",
-        }}
-      >
-        {option.digit}
-      </span>
-      <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <span style={{ fontSize: 15 }}>{option.label}</span>
-        {grise && <span style={{ fontSize: 11, opacity: 0.7 }}>Bientôt disponible</span>}
-      </span>
+      {digit}
+      {/* Repere discret sur les touches qui menent quelque part. Il ne dit PAS
+          quoi — c'est l'appui maintenu qui le dit — mais il evite d'essayer les
+          dix touches une a une pour trouver les trois qui servent. */}
+      {option && (
+        <span
+          style={{
+            position: "absolute",
+            bottom: 8,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 5,
+            height: 5,
+            borderRadius: "50%",
+            background: option.disponible
+              ? "var(--accent)"
+              : "color-mix(in srgb, var(--text) 35%, transparent)",
+          }}
+        />
+      )}
     </button>
   )
 }
