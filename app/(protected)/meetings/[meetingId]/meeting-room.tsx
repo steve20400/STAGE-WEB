@@ -5,7 +5,7 @@ import { fetchMeeting, joinMeeting, leaveMeeting } from "../../../../src/service
 import { startMeetingCall } from "../../../../src/services/call-manager"
 import { useCallState } from "../../../../src/hooks/use-call"
 import { useTranslation } from "../../../../src/i18n"
-import type { Meeting } from "../../../../src/services/meetings-service"
+import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
 export default function MeetingRoomPage() {
@@ -15,7 +15,7 @@ export default function MeetingRoomPage() {
   const { success, error: showError } = useToast()
   const callState = useCallState()
 
-  const [meeting, setMeeting] = useState<Meeting | null>(null)
+  const [meeting, setMeeting] = useState<Reunion | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -46,13 +46,8 @@ export default function MeetingRoomPage() {
       await joinMeeting(parseInt(meetingId, 10))
       success(t("meet_joined"))
 
-      const participantIds = meeting.participants?.map((p) => p.userId) || []
-      await startMeetingCall(
-        parseInt(meetingId, 10),
-        participantIds,
-        meeting.type_media === 2 ? "video" : "audio",
-        meeting.objet
-      )
+      const participantIds = meeting.participants.map((p) => p.id)
+      await startMeetingCall(parseInt(meetingId, 10), participantIds, meeting.type, meeting.objet)
     } catch (err) {
       showError(t("error"), err instanceof Error ? err.message : t("meet_join_failed"))
     }
@@ -100,16 +95,16 @@ export default function MeetingRoomPage() {
 
       <div className="meeting-info">
         <p>
-          {t("meet_type")} : {meeting.type_media === 2 ? t("video_label") : t("cinfo_audio")}
+          {t("meet_type")} : {meeting.type === "video" ? t("video_label") : t("cinfo_audio")}
         </p>
-        <p>{t("meet_duration_minutes", { n: Math.floor((meeting.duree || 3600) / 60) })}</p>
-        {meeting.participants && meeting.participants.length > 0 && (
+        <p>{t("meet_duration_minutes", { n: Math.floor(meeting.dureeSecondes / 60) })}</p>
+        {meeting.participants.length > 0 && (
           <>
             <p>{t("meet_participants", { count: meeting.participants.length })}</p>
             <div className="participants-grid">
               {meeting.participants.map((p) => (
-                <div key={p.userId} className="participant-box">
-                  <div className="participant-name">{p.displayName}</div>
+                <div key={p.id} className="participant-box">
+                  <div className="participant-name">{p.nom}</div>
                   <div className={`participant-status ${p.connecte ? "connected" : "pending"}`}>
                     {p.connecte ? t("meet_connected") : t("meet_pending")}
                   </div>

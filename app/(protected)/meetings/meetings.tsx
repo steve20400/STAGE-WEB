@@ -8,12 +8,22 @@ import {
   declineMeeting,
   endMeeting,
   deleteMeeting,
-  type Meeting,
+  type Reunion,
 } from "../../../src/services/meetings-service"
+import { getMyUserId } from "../../../src/data/session-user"
 import { CreateMeetingModal } from "./create-meeting-modal"
 import "./meetings.css"
 
 type MeetingTab = "ongoing" | "upcoming" | "ended"
+
+/**
+ * Une reunion sans heure de debut a demarre a sa creation : le serveur pose
+ * l'instant courant quand le champ manque. La traiter comme « pas encore
+ * commencee » la faisait disparaitre des trois onglets a la fois.
+ */
+function aCommence(reunion: Reunion, maintenant: number): boolean {
+  return !reunion.debut || new Date(reunion.debut).getTime() <= maintenant
+}
 
 export default function MeetingsPage() {
   const { t, language } = useTranslation()
@@ -21,7 +31,7 @@ export default function MeetingsPage() {
   const { success, error: showError } = useToast()
 
   const [tab, setTab] = useState<MeetingTab>("ongoing")
-  const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [meetings, setMeetings] = useState<Reunion[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -32,19 +42,16 @@ export default function MeetingsPage() {
   // Filtrer les réunions par onglet
   const filteredMeetings = useMemo(() => {
     return meetings.filter((m) => {
-      const isEnded = m.isEnd === 1
-      if (tab === "ended") return isEnded
-      if (tab === "ongoing")
-        return !isEnded && m.startTime && new Date(m.startTime).getTime() <= now
-      if (tab === "upcoming")
-        return !isEnded && m.startTime && new Date(m.startTime).getTime() > now
+      if (tab === "ended") return m.terminee
+      if (tab === "ongoing") return !m.terminee && aCommence(m, now)
+      if (tab === "upcoming") return !m.terminee && !aCommence(m, now)
       return false
     })
   }, [meetings, tab, now])
 
   const loadMeetings = useCallback(async () => {
     try {
-      const data = await fetchMeetings()
+      const data = await fetchMeetings(getMyUserId() ?? undefined)
       setMeetings(data)
       setError("")
     } catch (err) {
@@ -109,15 +116,10 @@ export default function MeetingsPage() {
   // `onglet` et non `t` : le parametre masquait la fonction de traduction, et
   // aucun libelle de cette portee n'aurait pu suivre la langue choisie.
   const getBadgeCount = (onglet: MeetingTab) => {
-    if (onglet === "ongoing")
-      return meetings.filter(
-        (m) => !m.isEnd && m.startTime && new Date(m.startTime).getTime() <= now
-      ).length
+    if (onglet === "ongoing") return meetings.filter((m) => !m.terminee && aCommence(m, now)).length
     if (onglet === "upcoming")
-      return meetings.filter(
-        (m) => !m.isEnd && m.startTime && new Date(m.startTime).getTime() > now
-      ).length
-    return meetings.filter((m) => m.isEnd === 1).length
+      return meetings.filter((m) => !m.terminee && !aCommence(m, now)).length
+    return meetings.filter((m) => m.terminee).length
   }
 
   return (
@@ -177,21 +179,19 @@ export default function MeetingsPage() {
             <div key={meeting.id} className="meeting-card">
               <div className="meeting-head">
                 <div className="meeting-title">{meeting.objet}</div>
-                {meeting.isEnd === 1 && (
-                  <span className="meeting-ended">{t("meet_tab_ended")}</span>
-                )}
+                {meeting.terminee && <span className="meeting-ended">{t("meet_tab_ended")}</span>}
               </div>
               <div className="meeting-info">
                 <span className="meeting-type">
-                  {meeting.type_media === 1 ? t("cinfo_audio") : t("video_label")}
+                  {meeting.type === "audio" ? t("cinfo_audio") : t("video_label")}
                 </span>
                 <span className="meeting-time">
                   {/* La date se lit : elle suit la langue choisie, pas un fr-FR fige. */}
-                  {meeting.startTime ? new Date(meeting.startTime).toLocaleString(language) : "-"}
+                  {meeting.debut ? new Date(meeting.debut).toLocaleString(language) : "-"}
                 </span>
               </div>
               <div className="meeting-actions">
-                {meeting.isEnd !== 1 && (
+                {!meeting.terminee && (
                   <>
                     <button className="btn-primary" onClick={() => void handleJoin(meeting.id)}>
                       {t("meet_join")}
@@ -204,7 +204,7 @@ export default function MeetingsPage() {
                     </button>
                   </>
                 )}
-                {meeting.isEnd === 1 && (
+                {meeting.terminee && (
                   <button className="btn-danger" onClick={() => void handleDelete(meeting.id)}>
                     {t("delete")}
                   </button>

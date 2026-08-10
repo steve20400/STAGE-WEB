@@ -1,83 +1,202 @@
 import { apiRequest } from "../lib/api-client"
+import { resolveMediaUrl } from "./media-service"
 
-export interface Meeting {
+/**
+ * Reunions audio/video.
+ *
+ * Le backend parle son vocabulaire de base de donnees — `idMeeting`,
+ * `IDparticipant`, `type_media`, `isEnd`, `status` numerique. Ce module le
+ * traduit une fois pour toutes en un modele lisible, et les ecrans ne voient
+ * plus que celui-la.
+ *
+ * Ce n'est pas une coquetterie : le front lisait auparavant `meeting.id` et
+ * `participant.userId`, deux champs que le serveur n'envoie pas. La liste
+ * s'affichait donc, mais chaque reunion menait a /meetings/undefined et les
+ * participants apparaissaient sans nom. Un modele explicite rend ce genre
+ * d'ecart impossible a ignorer : il se voit a la compilation.
+ */
+
+/** 0 = invite, 1 = accepte, 2 = decline. */
+export type StatutParticipant = "invite" | "accepte" | "decline"
+
+export interface Personne {
+  id: string
+  nom: string
+  numero: string
+  avatarUrl: string | null
+}
+
+export interface ParticipantReunion extends Personne {
+  statut: StatutParticipant
+  /** Present dans la salle a l'instant. */
+  connecte: boolean
+  /** Arrivee dans la salle, si la personne y est deja entree. */
+  entreeA: string | null
+  /** Temps passe dans la salle, en secondes. */
+  dureeSecondes: number | null
+}
+
+export interface Reunion {
   id: number
-  idMeeting?: number
   objet: string
-  type_media: number
-  duree: number
-  start_time?: string
-  room?: string
-  isEnd?: number
+  type: "audio" | "video"
+  /** Identifiant de salle cote serveur, porte par l'appel. */
+  salle: string | null
+  terminee: boolean
+  /** Debut prevu. */
+  debut: string | null
+  /** Duree prevue, en secondes. */
+  dureeSecondes: number
+  organisateur: Personne
+  participants: ParticipantReunion[]
+  /** Vrai si le compte courant a cree la reunion : lui seul peut la terminer. */
+  jeSuisOrganisateur: boolean
+}
+
+/* ----------------- Traduction du vocabulaire serveur ----------------- */
+
+interface PersonneBrute {
+  id?: string
+  IDparticipant?: string
+  pseudo?: string
+  publicNumber?: string
+  avatarUrl?: string | null
+  status?: number
   connecte?: number
-  startTime?: string
-  organizerPseudo?: string
-  organizerId?: string
-  participants?: Array<{
-    userId: string
-    displayName: string
-    connecte?: number
-    start_time?: string
-    duree?: number
-  }>
+  start_time?: string | null
+  duree?: number | null
 }
 
-export interface CreateMeetingRequest {
+interface ReunionBrute {
+  idMeeting: number
   objet: string
   type_media: number
+  room?: string | null
+  isEnd?: number
+  start_time?: string | null
   duree?: number
-  participantNumbers?: string[]
-  start_time?: string
-  room?: string
+  organiser?: PersonneBrute
+  participants?: PersonneBrute[]
+  isOrganiser?: boolean
 }
 
-export async function fetchMeetings(): Promise<Meeting[]> {
-  const res = await apiRequest<{ meetings?: Meeting[] }>("/api/meetings")
-  return (res.meetings || []) as Meeting[]
-}
+const STATUTS: Record<number, StatutParticipant> = { 0: "invite", 1: "accepte", 2: "decline" }
 
-export async function fetchMeeting(id: number): Promise<Meeting> {
-  const res = await apiRequest<Meeting>(`/api/meetings/${id}`)
-  return res
-}
-
-export async function createMeeting(data: CreateMeetingRequest): Promise<{ id: number; idMeeting?: number }> {
-  const body: Record<string, unknown> = {
-    objet: data.objet,
-    type_media: data.type_media,
-    duree: data.duree ?? 3600,
+function versPersonne(brut: PersonneBrute | undefined): Personne {
+  return {
+    id: brut?.id ?? brut?.IDparticipant ?? "",
+    nom: brut?.pseudo ?? brut?.publicNumber ?? "",
+    numero: brut?.publicNumber ?? "",
+    avatarUrl: brut?.avatarUrl ? resolveMediaUrl(brut.avatarUrl) : null,
   }
-  if (data.participantNumbers?.length) {
-    body.participantNumbers = data.participantNumbers
-  }
-  if (data.start_time) body.start_time = data.start_time
-  if (data.room) body.room = data.room
+}
 
+function versParticipant(brut: PersonneBrute): ParticipantReunion {
+  return {
+    ...versPersonne(brut),
+    statut: STATUTS[brut.status ?? 0] ?? "invite",
+    connecte: brut.connecte === 1,
+    entreeA: brut.start_time ?? null,
+    dureeSecondes: brut.duree ?? null,
+  }
+}
+
+function versReunion(brut: ReunionBrute, monId?: string): Reunion {
+  const organisateur = versPersonne(brut.organiser)
+  return {
+    id: brut.idMeeting,
+    objet: brut.objet,
+    // Le serveur code 1 pour l'audio et 2 pour la video.
+    type: brut.type_media === 2 ? "video" : "audio",
+    salle: brut.room ?? null,
+    terminee: brut.isEnd === 1,
+    debut: brut.start_time ?? null,
+    dureeSecondes: brut.duree ?? 3600,
+    organisateur,
+    participants: (brut.participants ?? []).map(versParticipant),
+    // La liste ne porte pas isOrganiser : on le deduit alors de l'organisateur.
+    jeSuisOrganisateur: brut.isOrganiser ?? (monId ? organisateur.id === monId : false),
+  }
+}
+
+/* ----------------- Lecture ----------------- */
+
+/** GET /api/meetings — reunions organisees par le compte ou auxquelles il est convie. */
+export async function fetchMeetings(monId?: string): Promise<Reunion[]> {
+  const res = await apiRequest<{ meetings?: ReunionBrute[] }>("/api/meetings")
+  return (res.meetings ?? []).map((m) => versReunion(m, monId))
+}
+
+/** GET /api/meetings/:id — detail, avec la liste complete des participants. */
+export async function fetchMeeting(id: number): Promise<Reunion> {
+  const res = await apiRequest<ReunionBrute>(`/api/meetings/${id}`)
+  return versReunion(res)
+}
+
+/* ----------------- Ecriture ----------------- */
+
+export interface NouvelleReunion {
+  objet: string
+  type: "audio" | "video"
+  /** Duree prevue, en secondes. */
+  dureeSecondes: number
+  /** Numeros Alanya des invites. Le serveur refuse la creation si l'un est inconnu. */
+  numerosInvites?: string[]
+  /** Debut prevu, au format ISO. Le serveur prend l'instant present s'il manque. */
+  debut?: string
+}
+
+/** POST /api/meetings — cree la reunion et invite les participants. */
+export async function createMeeting(donnees: NouvelleReunion): Promise<number> {
   const res = await apiRequest<{ idMeeting?: number; id?: number }>("/api/meetings", {
     method: "POST",
-    body,
+    body: {
+      objet: donnees.objet,
+      type_media: donnees.type === "video" ? 2 : 1,
+      duree: donnees.dureeSecondes,
+      ...(donnees.debut ? { start_time: donnees.debut } : {}),
+      ...(donnees.numerosInvites?.length ? { participantNumbers: donnees.numerosInvites } : {}),
+    },
   })
-  const id = (res.idMeeting ?? res.id) as number
-  if (!id) throw new Error("Backend did not return meeting ID")
-  return { id, idMeeting: res.idMeeting }
+  const id = res.idMeeting ?? res.id
+  if (!id) throw new Error("Le serveur n'a pas renvoye d'identifiant de reunion.")
+  return id
 }
 
+/**
+ * POST /api/meetings/:id/participants — convie d'autres personnes en cours de route.
+ *
+ * Reserve a l'organisateur cote serveur ; l'ecran ne propose donc le bouton
+ * qu'a lui, plutot que de laisser les autres decouvrir un refus.
+ */
+export async function inviterAReunion(id: number, numeros: string[]): Promise<void> {
+  await apiRequest(`/api/meetings/${id}/participants`, {
+    method: "POST",
+    body: { participantNumbers: numeros },
+  })
+}
+
+/** POST /api/meetings/:id/join — entre dans la salle (status accepte, connecte). */
 export async function joinMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/join`, { method: "POST", body: {} })
 }
 
+/** POST /api/meetings/:id/leave — quitte la salle sans la fermer. */
 export async function leaveMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/leave`, { method: "POST", body: {} })
 }
 
+/** POST /api/meetings/:id/decline — refuse l'invitation. */
 export async function declineMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/decline`, { method: "POST", body: {} })
 }
 
+/** POST /api/meetings/:id/end — ferme la reunion pour tout le monde. Organisateur seul. */
 export async function endMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/end`, { method: "POST", body: {} })
 }
 
+/** DELETE /api/meetings/:id/delete — efface la reunion terminee. */
 export async function deleteMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/delete`, { method: "DELETE" })
 }

@@ -48,14 +48,13 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
 
     setLoading(true)
     try {
-      const participantNumbers = Array.from(selectedParticipants)
+      const numeros = Array.from(selectedParticipants)
       await createMeeting({
         objet: objet.trim(),
-        type_media: typeMedia,
-        duree: parseInt(duree, 10) || 3600,
-        start_time: startTime,
-        ...(endTime && { end_time: endTime }),
-        participantNumbers: participantNumbers.length > 0 ? participantNumbers : undefined,
+        type: typeMedia === 2 ? "video" : "audio",
+        dureeSecondes: parseInt(duree, 10) || 3600,
+        debut: startTime,
+        numerosInvites: numeros.length > 0 ? numeros : undefined,
       })
       success(t("meet_created"))
       setObjet("")
