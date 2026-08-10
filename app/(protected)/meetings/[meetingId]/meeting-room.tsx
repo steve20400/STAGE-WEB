@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
 import { fetchMeeting, joinMeeting, leaveMeeting } from "../../../../src/services/meetings-service"
-import { startMeetingCall } from "../../../../src/services/call-manager"
+import { joinMeetingRoom } from "../../../../src/services/call-manager"
 import { useCallState } from "../../../../src/hooks/use-call"
 import { useTranslation } from "../../../../src/i18n"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
@@ -47,8 +47,9 @@ export default function MeetingRoomPage() {
       await joinMeeting(parseInt(meetingId, 10))
       success(t("meet_joined"))
 
-      const participantIds = meeting.participants.map((p) => p.id)
-      await startMeetingCall(parseInt(meetingId, 10), participantIds, meeting.type, meeting.objet)
+      // Le salon annonce lui-meme qui est deja la : inutile de lui passer la
+      // liste des invites, qui ne dit pas qui est present.
+      await joinMeetingRoom(parseInt(meetingId, 10), meeting.type, meeting.objet)
     } catch (err) {
       showError(t("error"), err instanceof Error ? err.message : t("meet_join_failed"))
     }

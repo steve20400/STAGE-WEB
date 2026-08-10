@@ -22,6 +22,8 @@ import {
   subscribeToCallEvents,
   subscribeToMeetingEvents,
   sendMeetingSignal,
+  sendMeetingJoin,
+  sendMeetingLeave,
   type CallServerEvent,
 } from "./websocket-service"
 import { isValidAlanyaNumber, normalizeAlanyaNumber } from "../lib/alanya-number"
@@ -589,6 +591,19 @@ let salleAEteHabitee = false
 /** Un depart peut en preceder une arrivee de quelques centaines de millisecondes. */
 const SOLITUDE_MS = 2000
 let solitudeTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Reunion en cours, ou null pour un appel ordinaire.
+ *
+ * Le maillage WebRTC est le meme dans les deux cas — memes sessions, meme
+ * negociation — mais les trames de signalisation NE LE SONT PAS : le serveur
+ * tient un salon separe pour les reunions, avec son propre vocabulaire. Router
+ * les offres d'une reunion dans les trames d'appel les envoyait dans un salon
+ * que personne n'habitait : web et mobile pouvaient rejoindre la meme reunion
+ * sans jamais se voir.
+ */
+let salleReunion: number | null = null
+let desabonnementSalle: (() => void) | null = null
 // callId -> (userId -> signaux recus avant que la session soit prete)
 const signalBuffer = new Map<string, Map<string, WebrtcSignal[]>>()
 let localStream: MediaStream | null = null
@@ -699,7 +714,10 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
     asOfferer,
     stream,
     iceServers,
-    (signal) => sendCallSignal(callId, peerId, signal),
+    (signal) =>
+      salleReunion !== null
+        ? sendMeetingSignal(salleReunion, peerId, signal)
+        : sendCallSignal(callId, peerId, signal),
     publishRemoteStreams
   )
   peers.set(peerId, session)
@@ -780,6 +798,11 @@ function clearCall(markEnded: boolean) {
   // l'appel suivant partirait des l'arrivee du premier participant.
   // (transferPending repart a faux avec initialState.)
   cibleDuTransfert = null
+  if (desabonnementSalle) {
+    desabonnementSalle()
+    desabonnementSalle = null
+  }
+  salleReunion = null
   annulerSolitude()
   attendus.clear()
   invitationsEnVol = 0
@@ -1224,12 +1247,24 @@ export async function startOutgoingCall(
 }
 
 /** Démarre un appel de groupe pour une réunion. */
-export async function startMeetingCall(
+/**
+ * Entre dans la salle d'une reunion.
+ *
+ * Passe par le salon du serveur — `meeting_join` — et non par la creation d'un
+ * appel. C'est toute la difference : une reunion existe deja, on la REJOINT,
+ * alors que l'ancienne version en creait un appel parallele portant son nom.
+ * Le mobile, lui, a toujours parle au salon ; les deux clients pouvaient donc
+ * rejoindre la meme reunion sans jamais se croiser.
+ *
+ * Qui offre a qui suit la meme regle que pour un appel : celui qui arrive
+ * n'offre pas, ceux qui sont deja la offrent. Sans cette convention, deux
+ * arrivees simultanees s'enverraient deux offres croisees.
+ */
+export async function joinMeetingRoom(
   meetingId: number,
-  participants: string[],
   type: CallType,
   title: string
-): Promise<string> {
+): Promise<void> {
   ensureEventSubscription()
 
   if (state.incoming) {
@@ -1239,51 +1274,35 @@ export async function startMeetingCall(
     await hangUp()
   }
 
-  let started
-  try {
-    started = await startCallRest(`meeting_${meetingId}`, type)
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 409) {
-      await endStaleServerCalls()
-      try {
-        started = await startCallRest(`meeting_${meetingId}`, type)
-      } catch (retryError) {
-        if (retryError instanceof ApiError && retryError.status === 409) {
-          throw new Error(tr("call_busy_detail"))
-        }
-        throw retryError
-      }
-    } else {
-      throw err
-    }
-  }
-  sendCallRing(started.id)
-
-  const participantNames: Record<string, string> = {}
+  salleReunion = meetingId
   attendus.clear()
-  for (const p of participants) {
-    participantNames[p] = p
-    attendus.add(p)
-  }
 
   setState({
-    activeCallId: started.id,
+    // La salle tient lieu d'appel actif : le reste de l'ecran d'appel — grille
+    // des participants, micro, camera, raccrochage — fonctionne sans savoir
+    // qu'il s'agit d'une reunion.
+    activeCallId: `meeting_${meetingId}`,
     activeConvId: `meeting_${meetingId}`,
     peerName: title,
     peerAvatarUrl: null,
     callType: type,
-    role: "outgoing",
-    progress: "ringtone",
+    role: "ongoing",
+    progress: "ongoing",
     isGroup: true,
-    isInitiator: true,
-    participantNames,
+    isInitiator: false,
+    participantNames: {},
     micOn: true,
     camOn: type === "video",
     audioOutput: type === "video" ? "speaker" : defaultAudioOutput(),
     localStream: null,
     remoteStreams: {},
+    endedAt: null,
+    error: null,
   })
 
+  // Le flux local AVANT d'annoncer son arrivee : les autres vont offrir des
+  // reception de `meeting_user_joined`, et une offre qui arrive sans micro ni
+  // camera prets se negocie sans piste.
   try {
     await ensureLocalStream(type === "video")
   } catch {
@@ -1292,7 +1311,61 @@ export async function startMeetingCall(
     })
   }
 
-  return started.id
+  desabonnementSalle?.()
+  desabonnementSalle = subscribeToMeetingEvents((event) => {
+    if (Number(event.meetingId) !== meetingId) return
+    void traiterEvenementSalle(event)
+  })
+
+  sendMeetingJoin(meetingId)
+}
+
+/** Suite des evenements du salon, une fois qu'on y est entre. */
+async function traiterEvenementSalle(event: Record<string, unknown>) {
+  if (salleReunion === null) return
+
+  if (event.type === "meeting_joined") {
+    // Ceux qui etaient deja la : c'est a eux d'offrir, on se contente de tenir
+    // la session prete a recevoir leur offre.
+    const presents = Array.isArray(event.participants) ? (event.participants as string[]) : []
+    for (const id of presents) await connectToPeer(id, false)
+    return
+  }
+
+  if (event.type === "meeting_user_joined") {
+    const id = String(event.userId ?? "")
+    if (!id) return
+    const nom = String(event.displayName ?? "")
+    if (nom) {
+      setState({ participantNames: { ...state.participantNames, [id]: nom } })
+    }
+    // Nouveau venu : nous sommes deja la, donc c'est nous qui offrons.
+    await connectToPeer(id, true)
+    return
+  }
+
+  if (event.type === "meeting_user_left") {
+    const id = String(event.userId ?? "")
+    if (!id) return
+    removePeer(id)
+    nePlusAttendre(id)
+    // Meme regle qu'en appel : on ne reste pas seul dans une salle.
+    verifierSolitude()
+    return
+  }
+
+  if (event.type === "meeting_signal") {
+    const from = String(event.fromUserId ?? "")
+    if (!from) return
+    const session = peers.get(from)
+    if (session) await session.handleSignal(event.signal as WebrtcSignal)
+    else {
+      // Signal arrive avant que la session existe : on l'ouvre en receveur,
+      // puis on lui remet la trame.
+      await connectToPeer(from, false)
+      await peers.get(from)?.handleSignal(event.signal as WebrtcSignal)
+    }
+  }
 }
 
 /** Accepte l'appel entrant courant. Renvoie l'id de l'appel rejoint. */
@@ -1391,7 +1464,12 @@ export async function hangUp(): Promise<void> {
     if (callId) {
       // Dans un groupe, même l'initiateur quitte individuellement après décrochage.
       // Le backend ne termine globalement que lorsqu'il reste moins de deux personnes.
-      if (wasGroup && wasRole === "ongoing") {
+      if (salleReunion !== null) {
+        // Une reunion se quitte : elle continue sans nous. La terminer
+        // reviendrait a la fermer pour tout le monde, ce que seul
+        // l'organisateur peut faire, et depuis la liste des reunions.
+        sendMeetingLeave(salleReunion)
+      } else if (wasGroup && wasRole === "ongoing") {
         await leaveCallRest(callId)
         sendCallState(callId, "left", myUserId() ?? undefined, myDisplayName())
       } else {
