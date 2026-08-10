@@ -188,7 +188,7 @@ export async function fetchChatConversationsCacheFirst(
 
 /**
  * POST /api/conversations — Cree (ou recupere si elle existe deja) une conversation
- * directe avec le numero Alanya (6 ou 8 chiffres) du contact. Renvoie l'id backend.
+ * directe avec le numero Alanya du contact. Renvoie l'id backend.
  */
 export async function createPrivateChat(publicNumber: string): Promise<{ id: string }> {
   const response = await apiRequest<{ id: string; isGroup: boolean }>("/api/conversations", {

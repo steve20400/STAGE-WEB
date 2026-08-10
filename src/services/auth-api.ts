@@ -21,7 +21,7 @@ import { langueInitiale, traduire, type Cle } from "../i18n"
 const tr = (cle: Cle) => traduire(langueInitiale(), cle)
 
 export interface LoginPayload {
-  /** Email ou numero Alanya (6 ou 8 chiffres). */
+  /** Email ou numero Alanya. */
   phone: string
   password: string
 }
@@ -97,7 +97,7 @@ function buildPrototypeUser(identifier: string) {
   } satisfies SessionUser
 }
 
-/** POST /api/auth/login — identifier = email ou numero Alanya (6 ou 8 chiffres). */
+/** POST /api/auth/login — identifier = email ou numero Alanya. */
 export async function loginWithPassword(payload: LoginPayload) {
   const identifier = payload.phone.trim()
   const fallbackUser = buildPrototypeUser(identifier)

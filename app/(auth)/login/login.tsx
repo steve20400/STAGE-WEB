@@ -26,7 +26,7 @@ function formatIdentifierInput(value: string) {
   return /^[\d\s-]+$/.test(value) ? formatAlanyaNumber(value).replace(/-/g, " ") : value
 }
 
-// Le backend accepte un email ou l'Alanya ID (6 ou 8 chiffres).
+// Le backend accepte un email ou l'Alanya ID, sans longueur imposee.
 function isValidIdentifier(value: string) {
   const normalized = normalizeIdentifier(value)
   return isValidAlanyaNumber(normalized) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)

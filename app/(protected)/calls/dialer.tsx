@@ -16,10 +16,9 @@ const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""] as const
  * Composeur plein ecran : le numero en cours de composition, un clavier, et le
  * choix entre appel audio et appel video. Rien d'autre, comme sur un telephone.
  *
- * Le numero saisi est un Alanya ID, pas un numero de telephone : six chiffres
- * pour les anciens comptes, huit pour les nouveaux — les deux longueurs
- * coexistent, d'ou la validation par `isValidAlanyaNumber` plutot qu'une
- * longueur fixe.
+ * Le numero saisi est un Alanya ID, pas un numero de telephone, et sa longueur
+ * n'est pas imposee : le front verifie seulement que la saisie peut etre un
+ * identifiant, le serveur tranche sur l'existence du compte.
  */
 export function Dialer({
   onClose,
@@ -96,10 +95,10 @@ export function Dialer({
         </div>
         <div className="dialer-hint">
           {digits.length === 0
-            ? t("dial_hint_6_or_8")
+            ? t("dial_hint_number")
             : valide
               ? t("dial_ready")
-              : t("digits_need_6_or_8", { n: digits.length })}
+              : t("digits_too_short", { n: digits.length })}
         </div>
         {digits.length >= 6 && (
           <div
@@ -140,7 +139,7 @@ export function Dialer({
             onClick={() => call("audio")}
             disabled={!valide}
             aria-label={t("audio_call")}
-            title={valide ? t("audio_call") : t("dial_6_or_8")}
+            title={valide ? t("audio_call") : t("dial_a_number")}
           >
             <svg
               width="24"
@@ -159,7 +158,7 @@ export function Dialer({
             onClick={() => call("video")}
             disabled={!valide}
             aria-label={t("video_call")}
-            title={valide ? t("video_call") : t("dial_6_or_8")}
+            title={valide ? t("video_call") : t("dial_a_number")}
           >
             <svg
               width="24"

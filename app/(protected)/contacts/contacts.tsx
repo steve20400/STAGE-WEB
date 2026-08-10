@@ -25,7 +25,7 @@ import "../calls/calls-page.css"
 
 /**
  * Repertoire : liste des contacts + formulaire d'enregistrement d'un contact
- * par son Alanya ID (6 ou 8 chiffres) avec alias optionnel.
+ * par son Alanya ID avec alias optionnel.
  */
 export default function ContactsPage() {
   const navigate = useNavigate()

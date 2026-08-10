@@ -2,7 +2,7 @@ export interface SessionUser {
   /** UUID backend — sert a distinguer "moi" dans les messages/evenements WS. */
   id?: string
   name: string
-  /** Numero Alanya (6 ou 8 chiffres), publicNumber cote backend. */
+  /** Numero Alanya, publicNumber cote backend. */
   phone: string
   email?: string
   statusMsg?: string

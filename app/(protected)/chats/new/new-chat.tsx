@@ -51,7 +51,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
     const contact = contacts.find((c) => c.id === contactId)
     if (!contact) return
     try {
-      // Le backend identifie les gens par leur Alanya ID (6 ou 8 chiffres).
+      // Le backend identifie les gens par leur Alanya ID, quelle qu'en soit la longueur.
       const conversation = await createPrivateChat(contact.phone)
       navigate(`/chats/${conversation.id}`)
     } catch (e) {

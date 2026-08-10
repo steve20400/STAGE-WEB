@@ -357,12 +357,12 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                   </div>
                   <div className="call-opt-numero-aide" aria-live="polite">
                     {chiffres.length === 0
-                      ? t("dial_hint_6_or_8")
+                      ? t("dial_hint_number")
                       : contactDuNumero
                         ? contactDuNumero.name
                         : numeroValide
                           ? t("number_complete")
-                          : t("digits_need_6_or_8", { n: chiffres.length })}
+                          : t("digits_too_short", { n: chiffres.length })}
                   </div>
 
                   <div className="call-opt-touches">
@@ -397,7 +397,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                     className="call-opt-valider"
                     onClick={validerLeNumero}
                     disabled={!numeroValide}
-                    title={numeroValide ? undefined : t("dial_6_or_8")}
+                    title={numeroValide ? undefined : t("dial_a_number")}
                   >
                     {dialogue === "inviter"
                       ? t("invite_this_number")
