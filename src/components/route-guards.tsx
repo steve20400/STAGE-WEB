@@ -1,8 +1,10 @@
 import { type ReactNode } from "react"
 import { Navigate, useLocation } from "react-router-dom"
 import { useAuth } from "./auth-provider"
+import { useTranslation } from "../i18n"
 
 function RouteGuardFallback() {
+  const { t } = useTranslation()
   return (
     <div
       style={{
@@ -15,7 +17,7 @@ function RouteGuardFallback() {
         fontSize: 14,
       }}
     >
-      Chargement...
+      {t("loading")}
     </div>
   )
 }

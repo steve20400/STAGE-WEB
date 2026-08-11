@@ -160,7 +160,10 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
   if (!response.ok) {
     throw new ApiError(
-      inferMessage(payload, `La requete a echoue (${response.status}).`),
+      inferMessage(
+        payload,
+        traduire(langueInitiale(), "v2_request_failed", { statut: response.status })
+      ),
       response.status,
       payload
     )

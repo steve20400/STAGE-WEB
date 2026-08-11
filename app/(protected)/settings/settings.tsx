@@ -10,7 +10,6 @@ import RealtimeStatus from "../../../src/components/realtime-status"
 import {
   debloquer,
   listerBloques,
-  nomDuBloque,
   type PersonneBloquee,
 } from "../../../src/services/blocked-service"
 import {
@@ -50,7 +49,6 @@ import {
   type RingtoneEvent,
 } from "../../../src/services/ringtones"
 import {
-  OUTPUT_LABELS,
   defaultAudioOutput,
   setDefaultAudioOutput,
   type AudioOutputMode,
@@ -71,7 +69,6 @@ import {
   type LoginAccess,
   estRenseigne,
   fetchLoginHistory,
-  quand,
 } from "../../../src/services/user-access-service"
 import { sendSessionRevoked } from "../../../src/services/websocket-service"
 import { avatarDisplaySrc, fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
@@ -136,6 +133,27 @@ function analyzePassword(pwd: string): { score: number; labelKey: Cle | null; co
     { labelKey: "strength_very_strong", color: "var(--accent)" },
   ]
   return { score, ...levels[Math.min(5, score)] }
+}
+
+/*
+ * Nom des sonneries fournies, et nom des sorties audio, sous forme de CLES.
+ *
+ * Les services les exposent en francais en dur (« Sonnerie classique »,
+ * « Haut-parleur ») dans des tableaux construits a l'import : un libelle deja
+ * traduit y resterait fige dans la langue du chargement. On garde donc la cle
+ * ici et on traduit au rendu.
+ */
+const NOM_SONNERIE: Record<string, Cle> = {
+  "incoming_ring.mp3": "p2_ringtone_alanya_incoming",
+  "outgoing_ring.mp3": "p2_ringtone_alanya_outgoing",
+  "notification.mp3": "p2_ringtone_alanya_notification",
+  "ringtone.mp3": "p2_ringtone_classic",
+  "message.mp3": "p2_ringtone_message_beep",
+}
+
+const NOM_SORTIE_AUDIO: Record<AudioOutputMode, Cle> = {
+  earpiece: "p2_audio_earpiece",
+  speaker: "p2_audio_speaker",
 }
 
 /**
@@ -228,7 +246,7 @@ function RingtonePicker() {
             >
               {RINGTONES.map((ringtone) => (
                 <option key={ringtone.file} value={ringtone.file}>
-                  {ringtone.label}
+                  {NOM_SONNERIE[ringtone.file] ? t(NOM_SONNERIE[ringtone.file]) : ringtone.label}
                   {ringtone.note ? ` — ${t(ringtone.note)}` : ""}
                 </option>
               ))}
@@ -279,7 +297,7 @@ function RingtonePicker() {
                 setSortieAudio(mode)
               }}
             >
-              {OUTPUT_LABELS[mode]}
+              {t(NOM_SORTIE_AUDIO[mode])}
             </button>
           ))}
         </div>
@@ -1027,6 +1045,46 @@ function derniereActivite(iso: string | null): string {
   return date.toLocaleDateString(langue, { day: "numeric", month: "long", year: "numeric" })
 }
 
+/**
+ * Date d'une connexion en clair : « Aujourd'hui a 14:32 », « Hier a 09:05 »,
+ * puis la date complete.
+ *
+ * Le `quand()` du service renvoie ces mots en francais en dur et force la
+ * locale fr-FR ; on reformate ici pour que le journal des connexions suive la
+ * langue choisie, heure et date comprises.
+ */
+function quandTraduit(iso: string): string {
+  // Hors composant : la langue est relue a chaque appel, jamais figee a l'import.
+  const langue = langueInitiale()
+  const date = new Date(iso)
+  const heure = date.toLocaleTimeString(langue, { hour: "2-digit", minute: "2-digit" })
+  const jour = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const maintenant = new Date()
+  const ceJour = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate())
+  const ecart = Math.round((ceJour.getTime() - jour.getTime()) / 86400000)
+  if (ecart === 0) return traduire(langue, "p2_today_at", { heure })
+  if (ecart === 1) return traduire(langue, "p2_yesterday_at", { heure })
+  const jourMoisAnnee = date.toLocaleDateString(langue, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+  return traduire(langue, "p2_date_at", { date: jourMoisAnnee, heure })
+}
+
+/**
+ * Nom affiche d'une personne bloquee. Le `nomDuBloque()` du service retombe sur
+ * un « Inconnu » francais en dur quand ni le pseudo ni le numero ne sont
+ * connus : ce repli est traduit ici.
+ */
+function nomBloque(personne: PersonneBloquee): string {
+  return (
+    personne.pseudo?.trim() ||
+    personne.publicNumber ||
+    traduire(langueInitiale(), "p2_unknown_person")
+  )
+}
+
 function versSession(a: Appareil): SessionAffichee {
   return {
     appareilId: a.appareilId,
@@ -1039,7 +1097,14 @@ function versSession(a: Appareil): SessionAffichee {
      *
      * Rien n'est ajoute quand le pseudo est absent — pas de parentheses vides.
      */
-    location: a.nomAgent ? `${a.system ?? ""} (${a.nomAgent})`.trim() : (a.system ?? ""),
+    // « Unknown » est la valeur que le registre stocke quand le systeme n'a pas
+    // pu etre reconnu : c'est un identifiant, pas un libelle. On le traduit ici,
+    // a l'affichage, sans toucher a ce qui est ecrit en base.
+    location: (() => {
+      const systeme =
+        a.system === "Unknown" ? traduire(langueInitiale(), "v2_unknown") : (a.system ?? "")
+      return a.nomAgent ? `${systeme} (${a.nomAgent})`.trim() : systeme
+    })(),
     current: estAppareilCourant(a),
     ts: derniereActivite(a.lastLogin),
     isMobile: a.typeDevice === TYPE_DEVICE.android || a.typeDevice === TYPE_DEVICE.ios,
@@ -1260,7 +1325,7 @@ export default function SettingsPage() {
     try {
       await debloquer(personne.idBlock)
       setBloques((liste) => liste.filter((b) => b.idBlock !== personne.idBlock))
-      success(t("unblocked_toast"), t("set_unblocked_detail", { nom: nomDuBloque(personne) }))
+      success(t("unblocked_toast"), t("set_unblocked_detail", { nom: nomBloque(personne) }))
     } catch (err) {
       toastError(t("set_unblock_failed"), err instanceof Error ? err.message : undefined)
     }
@@ -2349,7 +2414,7 @@ export default function SettingsPage() {
                             marginBottom: 2,
                           }}
                         >
-                          {quand(a.dateLogin)}
+                          {quandTraduit(a.dateLogin)}
                         </div>
                         <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
                           {details.length > 0 ? details.join(" - ") : t("set_unknown_origin")}
@@ -2516,7 +2581,7 @@ export default function SettingsPage() {
                     >
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, color: "var(--text-primary)" }}>
-                          {nomDuBloque(personne)}
+                          {nomBloque(personne)}
                         </div>
                         {personne.publicNumber && (
                           <div style={{ fontSize: 11, color: "var(--text-muted)" }}>

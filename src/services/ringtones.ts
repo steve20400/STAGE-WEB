@@ -118,7 +118,10 @@ export async function importRingtone(file: File): Promise<CustomRingtone> {
   }
   if (file.size > MAX_CUSTOM_RINGTONE_BYTES) {
     throw new Error(
-      `Fichier trop lourd : ${(file.size / 1024 / 1024).toFixed(1)} Mo pour ${MAX_CUSTOM_RINGTONE_BYTES / 1024 / 1024} Mo au maximum.`
+      traduire(langueInitiale(), "v2_ringtone_too_heavy", {
+        taille: (file.size / 1024 / 1024).toFixed(1),
+        maximum: MAX_CUSTOM_RINGTONE_BYTES / 1024 / 1024,
+      })
     )
   }
 
@@ -126,7 +129,10 @@ export async function importRingtone(file: File): Promise<CustomRingtone> {
   const entree: CustomRingtone = {
     url: media.url,
     // Le nom du fichier sans son extension : c'est ce que l'utilisateur reconnait.
-    label: file.name.replace(/\.[^.]+$/, "").trim() || "Sonnerie importee",
+    // Le repli, lui, s'affiche dans la liste des sonneries : il se traduit.
+    label:
+      file.name.replace(/\.[^.]+$/, "").trim() ||
+      traduire(langueInitiale(), "set_ringtone_imported"),
   }
   saveCustomRingtones([...customRingtones().filter((e) => e.url !== entree.url), entree])
   return entree

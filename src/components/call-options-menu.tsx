@@ -177,17 +177,17 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
       demande
         .then(() =>
           inviter
-            ? toast.success("Invitation envoyee", `Le telephone de ${nom} sonne.`)
-            : toast.info("Transfert lance", `Depart des que ${nom} decroche.`)
+            ? toast.success(t("a2_invite_sent"), t("a2_invite_sent_detail", { name: nom }))
+            : toast.info(t("a2_transfer_started"), t("a2_transfer_started_detail", { name: nom }))
         )
         .catch((err: unknown) =>
           toast.error(
-            inviter ? "Invitation impossible" : "Transfert impossible",
+            inviter ? t("a2_invite_failed") : t("a2_transfer_failed"),
             err instanceof Error ? err.message : undefined
           )
         )
     },
-    [dialogue, fermerDialogue, toast]
+    [dialogue, fermerDialogue, toast, t]
   )
 
   // ---- Pave de saisie -------------------------------------------------------

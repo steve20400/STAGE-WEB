@@ -1,7 +1,9 @@
 ﻿import { useEffect, useRef } from "react"
 import { useTheme } from "./theme-provider"
+import { useTranslation } from "../i18n"
 
 export function ThemeToggle({ className }: { className?: string }) {
+  const { t } = useTranslation()
   const { palette, resolvedTheme, toggle, togglePalette } = useTheme()
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDark = resolvedTheme === "dark"
@@ -30,8 +32,11 @@ export function ThemeToggle({ className }: { className?: string }) {
   return (
     <button
       onClick={handlePress}
-      aria-label={isDark ? "Passer en mode clair" : "Passer en mode sombre"}
-      title={`${isDark ? "Mode clair" : "Mode sombre"} - double tap: ${isSoftPalette ? "theme standard" : "theme creme"}`}
+      aria-label={isDark ? t("s2_switch_light") : t("s2_switch_dark")}
+      title={t("s2_theme_toggle_hint", {
+        mode: isDark ? t("s2_light_mode") : t("s2_dark_mode"),
+        palette: isSoftPalette ? t("s2_palette_standard") : t("s2_palette_cream"),
+      })}
       className={className}
       style={{
         width: 36,
@@ -89,12 +94,16 @@ export function ThemeToggle({ className }: { className?: string }) {
 }
 
 export function ThemeSelector() {
+  const { t } = useTranslation()
   const { theme, setTheme } = useTheme()
 
+  // Table construite a chaque rendu, et non au niveau du module : un libelle
+  // traduit une seule fois a l'import resterait fige dans la langue du
+  // chargement, et ne suivrait pas un changement de langue.
   const OPTIONS = [
     {
       value: "light" as const,
-      label: "Clair",
+      label: t("s2_theme_light"),
       icon: (
         <svg
           width="18"
@@ -166,7 +175,7 @@ export function ThemeSelector() {
     },
     {
       value: "dark" as const,
-      label: "Sombre",
+      label: t("s2_theme_dark"),
       icon: (
         <svg
           width="18"
@@ -237,7 +246,7 @@ export function ThemeSelector() {
     },
     {
       value: "system" as const,
-      label: "Systeme",
+      label: t("s2_theme_system"),
       icon: (
         <svg
           width="18"

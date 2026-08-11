@@ -186,7 +186,7 @@ export default function SignUpPage() {
 
     if (demoOtp && entered !== demoOtp) {
       setLoading(false)
-      setError("Code incorrect. Reessayez.")
+      setError(t("x2_otp_incorrect"))
       setOtpDigits(Array(OTP_LEN).fill(""))
       return
     }
@@ -203,7 +203,7 @@ export default function SignUpPage() {
       )
       navigate("/chats", { replace: true })
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Verification impossible.")
+      setError(submitError instanceof Error ? submitError.message : t("x2_verify_failed"))
       setOtpDigits(Array(OTP_LEN).fill(""))
     } finally {
       setLoading(false)
@@ -220,7 +220,7 @@ export default function SignUpPage() {
     <div className="si-root">
       <aside className="si-left">
         <div className="logo">
-          <img src={alanyaLogo} alt="Logo Alanya Work" className="auth-school-logo" />
+          <img src={alanyaLogo} alt={t("x2_logo_alt")} className="auth-school-logo" />
           <div className="auth-brand-copy">
             <BrandName className="logo-txt" />
           </div>
@@ -365,7 +365,7 @@ export default function SignUpPage() {
                 <label htmlFor="pwd">{t("password")}</label>
                 <div className="field-icon">
                   <button className="tog" type="button" onClick={() => setShowPwd((v) => !v)}>
-                    {showPwd ? "Masquer" : "Afficher"}
+                    {showPwd ? t("hide") : t("show")}
                   </button>
                 </div>
               </div>
@@ -404,13 +404,18 @@ export default function SignUpPage() {
                 <label htmlFor="confirm">{t("confirm_password")}</label>
                 <div className="field-icon">
                   <button className="tog" type="button" onClick={() => setShowConfirm((v) => !v)}>
-                    {showConfirm ? "Masquer" : "Afficher"}
+                    {showConfirm ? t("hide") : t("show")}
                   </button>
                 </div>
               </div>
 
               <div className="btn-row">
-                <button type="button" className="btn-submit btn-back" onClick={() => setStep(1)}>
+                <button
+                  type="button"
+                  className="btn-submit btn-back"
+                  aria-label={t("back")}
+                  onClick={() => setStep(1)}
+                >
                   ?
                 </button>
                 <button
@@ -447,7 +452,9 @@ export default function SignUpPage() {
                   {countdown > 0 ? (
                     <span>
                       {t("auth_resend_in")}{" "}
-                      <strong className="countdown-accent">{countdown}s</strong>
+                      <strong className="countdown-accent">
+                        {t("x2_seconds_short", { n: countdown })}
+                      </strong>
                     </span>
                   ) : (
                     <button

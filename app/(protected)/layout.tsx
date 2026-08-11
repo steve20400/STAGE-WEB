@@ -245,7 +245,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* Logo + bouton fermeture (mobile) / repli (desktop) */}
       <div className="sb-logo">
-        <img src={alanyaLogo} alt="Logo Alanya Work" className="sb-school-logo" />
+        <img src={alanyaLogo} alt={t("s2_logo_alt")} className="sb-school-logo" />
         <div className="sb-brand-copy">
           <BrandName sur="marque" className="sb-logo-txt" />
         </div>
@@ -273,7 +273,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           </button>
         )}
         {onClose && (
-          <button className="sb-close" onClick={onClose} aria-label="Fermer le menu">
+          <button className="sb-close" onClick={onClose} aria-label={t("s2_close_menu")}>
             <Icons.Close />
           </button>
         )}
@@ -319,7 +319,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
       {/* Profil + deconnexion */}
       <div className="sb-footer">
         <div className="sb-theme-row">
-          <span className="sb-theme-label">Theme</span>
+          <span className="sb-theme-label">{t("theme")}</span>
           <ThemeToggle />
         </div>
         <div className="sb-profile" onClick={() => navigate("/settings")}>
@@ -424,7 +424,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             <Icons.Menu />
           </button>
           <div className="topbar-brand">
-            <img src={alanyaLogo} alt="Logo Alanya Work" className="topbar-school-logo" />
+            <img src={alanyaLogo} alt={t("s2_logo_alt")} className="topbar-school-logo" />
             <div className="topbar-brand-copy">
               <BrandName sur="marque" className="topbar-title" />
             </div>

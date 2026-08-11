@@ -184,8 +184,13 @@ export default function MeetingRoomPage() {
       </div>
 
       <div className="meeting-info">
+        {/* Le deux-points est DANS la traduction : l'espace qui le precede est
+            une regle francaise, l'anglais colle le signe au mot et le chinois
+            emploie le sien. Le coder ici les imposait a tout le monde. */}
         <p>
-          {t("meet_type")} : {meeting.type === "video" ? t("video_label") : t("cinfo_audio")}
+          {t("r2_meet_type_value", {
+            value: meeting.type === "video" ? t("video_label") : t("cinfo_audio"),
+          })}
         </p>
         <p>{t("meet_duration_minutes", { n: Math.floor(meeting.dureeSecondes / 60) })}</p>
         {meeting.participants.length > 0 && (
@@ -205,8 +210,12 @@ export default function MeetingRoomPage() {
                       <span>{toInitials(p.nom)}</span>
                     )}
                     {p.connecte && <span className="participant-pastille" aria-hidden="true" />}
+                    {/* Sur la vignette d'un AUTRE, la pastille constate un
+                        etat — elle n'invite a rien. « Lever la main » y
+                        promettait une action qu'on ne peut pas faire a sa
+                        place. */}
                     {mainsLevees.has(p.id) && (
-                      <span className="participant-main" title={t("meet_raise_hand")}>
+                      <span className="participant-main" title={t("r2_hand_raised")}>
                         ✋
                       </span>
                     )}
@@ -327,13 +336,16 @@ export default function MeetingRoomPage() {
             {callState.micOn ? "🎙" : "🔇"}
           </button>
 
+          {/* Un bouton annonce ce qu'il VA faire, comme le micro juste a cote.
+              « Camera desactivee » decrivait l'etat, et une fois la camera
+              coupee l'infobulle se resumait a « Video ». */}
           {meeting.type === "video" && (
             <button
               className={`meeting-controle${callState.camOn ? "" : " coupe"}`}
               onClick={() => toggleCamera()}
               aria-pressed={!callState.camOn}
-              title={callState.camOn ? t("camera_off") : t("video_label")}
-              aria-label={callState.camOn ? t("camera_off") : t("video_label")}
+              title={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
+              aria-label={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
             >
               {callState.camOn ? "🎥" : "🚫"}
             </button>
@@ -343,12 +355,16 @@ export default function MeetingRoomPage() {
             className={`meeting-controle${maMain ? " actif" : ""}`}
             onClick={() => sendMeetingHand(Number(meetingId), !maMain)}
             aria-pressed={maMain}
-            title={t("meet_raise_hand")}
-            aria-label={t("meet_raise_hand")}
+            title={maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
+            aria-label={maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
           >
             ✋
           </button>
 
+          {/* « Sortie audio des appels » est le libelle d'une ligne de
+              Parametres : dans la salle, il nommait un reglage au lieu de dire
+              vers quoi la bascule envoie le son, et ne bougeait pas d'un etat a
+              l'autre. */}
           {meeting.type !== "video" && (
             <button
               className={`meeting-controle${callState.audioOutput === "speaker" ? " actif" : ""}`}
@@ -356,8 +372,16 @@ export default function MeetingRoomPage() {
                 setCallAudioOutput(callState.audioOutput === "speaker" ? "earpiece" : "speaker")
               }
               aria-pressed={callState.audioOutput === "speaker"}
-              title={t("set_audio_output")}
-              aria-label={t("set_audio_output")}
+              title={
+                callState.audioOutput === "speaker"
+                  ? t("r2_switch_to_earpiece")
+                  : t("r2_switch_to_speaker")
+              }
+              aria-label={
+                callState.audioOutput === "speaker"
+                  ? t("r2_switch_to_earpiece")
+                  : t("r2_switch_to_speaker")
+              }
             >
               {callState.audioOutput === "speaker" ? "🔊" : "🎧"}
             </button>

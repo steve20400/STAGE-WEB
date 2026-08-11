@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { CallDisplayMode } from "../services/call-manager"
 import { toInitials } from "../data/session-user"
+import { useTranslation } from "../i18n"
 import "./participant-grid.css"
 
 /**
@@ -99,6 +100,7 @@ function TuileParticipant({
   participant: Participant
   isVideo: boolean
 }) {
+  const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const imageVivante = usePisteVideoVivante(participant.stream)
   const microVivant = usePisteAudioVivante(participant.stream)
@@ -129,9 +131,11 @@ function TuileParticipant({
         <span className="pg-name">{participant.name}</span>
         <span
           className={microVivant ? "pg-mic on" : "pg-mic off"}
-          title={microVivant ? "Micro actif" : "Micro coupe"}
+          title={microVivant ? t("a2_mic_on") : t("a2_mic_muted")}
           aria-label={
-            microVivant ? `${participant.name} : micro actif` : `${participant.name} : micro coupe`
+            microVivant
+              ? t("a2_participant_mic_on", { name: participant.name })
+              : t("a2_participant_mic_muted", { name: participant.name })
           }
         >
           {microVivant ? (

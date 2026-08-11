@@ -1,4 +1,5 @@
 import { apiRequest } from "../lib/api-client"
+import { langueInitiale, traduire } from "../i18n"
 
 /**
  * Registre des appareils du compte : ce qui alimente un ecran
@@ -67,6 +68,13 @@ export function getOrCreateWebDeviceId(): string {
  * Volontairement grossier : il ne sert qu'a distinguer les appareils dans la
  * liste avant que l'utilisateur ne les renomme. On evite d'exposer la chaine
  * user-agent complete, illisible et inutilement bavarde.
+ *
+ * Les noms de navigateurs et de systemes ne se traduisent pas — ce sont des
+ * marques. Seuls le mot de liaison et le repli « Navigateur » le sont : ils
+ * s'affichent dans la liste des appareils, ou ils restaient francais pour tout
+ * le monde. Le libelle etant enregistre cote serveur a la premiere connexion,
+ * il garde ensuite la langue de ce jour-la : c'est un nom d'appareil, que
+ * l'utilisateur peut de toute facon changer.
  */
 function libelleParDefaut(): string {
   const ua = navigator.userAgent
@@ -80,7 +88,7 @@ function libelleParDefaut(): string {
           ? "Chrome"
           : /Safari\//.test(ua)
             ? "Safari"
-            : "Navigateur"
+            : traduire(langueInitiale(), "v2_browser")
 
   const systeme = /Windows/.test(ua)
     ? "Windows"
@@ -94,7 +102,9 @@ function libelleParDefaut(): string {
             ? "Linux"
             : ""
 
-  return systeme ? `${navigateur} sur ${systeme}` : navigateur
+  return systeme
+    ? traduire(langueInitiale(), "v2_browser_on_system", { navigateur, systeme })
+    : navigateur
 }
 
 function systemeCourt(): string {
@@ -105,7 +115,12 @@ function systemeCourt(): string {
   if (/iPhone|iPad/.test(ua)) return "iOS"
   if (/Mac OS X/.test(ua)) return "macOS"
   if (/Linux/.test(ua)) return "Linux"
-  return "Inconnu"
+  // PAS de traduction ici : cette valeur est POSTEE au serveur et relue depuis
+  // les autres appareils du compte, l'application mobile comprise. Traduite,
+  // elle inscrirait « 未知 » dans un registre dont toutes les autres valeurs sont
+  // des identifiants — « Android », « iOS », « Linux ». C'est a l'affichage de
+  // la traduire, comme le fait deja la liste des appareils.
+  return "Unknown"
 }
 
 /**

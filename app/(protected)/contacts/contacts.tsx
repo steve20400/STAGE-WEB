@@ -73,7 +73,7 @@ export default function ContactsPage() {
       }
     } catch (err) {
       error(
-        existant ? "Deblocage impossible" : "Blocage impossible",
+        existant ? t("cinfo_unblock_failed") : t("cinfo_block_failed"),
         err instanceof Error ? err.message : undefined
       )
     }
@@ -120,8 +120,8 @@ export default function ContactsPage() {
       const conversation = await createPrivateChat(publicNumber)
       navigate(`/chats/${conversation.id}`)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Conversation impossible."
-      error("Erreur", message)
+      const message = err instanceof Error ? err.message : t("conv_create_failed")
+      error(t("error"), message)
     }
   }
 
@@ -131,7 +131,7 @@ export default function ContactsPage() {
       const callId = await startOutgoingCall(conversation.id, type, name)
       navigate(`/calls/${callId}?type=${type}&returnTo=/contacts`)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Appel impossible."
+      const message = err instanceof Error ? err.message : t("call_failed_now")
       error(t("call_failed"), message)
     }
   }
@@ -141,8 +141,8 @@ export default function ContactsPage() {
       await removeContact(id)
       success(t("contact_removed"), t("contact_removed_detail"))
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Suppression impossible."
-      error("Erreur", message)
+      const message = err instanceof Error ? err.message : t("cinfo_delete_failed")
+      error(t("error"), message)
     } finally {
       setConfirmDelete(null)
     }
@@ -191,7 +191,7 @@ export default function ContactsPage() {
               style={{ padding: "10px 12px", width: 220, fontSize: 13 }}
             />
             <button className="new-call-btn" type="submit" disabled={!canSave || saving}>
-              {saving ? "Enregistrement..." : "Enregistrer"}
+              {saving ? t("device_name_saving") : t("save")}
             </button>
             <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{t("alanya_id_hint")}</span>
           </form>
@@ -253,7 +253,7 @@ export default function ContactsPage() {
 
               <div className="call-right">
                 <RowActionsMenu
-                  ariaLabel={`Actions pour ${contact.name}`}
+                  ariaLabel={t("l2_actions_for", { nom: contact.name })}
                   actions={[
                     { label: t("send_message"), onSelect: () => void openChat(contact.phone) },
                     {

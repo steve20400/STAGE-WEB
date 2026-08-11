@@ -7,6 +7,7 @@
   useEffect,
   type ReactNode,
 } from "react"
+import { useTranslation } from "../i18n"
 
 type ToastType = "success" | "error" | "warning" | "info"
 
@@ -102,6 +103,7 @@ const STYLES: Record<ToastType, { icon: string; bar: string; bg: string; border:
 }
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
   const [exiting, setExiting] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -109,8 +111,8 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   const duration = toast.duration ?? 4000
 
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 10)
-    return () => clearTimeout(t)
+    const apparition = setTimeout(() => setVisible(true), 10)
+    return () => clearTimeout(apparition)
   }, [])
 
   useEffect(() => {
@@ -211,7 +213,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
         }}
         onMouseEnter={(e) => (e.currentTarget.style.color = "#9CA3AF")}
         onMouseLeave={(e) => (e.currentTarget.style.color = "#374151")}
-        aria-label="Fermer"
+        aria-label={t("close")}
       >
         <svg
           width="13"
@@ -231,15 +233,16 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const remove = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
+    setToasts((prev) => prev.filter((item) => item.id !== id))
   }, [])
 
-  const toast = useCallback((t: Omit<Toast, "id">) => {
+  const toast = useCallback((contenu: Omit<Toast, "id">) => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    setToasts((prev) => [...prev.slice(-4), { ...t, id }]) // max 5 toasts
+    setToasts((prev) => [...prev.slice(-4), { ...contenu, id }]) // max 5 toasts
   }, [])
 
   const success = useCallback(
@@ -273,7 +276,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
       <div
         aria-live="polite"
-        aria-label="Notifications"
+        aria-label={t("settings_notifications")}
         style={{
           position: "fixed",
           bottom: 24,
@@ -285,8 +288,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           pointerEvents: toasts.length ? "auto" : "none",
         }}
       >
-        {toasts.map((t) => (
-          <ToastItem key={t.id} toast={t} onRemove={remove} />
+        {toasts.map((item) => (
+          <ToastItem key={item.id} toast={item} onRemove={remove} />
         ))}
       </div>
     </ToastContext.Provider>

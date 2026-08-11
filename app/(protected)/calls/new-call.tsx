@@ -85,7 +85,7 @@ export default function NewCallPage() {
     <div className="calls-root" style={{ padding: "20px 0" }}>
       <div className="calls-head" style={{ marginBottom: 14 }}>
         <div className="calls-title-row page-title-row">
-          <h1 className="calls-title">Nouvel appel</h1>
+          <h1 className="calls-title">{t("a2_new_call")}</h1>
         </div>
 
         <div className="calls-controls" style={{ marginTop: 14 }}>
@@ -114,13 +114,13 @@ export default function NewCallPage() {
               className={`filter-btn ${type === "audio" ? "on" : ""}`}
               onClick={() => setType("audio")}
             >
-              Audio
+              {t("filter_audio")}
             </button>
             <button
               className={`filter-btn ${type === "video" ? "on" : ""}`}
               onClick={() => setType("video")}
             >
-              Video
+              {t("filter_video")}
             </button>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function NewCallPage() {
               </div>
 
               <div className="call-right">
-                {selected ? <span className="missed-badge">Selectionne</span> : null}
+                {selected ? <span className="missed-badge">{t("a2_selected")}</span> : null}
               </div>
             </div>
           )
@@ -170,7 +170,13 @@ export default function NewCallPage() {
 
       <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
         <button className="new-call-btn" onClick={startCall} disabled={!selectedId || starting}>
-          {starting ? "Demarrage..." : `Demarrer appel ${type}`}
+          {/* Deux libelles entiers plutot qu'un mot colle au bout d'une phrase :
+              toutes les langues ne rangent pas l'adjectif apres le nom. */}
+          {starting
+            ? t("a2_starting")
+            : type === "video"
+              ? t("a2_start_video_call")
+              : t("a2_start_audio_call")}
         </button>
       </div>
     </div>

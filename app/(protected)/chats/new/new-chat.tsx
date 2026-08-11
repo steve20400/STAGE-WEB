@@ -56,13 +56,13 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
       const message = e instanceof Error ? e.message : t("conv_create_failed")
-      error("Conversation impossible", message)
+      error(t("l2_conversation_failed"), message)
     }
   }
 
   const createGroup = async () => {
     if (groupName.trim().length < 2 || selected.size < 2) {
-      error("Groupe incomplet", t("group_needs_members"))
+      error(t("l2_group_incomplete"), t("group_needs_members"))
       return
     }
 
@@ -72,11 +72,11 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
         .filter((contact) => selected.has(contact.id))
         .map((contact) => contact.phone)
       const conversation = await createGroupChat(groupName.trim(), memberNumbers)
-      success("Groupe cree", `${selected.size} membres ajoutes.`)
+      success(t("l2_group_created"), t("cinfo_members_added", { count: selected.size }))
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
       const message = e instanceof Error ? e.message : t("group_create_failed")
-      error("Groupe impossible", message)
+      error(t("l2_group_failed"), message)
     } finally {
       setLoading(false)
     }
@@ -86,13 +86,13 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
     const phone = normalizePhone(newPhone).replace(/\D/g, "")
 
     if (!isValidAlanyaNumber(phone)) {
-      error("Numero invalide", t("use_alanya_id"))
+      error(t("l2_invalid_number"), t("use_alanya_id"))
       return
     }
 
     const exists = contacts.some((contact) => normalizePhone(contact.phone) === phone)
     if (exists) {
-      error("Contact existant", t("number_already_contact"))
+      error(t("contact_exists"), t("number_already_contact"))
       return
     }
 
@@ -101,12 +101,12 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       addContact(contact)
       // Pas de creation de conversation ici : elle sera creee via POST /api/chats
       // uniquement quand l'utilisateur clique sur le contact (startDirectChat).
-      success("Contact ajoute", `${contact.name} est disponible.`)
+      success(t("contact_saved"), t("l2_contact_now_available", { nom: contact.name }))
       setNewPhone("")
       setShowAdd(false)
     } catch (e) {
       const message = e instanceof Error ? e.message : t("add_failed")
-      error("Ajout impossible", message)
+      error(t("add_failed"), message)
     }
   }
 
@@ -156,16 +156,16 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
         className="ncm-overlay"
         onClick={(event) => event.target === event.currentTarget && onClose()}
       >
-        <div className="ncm-card" role="dialog" aria-label="Nouveau chat">
+        <div className="ncm-card" role="dialog" aria-label={t("new_chat")}>
           <div className="ncm-head">
             <div className="ncm-title-row page-title-row">
               <h2 className="ncm-title">{mode === "chat" ? t("new_message") : t("new_group")}</h2>
               <div className="ncm-actions">
                 <button className="ncm-add-btn" onClick={() => setShowAdd((value) => !value)}>
-                  + Contact
+                  {t("l2_plus_contact")}
                 </button>
                 <button className="ncm-close" onClick={onClose}>
-                  Fermer
+                  {t("close")}
                 </button>
               </div>
             </div>
@@ -175,7 +175,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
                 className={`ncm-tab ${mode === "chat" ? "on" : ""}`}
                 onClick={() => setMode("chat")}
               >
-                Message direct
+                {t("l2_direct_message")}
               </button>
               <button
                 className={`ncm-tab ${mode === "group" ? "on" : ""}`}
@@ -198,7 +198,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
             {showAdd && (
               <div className="ncm-add-box">
                 <input
-                  placeholder="Alanya ID (ex. 12 34 56 78)"
+                  placeholder={t("l2_alanya_id_example")}
                   value={formatAlanyaNumber(newPhone)}
                   onChange={(event) => setNewPhone(formatAlanyaNumber(event.target.value))}
                   inputMode="numeric"
@@ -209,10 +209,10 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <div className="ncm-add-row">
                   <button className="cancel" onClick={() => setShowAdd(false)}>
-                    Annuler
+                    {t("cancel")}
                   </button>
                   <button className="confirm" onClick={createContact}>
-                    Ajouter
+                    {t("l2_add")}
                   </button>
                 </div>
               </div>
@@ -221,7 +221,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
 
           <div className="ncm-list">
             {filtered.length === 0 && (
-              <div className="ncm-empty">Aucun contact trouve pour "{query}"</div>
+              <div className="ncm-empty">{t("l2_no_contact_for", { requete: query })}</div>
             )}
 
             {filtered.map((contact) => {
@@ -270,7 +270,9 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
 
           {mode === "group" && (
             <div className="ncm-foot">
-              <div className="ncm-foot-label">{selected.size} membre(s) selectionne(s)</div>
+              <div className="ncm-foot-label">
+                {t("l2_members_selected", { count: selected.size })}
+              </div>
               <input
                 className="ncm-search"
                 style={{ maxWidth: 180 }}
@@ -283,7 +285,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
                 onClick={createGroup}
                 disabled={loading || groupName.trim().length < 2 || selected.size < 2}
               >
-                {loading ? "Creation..." : "Creer"}
+                {loading ? t("l2_creating") : t("l2_create")}
               </button>
             </div>
           )}

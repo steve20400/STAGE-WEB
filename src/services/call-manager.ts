@@ -473,7 +473,9 @@ function parseIvrOptions(brut: unknown): IvrOption[] {
     if (!Number.isFinite(digit)) continue
     options.push({
       digit,
-      label: typeof o.label === "string" ? o.label : `Service ${digit}`,
+      // Le libelle vient du centre d'appels ; le repli, lui, est a nous, donc
+      // il se traduit — c'est un bouton du menu, en toutes lettres a l'ecran.
+      label: typeof o.label === "string" ? o.label : tr("v2_ivr_service", { digit }),
       // Absent = disponible : un serveur anterieur ne connait pas ce champ, et
       // tout griser serait pire que de laisser essayer.
       disponible: o.disponible !== false,
@@ -615,8 +617,16 @@ function myUserId(): string | null {
   return getMyUserId()
 }
 
+/**
+ * Nom que l'on annonce aux autres participants.
+ *
+ * Le repli s'affiche sur LEUR ecran, pas sur le notre : il part donc dans la
+ * langue de celui qui appelle, faute de savoir celle d'en face. C'est deja
+ * mieux qu'un « Utilisateur Alanya » francais pour tout le monde — dans le cas
+ * courant, les deux bouts lisent la meme langue.
+ */
 function myDisplayName(): string {
-  return loadSessionUser()?.name ?? "Utilisateur Alanya"
+  return loadSessionUser()?.name ?? tr("v2_alanya_user")
 }
 
 // La regle d'offreur n'est plus une comparaison d'UUID : elle est POSITIONNELLE
@@ -858,7 +868,7 @@ async function onPeerJoined(userId: string, displayName: string | null) {
   setState({
     participantNames: {
       ...state.participantNames,
-      [userId]: displayName?.trim() || state.participantNames[userId] || "Participant",
+      [userId]: displayName?.trim() || state.participantNames[userId] || tr("participant"),
     },
     role: state.role === "outgoing" ? "ongoing" : state.role,
     progress: "ongoing",
@@ -888,7 +898,7 @@ async function handleServerEvent(event: CallServerEvent) {
         convId,
         callType: event.callType === "VIDEO" ? "video" : "audio",
         callerId: String(event.callerId ?? ""),
-        callerName: String(event.callerName ?? "Appel"),
+        callerName: String(event.callerName ?? tr("call")),
         callerAvatarUrl,
         isGroup: Boolean(event.isGroup),
         groupName: (event.groupName as string | null) ?? null,
@@ -933,7 +943,7 @@ async function handleServerEvent(event: CallServerEvent) {
     const session: IvrSession = {
       callId,
       centerId: String(event.centerId ?? ""),
-      centerName: String(event.centerName ?? state.peerName ?? "Standard"),
+      centerName: String(event.centerName ?? state.peerName ?? tr("v2_call_center")),
       centerNumber: (event.centerNumber as string | null) ?? null,
       promptUrl: (event.promptUrl as string | null) ?? null,
       holdUrl: (event.holdUrl as string | null) ?? null,
@@ -1091,7 +1101,7 @@ async function handleServerEvent(event: CallServerEvent) {
       // plutot que de partir en laissant le correspondant seul.
       if (callState === "declined" && state.transferPending && userId === cibleDuTransfert) {
         cibleDuTransfert = null
-        setState({ transferPending: false, error: "Transfert refuse" })
+        setState({ transferPending: false, error: tr("v2_transfer_declined") })
         return
       }
       if (callId === state.activeCallId && userId) {
@@ -1197,7 +1207,7 @@ export async function startOutgoingCall(
   const participantNames: Record<string, string> = {}
   attendus.clear()
   for (const callee of started.callees ?? []) {
-    participantNames[callee.userId] = callee.pseudo ?? callee.publicNumber ?? "Membre"
+    participantNames[callee.userId] = callee.pseudo ?? callee.publicNumber ?? tr("v2_member")
     attendus.add(callee.userId)
   }
 

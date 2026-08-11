@@ -69,8 +69,8 @@ export function Dialer({
   }, [call, erase, onClose, press])
 
   return (
-    <div className="dialer-root" role="dialog" aria-label="Composer un numero">
-      <button className="dialer-close" onClick={onClose} aria-label="Fermer le clavier">
+    <div className="dialer-root" role="dialog" aria-label={t("a2_dial_dialog")}>
+      <button className="dialer-close" onClick={onClose} aria-label={t("a2_close_keypad")}>
         <svg
           width="20"
           height="20"

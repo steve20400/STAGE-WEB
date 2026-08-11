@@ -15,12 +15,8 @@ import {
   setCallAudioOutput,
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
-import { useTranslation } from "../../../../src/i18n"
-import {
-  OUTPUT_LABELS,
-  OUTPUT_LABELS_COURTS,
-  OUTPUT_VOLUME,
-} from "../../../../src/services/audio-output"
+import { useTranslation, type Cle } from "../../../../src/i18n"
+import { OUTPUT_VOLUME, type AudioOutputMode } from "../../../../src/services/audio-output"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./call-room-page.css"
 
@@ -33,6 +29,21 @@ import "./call-room-page.css"
  * distants, en comptant l'utilisateur courant.
  */
 const PARTICIPANTS_POUR_DIVISER = 2
+
+/**
+ * Cles, pas libelles : la sortie audio se traduit AU RENDU. Un libelle resolu
+ * ici resterait fige dans la langue du chargement du module.
+ */
+const CLE_SORTIE: Record<AudioOutputMode, Cle> = {
+  earpiece: "a2_output_earpiece",
+  speaker: "a2_output_speaker",
+}
+
+/** Libelles courts pour la barre de commandes, ou la place manque. */
+const CLE_SORTIE_COURTE: Record<AudioOutputMode, Cle> = {
+  earpiece: "a2_output_earpiece_short",
+  speaker: "a2_output_speaker_short",
+}
 
 type CallScreenState = "ringing" | "active" | "ended"
 
@@ -51,6 +62,9 @@ export default function CallRoomPage() {
   const returnTo = searchParams.get("returnTo") || "/calls"
 
   const call = useCallState()
+  // Declare AVANT les memos : le nom de repli d'un participant passe par `t`,
+  // et une constante lue avant sa declaration leve une erreur a l'execution.
+  const { t } = useTranslation()
 
   const isOurCall = call.activeCallId !== null && call.activeCallId === callId
   const remoteStreamEntries = useMemo(
@@ -64,9 +78,9 @@ export default function CallRoomPage() {
       remoteStreamEntries.map(([id, stream]) => ({
         id,
         stream,
-        name: call.participantNames[id] ?? call.peerName ?? "Participant",
+        name: call.participantNames[id] ?? call.peerName ?? t("participant"),
       })),
-    [remoteStreamEntries, call.participantNames, call.peerName]
+    [remoteStreamEntries, call.participantNames, call.peerName, t]
   )
   // Vrai uniquement si le flux distant transporte une image (voir le hook).
   const remoteHasVideo = useHasLiveVideo(remoteStreamEntries[0]?.[1])
@@ -88,7 +102,7 @@ export default function CallRoomPage() {
    * la grille, au milieu, en doublon d'une des tuiles.
    */
   const ecranDivise = participantsDistants.length >= PARTICIPANTS_POUR_DIVISER
-  const peerName = call.peerName || "Contact"
+  const peerName = call.peerName || t("a2_contact")
   const peerInitials = toInitials(peerName)
   // Photo du correspondant : le destinataire appele quand on appelle, l'appelant
   // quand on recoit. Le call-manager remplit peerAvatarUrl dans les deux sens.
@@ -98,7 +112,6 @@ export default function CallRoomPage() {
   // Lecture refusee par le navigateur : sans cet etat, l'appel est muet et
   // l'utilisateur n'a aucune explication ni aucun moyen de reessayer.
   const [audioBlocked, setAudioBlocked] = useState(false)
-  const { t } = useTranslation()
   const [controlsVisible, setControlsVisible] = useState(true)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
@@ -375,7 +388,7 @@ export default function CallRoomPage() {
               >
                 <path d="M19 12H5M12 5l-7 7 7 7" />
               </svg>
-              Retour
+              {t("back")}
             </button>
 
             <div className="call-type-pill">
@@ -407,7 +420,7 @@ export default function CallRoomPage() {
                 </svg>
               )}
               {isVideo ? t("filter_video") : t("filter_audio")}
-              {call.isGroup ? " (groupe)" : ""}
+              {call.isGroup ? ` (${t("a2_group")})` : ""}
             </div>
           </div>
 
@@ -448,7 +461,7 @@ export default function CallRoomPage() {
                 {callState === "active" && <div className="status-dot-live" />}
                 {stateLabel[callState]}
                 {callState === "active" && call.isGroup
-                  ? ` — ${remoteStreamEntries.length + 1} participants`
+                  ? ` — ${t("a2_participants_count", { n: remoteStreamEntries.length + 1 })}`
                   : ""}
               </div>
               {/* Transfert supervise : entre l'invitation et le depart, rien ne
@@ -477,20 +490,22 @@ export default function CallRoomPage() {
           {(showRemoteVideo || ecranDivise) && (
             <div className="video-name-chip">
               <span className="video-name-chip-name">
-                {ecranDivise ? `${remoteStreamEntries.length + 1} participants` : peerName}
+                {ecranDivise
+                  ? t("a2_participants_count", { n: remoteStreamEntries.length + 1 })
+                  : peerName}
               </span>
               <span className="video-name-chip-time">
                 <span className="status-dot-live" />
                 {formatElapsed(elapsed)}
                 {!ecranDivise && call.isGroup
-                  ? ` — ${remoteStreamEntries.length + 1} participants`
+                  ? ` — ${t("a2_participants_count", { n: remoteStreamEntries.length + 1 })}`
                   : ""}
               </span>
               {/* Le bloc central portait ces deux messages : sans lui, ils
                   n'auraient plus nulle part ou s'afficher. */}
               {call.transferPending && (
                 <span className="video-name-chip-time" style={{ color: "var(--accent)" }}>
-                  Transfert en cours…
+                  {t("a2_transfer_ongoing")}
                 </span>
               )}
               {call.error && (
@@ -599,7 +614,9 @@ export default function CallRoomPage() {
                     </svg>
                   )}
                 </div>
-                <span className="ctrl-btn-label">{call.micOn ? "Micro" : "Muet"}</span>
+                <span className="ctrl-btn-label">
+                  {call.micOn ? t("mic_short") : t("muted_short")}
+                </span>
               </button>
 
               {isVideo && (
@@ -637,7 +654,9 @@ export default function CallRoomPage() {
                       </svg>
                     )}
                   </div>
-                  <span className="ctrl-btn-label">{call.camOn ? "Camera" : "Camera off"}</span>
+                  <span className="ctrl-btn-label">
+                    {call.camOn ? t("a2_cam_short") : t("a2_cam_off_short")}
+                  </span>
                 </button>
               )}
 
@@ -648,7 +667,10 @@ export default function CallRoomPage() {
                   aria-label={t("switch_camera")}
                 >
                   <div className="ctrl-btn-icon ctrl-on">↻</div>
-                  <span className="ctrl-btn-label">{t("back")}</span>
+                  {/* Cette commande RETOURNE la camera : la cle generique
+                      « back » y affichait « Retour », donc « Back » en anglais,
+                      juste sous une icone de bascule. */}
+                  <span className="ctrl-btn-label">{t("a2_flip_camera_short")}</span>
                 </button>
               )}
 
@@ -660,12 +682,12 @@ export default function CallRoomPage() {
                   onClick={() =>
                     setCallAudioOutput(call.audioOutput === "speaker" ? "earpiece" : "speaker")
                   }
-                  aria-label={OUTPUT_LABELS[call.audioOutput]}
+                  aria-label={t(CLE_SORTIE[call.audioOutput])}
                   aria-pressed={call.audioOutput === "speaker"}
                   title={
                     call.audioOutput === "speaker"
-                      ? "Passer en ecoute a l'oreille"
-                      : "Passer en haut-parleur"
+                      ? t("a2_switch_to_earpiece")
+                      : t("a2_switch_to_speaker")
                   }
                 >
                   <div
@@ -700,7 +722,7 @@ export default function CallRoomPage() {
                       </svg>
                     )}
                   </div>
-                  <span className="ctrl-btn-label">{OUTPUT_LABELS_COURTS[call.audioOutput]}</span>
+                  <span className="ctrl-btn-label">{t(CLE_SORTIE_COURTE[call.audioOutput])}</span>
                 </button>
               )}
 

@@ -62,7 +62,7 @@ export default function LoginPage() {
       await login({ phone: normalizeIdentifier(phone), password: pwd })
       navigate(redirectTo, { replace: true })
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Connexion impossible.")
+      setError(submitError instanceof Error ? submitError.message : t("x2_login_failed"))
     } finally {
       setLoading(false)
     }
@@ -72,7 +72,7 @@ export default function LoginPage() {
     <div className="login-root">
       <div className="left-panel">
         <div className="logo">
-          <img src={alanyaLogo} alt="Logo Alanya Work" className="auth-school-logo" />
+          <img src={alanyaLogo} alt={t("x2_logo_alt")} className="auth-school-logo" />
           <div className="auth-brand-copy">
             <BrandName className="logo-name" />
           </div>

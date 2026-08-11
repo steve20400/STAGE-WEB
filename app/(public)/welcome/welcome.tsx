@@ -13,7 +13,7 @@ export default function WelcomePage() {
         {/* Navbar */}
         <nav className="nav">
           <div className="nav-logo">
-            <img src={alanyaLogo} alt="Logo Alanya Work" className="school-logo" />
+            <img src={alanyaLogo} alt={t("x2_logo_alt")} className="school-logo" />
             <div className="brand-copy">
               <BrandName className="display-font brand-name" />
             </div>

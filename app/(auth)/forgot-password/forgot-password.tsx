@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
     <div className="fp-root">
       <main className="fp-card">
         <Link to="/" className="fp-brand" aria-label={t("auth_back_home")}>
-          <img src={alanyaLogo} alt="Logo Alanya Work" className="fp-logo" />
+          <img src={alanyaLogo} alt={t("x2_logo_alt")} className="fp-logo" />
           <span>
             <BrandName className="fp-brand-name" />
           </span>

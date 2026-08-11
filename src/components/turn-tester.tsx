@@ -161,13 +161,13 @@ export default function TurnTester() {
           <div style={{ display: "flex", gap: 8 }}>
             <input
               style={inputStyle}
-              placeholder="Username"
+              placeholder={t("s2_username")}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
             <input
               style={inputStyle}
-              placeholder="Credential"
+              placeholder={t("password")}
               value={credential}
               onChange={(e) => setCredential(e.target.value)}
             />

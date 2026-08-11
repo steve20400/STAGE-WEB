@@ -15,7 +15,7 @@ import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { ApiError } from "../../../src/lib/api-client"
 import { Dialer } from "./dialer"
 import { AvatarCircle } from "../../../src/components/avatar-circle"
-import { useTranslation, type Cle } from "../../../src/i18n"
+import { langueInitiale, traduire, useTranslation, type Cle } from "../../../src/i18n"
 
 type FilterType = "all" | "missed" | "audio" | "video"
 
@@ -29,23 +29,33 @@ const SORT_KEYS: Record<SortType, Cle> = {
   name: "sort_name",
 }
 
+/**
+ * Heures, jours et mois suivent la langue choisie, comme les libelles.
+ *
+ * `fr-FR` etait fige ici : un utilisateur en anglais lisait « lundi » et
+ * « nov. » au milieu d'un ecran par ailleurs traduit. Ces deux fonctions vivent
+ * hors composant : elles passent donc par `traduire(langueInitiale(), ...)`,
+ * evalue a chaque appel, et non par le hook.
+ */
 function formatItemTime(date: Date): string {
+  const langue = langueInitiale()
   const now = new Date()
   const diff = now.getTime() - date.getTime()
   const days = Math.floor(diff / 86400000)
-  if (days === 0) return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
-  if (days === 1) return "Hier"
-  if (days < 7) return date.toLocaleDateString("fr-FR", { weekday: "long" })
-  return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
+  if (days === 0) return date.toLocaleTimeString(langue, { hour: "2-digit", minute: "2-digit" })
+  if (days === 1) return traduire(langue, "a2_yesterday")
+  if (days < 7) return date.toLocaleDateString(langue, { weekday: "long" })
+  return date.toLocaleDateString(langue, { day: "numeric", month: "short" })
 }
 
 function formatGroupHeader(date: Date): string {
+  const langue = langueInitiale()
   const now = new Date()
   const diff = Math.floor((now.getTime() - date.getTime()) / 86400000)
-  if (diff === 0) return "Aujourd'hui"
-  if (diff === 1) return "Hier"
-  if (diff < 7) return date.toLocaleDateString("fr-FR", { weekday: "long" })
-  return date.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+  if (diff === 0) return traduire(langue, "a2_today")
+  if (diff === 1) return traduire(langue, "a2_yesterday")
+  if (diff < 7) return date.toLocaleDateString(langue, { weekday: "long" })
+  return date.toLocaleDateString(langue, { day: "numeric", month: "long", year: "numeric" })
 }
 
 function DirectionArrow({ direction }: { direction: CallDirection }) {
@@ -67,7 +77,7 @@ function DirectionArrow({ direction }: { direction: CallDirection }) {
 }
 
 export default function CallsPage() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<FilterType>("all")
   const [sort, setSort] = useState<SortType>("recent")
@@ -102,14 +112,18 @@ export default function CallsPage() {
       .filter((call) => call.contactName.toLowerCase().includes(search.toLowerCase()))
   }, [callsHistory, filter, search])
 
+  // `language` figure dans les dependances : l'ordre alphabetique depend du
+  // collateur, et il differe franchement entre le pinyin chinois et les langues
+  // latines. Sans elle, la liste resterait triee selon la langue precedente tant
+  // que ni le filtre ni la recherche ne bougent.
   const sorted = useMemo(() => {
     const list = [...filtered]
     if (sort === "name")
-      return list.sort((a, b) => a.contactName.localeCompare(b.contactName, "fr"))
+      return list.sort((a, b) => a.contactName.localeCompare(b.contactName, language))
     return list.sort((a, b) =>
       sort === "oldest" ? a.ts.getTime() - b.ts.getTime() : b.ts.getTime() - a.ts.getTime()
     )
-  }, [filtered, sort])
+  }, [filtered, sort, language])
 
   const grouped = useMemo(() => {
     // Trie par nom, le regroupement par jour n'a plus de sens : on rend une
@@ -215,7 +229,7 @@ export default function CallsPage() {
                 <circle cx="9" cy="7" r="4" />
                 <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
               </svg>
-              Appeler contact
+              {t("call_contact")}
             </button>
             <button className="dial-btn" onClick={() => setDialerOpen(true)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -229,7 +243,7 @@ export default function CallsPage() {
                 <circle cx="12" cy="18" r="1.9" />
                 <circle cx="18" cy="18" r="1.9" />
               </svg>
-              Composer ID
+              {t("dial_id")}
             </button>
           </div>
 
@@ -266,7 +280,7 @@ export default function CallsPage() {
                     t("filter_all")
                   ) : current === "missed" ? (
                     <>
-                      Manques{" "}
+                      {t("filter_missed")}{" "}
                       {missedCount > 0 && (
                         <span
                           style={{
@@ -293,7 +307,7 @@ export default function CallsPage() {
 
             {/* Tri de l'historique, distinct des filtres de type au-dessus. */}
             <div className="sort-group" role="group" aria-label={t("sort_history")}>
-              <span className="sort-label">Trier</span>
+              <span className="sort-label">{t("sort")}</span>
               {(Object.keys(SORT_KEYS) as SortType[]).map((current) => (
                 <button
                   key={current}
@@ -323,9 +337,10 @@ export default function CallsPage() {
                     <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                   </svg>
                 ),
+                id: "total",
                 iconBg: "#E8B84B15",
                 val: callsHistory.length,
-                lbl: "Total appels",
+                lbl: t("a2_stat_total_calls"),
               },
               {
                 icon: (
@@ -341,9 +356,10 @@ export default function CallsPage() {
                     <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                   </svg>
                 ),
+                id: "missed",
                 iconBg: "#ef444415",
                 val: missedCount,
-                lbl: "Appels manques",
+                lbl: t("a2_stat_missed_calls"),
                 valColor: "#ef4444",
               },
               {
@@ -361,12 +377,15 @@ export default function CallsPage() {
                     <rect x="1" y="5" width="15" height="14" rx="2" />
                   </svg>
                 ),
+                id: "video",
                 iconBg: "#60a5fa15",
                 val: callsHistory.filter((call) => call.type === "video").length,
-                lbl: "Appels video",
+                lbl: t("a2_stat_video_calls"),
               },
+              // La cle de liste porte l'identifiant et non le libelle : traduit,
+              // celui-ci change avec la langue et remonterait toute la bande.
             ].map((chip) => (
-              <div className="stat-chip" key={chip.lbl}>
+              <div className="stat-chip" key={chip.id}>
                 <div className="stat-chip-icon" style={{ background: chip.iconBg }}>
                   {chip.icon}
                 </div>
@@ -501,7 +520,7 @@ export default function CallsPage() {
                       <div className="call-right">
                         <div className="call-ts">{formatItemTime(call.ts)}</div>
                         <RowActionsMenu
-                          ariaLabel={`Actions pour ${call.contactName}`}
+                          ariaLabel={t("a2_actions_for", { name: call.contactName })}
                           actions={[
                             {
                               label: t("call_back_audio"),

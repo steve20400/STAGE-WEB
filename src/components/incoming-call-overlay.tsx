@@ -183,7 +183,12 @@ export default function IncomingCallOverlay({
         }
       `}</style>
 
-      <div className="ical-overlay" role="dialog" aria-modal="true" aria-label="Appel entrant">
+      <div
+        className="ical-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("ring_incoming_call")}
+      >
         <div className="ical-card">
           <div className="ical-avatar-wrap">
             <div
@@ -248,7 +253,7 @@ export default function IncomingCallOverlay({
             </button>
           </div>
 
-          <div className="ical-timer">Decline automatiquement dans {remaining}s</div>
+          <div className="ical-timer">{t("a2_auto_decline_in", { n: remaining })}</div>
         </div>
       </div>
     </>

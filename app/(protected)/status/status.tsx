@@ -1,4 +1,4 @@
-import { useTranslation } from "../../../src/i18n"
+import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useToast } from "../../../src/components/toast"
 import { toInitials } from "../../../src/data/session-user"
@@ -21,12 +21,15 @@ function groupLabel(group: StatusGroup): string {
   return group.pseudo?.trim() || group.publicNumber
 }
 
+// Helper hors composant : la langue est relue a chaque appel, donc a chaque
+// rendu. Un changement de langue se propage sans recharger la page.
 function timeAgo(iso: string): string {
+  const langue = langueInitiale()
   const diffMin = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
-  if (diffMin < 1) return "a l'instant"
-  if (diffMin < 60) return `il y a ${diffMin} min`
+  if (diffMin < 1) return traduire(langue, "l2_just_now")
+  if (diffMin < 60) return traduire(langue, "set_ago_minutes", { n: diffMin })
   const h = Math.floor(diffMin / 60)
-  return `il y a ${h} h`
+  return traduire(langue, "set_ago_hours", { n: h })
 }
 
 /** Anneau d'avatar : accent si statuts non vus, discret sinon. */
@@ -39,7 +42,8 @@ function StatusAvatar({
   isMine?: boolean
   onClick: () => void
 }) {
-  const label = isMine ? "Mon statut" : groupLabel(group)
+  const { t } = useTranslation()
+  const label = isMine ? t("l2_my_status") : groupLabel(group)
   const ringColor = group.hasUnviewed && !isMine ? "var(--accent)" : "var(--border-strong)"
   return (
     <button
@@ -208,13 +212,13 @@ export default function StatusPage() {
     setPosting(true)
     try {
       await postTextStatus(text, composerBg)
-      success("Statut publie", t("status_visible_24h"))
+      success(t("l2_status_published"), t("status_visible_24h"))
       setComposerText("")
       setComposerOpen(false)
       await reload()
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Publication impossible."
-      error("Statut non publie", message)
+      const message = err instanceof Error ? err.message : t("l2_publish_failed_detail")
+      error(t("l2_status_not_published"), message)
     } finally {
       setPosting(false)
     }
@@ -223,18 +227,18 @@ export default function StatusPage() {
   const submitMediaStatus = async (file: File) => {
     if (posting) return
     if (file.size > 50 * 1024 * 1024) {
-      error("Fichier trop volumineux", "Maximum 50 Mo.")
+      error(t("set_file_too_large"), t("l2_max_50_mb"))
       return
     }
     setPosting(true)
     try {
       await postMediaStatus(file)
-      success("Statut publie", t("status_visible_24h"))
+      success(t("l2_status_published"), t("status_visible_24h"))
       setComposerOpen(false)
       await reload()
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Publication impossible."
-      error("Statut non publie", message)
+      const message = err instanceof Error ? err.message : t("l2_publish_failed_detail")
+      error(t("l2_status_not_published"), message)
     } finally {
       setPosting(false)
     }
@@ -245,11 +249,11 @@ export default function StatusPage() {
     const status = viewer.group.statuses[viewer.index]
     try {
       await deleteStatus(status.id)
-      success("Statut supprime", "")
+      success(t("l2_status_deleted"), "")
       closeViewer()
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Suppression impossible."
-      error("Erreur", message)
+      const message = err instanceof Error ? err.message : t("cinfo_delete_failed")
+      error(t("error"), message)
     }
   }
 
@@ -261,7 +265,7 @@ export default function StatusPage() {
         <div className="calls-title-row page-title-row">
           <h1 className="calls-title">{t("status")}</h1>
           <button className="new-call-btn" onClick={() => setComposerOpen((v) => !v)}>
-            {composerOpen ? "Fermer" : t("publish_status")}
+            {composerOpen ? t("close") : t("publish_status")}
           </button>
         </div>
       </div>
@@ -301,7 +305,7 @@ export default function StatusPage() {
               <button
                 key={colorHex}
                 onClick={() => setComposerBg(colorHex)}
-                aria-label={`Fond ${colorHex}`}
+                aria-label={t("l2_background_color", { couleur: colorHex })}
                 style={{
                   width: 28,
                   height: 28,
@@ -340,14 +344,14 @@ export default function StatusPage() {
                 cursor: "pointer",
               }}
             >
-              Photo / video
+              {t("l2_photo_video")}
             </button>
             <button
               className="new-call-btn"
               onClick={() => void submitTextStatus()}
               disabled={!composerText.trim() || posting}
             >
-              {posting ? "Publication..." : "Publier"}
+              {posting ? t("l2_publishing") : t("l2_publish")}
             </button>
           </div>
         </div>
@@ -372,7 +376,7 @@ export default function StatusPage() {
       </div>
 
       {loading && (
-        <div style={{ color: "var(--text-muted)", fontSize: 13, padding: 12 }}>Chargement...</div>
+        <div style={{ color: "var(--text-muted)", fontSize: 13, padding: 12 }}>{t("loading")}</div>
       )}
       {!loading && !feed.me?.statuses.length && feed.others.length === 0 && (
         <div className="empty-state">
@@ -428,15 +432,17 @@ export default function StatusPage() {
                 fontSize: 13,
               }}
             >
-              {toInitials(viewer.isMine ? "Moi" : groupLabel(viewer.group))}
+              {toInitials(viewer.isMine ? t("l2_me") : groupLabel(viewer.group))}
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>
-                {viewer.isMine ? "Mon statut" : groupLabel(viewer.group)}
+                {viewer.isMine ? t("l2_my_status") : groupLabel(viewer.group)}
               </div>
               <div style={{ color: "#ffffff90", fontSize: 11 }}>
                 {timeAgo(currentStatus.createdAt)}
-                {viewer.isMine ? ` — ${currentStatus.viewsCount} vue(s)` : ""}
+                {viewer.isMine
+                  ? ` — ${t("l2_views_count", { count: currentStatus.viewsCount })}`
+                  : ""}
               </div>
             </div>
             {viewer.isMine && (
@@ -468,7 +474,7 @@ export default function StatusPage() {
             )}
             <button
               onClick={closeViewer}
-              aria-label="Fermer"
+              aria-label={t("close")}
               style={{
                 background: "#ffffff20",
                 border: "none",
@@ -561,7 +567,7 @@ export default function StatusPage() {
             {currentStatus.type === "IMAGE" && currentStatus.mediaUrl && (
               <img
                 src={resolveMediaUrl(currentStatus.mediaUrl)}
-                alt="statut"
+                alt={t("l2_status_alt")}
                 style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
               />
             )}

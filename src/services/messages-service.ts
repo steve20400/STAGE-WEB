@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from "../lib/api-client"
+import { langueInitiale, traduire } from "../i18n"
 import { type ChatMessageMock, type MessageStatus, type MessageType } from "../mocks/chat-data"
 import { getMyUserId } from "../data/session-user"
 import {
@@ -83,10 +84,19 @@ function toBackendType(type: MessageType): string {
   return "TEXT"
 }
 
-function formatBytes(size?: number): string | undefined {
+/**
+ * Taille d'une piece jointe, telle qu'elle s'affiche sous la bulle.
+ *
+ * L'unite se traduit : « Ko » et « Mo » sont des abreviations francaises, et
+ * elles restaient telles quelles pour un lecteur anglophone ou russophone.
+ */
+export function formatBytes(size?: number): string | undefined {
   if (!size || size <= 0) return undefined
-  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} Ko`
-  return `${(size / 1024 / 1024).toFixed(1)} Mo`
+  const langue = langueInitiale()
+  if (size < 1024 * 1024) {
+    return traduire(langue, "v2_size_kb", { taille: Math.max(1, Math.round(size / 1024)) })
+  }
+  return traduire(langue, "v2_size_mb", { taille: (size / 1024 / 1024).toFixed(1) })
 }
 
 /** Transforme la reponse backend vers le type front, en distinguant "me" vs autre. */

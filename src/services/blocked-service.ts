@@ -1,4 +1,5 @@
 import { apiRequest } from "../lib/api-client"
+import { langueInitiale, traduire } from "../i18n"
 
 /**
  * Blocage de contacts.
@@ -79,5 +80,7 @@ export async function debloquer(idBlock: number): Promise<void> {
 
 /** Nom affichable d'une personne bloquee, quel que soit ce que le serveur a. */
 export function nomDuBloque(personne: PersonneBloquee): string {
-  return personne.pseudo?.trim() || personne.publicNumber || "Inconnu"
+  return (
+    personne.pseudo?.trim() || personne.publicNumber || traduire(langueInitiale(), "v2_unknown")
+  )
 }

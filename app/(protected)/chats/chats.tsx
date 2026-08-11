@@ -15,13 +15,16 @@ import { getMyUserId, toInitials } from "../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
 import { listerBlocages } from "../../../src/services/blocked-service"
-import { useTranslation } from "../../../src/i18n"
+import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import "./chats-page.css"
 
+// Helper hors composant : la langue est relue a chaque appel, donc a chaque
+// rendu. Un changement de langue se propage sans recharger la page.
 function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
-  if (type === "file") return "[fichier] "
-  if (type === "audio") return "[audio] "
-  if (type === "image") return "[image] "
+  const langue = langueInitiale()
+  if (type === "file") return `[${traduire(langue, "file")}] `
+  if (type === "audio") return `[${traduire(langue, "cinfo_audio")}] `
+  if (type === "image") return `[${traduire(langue, "l2_image")}] `
   return ""
 }
 
@@ -197,7 +200,7 @@ export default function ChatsPage() {
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             ) : (
-              toInitials(sessionUser?.name ?? "Moi")
+              toInitials(sessionUser?.name ?? t("l2_me"))
             )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -211,7 +214,7 @@ export default function ChatsPage() {
                 whiteSpace: "nowrap",
               }}
             >
-              {sessionUser?.name ?? "Mon profil"}
+              {sessionUser?.name ?? t("my_profile")}
             </div>
             <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
               Alanya ID :{" "}
@@ -397,7 +400,7 @@ function ConvItem({ conv }: { conv: ConversationMock }) {
       <div className="conv-meta">
         <div className="conv-name">
           {conv.name}
-          {conv.isPinned && <span className="pin-icon">epingle</span>}
+          {conv.isPinned && <span className="pin-icon">{t("l2_pinned_badge")}</span>}
           {conv.isGroup && (
             <span
               style={{
@@ -409,7 +412,7 @@ function ConvItem({ conv }: { conv: ConversationMock }) {
                 fontWeight: 500,
               }}
             >
-              groupe
+              {t("set_about_group")}
             </span>
           )}
           {/* Reservee par un appareil du compte. Visible AVANT d'ouvrir : c'est
@@ -419,7 +422,9 @@ function ConvItem({ conv }: { conv: ConversationMock }) {
             <span
               className="conv-lock"
               title={
-                conv.lock.detenteur ? `${conv.lock.detenteur} a la main` : t("locked_by_device")
+                conv.lock.detenteur
+                  ? t("has_the_hand", { name: conv.lock.detenteur })
+                  : t("locked_by_device")
               }
             >
               <svg
@@ -435,7 +440,7 @@ function ConvItem({ conv }: { conv: ConversationMock }) {
                 <rect x="4" y="11" width="16" height="10" rx="2" />
                 <path d="M8 11V7a4 4 0 018 0v4" />
               </svg>
-              {conv.lock.detenteur ?? "reservee"}
+              {conv.lock.detenteur ?? t("l2_reserved_badge")}
             </span>
           )}
         </div>

@@ -63,7 +63,7 @@ export default function AiAssistantPage() {
       setMessages((prev) => [...prev, reply])
     } catch (err) {
       const message = err instanceof Error ? err.message : t("ai_unavailable")
-      error("Assistant IA", message)
+      error(t("assistant"), message)
     } finally {
       setThinking(false)
       inputRef.current?.focus()
@@ -82,8 +82,8 @@ export default function AiAssistantPage() {
       await clearAiHistory()
       setMessages([])
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Suppression impossible."
-      error("Erreur", message)
+      const message = err instanceof Error ? err.message : t("set_delete_failed_detail")
+      error(t("error"), message)
     } finally {
       setConfirmClear(false)
     }
@@ -109,7 +109,7 @@ export default function AiAssistantPage() {
           </svg>
         </div>
         <div className="room-info">
-          <div className="room-name">Assistant Alanya</div>
+          <div className="room-name">{t("s2_ai_name")}</div>
           <div className="room-sub" style={{ color: "var(--text-muted)" }}>
             {t("ai_powered_by")}
           </div>
@@ -200,7 +200,7 @@ export default function AiAssistantPage() {
         {thinking && (
           <div className="typing-indicator">
             <div className="typing-av" style={{ background: "var(--brand)", color: "#fff" }}>
-              IA
+              {t("s2_ai_short")}
             </div>
             <div className="typing-bubble">
               <div className="td" />
@@ -224,13 +224,13 @@ export default function AiAssistantPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
-            aria-label="Ecrire a l'assistant"
+            aria-label={t("s2_write_to_assistant")}
           />
           <button
             className="send-btn"
             onClick={() => void send()}
             disabled={!input.trim() || thinking}
-            aria-label="Envoyer"
+            aria-label={t("send")}
           >
             <svg
               width="15"
@@ -299,7 +299,7 @@ export default function AiAssistantPage() {
                   cursor: "pointer",
                 }}
               >
-                Annuler
+                {t("cancel")}
               </button>
               <button
                 onClick={() => void handleClear()}
@@ -314,7 +314,7 @@ export default function AiAssistantPage() {
                   cursor: "pointer",
                 }}
               >
-                Effacer
+                {t("erase")}
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { apiRequest } from "../lib/api-client"
 import { resolveMediaUrl } from "./media-service"
+import { langueInitiale, traduire } from "../i18n"
 
 /**
  * Reunions audio/video.
@@ -162,7 +163,7 @@ export async function createMeeting(donnees: NouvelleReunion): Promise<number> {
     },
   })
   const id = res.idMeeting ?? res.id
-  if (!id) throw new Error("Le serveur n'a pas renvoye d'identifiant de reunion.")
+  if (!id) throw new Error(traduire(langueInitiale(), "v2_meeting_no_id"))
   return id
 }
 

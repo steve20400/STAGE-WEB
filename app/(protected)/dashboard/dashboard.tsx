@@ -7,7 +7,7 @@ import {
 } from "../../../src/services/dashboard-service"
 import { subscribeToAllMessages } from "../../../src/services/websocket-service"
 import "./dashboard-page.css"
-import { useTranslation } from "../../../src/i18n"
+import { useTranslation, type Cle, type LanguageCode } from "../../../src/i18n"
 
 // TYPES
 
@@ -23,17 +23,37 @@ function avatarColor(index: number): string {
   return AVATAR_COLORS[index % AVATAR_COLORS.length]
 }
 
-/** Determine la salutation selon l'heure de la journee. */
-function getGreeting(): string {
+/**
+ * Salutation selon l'heure de la journee, rendue sous forme de CLE : le libelle
+ * est resolu au rendu, il suit donc la langue choisie sans rechargement.
+ */
+function greetingKey(): Cle {
   const hour = new Date().getHours()
-  if (hour < 12) return "Bonjour"
-  if (hour < 18) return "Bon apres-midi"
-  return "Bonsoir"
+  if (hour < 12) return "s2_greeting_morning"
+  if (hour < 18) return "s2_greeting_afternoon"
+  return "s2_greeting_evening"
 }
 
-/** Formate la date du jour en francais (ex : "jeudi 10 avril"). */
-function getTodayLabel(): string {
-  return new Date().toLocaleDateString("fr-FR", {
+/**
+ * Etiquette regionale de chaque langue, pour les noms de jour et de mois.
+ * Le code court suffirait au navigateur, mais il choisirait « pt-BR » pour le
+ * portugais et « nn » pour le norvegien : on fixe la variante attendue.
+ */
+const LOCALES: Record<LanguageCode, string> = {
+  fr: "fr-FR",
+  en: "en-GB",
+  es: "es-ES",
+  de: "de-DE",
+  pt: "pt-PT",
+  ru: "ru-RU",
+  zh: "zh-CN",
+  sv: "sv-SE",
+  no: "nb-NO",
+}
+
+/** Date du jour dans la langue courante (ex : « jeudi 10 avril »). */
+function getTodayLabel(langue: LanguageCode): string {
+  return new Date().toLocaleDateString(LOCALES[langue], {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -90,7 +110,7 @@ function CallDirectionIcon({ direction }: { direction: DashboardCall["direction"
 // PAGE PRINCIPALE
 
 export default function DashboardPage() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const navigate = useNavigate()
   const [data, setData] = useState<DashboardData | null>(null)
 
@@ -124,7 +144,7 @@ export default function DashboardPage() {
     return (
       <main className="dash">
         <div className="dash-header">
-          <h1 className="dash-title">Chargement...</h1>
+          <h1 className="dash-title">{t("loading")}</h1>
         </div>
       </main>
     )
@@ -138,9 +158,9 @@ export default function DashboardPage() {
   return (
     <main className="dash">
       <div className="dash-header">
-        <div className="greeting">{getTodayLabel()}</div>
+        <div className="greeting">{getTodayLabel(language)}</div>
         <h1 className="dash-title">
-          {getGreeting()}, <span>{firstName}.</span>
+          {t(greetingKey())}, <span>{firstName}.</span>
         </h1>
       </div>
 
@@ -172,9 +192,9 @@ export default function DashboardPage() {
         {/* Conversations */}
         <div className="card">
           <div className="card-head">
-            <span className="card-title">Conversations recentes</span>
+            <span className="card-title">{t("s2_recent_conversations")}</span>
             <Link to="/chats" className="card-link">
-              Tout voir
+              {t("s2_see_all")}
             </Link>
           </div>
 
@@ -194,7 +214,7 @@ export default function DashboardPage() {
                 <div className="chat-meta">
                   <div className="chat-name">
                     {chat.name}
-                    {chat.isGroup && <span className="group-pill">groupe</span>}
+                    {chat.isGroup && <span className="group-pill">{t("set_about_group")}</span>}
                   </div>
                   <div className="chat-preview">{chat.lastMessage}</div>
                 </div>
@@ -224,15 +244,15 @@ export default function DashboardPage() {
           <div className="profile-divider" />
 
           <div className="profile-row">
-            <span className="profile-row-label">Statut</span>
-            <span className="profile-row-val profile-row-val--online">En ligne</span>
+            <span className="profile-row-label">{t("s2_profile_status")}</span>
+            <span className="profile-row-val profile-row-val--online">{t("online")}</span>
           </div>
           <div className="profile-row">
-            <span className="profile-row-label">Message</span>
+            <span className="profile-row-label">{t("cinfo_message")}</span>
             <span className="profile-row-val">{currentUser.statusMsg}</span>
           </div>
           <div className="profile-row">
-            <span className="profile-row-label">Membre depuis</span>
+            <span className="profile-row-label">{t("s2_member_since")}</span>
             <span className="profile-row-val">{currentUser.memberSince}</span>
           </div>
           <div className="profile-row">
@@ -252,9 +272,9 @@ export default function DashboardPage() {
         {/* Appels recents */}
         <div className="card">
           <div className="card-head">
-            <span className="card-title">Appels recents</span>
+            <span className="card-title">{t("dash_recent_calls")}</span>
             <Link to="/calls" className="card-link">
-              Tout voir
+              {t("s2_see_all")}
             </Link>
           </div>
 
@@ -270,10 +290,12 @@ export default function DashboardPage() {
                   <div className="call-name">{call.name}</div>
                   <div className="call-meta">
                     <CallDirectionIcon direction={call.direction} />
-                    <span className="type-badge">{call.type === "video" ? "Video" : "Audio"}</span>
+                    <span className="type-badge">
+                      {call.type === "video" ? t("filter_video") : t("filter_audio")}
+                    </span>
                     {call.duration !== "-" && <span>{call.duration}</span>}
                     {call.direction === "missed" && (
-                      <span className="call-missed-label">Manque</span>
+                      <span className="call-missed-label">{t("s2_missed")}</span>
                     )}
                   </div>
                 </div>
@@ -282,7 +304,8 @@ export default function DashboardPage() {
                   <div className="call-time">{call.time}</div>
                   <button
                     className="call-btn"
-                    title="Rappeler"
+                    title={t("s2_call_back")}
+                    aria-label={t("s2_call_back")}
                     onClick={() =>
                       navigate(
                         `/calls/new?contact=${call.contactId}&type=${call.type}&returnTo=${encodeURIComponent("/dashboard")}`
@@ -310,8 +333,8 @@ export default function DashboardPage() {
         {/* Contacts */}
         <div className="card">
           <div className="card-head">
-            <span className="card-title">Contacts</span>
-            <span className="contacts-online">{onlineCount} en ligne</span>
+            <span className="card-title">{t("contacts")}</span>
+            <span className="contacts-online">{t("s2_n_online", { n: onlineCount })}</span>
           </div>
 
           {contacts.map((contact, i) => {
@@ -329,7 +352,7 @@ export default function DashboardPage() {
                 </div>
 
                 <Link to={`/chats?contact=${contact.id}`} className="contact-write">
-                  Ecrire
+                  {t("s2_write")}
                 </Link>
               </div>
             )

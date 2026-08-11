@@ -26,6 +26,7 @@ import {
 import { findLocalGroup, toChatInfoMock } from "../../../../src/data/local-groups"
 import { useToast } from "../../../../src/components/toast"
 import {
+  formatBytes,
   deleteChatMessage,
   fetchMessages,
   fetchMessagesCacheFirst,
@@ -105,7 +106,9 @@ class MessageErrorBoundary extends Component<
           color: "var(--text-secondary)",
         }}
       >
-        <div style={{ fontWeight: 700 }}>{this.props.name ?? "Fichier"}</div>
+        <div style={{ fontWeight: 700 }}>
+          {this.props.name ?? traduire(langueInitiale(), "file")}
+        </div>
         {this.props.size && <div style={{ marginTop: 2 }}>{this.props.size}</div>}
         <div style={{ marginTop: 5 }}>{traduire(langueInitiale(), "preview_unavailable")}</div>
       </div>
@@ -116,16 +119,22 @@ class MessageErrorBoundary extends Component<
 // Realtime : WebSocket natif du backend Alanya (evenements { type: "message" | "typing" | "read" })
 
 function formatTime(d: Date) {
-  return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+  return d.toLocaleTimeString(langueInitiale(), { hour: "2-digit", minute: "2-digit" })
 }
 
 function formatDateSeparator(d: Date) {
   const today = new Date()
   const yesterday = new Date(today)
   yesterday.setDate(today.getDate() - 1)
-  if (d.toDateString() === today.toDateString()) return "Aujourd'hui"
-  if (d.toDateString() === yesterday.toDateString()) return "Hier"
-  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+  if (d.toDateString() === today.toDateString()) return traduire(langueInitiale(), "f2_today")
+  if (d.toDateString() === yesterday.toDateString())
+    return traduire(langueInitiale(), "f2_yesterday")
+  // Le jour et le mois s'ecrivent en toutes lettres : ils suivent la langue choisie.
+  return d.toLocaleDateString(langueInitiale(), {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
 }
 
 /**
@@ -195,9 +204,9 @@ function ViewerFullscreenButton({
         event.stopPropagation()
         onToggle()
       }}
-      aria-label={expanded ? t("reset_zoom") : "Afficher en plein ecran"}
+      aria-label={expanded ? t("reset_zoom") : t("f2_show_fullscreen")}
       aria-pressed={expanded}
-      title={expanded ? "Taille initiale" : "Plein ecran"}
+      title={expanded ? t("f2_original_size") : t("f2_fullscreen")}
       style={{
         background: "none",
         border: "none",
@@ -350,7 +359,7 @@ function DocumentViewer({
           }}
         >
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {name ?? "Fichier"}
+            {name ?? t("file")}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
             <ViewerFullscreenButton
@@ -389,7 +398,7 @@ function DocumentViewer({
           {!isOffice && isImage && (
             <img
               src={url}
-              alt={name ?? "image"}
+              alt={name ?? t("f2_image")}
               style={{
                 maxWidth: "100%",
                 maxHeight: bodyHeight,
@@ -513,7 +522,7 @@ function DocumentViewer({
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
-              <div style={{ fontSize: 13, opacity: 0.8 }}>{name ?? "Fichier"}</div>
+              <div style={{ fontSize: 13, opacity: 0.8 }}>{name ?? t("file")}</div>
               <a
                 href={url}
                 target="_blank"
@@ -936,9 +945,14 @@ function fileTypeInfo(filename?: string, mime?: string): { color: string; label:
 /** Estime le nombre de pages approximatif d'un document selon sa taille et son type. */
 function estimatePages(fileName?: string, fileSize?: string): number {
   const ext = (fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
-  const bytesStr = fileSize ?? "0 Mo"
-  const bytesMatch = bytesStr.match(/([0-9]+(?:\.[0-9]+)?)\s*Mo/i)
-  const bytes = bytesMatch ? parseFloat(bytesMatch[1]) * 1024 * 1024 : 0
+  // On lit le NOMBRE et son ordre de grandeur, jamais le mot qui suit : l'unite
+  // est traduite a l'affichage — « Mo », « MB », « МБ » — et la relire figeait
+  // l'estimation a une page dans huit langues sur neuf.
+  const taille = (fileSize ?? "").match(/([0-9]+(?:[.,][0-9]+)?)\s*([kKmMgG])?/)
+  const nombre = taille ? parseFloat(taille[1].replace(",", ".")) : 0
+  const facteur =
+    { k: 1024, m: 1024 * 1024, g: 1024 * 1024 * 1024 }[(taille?.[2] ?? "").toLowerCase()] ?? 1
+  const bytes = Number.isFinite(nombre) ? nombre * facteur : 0
   if (["pdf"].includes(ext)) return Math.max(1, Math.ceil(bytes / 5000))
   if (["doc", "docx", "ppt", "pptx", "txt", "csv", "md", "tex", "latex", "bib"].includes(ext))
     return Math.max(1, Math.ceil(bytes / 3000))
@@ -1215,7 +1229,7 @@ function CallEventChip({ call }: { call: CallRecord }) {
           : ""
   const failed = Boolean(outcome)
 
-  const label = `${call.type === "video" ? "Appel vidéo" : "Appel vocal"}${outcome ? ` — ${outcome}` : ""}`
+  const label = `${call.type === "video" ? t("video_call") : t("audio_call")}${outcome ? ` — ${outcome}` : ""}`
 
   // Couleurs : rouge si manque/refuse, vert si sortant reussi, bleu si entrant reussi
   const tint = failed ? "var(--danger)" : isOutgoing ? "#22c55e" : "#3b82f6"
@@ -1330,6 +1344,7 @@ function AudioPlayer({
   durationMs?: number
   isMe: boolean
 }) {
+  const { t } = useTranslation()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -1374,7 +1389,7 @@ function AudioPlayer({
       />
       <button
         onClick={toggle}
-        aria-label={playing ? "Pause" : "Lecture"}
+        aria-label={playing ? t("f2_pause") : t("f2_play")}
         style={{
           width: 34,
           height: 34,
@@ -1572,7 +1587,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
             fontSize: 10,
           }}
         >
-          Copier
+          {t("copy")}
         </button>
       </div>
       {loading ? (
@@ -1773,7 +1788,7 @@ function OfficePreview({
       }}
     >
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 600 }}>Apercu {label}</div>
+        <div style={{ fontSize: 11, fontWeight: 600 }}>{t("f2_preview_of", { format: label })}</div>
         <div style={{ fontSize: 9.5, opacity: 0.78, marginTop: 2, lineHeight: 1.4 }}>
           {t("office_warning")}
         </div>
@@ -1796,7 +1811,7 @@ function OfficePreview({
           cursor: "pointer",
         }}
       >
-        Afficher
+        {t("show")}
       </button>
       {/* Dans le fil, la ligne de fichier sous l'apercu porte deja le
         telechargement : le repeter ici alourdissait la bulle pour rien. */}
@@ -1817,7 +1832,7 @@ function OfficePreview({
             textDecoration: "none",
           }}
         >
-          Telecharger
+          {t("download")}
         </a>
       )}
     </div>
@@ -1850,7 +1865,7 @@ function VideoPreview({
       >
         <div style={{ fontWeight: 600 }}>{name ?? t("video_label")}</div>
         <div style={{ opacity: 0.72, marginTop: 3 }}>
-          {size ?? "Taille inconnue"} · {formatAudioDuration(durationMs)}
+          {size ?? t("f2_unknown_size")} · {formatAudioDuration(durationMs)}
         </div>
         <div style={{ opacity: 0.72, marginTop: 4 }}>{t("preview_downloadable")}</div>
       </div>
@@ -1906,7 +1921,7 @@ function FullMediaPreview({
   maxHeight?: string
 }) {
   const { t } = useTranslation()
-  const name = subject.name ?? "Fichier"
+  const name = subject.name ?? t("file")
   const ext = name.split(".").pop()?.toLowerCase() ?? ""
   const isPdf = subject.mime === "application/pdf" || ext === "pdf"
   const isText = subject.mime.startsWith("text/") || TEXT_PREVIEW_EXTENSIONS.includes(ext)
@@ -1973,7 +1988,8 @@ function FullMediaPreview({
           {name}
         </div>
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
-          {subject.note ? `${subject.note} — ` : ""}ce format n'a pas d'apercu dans le navigateur.
+          {subject.note ? `${subject.note} — ` : ""}
+          {t("f2_no_browser_preview")}
         </div>
       </div>
     </div>
@@ -2076,7 +2092,7 @@ function MediaGallery({
             whiteSpace: "nowrap",
           }}
         >
-          {shown?.fileName ?? "Media"}
+          {shown?.fileName ?? t("f2_media")}
           <span style={{ opacity: 0.6, fontWeight: 400 }}>
             {" "}
             — {position + 1}/{msgs.length}
@@ -2090,7 +2106,7 @@ function MediaGallery({
               rel="noreferrer"
               style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}
             >
-              Telecharger
+              {t("download")}
             </a>
           )}
           <ViewerFullscreenButton
@@ -2264,7 +2280,7 @@ function ImageLightbox({
     >
       <img
         src={url}
-        alt={name ?? "image"}
+        alt={name ?? t("f2_image")}
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: expanded ? "100vw" : "92vw",
@@ -2428,7 +2444,10 @@ function MediaComposer({
               name: current.file.name,
               mime: current.mime,
               kind: current.kind,
-              note: `${(current.file.size / 1024 / 1024).toFixed(1)} Mo`,
+              // Meme fonction que le message confirme par le serveur : sans
+              // elle, la meme piece jointe s'ecrivait « 8.0 Mo » a l'envoi puis
+              // « 8.0 MB » apres confirmation, dans le meme fil.
+              note: formatBytes(current.file.size),
             }}
           />
         </div>
@@ -2448,7 +2467,7 @@ function MediaComposer({
             <div key={item.url} style={{ position: "relative", flexShrink: 0 }}>
               <button
                 onClick={() => onIndexChange(i)}
-                aria-label={`Voir ${item.file.name}`}
+                aria-label={t("f2_view_named", { nom: item.file.name })}
                 aria-current={i === index}
                 style={{
                   width: 52,
@@ -2489,7 +2508,7 @@ function MediaComposer({
               </button>
               <button
                 onClick={() => onRemove(i)}
-                aria-label={`Retirer ${item.file.name}`}
+                aria-label={t("set_remove_named", { nom: item.file.name })}
                 style={{
                   position: "absolute",
                   top: -5,
@@ -2613,10 +2632,10 @@ function quotedMediaLabel(msg: Message): string {
   const caption = msg.content?.trim()
   if (caption) return caption
   if (msg.fileName) return msg.fileName
-  if (msg.type === "image") return "Photo"
+  if (msg.type === "image") return traduire(langueInitiale(), "photo")
   if (msg.type === "video") return traduire(langueInitiale(), "video_label")
-  if (msg.type === "audio") return "Message vocal"
-  return "Fichier"
+  if (msg.type === "audio") return traduire(langueInitiale(), "voice_message")
+  return traduire(langueInitiale(), "file")
 }
 
 /**
@@ -2842,7 +2861,11 @@ function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: num
             e.stopPropagation()
             onOpen(index)
           }}
-          aria-label={`Ouvrir ${item.fileName ?? t("the_media")} (${index + 1} sur ${msgs.length})`}
+          aria-label={t("f2_open_media_position", {
+            nom: item.fileName ?? t("the_media"),
+            index: index + 1,
+            total: msgs.length,
+          })}
           style={{
             position: "relative",
             padding: 0,
@@ -2963,11 +2986,11 @@ function MessageBubble({
   const quote = msg.replySnapshot
     ? {
         content: msg.replySnapshot.isDeleted
-          ? "Message supprime"
-          : msg.replySnapshot.content || "[media]",
+          ? t("message_deleted")
+          : msg.replySnapshot.content || t("f2_media_tag"),
       }
     : replyMsg
-      ? { content: replyMsg.content || "[media]" }
+      ? { content: replyMsg.content || t("f2_media_tag") }
       : undefined
 
   // Pendant un glisser-pour-repondre, la fleche occupe la meme place que le
@@ -3292,19 +3315,19 @@ function MessageBubble({
                     minWidth: 170,
                   }}
                 >
-                  {menuItem("Repondre", () => onReply(msg))}
-                  {msg.content ? menuItem("Copier", () => onCopy(msg)) : null}
+                  {menuItem(t("reply"), () => onReply(msg))}
+                  {msg.content ? menuItem(t("copy"), () => onCopy(msg)) : null}
                   {/* Sur un lot, « Agrandir » ouvre la galerie : le menu porte sur la
                     grille entiere, pas sur son premier fichier. */}
                   {albumMsgs && onOpenAlbum
-                    ? menuItem("Agrandir", () => onOpenAlbum(0))
+                    ? menuItem(t("f2_enlarge"), () => onOpenAlbum(0))
                     : canExpandMedia
-                      ? menuItem("Agrandir", openExpandedPreview)
+                      ? menuItem(t("f2_enlarge"), openExpandedPreview)
                       : null}
                   {msg.type === "audio" && mediaSrc
                     ? menuItem(t("download_audio"), downloadAudio)
                     : null}
-                  {menuItem("Transferer", () => onForward(msg))}
+                  {menuItem(t("forward"), () => onForward(msg))}
                   {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
                   {isMe
                     ? menuItem(t("delete_for_all"), () => onDelete(msg, "everyone"), true)
@@ -3338,7 +3361,7 @@ function MessageBubble({
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                 }}
-                title={`Envoye depuis ${msg.nomAgent}`}
+                title={t("f2_sent_from", { nom: msg.nomAgent })}
               >
                 {msg.nomAgent}
               </div>
@@ -3478,7 +3501,7 @@ function MessageBubble({
                   {msg.type === "image" && mediaSrc && (
                     <img
                       src={mediaSrc}
-                      alt={msg.fileName ?? "image"}
+                      alt={msg.fileName ?? t("f2_image")}
                       onClick={() => onOpenImage(mediaSrc, msg.fileName)}
                       style={{
                         width: "100%",
@@ -3628,7 +3651,7 @@ function MessageBubble({
                           return (
                             <img
                               src={mediaSrc}
-                              alt={msg.fileName ?? "image"}
+                              alt={msg.fileName ?? t("f2_image")}
                               style={{
                                 maxWidth: "100%",
                                 maxHeight: 220,
@@ -3792,14 +3815,16 @@ function MessageBubble({
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                {msg.fileName ?? msg.content ?? "Fichier"}
+                                {msg.fileName ?? msg.content ?? t("file")}
                               </div>
                               {msg.fileSize && (
                                 <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
                               )}
                               {msg.fileSize && msg.fileName ? (
                                 <div style={{ fontSize: 9, opacity: 0.7, marginTop: 1 }}>
-                                  Pages : ~{estimatePages(msg.fileName, msg.fileSize)}
+                                  {t("f2_pages_approx", {
+                                    n: estimatePages(msg.fileName, msg.fileSize),
+                                  })}
                                 </div>
                               ) : null}
                               <div
@@ -3840,7 +3865,7 @@ function MessageBubble({
                                         : "var(--text-secondary)",
                                     }}
                                   >
-                                    Envoi en cours...
+                                    {t("f2_sending_in_progress")}
                                   </span>
                                 </div>
                               )}
@@ -3868,7 +3893,7 @@ function MessageBubble({
                                     cursor: "pointer",
                                   }}
                                 >
-                                  Ouvrir
+                                  {t("f2_open")}
                                 </button>
                                 <a
                                   href={mediaSrc ? mediaSrc : "#"}
@@ -3976,7 +4001,7 @@ function MessageBubble({
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                {msg.fileName ?? msg.content ?? "Fichier"}
+                                {msg.fileName ?? msg.content ?? t("file")}
                               </div>
                               {msg.fileSize && (
                                 <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
@@ -4647,12 +4672,12 @@ export default function ChatRoomPage() {
     } catch (err) {
       // En cas d'echec, on marque le message comme "non envoye" pour informer l'user
       setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "sending" } : m)))
-      const message = err instanceof Error ? err.message : "Envoi impossible."
-      error("Message non envoye", message)
+      const message = err instanceof Error ? err.message : t("send_failed")
+      error(t("f2_message_not_sent"), message)
     } finally {
       setSending(false)
     }
-  }, [input, sending, replyTo, chatId, error])
+  }, [input, sending, replyTo, chatId, error, t])
 
   // Touche Entree = envoi (Shift+Entree = saut de ligne)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -4696,7 +4721,9 @@ export default function ChatRoomPage() {
         status: "sending",
         timestamp: new Date(),
         fileName: filename,
-        fileSize: `${(file.size / 1024 / 1024).toFixed(1)} Mo`,
+        // Meme fonction que le message confirme par le serveur : le message
+        // optimiste et le definitif doivent s'ecrire pareil.
+        fileSize: formatBytes(file.size),
         mediaMime: mime,
         durationMs,
         mediaUrl: localUrl,
@@ -4755,10 +4782,10 @@ export default function ChatRoomPage() {
           return prev.filter((m) => m.id !== tempId)
         })
         const message = err instanceof Error ? err.message : t("send_file_failed")
-        error("Fichier non envoye", message)
+        error(t("f2_file_not_sent"), message)
       }
     },
-    [chatId, replyTo, error]
+    [chatId, replyTo, error, t]
   )
 
   const mediaKindFromFile = (file: File): "image" | "audio" | "video" | "file" => {
@@ -4802,10 +4829,7 @@ export default function ChatRoomPage() {
     const toSend = Array.from(files)
     const oversized = toSend.filter((f) => f.size > 2000 * 1024 * 1024)
     if (oversized.length > 0) {
-      error(
-        "Fichier(s) trop volumineux",
-        `${oversized.length} fichier(s) depassent 2 Go et seront ignores.`
-      )
+      error(t("f2_files_too_large"), t("f2_files_over_limit", { count: oversized.length }))
     }
     const valid = toSend.filter((f) => f.size <= 2000 * 1024 * 1024)
     const prepared: PendingMedia[] = []
@@ -4878,7 +4902,7 @@ export default function ChatRoomPage() {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     } catch {
-      error("Micro inaccessible", t("allow_mic"))
+      error(t("micro_unavailable"), t("allow_mic"))
       return
     }
 
@@ -4946,8 +4970,8 @@ export default function ChatRoomPage() {
   const handleCopy = (msg: Message) => {
     void navigator.clipboard
       .writeText(msg.content)
-      .then(() => success("Copie", t("message_copied")))
-      .catch(() => error("Copie impossible", t("clipboard_unavailable")))
+      .then(() => success(t("copied"), t("message_copied")))
+      .catch(() => error(t("f2_copy_failed"), t("clipboard_unavailable")))
   }
 
   const handleDelete = (msg: Message, scope: "me" | "everyone") => {
@@ -4964,13 +4988,13 @@ export default function ChatRoomPage() {
 
   // Demarre un appel WebRTC dans cette conversation puis ouvre la salle d'appel.
   const startCallFromChat = (callType: "audio" | "video") => {
-    void startOutgoingCall(chatId, callType, chat?.name ?? "Contact")
+    void startOutgoingCall(chatId, callType, chat?.name ?? t("f2_contact"))
       .then((newCallId) => {
         navigate(`/calls/${newCallId}?type=${callType}&returnTo=${encodeURIComponent(returnTo)}`)
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : t("call_start_failed")
-        error("Appel impossible", message)
+        error(t("call_failed"), message)
       })
   }
 
@@ -4988,7 +5012,7 @@ export default function ChatRoomPage() {
 
   /** Nom affichable d'un expediteur : membre du groupe, contact, sinon debut d'UUID. */
   const resolveSenderName = (senderId: string): string => {
-    if (senderId === "me") return "Vous"
+    if (senderId === "me") return t("you")
     const backendMember = chat?.membersInfo?.find(
       (m: { id: string; pseudo?: string | null; publicNumber?: string }) => m.id === senderId
     )
@@ -5007,7 +5031,7 @@ export default function ChatRoomPage() {
       `[data-message-id="${messageId}"]`
     )
     if (!target) {
-      error("Message introuvable", t("too_old_to_show"))
+      error(t("f2_message_not_found"), t("too_old_to_show"))
       return
     }
     target.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -5092,11 +5116,11 @@ export default function ChatRoomPage() {
             {/* Presence du serveur temps reel, avec repli sur l'activite recente
                 si elle est masquee ; rien (plutot qu'un faux "Hors ligne") sinon. */}
             {isTyping
-              ? "en train d'ecrire..."
+              ? t("f2_typing")
               : chat.isGroup
-                ? `${chat.members?.length ?? 0} membres`
+                ? t("cinfo_members_count", { count: chat.members?.length ?? 0 })
                 : peerOnline
-                  ? "En ligne"
+                  ? t("online")
                   : " "}
           </div>
         </div>
@@ -5252,7 +5276,10 @@ export default function ChatRoomPage() {
                 // voit, un seul envoi. Supprimer une tuile sur cinq n'aurait pas
                 // de sens face a une grille unique.
                 return (
-                  <MessageErrorBoundary key={`album-${head.id}`} name={`${lot.length} fichiers`}>
+                  <MessageErrorBoundary
+                    key={`album-${head.id}`}
+                    name={t("f2_n_files", { count: lot.length })}
+                  >
                     <MessageBubble
                       msg={head}
                       isMe={albumIsMe}
@@ -5384,7 +5411,7 @@ export default function ChatRoomPage() {
               savait plus a quoi on repondait. */}
           {hasQuotedMedia(replyTo) && <QuoteThumbnail msg={replyTo} />}
           <div className="reply-bar-content">
-            <div className="reply-bar-label">Repondre a</div>
+            <div className="reply-bar-label">{t("reply_to")}</div>
             <div className="reply-bar-txt">
               {hasQuotedMedia(replyTo) ? quotedMediaLabel(replyTo) : replyTo.content}
             </div>
@@ -5485,7 +5512,7 @@ export default function ChatRoomPage() {
                       <polyline points="21 15 16 10 5 21" />
                     </svg>
                   </div>
-                  Photo / image
+                  {t("f2_photo_image")}
                 </button>
                 <button
                   className="attach-opt"
@@ -5511,7 +5538,7 @@ export default function ChatRoomPage() {
                       <rect x="1" y="5" width="15" height="14" rx="2" />
                     </svg>
                   </div>
-                  Vidéo
+                  {t("video")}
                 </button>
                 <button
                   className="attach-opt"
@@ -5538,7 +5565,7 @@ export default function ChatRoomPage() {
                       <polyline points="14 2 14 8 20 8" />
                     </svg>
                   </div>
-                  Document
+                  {t("f2_document")}
                 </button>
                 <button
                   className="attach-opt"
@@ -5565,7 +5592,7 @@ export default function ChatRoomPage() {
                       <circle cx="18" cy="16" r="3" />
                     </svg>
                   </div>
-                  Audio
+                  {t("cinfo_audio")}
                 </button>
                 <button
                   className="attach-opt"
@@ -5590,7 +5617,7 @@ export default function ChatRoomPage() {
                       <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
                     </svg>
                   </div>
-                  Tout fichier
+                  {t("f2_any_file")}
                 </button>
               </div>
             )}
@@ -5659,7 +5686,7 @@ export default function ChatRoomPage() {
                     cursor: "pointer",
                   }}
                 >
-                  Annuler
+                  {t("cancel")}
                 </button>
                 <button
                   className="send-btn"
@@ -5778,10 +5805,10 @@ export default function ChatRoomPage() {
           onForward={async (convIds) => {
             try {
               const count = await forwardChatMessage(forwardMsg.id, convIds)
-              success("Message transfere", `Envoye dans ${count} conversation(s).`)
+              success(t("forwarded_success"), t("f2_sent_in_n_convs", { count }))
             } catch (err) {
-              const message = err instanceof Error ? err.message : "Transfert impossible."
-              error("Transfert echoue", message)
+              const message = err instanceof Error ? err.message : t("f2_forward_failed")
+              error(t("f2_forward_error"), message)
             } finally {
               setForwardMsg(null)
             }
@@ -5868,12 +5895,12 @@ function ForwardDialog({
             color: "var(--text-primary)",
           }}
         >
-          Transferer vers...
+          {t("forward_to")}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
           {loading && (
             <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
-              Chargement...
+              {t("loading")}
             </div>
           )}
           {!loading && conversations.length === 0 && (
@@ -5941,7 +5968,7 @@ function ForwardDialog({
               cursor: "pointer",
             }}
           >
-            Annuler
+            {t("cancel")}
           </button>
           <button
             disabled={selected.size === 0 || sending}
@@ -5961,7 +5988,7 @@ function ForwardDialog({
               opacity: selected.size === 0 || sending ? 0.6 : 1,
             }}
           >
-            {sending ? "Transfert..." : `Transferer (${selected.size})`}
+            {sending ? t("f2_forwarding") : t("f2_forward_count", { count: selected.size })}
           </button>
         </div>
       </div>
