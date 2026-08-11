@@ -1,4 +1,5 @@
 import { initIndexedDB } from "../indexedDB/schema"
+import type { CodeMoteur } from "./traduction-fournisseurs"
 
 /**
  * Cache local des traductions de messages.
@@ -13,8 +14,12 @@ import { initIndexedDB } from "../indexedDB/schema"
  * assume.
  */
 
-/** Type du moteur ayant produit la traduction, affiche sous la bulle. */
-export type MoteurTraduction = "local" | "en-ligne"
+/**
+ * Moteur ayant produit la traduction, nomme sous la bulle et present dans la
+ * cle : deux moteurs ne rendent pas le meme texte, l'un ne doit donc jamais
+ * servir la reponse de l'autre.
+ */
+export type MoteurTraduction = CodeMoteur
 
 export interface EntreeTraduction {
   cle: string
@@ -56,7 +61,7 @@ const MAX_LANGUES_CIBLES = 3
  * consommer du quota sans jamais etre relues.
  */
 const MARQUEUR_GENERATION = "alanya_traduction_cache_generation"
-const GENERATION = "2026-08-initial"
+const GENERATION = "2026-08-moteur-dans-la-cle"
 
 const MAGASIN = "traductions"
 
@@ -124,9 +129,26 @@ function empreinteDeSecours(texte: string): string {
   return `x${morceaux.join("").slice(0, 31)}`
 }
 
-/** Clef d'une traduction. L'empreinte est en tete : voir `oublierEmpreinte`. */
-function cleTraduction(empreinte: string, source: string, cible: string): string {
-  return `${empreinte}|${source}|${cible}`
+/**
+ * Clef d'une traduction.
+ *
+ * Le MOTEUR en fait partie, comme cote serveur : deux moteurs ne rendent pas la
+ * meme phrase, et une entree ecrite par DeepL ne doit pas etre servie a qui a
+ * choisi le navigateur — ni compter comme deja obtenue quand l'utilisateur
+ * change de moteur precisement parce que la traduction ne lui convenait pas.
+ *
+ * Il est en QUEUE et non en tete, a l'inverse du serveur : ici l'empreinte doit
+ * rester le prefixe de la cle, c'est elle qui permet le balayage de plage de
+ * `oublierEmpreinte`. Le serveur, lui, n'a qu'une table en memoire a interroger
+ * cle par cle, l'ordre y est libre.
+ */
+function cleTraduction(
+  empreinte: string,
+  source: string,
+  cible: string,
+  moteur: MoteurTraduction
+): string {
+  return `${empreinte}|${source}|${cible}|${moteur}`
 }
 
 /** Clef d'une detection de langue, dans le meme magasin et le meme espace de cles. */
@@ -200,9 +222,10 @@ async function ecrireEntree(entree: EntreeTraduction): Promise<void> {
 export async function lireTraduction(
   empreinte: string,
   source: string,
-  cible: string
+  cible: string,
+  moteur: MoteurTraduction
 ): Promise<EntreeTraduction | null> {
-  return lireEntree(cleTraduction(empreinte, source, cible))
+  return lireEntree(cleTraduction(empreinte, source, cible, moteur))
 }
 
 /**
@@ -222,7 +245,7 @@ export async function ecrireTraduction(
 ): Promise<void> {
   const maintenant = Date.now()
   await ecrireEntree({
-    cle: cleTraduction(empreinte, source, cible),
+    cle: cleTraduction(empreinte, source, cible, moteur),
     texte,
     source,
     cible,
@@ -246,7 +269,9 @@ export async function ecrireLangueDetectee(empreinte: string, langue: string): P
     texte: langue,
     source: langue,
     cible: "",
-    moteur: "local",
+    // La detection est toujours le fait du navigateur, quel que soit le moteur
+    // choisi pour traduire : aucun texte ne sort de l'appareil pour la produire.
+    moteur: "navigateur",
     creeLe: maintenant,
     luLe: maintenant,
   })

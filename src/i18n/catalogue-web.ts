@@ -907,15 +907,31 @@ export const WEB_TRANSLATION_KEYS = [
   "trad_err_service",
   "trad_err_same_language",
   "trad_err_local_unavailable",
-  "trad_err_online_disabled",
+  "trad_err_engine_unavailable",
   "settings_translation",
   "trad_sub",
-  "trad_mode_title",
-  "trad_mode_default",
-  "trad_online_toggle",
-  "trad_online_toggle_desc",
-  "trad_mode_local_active",
-  "trad_mode_online_active",
+  "trad_engines_title",
+  "trad_engines_desc",
+  "trad_engines_loading",
+  "trad_engines_failed",
+  "trad_engines_retry",
+  "trad_engine_recommended",
+  "trad_engine_price_free",
+  "trad_engine_price",
+  "trad_engine_unavailable_server",
+  "trad_engine_unavailable_browser",
+  "trad_engine_active_local",
+  "trad_engine_active_remote",
+  "trad_engine_name_navigateur",
+  "trad_engine_name_azure",
+  "trad_engine_name_google",
+  "trad_engine_name_deepl",
+  "trad_engine_name_libretranslate",
+  "trad_engine_note_navigateur",
+  "trad_engine_note_azure",
+  "trad_engine_note_google",
+  "trad_engine_note_deepl",
+  "trad_engine_note_libretranslate",
   "trad_local_title",
   "trad_local_desc",
   "trad_local_unsupported_cta",
@@ -942,22 +958,21 @@ export const WEB_TRANSLATION_KEYS = [
   "trad_cache_cleared",
   "trad_consent_title",
   "trad_consent_p1",
-  "trad_consent_p2",
   "trad_consent_p3",
   "trad_consent_p4",
   "trad_consent_p5",
   "trad_consent_stay_local",
   "trad_consent_accept",
-  "trad_online_enabled",
+  "trad_engine_changed",
   "trad_local_restored",
   "thr_trad_action",
   "thr_trad_hide",
   "thr_trad_loading",
-  "thr_trad_by_local",
-  "thr_trad_by_online",
+  "thr_trad_by_device",
+  "thr_trad_by_engine",
   "thr_trad_retry",
   "thr_trad_failed",
-  "thr_trad_enable_online_q",
+  "thr_trad_choose_engine_q",
   "thr_trad_open_settings",
 ] as const
 
@@ -1888,22 +1903,46 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_same_language: "Ce message est déjà dans votre langue.",
     trad_err_local_unavailable:
       "La traduction locale n'est pas disponible dans ce navigateur. Elle fonctionne sur Chrome et Edge, sur ordinateur.",
-    trad_err_online_disabled: "Activez la traduction en ligne pour traduire ce message.",
+    trad_err_engine_unavailable:
+      "Le moteur de traduction choisi n'est pas disponible. Choisissez-en un autre dans les Paramètres.",
     settings_translation: "Traduction",
     trad_sub: "Traduisez les messages reçus dans votre langue, sur cet appareil de préférence.",
-    trad_mode_title: "Mode de traduction",
-    trad_mode_default:
-      "Le mode local est le mode par défaut : la traduction se fait sur cet appareil et aucun message n'est envoyé à qui que ce soit.",
-    trad_online_toggle: "Traduction en ligne",
-    trad_online_toggle_desc:
-      "Désactivé, tout reste sur cet appareil. Activé, le texte des messages que vous choisissez de traduire est envoyé à Microsoft Azure Translator.",
-    trad_mode_local_active: "Mode local actif — vos messages ne quittent pas cet appareil.",
-    trad_mode_online_active: "Mode en ligne actif — le texte traduit est envoyé à Microsoft Azure.",
+    trad_engines_title: "Moteur de traduction",
+    trad_engines_desc:
+      "Choisissez qui traduit vos messages. Le prix indiqué est le tarif du fournisseur, par million de caractères traduits.",
+    trad_engines_loading: "Chargement des moteurs…",
+    trad_engines_failed: "La liste des moteurs n'a pas pu être chargée.",
+    trad_engines_retry: "Réessayer",
+    trad_engine_recommended: "Recommandé · par défaut",
+    trad_engine_price_free: "Gratuit",
+    trad_engine_price: "{prix} par million de caractères",
+    trad_engine_unavailable_server:
+      "Ce moteur n'est pas configuré sur le serveur : il ne peut pas être choisi pour l'instant.",
+    trad_engine_unavailable_browser:
+      "Ce navigateur n'a pas de moteur de traduction intégré. Il en existe un sur Chrome et Edge, sur ordinateur.",
+    trad_engine_active_local: "Moteur actif : {moteur}. Vos messages ne quittent pas cet appareil.",
+    trad_engine_active_remote:
+      "Moteur actif : {moteur}. Le texte que vous faites traduire est envoyé à {moteur}.",
+    trad_engine_name_navigateur: "Navigateur (sur cet appareil)",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "Gratuit, et rien ne sort de cet appareil : c'est le navigateur qui traduit. Fonctionne sur Chrome et Edge, sur ordinateur.",
+    trad_engine_note_azure:
+      "Microsoft ne conserve pas le texte envoyé, ne l'utilise pas pour entraîner ses modèles et n'en garde aucune trace.",
+    trad_engine_note_google:
+      "Facturé au caractère quel que soit l'alphabet : une lettre cyrillique ou un idéogramme comptent comme une lettre latine. Le texte est envoyé à Google.",
+    trad_engine_note_deepl:
+      "Souvent la meilleure qualité sur les langues européennes, mais son catalogue de langues est plus étroit. Le texte est envoyé à DeepL.",
+    trad_engine_note_libretranslate:
+      "Logiciel libre, sur un serveur auto-hébergé : gratuit hors coût du serveur. Faute de modèle direct entre deux langues, la traduction passe par l'anglais et la qualité baisse.",
     trad_local_title: "Traduction sur cet appareil",
     trad_local_desc:
       "Votre navigateur télécharge les composants de langue et traduit sans rien envoyer. Choisissez les langues que vous recevez : elles seront traduites vers {langue}.",
     trad_local_unsupported_cta:
-      "Vous pouvez traduire quand même en activant la traduction en ligne, en sachant que le texte sortira de cet appareil.",
+      "Vous pouvez choisir un autre moteur ci-dessus, en sachant que le texte sortira alors de cet appareil.",
     trad_state_ready: "Prêt à installer",
     trad_state_installed: "Installé pour ce site",
     trad_state_unavailable: "Non disponible",
@@ -1930,29 +1969,27 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Elles seront recalculées à la prochaine lecture. Les paquets de langue de votre navigateur ne sont pas concernés.",
     trad_cache_clear_btn: "Effacer",
     trad_cache_cleared: "Traductions effacées",
-    trad_consent_title: "Activer la traduction en ligne ?",
+    trad_consent_title: "Envoyer vos messages à {moteur} ?",
     trad_consent_p1:
-      "En mode en ligne, le texte des messages que vous choisissez de traduire est envoyé à Microsoft Azure Translator pour y être traduit. Il quitte cet appareil.",
-    trad_consent_p2:
-      "Microsoft s'engage à ne pas conserver ce texte, à ne pas l'utiliser pour entraîner ses modèles et à n'en garder aucune trace.",
+      "Le texte des messages que vous choisissez de traduire sera envoyé à {moteur} pour y être traduit. Il quitte cet appareil.",
     trad_consent_p3:
       "Ne sont envoyés que les messages sur lesquels vous appuyez sur Traduire. Vos autres messages, vos médias et vos conversations ne sont jamais transmis.",
     trad_consent_p4:
-      "Le mode par défaut est local : la traduction s'effectue alors sur votre appareil et rien n'est envoyé à personne. Il ne fonctionne que sur Chrome et Edge, sur ordinateur.",
+      "Le moteur du navigateur reste le choix par défaut : gratuit, et rien ne sort de votre appareil. Il ne fonctionne que sur Chrome et Edge, sur ordinateur.",
     trad_consent_p5:
-      "Vous pouvez revenir au mode local à tout moment dans Paramètres › Traduction.",
-    trad_consent_stay_local: "Rester en mode local",
-    trad_consent_accept: "Activer la traduction en ligne",
-    trad_online_enabled: "Traduction en ligne activée",
-    trad_local_restored: "Mode local rétabli",
+      "Vous pouvez revenir au moteur du navigateur à tout moment dans Paramètres › Traduction.",
+    trad_consent_stay_local: "Garder le navigateur",
+    trad_consent_accept: "Envoyer à {moteur}",
+    trad_engine_changed: "Moteur de traduction : {moteur}",
+    trad_local_restored: "Moteur du navigateur rétabli",
     thr_trad_action: "Traduire",
     thr_trad_hide: "Masquer la traduction",
     thr_trad_loading: "Traduction en cours…",
-    thr_trad_by_local: "Traduit sur cet appareil",
-    thr_trad_by_online: "Traduit en ligne",
+    thr_trad_by_device: "Traduit sur cet appareil",
+    thr_trad_by_engine: "Traduit par {moteur}",
     thr_trad_retry: "Réessayer",
     thr_trad_failed: "La traduction a échoué.",
-    thr_trad_enable_online_q: "Activer la traduction en ligne ?",
+    thr_trad_choose_engine_q: "Choisir un autre moteur dans les Paramètres ?",
     thr_trad_open_settings: "Ouvrir les Paramètres",
   },
   en: {
@@ -2873,22 +2910,46 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_same_language: "This message is already in your language.",
     trad_err_local_unavailable:
       "On-device translation is not available in this browser. It works in Chrome and Edge on desktop.",
-    trad_err_online_disabled: "Turn on online translation to translate this message.",
+    trad_err_engine_unavailable:
+      "The translation engine you chose is not available. Pick another one in Settings.",
     settings_translation: "Translation",
     trad_sub: "Translate incoming messages into your language — on this device whenever possible.",
-    trad_mode_title: "Translation mode",
-    trad_mode_default:
-      "Local mode is the default: translation happens on this device and no message is sent to anyone.",
-    trad_online_toggle: "Online translation",
-    trad_online_toggle_desc:
-      "Off, everything stays on this device. On, the text of the messages you choose to translate is sent to Microsoft Azure Translator.",
-    trad_mode_local_active: "Local mode active — your messages never leave this device.",
-    trad_mode_online_active: "Online mode active — translated text is sent to Microsoft Azure.",
+    trad_engines_title: "Translation engine",
+    trad_engines_desc:
+      "Choose who translates your messages. The price shown is the provider's rate, per million characters translated.",
+    trad_engines_loading: "Loading the engines…",
+    trad_engines_failed: "The list of engines could not be loaded.",
+    trad_engines_retry: "Try again",
+    trad_engine_recommended: "Recommended · default",
+    trad_engine_price_free: "Free",
+    trad_engine_price: "{prix} per million characters",
+    trad_engine_unavailable_server:
+      "This engine is not configured on the server: it cannot be chosen for now.",
+    trad_engine_unavailable_browser:
+      "This browser has no built-in translation engine. Chrome and Edge have one, on desktop.",
+    trad_engine_active_local: "Active engine: {moteur}. Your messages never leave this device.",
+    trad_engine_active_remote:
+      "Active engine: {moteur}. The text you have translated is sent to {moteur}.",
+    trad_engine_name_navigateur: "Browser (on this device)",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "Free, and nothing leaves this device: the browser does the translating. Works in Chrome and Edge, on desktop.",
+    trad_engine_note_azure:
+      "Microsoft does not keep the text you send, does not use it to train its models and retains no trace of it.",
+    trad_engine_note_google:
+      "Billed per character whatever the alphabet: a Cyrillic letter or an ideogram counts the same as a Latin one. The text is sent to Google.",
+    trad_engine_note_deepl:
+      "Often the best quality on European languages, but its language catalogue is narrower. The text is sent to DeepL.",
+    trad_engine_note_libretranslate:
+      "Open-source software on a self-hosted server: free apart from the cost of the server. With no direct model between two languages, translation goes through English and quality drops.",
     trad_local_title: "On-device translation",
     trad_local_desc:
       "Your browser downloads the language components and translates without sending anything. Pick the languages you receive: they will be translated into {langue}.",
     trad_local_unsupported_cta:
-      "You can still translate by turning on online translation, knowing the text will leave this device.",
+      "You can pick another engine above, knowing the text will then leave this device.",
     trad_state_ready: "Ready to install",
     trad_state_installed: "Installed for this site",
     trad_state_unavailable: "Not available",
@@ -2914,28 +2975,26 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "They will be computed again next time you read them. Your browser's language packs are not affected.",
     trad_cache_clear_btn: "Erase",
     trad_cache_cleared: "Translations erased",
-    trad_consent_title: "Turn on online translation?",
+    trad_consent_title: "Send your messages to {moteur}?",
     trad_consent_p1:
-      "In online mode, the text of the messages you choose to translate is sent to Microsoft Azure Translator to be translated there. It leaves this device.",
-    trad_consent_p2:
-      "Microsoft undertakes not to keep this text, not to use it to train its models and to retain no trace of it.",
+      "The text of the messages you choose to translate will be sent to {moteur} to be translated there. It leaves this device.",
     trad_consent_p3:
       "Only the messages on which you tap Translate are sent. Your other messages, your media and your conversations are never transmitted.",
     trad_consent_p4:
-      "The default mode is local: translation then happens on your device and nothing is sent to anyone. It only works on Chrome and Edge, on a computer.",
-    trad_consent_p5: "You can go back to local mode at any time in Settings › Translation.",
-    trad_consent_stay_local: "Stay in local mode",
-    trad_consent_accept: "Turn on online translation",
-    trad_online_enabled: "Online translation turned on",
-    trad_local_restored: "Local mode restored",
+      "The browser engine remains the default choice: free, and nothing leaves your device. It only works in Chrome and Edge, on a computer.",
+    trad_consent_p5: "You can go back to the browser engine at any time in Settings › Translation.",
+    trad_consent_stay_local: "Keep the browser",
+    trad_consent_accept: "Send to {moteur}",
+    trad_engine_changed: "Translation engine: {moteur}",
+    trad_local_restored: "Browser engine restored",
     thr_trad_action: "Translate",
     thr_trad_hide: "Hide translation",
     thr_trad_loading: "Translating…",
-    thr_trad_by_local: "Translated on this device",
-    thr_trad_by_online: "Translated online",
+    thr_trad_by_device: "Translated on this device",
+    thr_trad_by_engine: "Translated by {moteur}",
     thr_trad_retry: "Try again",
     thr_trad_failed: "Translation failed.",
-    thr_trad_enable_online_q: "Turn on online translation?",
+    thr_trad_choose_engine_q: "Pick another engine in Settings?",
     thr_trad_open_settings: "Open Settings",
   },
   es: {
@@ -3860,22 +3919,46 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_same_language: "Este mensaje ya está en tu idioma.",
     trad_err_local_unavailable:
       "La traducción local no está disponible en este navegador. Funciona en Chrome y Edge, en ordenador.",
-    trad_err_online_disabled: "Activa la traducción en línea para traducir este mensaje.",
+    trad_err_engine_unavailable:
+      "El motor de traducción elegido no está disponible. Elige otro en los Ajustes.",
     settings_translation: "Traducción",
     trad_sub: "Traduce los mensajes recibidos a tu idioma, preferiblemente en este dispositivo.",
-    trad_mode_title: "Modo de traducción",
-    trad_mode_default:
-      "El modo local es el predeterminado: la traducción se realiza en este dispositivo y ningún mensaje se envía a nadie.",
-    trad_online_toggle: "Traducción en línea",
-    trad_online_toggle_desc:
-      "Desactivado, todo permanece en este dispositivo. Activado, el texto de los mensajes que elijas traducir se envía a Microsoft Azure Translator.",
-    trad_mode_local_active: "Modo local activo: tus mensajes no salen de este dispositivo.",
-    trad_mode_online_active: "Modo en línea activo: el texto traducido se envía a Microsoft Azure.",
+    trad_engines_title: "Motor de traducción",
+    trad_engines_desc:
+      "Elige quién traduce tus mensajes. El precio indicado es la tarifa del proveedor, por millón de caracteres traducidos.",
+    trad_engines_loading: "Cargando los motores…",
+    trad_engines_failed: "No se ha podido cargar la lista de motores.",
+    trad_engines_retry: "Reintentar",
+    trad_engine_recommended: "Recomendado · predeterminado",
+    trad_engine_price_free: "Gratis",
+    trad_engine_price: "{prix} por millón de caracteres",
+    trad_engine_unavailable_server:
+      "Este motor no está configurado en el servidor: por ahora no se puede elegir.",
+    trad_engine_unavailable_browser:
+      "Este navegador no tiene motor de traducción integrado. Chrome y Edge sí lo tienen, en ordenador.",
+    trad_engine_active_local: "Motor activo: {moteur}. Tus mensajes no salen de este dispositivo.",
+    trad_engine_active_remote:
+      "Motor activo: {moteur}. El texto que mandas traducir se envía a {moteur}.",
+    trad_engine_name_navigateur: "Navegador (en este dispositivo)",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "Gratis, y nada sale de este dispositivo: traduce el propio navegador. Funciona en Chrome y Edge, en ordenador.",
+    trad_engine_note_azure:
+      "Microsoft no conserva el texto enviado, no lo usa para entrenar sus modelos y no guarda ningún rastro.",
+    trad_engine_note_google:
+      "Se factura por carácter sea cual sea el alfabeto: una letra cirílica o un ideograma cuentan igual que una letra latina. El texto se envía a Google.",
+    trad_engine_note_deepl:
+      "A menudo la mejor calidad en lenguas europeas, pero su catálogo de idiomas es más estrecho. El texto se envía a DeepL.",
+    trad_engine_note_libretranslate:
+      "Software libre en un servidor autoalojado: gratis salvo el coste del servidor. A falta de un modelo directo entre dos idiomas, la traducción pasa por el inglés y la calidad baja.",
     trad_local_title: "Traducción en este dispositivo",
     trad_local_desc:
       "Tu navegador descarga los componentes de idioma y traduce sin enviar nada. Elige los idiomas que recibes: se traducirán a {langue}.",
     trad_local_unsupported_cta:
-      "Aun así puedes traducir activando la traducción en línea, sabiendo que el texto saldrá de este dispositivo.",
+      "Puedes elegir otro motor más arriba, sabiendo que entonces el texto saldrá de este dispositivo.",
     trad_state_ready: "Listo para instalar",
     trad_state_installed: "Instalado para este sitio",
     trad_state_unavailable: "No disponible",
@@ -3901,28 +3984,27 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Se volverán a calcular la próxima vez que las leas. Los paquetes de idioma de tu navegador no se ven afectados.",
     trad_cache_clear_btn: "Borrar",
     trad_cache_cleared: "Traducciones borradas",
-    trad_consent_title: "¿Activar la traducción en línea?",
+    trad_consent_title: "¿Enviar tus mensajes a {moteur}?",
     trad_consent_p1:
-      "En modo en línea, el texto de los mensajes que elijas traducir se envía a Microsoft Azure Translator para traducirlo allí. Sale de este dispositivo.",
-    trad_consent_p2:
-      "Microsoft se compromete a no conservar este texto, a no usarlo para entrenar sus modelos y a no guardar ningún rastro.",
+      "El texto de los mensajes que elijas traducir se enviará a {moteur} para traducirlo allí. Sale de este dispositivo.",
     trad_consent_p3:
       "Solo se envían los mensajes en los que pulsas Traducir. Tus demás mensajes, tus archivos y tus conversaciones nunca se transmiten.",
     trad_consent_p4:
-      "El modo predeterminado es local: la traducción se realiza en tu dispositivo y no se envía nada a nadie. Solo funciona en Chrome y Edge, en ordenador.",
-    trad_consent_p5: "Puedes volver al modo local en cualquier momento en Ajustes › Traducción.",
-    trad_consent_stay_local: "Seguir en modo local",
-    trad_consent_accept: "Activar la traducción en línea",
-    trad_online_enabled: "Traducción en línea activada",
-    trad_local_restored: "Modo local restablecido",
+      "El motor del navegador sigue siendo la opción predeterminada: gratis, y nada sale de tu dispositivo. Solo funciona en Chrome y Edge, en ordenador.",
+    trad_consent_p5:
+      "Puedes volver al motor del navegador en cualquier momento en Ajustes › Traducción.",
+    trad_consent_stay_local: "Mantener el navegador",
+    trad_consent_accept: "Enviar a {moteur}",
+    trad_engine_changed: "Motor de traducción: {moteur}",
+    trad_local_restored: "Motor del navegador restablecido",
     thr_trad_action: "Traducir",
     thr_trad_hide: "Ocultar la traducción",
     thr_trad_loading: "Traduciendo…",
-    thr_trad_by_local: "Traducido en este dispositivo",
-    thr_trad_by_online: "Traducido en línea",
+    thr_trad_by_device: "Traducido en este dispositivo",
+    thr_trad_by_engine: "Traducido por {moteur}",
     thr_trad_retry: "Reintentar",
     thr_trad_failed: "La traducción ha fallado.",
-    thr_trad_enable_online_q: "¿Activar la traducción en línea?",
+    thr_trad_choose_engine_q: "¿Elegir otro motor en los Ajustes?",
     thr_trad_open_settings: "Abrir Ajustes",
   },
   de: {
@@ -4855,25 +4937,48 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_same_language: "Diese Nachricht ist bereits in Ihrer Sprache.",
     trad_err_local_unavailable:
       "Die lokale Übersetzung ist in diesem Browser nicht verfügbar. Sie funktioniert in Chrome und Edge auf dem Computer.",
-    trad_err_online_disabled:
-      "Aktivieren Sie die Online-Übersetzung, um diese Nachricht zu übersetzen.",
+    trad_err_engine_unavailable:
+      "Die gewählte Übersetzungs-Engine ist nicht verfügbar. Wählen Sie in den Einstellungen eine andere.",
     settings_translation: "Übersetzung",
     trad_sub:
       "Übersetzen Sie empfangene Nachrichten in Ihre Sprache, vorzugsweise auf diesem Gerät.",
-    trad_mode_title: "Übersetzungsmodus",
-    trad_mode_default:
-      "Der lokale Modus ist die Voreinstellung: Die Übersetzung erfolgt auf diesem Gerät, und es wird keine Nachricht an Dritte gesendet.",
-    trad_online_toggle: "Online-Übersetzung",
-    trad_online_toggle_desc:
-      "Aus bleibt alles auf diesem Gerät. Ein wird der Text der Nachrichten, die Sie übersetzen lassen, an Microsoft Azure Translator gesendet.",
-    trad_mode_local_active: "Lokaler Modus aktiv – Ihre Nachrichten verlassen dieses Gerät nicht.",
-    trad_mode_online_active:
-      "Online-Modus aktiv – der übersetzte Text wird an Microsoft Azure gesendet.",
+    trad_engines_title: "Übersetzungs-Engine",
+    trad_engines_desc:
+      "Wählen Sie, wer Ihre Nachrichten übersetzt. Der angegebene Preis ist der Tarif des Anbieters, je Million übersetzter Zeichen.",
+    trad_engines_loading: "Engines werden geladen…",
+    trad_engines_failed: "Die Liste der Engines konnte nicht geladen werden.",
+    trad_engines_retry: "Erneut versuchen",
+    trad_engine_recommended: "Empfohlen · Standard",
+    trad_engine_price_free: "Kostenlos",
+    trad_engine_price: "{prix} je Million Zeichen",
+    trad_engine_unavailable_server:
+      "Diese Engine ist auf dem Server nicht konfiguriert: Sie kann derzeit nicht gewählt werden.",
+    trad_engine_unavailable_browser:
+      "Dieser Browser hat keine eingebaute Übersetzungs-Engine. Chrome und Edge haben eine, auf dem Computer.",
+    trad_engine_active_local:
+      "Aktive Engine: {moteur}. Ihre Nachrichten verlassen dieses Gerät nicht.",
+    trad_engine_active_remote:
+      "Aktive Engine: {moteur}. Der Text, den Sie übersetzen lassen, wird an {moteur} gesendet.",
+    trad_engine_name_navigateur: "Browser (auf diesem Gerät)",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "Kostenlos, und nichts verlässt dieses Gerät: Der Browser übersetzt selbst. Funktioniert in Chrome und Edge, auf dem Computer.",
+    trad_engine_note_azure:
+      "Microsoft speichert den gesendeten Text nicht, verwendet ihn nicht zum Trainieren seiner Modelle und bewahrt keine Spur davon auf.",
+    trad_engine_note_google:
+      "Abrechnung pro Zeichen, unabhängig vom Alphabet: Ein kyrillischer Buchstabe oder ein Schriftzeichen zählt wie ein lateinischer. Der Text wird an Google gesendet.",
+    trad_engine_note_deepl:
+      "Oft die beste Qualität bei europäischen Sprachen, aber der Sprachkatalog ist schmaler. Der Text wird an DeepL gesendet.",
+    trad_engine_note_libretranslate:
+      "Freie Software auf einem selbst gehosteten Server: kostenlos abgesehen von den Serverkosten. Fehlt ein direktes Modell zwischen zwei Sprachen, läuft die Übersetzung über Englisch und die Qualität sinkt.",
     trad_local_title: "Übersetzung auf diesem Gerät",
     trad_local_desc:
       "Ihr Browser lädt die Sprachkomponenten herunter und übersetzt, ohne etwas zu senden. Wählen Sie die Sprachen, die Sie empfangen: Sie werden nach {langue} übersetzt.",
     trad_local_unsupported_cta:
-      "Sie können trotzdem übersetzen, indem Sie die Online-Übersetzung einschalten – der Text verlässt dann dieses Gerät.",
+      "Sie können oben eine andere Engine wählen – der Text verlässt dann dieses Gerät.",
     trad_state_ready: "Bereit zur Installation",
     trad_state_installed: "Für diese Website installiert",
     trad_state_unavailable: "Nicht verfügbar",
@@ -4900,29 +5005,27 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Sie werden beim nächsten Lesen neu berechnet. Die Sprachpakete Ihres Browsers sind nicht betroffen.",
     trad_cache_clear_btn: "Löschen",
     trad_cache_cleared: "Übersetzungen gelöscht",
-    trad_consent_title: "Online-Übersetzung aktivieren?",
+    trad_consent_title: "Ihre Nachrichten an {moteur} senden?",
     trad_consent_p1:
-      "Im Online-Modus wird der Text der Nachrichten, die Sie übersetzen lassen, zur Übersetzung an Microsoft Azure Translator gesendet. Er verlässt dieses Gerät.",
-    trad_consent_p2:
-      "Microsoft verpflichtet sich, diesen Text nicht zu speichern, ihn nicht zum Trainieren seiner Modelle zu verwenden und keine Spur davon aufzubewahren.",
+      "Der Text der Nachrichten, die Sie übersetzen lassen, wird zur Übersetzung an {moteur} gesendet. Er verlässt dieses Gerät.",
     trad_consent_p3:
       "Gesendet werden nur die Nachrichten, bei denen Sie auf Übersetzen tippen. Ihre übrigen Nachrichten, Ihre Medien und Ihre Unterhaltungen werden nie übertragen.",
     trad_consent_p4:
-      "Der Standardmodus ist lokal: Die Übersetzung erfolgt dann auf Ihrem Gerät, und es wird nichts an Dritte gesendet. Er funktioniert nur in Chrome und Edge auf dem Computer.",
+      "Die Engine des Browsers bleibt die Standardwahl: kostenlos, und nichts verlässt Ihr Gerät. Sie funktioniert nur in Chrome und Edge auf dem Computer.",
     trad_consent_p5:
-      "Sie können jederzeit unter Einstellungen › Übersetzung zum lokalen Modus zurückkehren.",
-    trad_consent_stay_local: "Im lokalen Modus bleiben",
-    trad_consent_accept: "Online-Übersetzung aktivieren",
-    trad_online_enabled: "Online-Übersetzung aktiviert",
-    trad_local_restored: "Lokaler Modus wiederhergestellt",
+      "Sie können jederzeit unter Einstellungen › Übersetzung zur Engine des Browsers zurückkehren.",
+    trad_consent_stay_local: "Browser behalten",
+    trad_consent_accept: "An {moteur} senden",
+    trad_engine_changed: "Übersetzungs-Engine: {moteur}",
+    trad_local_restored: "Engine des Browsers wiederhergestellt",
     thr_trad_action: "Übersetzen",
     thr_trad_hide: "Übersetzung ausblenden",
     thr_trad_loading: "Wird übersetzt…",
-    thr_trad_by_local: "Auf diesem Gerät übersetzt",
-    thr_trad_by_online: "Online übersetzt",
+    thr_trad_by_device: "Auf diesem Gerät übersetzt",
+    thr_trad_by_engine: "Übersetzt von {moteur}",
     thr_trad_retry: "Erneut versuchen",
     thr_trad_failed: "Die Übersetzung ist fehlgeschlagen.",
-    thr_trad_enable_online_q: "Online-Übersetzung aktivieren?",
+    thr_trad_choose_engine_q: "Eine andere Engine in den Einstellungen wählen?",
     thr_trad_open_settings: "Einstellungen öffnen",
   },
   pt: {
@@ -5847,22 +5950,47 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_same_language: "Esta mensagem já está no seu idioma.",
     trad_err_local_unavailable:
       "A tradução local não está disponível neste navegador. Funciona no Chrome e no Edge, em computador.",
-    trad_err_online_disabled: "Ative a tradução online para traduzir esta mensagem.",
+    trad_err_engine_unavailable:
+      "O motor de tradução escolhido não está disponível. Escolha outro nas Definições.",
     settings_translation: "Tradução",
     trad_sub: "Traduza as mensagens recebidas para o seu idioma, de preferência neste dispositivo.",
-    trad_mode_title: "Modo de tradução",
-    trad_mode_default:
-      "O modo local é o padrão: a tradução é feita neste dispositivo e nenhuma mensagem é enviada a ninguém.",
-    trad_online_toggle: "Tradução online",
-    trad_online_toggle_desc:
-      "Desativado, tudo permanece neste dispositivo. Ativado, o texto das mensagens que escolher traduzir é enviado ao Microsoft Azure Translator.",
-    trad_mode_local_active: "Modo local ativo — as suas mensagens não saem deste dispositivo.",
-    trad_mode_online_active: "Modo online ativo — o texto traduzido é enviado à Microsoft Azure.",
+    trad_engines_title: "Motor de tradução",
+    trad_engines_desc:
+      "Escolha quem traduz as suas mensagens. O preço indicado é a tarifa do fornecedor, por milhão de caracteres traduzidos.",
+    trad_engines_loading: "A carregar os motores…",
+    trad_engines_failed: "Não foi possível carregar a lista de motores.",
+    trad_engines_retry: "Tentar novamente",
+    trad_engine_recommended: "Recomendado · predefinido",
+    trad_engine_price_free: "Gratuito",
+    trad_engine_price: "{prix} por milhão de caracteres",
+    trad_engine_unavailable_server:
+      "Este motor não está configurado no servidor: não pode ser escolhido por agora.",
+    trad_engine_unavailable_browser:
+      "Este navegador não tem motor de tradução integrado. O Chrome e o Edge têm, em computador.",
+    trad_engine_active_local:
+      "Motor ativo: {moteur}. As suas mensagens não saem deste dispositivo.",
+    trad_engine_active_remote:
+      "Motor ativo: {moteur}. O texto que manda traduzir é enviado ao {moteur}.",
+    trad_engine_name_navigateur: "Navegador (neste dispositivo)",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "Gratuito, e nada sai deste dispositivo: é o navegador que traduz. Funciona no Chrome e no Edge, em computador.",
+    trad_engine_note_azure:
+      "A Microsoft não conserva o texto enviado, não o utiliza para treinar os seus modelos e não guarda qualquer registo.",
+    trad_engine_note_google:
+      "Faturado por caractere seja qual for o alfabeto: uma letra cirílica ou um ideograma contam como uma letra latina. O texto é enviado à Google.",
+    trad_engine_note_deepl:
+      "Muitas vezes a melhor qualidade nas línguas europeias, mas o seu catálogo de idiomas é mais estreito. O texto é enviado ao DeepL.",
+    trad_engine_note_libretranslate:
+      "Software livre num servidor autoalojado: gratuito além do custo do servidor. Sem um modelo direto entre dois idiomas, a tradução passa pelo inglês e a qualidade baixa.",
     trad_local_title: "Tradução neste dispositivo",
     trad_local_desc:
       "O seu navegador descarrega os componentes de idioma e traduz sem enviar nada. Escolha os idiomas que recebe: serão traduzidos para {langue}.",
     trad_local_unsupported_cta:
-      "Ainda pode traduzir ativando a tradução online, sabendo que o texto sairá deste dispositivo.",
+      "Pode escolher outro motor acima, sabendo que o texto sairá então deste dispositivo.",
     trad_state_ready: "Pronto a instalar",
     trad_state_installed: "Instalado para este site",
     trad_state_unavailable: "Indisponível",
@@ -5888,28 +6016,27 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Serão recalculadas na próxima leitura. Os pacotes de idioma do seu navegador não são afetados.",
     trad_cache_clear_btn: "Apagar",
     trad_cache_cleared: "Traduções apagadas",
-    trad_consent_title: "Ativar a tradução online?",
+    trad_consent_title: "Enviar as suas mensagens ao {moteur}?",
     trad_consent_p1:
-      "No modo online, o texto das mensagens que escolher traduzir é enviado ao Microsoft Azure Translator para ser traduzido. Sai deste dispositivo.",
-    trad_consent_p2:
-      "A Microsoft compromete-se a não conservar este texto, a não o utilizar para treinar os seus modelos e a não guardar qualquer registo.",
+      "O texto das mensagens que escolher traduzir será enviado ao {moteur} para ser traduzido. Sai deste dispositivo.",
     trad_consent_p3:
       "Só são enviadas as mensagens em que carrega em Traduzir. As suas outras mensagens, os seus ficheiros e as suas conversas nunca são transmitidos.",
     trad_consent_p4:
-      "O modo predefinido é local: a tradução é feita no seu dispositivo e nada é enviado a ninguém. Só funciona no Chrome e no Edge, em computador.",
-    trad_consent_p5: "Pode voltar ao modo local a qualquer momento em Definições › Tradução.",
-    trad_consent_stay_local: "Ficar no modo local",
-    trad_consent_accept: "Ativar a tradução online",
-    trad_online_enabled: "Tradução online ativada",
-    trad_local_restored: "Modo local reposto",
+      "O motor do navegador continua a ser a escolha predefinida: gratuito, e nada sai do seu dispositivo. Só funciona no Chrome e no Edge, em computador.",
+    trad_consent_p5:
+      "Pode voltar ao motor do navegador a qualquer momento em Definições › Tradução.",
+    trad_consent_stay_local: "Manter o navegador",
+    trad_consent_accept: "Enviar ao {moteur}",
+    trad_engine_changed: "Motor de tradução: {moteur}",
+    trad_local_restored: "Motor do navegador reposto",
     thr_trad_action: "Traduzir",
     thr_trad_hide: "Ocultar a tradução",
     thr_trad_loading: "A traduzir…",
-    thr_trad_by_local: "Traduzido neste dispositivo",
-    thr_trad_by_online: "Traduzido online",
+    thr_trad_by_device: "Traduzido neste dispositivo",
+    thr_trad_by_engine: "Traduzido por {moteur}",
     thr_trad_retry: "Tentar novamente",
     thr_trad_failed: "A tradução falhou.",
-    thr_trad_enable_online_q: "Ativar a tradução online?",
+    thr_trad_choose_engine_q: "Escolher outro motor nas Definições?",
     thr_trad_open_settings: "Abrir Definições",
   },
   ru: {
@@ -6828,24 +6955,48 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_same_language: "Это сообщение уже на вашем языке.",
     trad_err_local_unavailable:
       "Локальный перевод недоступен в этом браузере. Он работает в Chrome и Edge на компьютере.",
-    trad_err_online_disabled: "Включите онлайн-перевод, чтобы перевести это сообщение.",
+    trad_err_engine_unavailable:
+      "Выбранный движок перевода недоступен. Выберите другой в настройках.",
     settings_translation: "Перевод",
     trad_sub:
       "Переводите полученные сообщения на ваш язык, по возможности прямо на этом устройстве.",
-    trad_mode_title: "Режим перевода",
-    trad_mode_default:
-      "Локальный режим используется по умолчанию: перевод выполняется на этом устройстве, и ни одно сообщение никуда не отправляется.",
-    trad_online_toggle: "Онлайн-перевод",
-    trad_online_toggle_desc:
-      "Выключено — всё остаётся на этом устройстве. Включено — текст выбранных вами сообщений отправляется в Microsoft Azure Translator.",
-    trad_mode_local_active: "Локальный режим активен — ваши сообщения не покидают это устройство.",
-    trad_mode_online_active:
-      "Онлайн-режим активен — переводимый текст отправляется в Microsoft Azure.",
+    trad_engines_title: "Движок перевода",
+    trad_engines_desc:
+      "Выберите, кто переводит ваши сообщения. Указана цена поставщика за миллион переведённых символов.",
+    trad_engines_loading: "Загрузка движков…",
+    trad_engines_failed: "Не удалось загрузить список движков.",
+    trad_engines_retry: "Повторить",
+    trad_engine_recommended: "Рекомендуется · по умолчанию",
+    trad_engine_price_free: "Бесплатно",
+    trad_engine_price: "{prix} за миллион символов",
+    trad_engine_unavailable_server:
+      "Этот движок не настроен на сервере: сейчас его выбрать нельзя.",
+    trad_engine_unavailable_browser:
+      "В этом браузере нет встроенного движка перевода. Он есть в Chrome и Edge на компьютере.",
+    trad_engine_active_local:
+      "Активный движок: {moteur}. Ваши сообщения не покидают это устройство.",
+    trad_engine_active_remote:
+      "Активный движок: {moteur}. Текст, который вы переводите, отправляется в {moteur}.",
+    trad_engine_name_navigateur: "Браузер (на этом устройстве)",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "Бесплатно, и ничего не покидает это устройство: переводит сам браузер. Работает в Chrome и Edge на компьютере.",
+    trad_engine_note_azure:
+      "Microsoft не хранит отправленный текст, не использует его для обучения своих моделей и не оставляет никаких следов.",
+    trad_engine_note_google:
+      "Оплата посимвольная независимо от алфавита: кириллическая буква или иероглиф считаются так же, как латинская буква. Текст отправляется в Google.",
+    trad_engine_note_deepl:
+      "Часто лучшее качество на европейских языках, но каталог языков уже. Текст отправляется в DeepL.",
+    trad_engine_note_libretranslate:
+      "Свободное ПО на собственном сервере: бесплатно, если не считать стоимости сервера. Без прямой модели между двумя языками перевод идёт через английский, и качество падает.",
     trad_local_title: "Перевод на устройстве",
     trad_local_desc:
       "Браузер скачивает языковые компоненты и переводит, ничего не отправляя. Выберите языки, на которых вам пишут: они будут переведены на {langue}.",
     trad_local_unsupported_cta:
-      "Вы всё же можете переводить, включив онлайн-перевод, — но текст покинет это устройство.",
+      "Выше можно выбрать другой движок — но тогда текст покинет это устройство.",
     trad_state_ready: "Готово к установке",
     trad_state_installed: "Установлено для этого сайта",
     trad_state_unavailable: "Недоступно",
@@ -6870,28 +7021,26 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "При следующем прочтении они будут вычислены заново. Языковых пакетов браузера это не касается.",
     trad_cache_clear_btn: "Удалить",
     trad_cache_cleared: "Переводы удалены",
-    trad_consent_title: "Включить онлайн-перевод?",
+    trad_consent_title: "Отправлять ваши сообщения в {moteur}?",
     trad_consent_p1:
-      "В онлайн-режиме текст сообщений, которые вы выбираете для перевода, отправляется в Microsoft Azure Translator. Он покидает это устройство.",
-    trad_consent_p2:
-      "Microsoft обязуется не хранить этот текст, не использовать его для обучения своих моделей и не оставлять никаких следов.",
+      "Текст сообщений, которые вы выбираете для перевода, будет отправлен в {moteur} для перевода. Он покидает это устройство.",
     trad_consent_p3:
       "Отправляются только те сообщения, на которых вы нажали «Перевести». Остальные сообщения, медиафайлы и переписка не передаются никогда.",
     trad_consent_p4:
-      "Режим по умолчанию — локальный: перевод выполняется на вашем устройстве, и ничего никуда не отправляется. Он работает только в Chrome и Edge на компьютере.",
-    trad_consent_p5: "Вернуться в локальный режим можно в любой момент: Настройки › Перевод.",
-    trad_consent_stay_local: "Остаться в локальном режиме",
-    trad_consent_accept: "Включить онлайн-перевод",
-    trad_online_enabled: "Онлайн-перевод включён",
-    trad_local_restored: "Локальный режим восстановлен",
+      "Движок браузера остаётся выбором по умолчанию: бесплатно, и ничего не покидает ваше устройство. Он работает только в Chrome и Edge на компьютере.",
+    trad_consent_p5: "Вернуться к движку браузера можно в любой момент: Настройки › Перевод.",
+    trad_consent_stay_local: "Оставить браузер",
+    trad_consent_accept: "Отправлять в {moteur}",
+    trad_engine_changed: "Движок перевода: {moteur}",
+    trad_local_restored: "Движок браузера восстановлен",
     thr_trad_action: "Перевести",
     thr_trad_hide: "Скрыть перевод",
     thr_trad_loading: "Переводим…",
-    thr_trad_by_local: "Переведено на этом устройстве",
-    thr_trad_by_online: "Переведено онлайн",
+    thr_trad_by_device: "Переведено на этом устройстве",
+    thr_trad_by_engine: "Переведено через {moteur}",
     thr_trad_retry: "Повторить",
     thr_trad_failed: "Не удалось перевести.",
-    thr_trad_enable_online_q: "Включить перевод онлайн?",
+    thr_trad_choose_engine_q: "Выбрать другой движок в настройках?",
     thr_trad_open_settings: "Открыть настройки",
   },
   zh: {
@@ -7796,20 +7945,38 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_service: "翻译服务暂时不可用。",
     trad_err_same_language: "这条消息已经是您使用的语言。",
     trad_err_local_unavailable: "此浏览器不支持本地翻译。该功能可在电脑版 Chrome 和 Edge 中使用。",
-    trad_err_online_disabled: "请开启在线翻译以翻译此消息。",
+    trad_err_engine_unavailable: "所选的翻译引擎不可用。请在设置中另选一个。",
     settings_translation: "翻译",
     trad_sub: "将收到的消息翻译成您的语言，尽量在本设备上完成。",
-    trad_mode_title: "翻译模式",
-    trad_mode_default: "本地模式为默认模式：翻译在本设备上完成，不会向任何人发送消息。",
-    trad_online_toggle: "在线翻译",
-    trad_online_toggle_desc:
-      "关闭时，一切都留在本设备。开启后，您选择翻译的消息文本会被发送到 Microsoft Azure Translator。",
-    trad_mode_local_active: "本地模式已启用 — 您的消息不会离开本设备。",
-    trad_mode_online_active: "在线模式已启用 — 翻译的文本会发送到 Microsoft Azure。",
+    trad_engines_title: "翻译引擎",
+    trad_engines_desc: "选择由谁翻译您的消息。所示价格为供应商的费率，按每百万个翻译字符计。",
+    trad_engines_loading: "正在加载引擎…",
+    trad_engines_failed: "无法加载引擎列表。",
+    trad_engines_retry: "重试",
+    trad_engine_recommended: "推荐 · 默认",
+    trad_engine_price_free: "免费",
+    trad_engine_price: "每百万字符 {prix}",
+    trad_engine_unavailable_server: "服务器未配置此引擎：目前无法选择。",
+    trad_engine_unavailable_browser: "此浏览器没有内置翻译引擎。电脑版 Chrome 和 Edge 有。",
+    trad_engine_active_local: "当前引擎：{moteur}。您的消息不会离开本设备。",
+    trad_engine_active_remote: "当前引擎：{moteur}。您请求翻译的文本会发送到 {moteur}。",
+    trad_engine_name_navigateur: "浏览器（本设备）",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "免费，且没有任何内容离开本设备：由浏览器自己翻译。可在电脑版 Chrome 和 Edge 上使用。",
+    trad_engine_note_azure: "Microsoft 不保留所发送的文本、不将其用于训练模型，也不留下任何记录。",
+    trad_engine_note_google:
+      "无论使用哪种字母表，均按字符计费：一个西里尔字母或一个汉字与一个拉丁字母计数相同。文本会发送到 Google。",
+    trad_engine_note_deepl: "在欧洲语言上往往质量最佳，但支持的语言目录较窄。文本会发送到 DeepL。",
+    trad_engine_note_libretranslate:
+      "自托管服务器上的开源软件：除服务器成本外免费。若两种语言之间没有直连模型，翻译将经由英语中转，质量随之下降。",
     trad_local_title: "设备端翻译",
     trad_local_desc:
       "您的浏览器会下载语言组件并在本地翻译，不发送任何内容。请选择您收到的语言：它们将被翻译成{langue}。",
-    trad_local_unsupported_cta: "您仍可以启用在线翻译来翻译，但文本会离开本设备。",
+    trad_local_unsupported_cta: "您可以在上方另选一个引擎，但那样文本就会离开本设备。",
     trad_state_ready: "可安装",
     trad_state_installed: "已为本站安装",
     trad_state_unavailable: "不可用",
@@ -7832,26 +7999,24 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_cache_confirm_desc: "下次阅读时会重新计算。浏览器的语言包不受影响。",
     trad_cache_clear_btn: "清除",
     trad_cache_cleared: "翻译已清除",
-    trad_consent_title: "要启用在线翻译吗？",
-    trad_consent_p1:
-      "在在线模式下，您选择翻译的消息文本会被发送到 Microsoft Azure Translator 进行翻译。它会离开本设备。",
-    trad_consent_p2: "Microsoft 承诺不保留该文本、不将其用于训练模型，也不留下任何记录。",
+    trad_consent_title: "要将您的消息发送到 {moteur} 吗？",
+    trad_consent_p1: "您选择翻译的消息文本将被发送到 {moteur} 进行翻译。它会离开本设备。",
     trad_consent_p3: "只有您点击“翻译”的消息才会被发送。您的其他消息、媒体和会话绝不会被传输。",
     trad_consent_p4:
-      "默认模式为本地模式：翻译在您的设备上完成，不会向任何人发送内容。它仅在电脑版 Chrome 和 Edge 上可用。",
-    trad_consent_p5: "您可以随时在“设置 › 翻译”中切换回本地模式。",
-    trad_consent_stay_local: "保持本地模式",
-    trad_consent_accept: "启用在线翻译",
-    trad_online_enabled: "已启用在线翻译",
-    trad_local_restored: "已恢复本地模式",
+      "浏览器引擎仍是默认选项：免费，且没有任何内容离开您的设备。它仅在电脑版 Chrome 和 Edge 上可用。",
+    trad_consent_p5: "您可以随时在“设置 › 翻译”中切换回浏览器引擎。",
+    trad_consent_stay_local: "保留浏览器",
+    trad_consent_accept: "发送到 {moteur}",
+    trad_engine_changed: "翻译引擎：{moteur}",
+    trad_local_restored: "已恢复浏览器引擎",
     thr_trad_action: "翻译",
     thr_trad_hide: "隐藏译文",
     thr_trad_loading: "正在翻译…",
-    thr_trad_by_local: "已在本设备上翻译",
-    thr_trad_by_online: "已在线翻译",
+    thr_trad_by_device: "已在本设备上翻译",
+    thr_trad_by_engine: "由 {moteur} 翻译",
     thr_trad_retry: "重试",
     thr_trad_failed: "翻译失败。",
-    thr_trad_enable_online_q: "要开启在线翻译吗？",
+    thr_trad_choose_engine_q: "要在设置中另选一个引擎吗？",
     thr_trad_open_settings: "打开设置",
   },
   sv: {
@@ -8773,23 +8938,47 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_same_language: "Det här meddelandet är redan på ditt språk.",
     trad_err_local_unavailable:
       "Lokal översättning är inte tillgänglig i den här webbläsaren. Den fungerar i Chrome och Edge på dator.",
-    trad_err_online_disabled: "Aktivera onlineöversättning för att översätta det här meddelandet.",
+    trad_err_engine_unavailable:
+      "Den valda översättningsmotorn är inte tillgänglig. Välj en annan under Inställningar.",
     settings_translation: "Översättning",
     trad_sub: "Översätt mottagna meddelanden till ditt språk, helst på den här enheten.",
-    trad_mode_title: "Översättningsläge",
-    trad_mode_default:
-      "Lokalt läge är standard: översättningen sker på den här enheten och inga meddelanden skickas till någon.",
-    trad_online_toggle: "Översättning online",
-    trad_online_toggle_desc:
-      "Avstängt stannar allt på den här enheten. Påslaget skickas texten i de meddelanden du väljer att översätta till Microsoft Azure Translator.",
-    trad_mode_local_active: "Lokalt läge aktivt – dina meddelanden lämnar aldrig den här enheten.",
-    trad_mode_online_active:
-      "Onlineläge aktivt – den översatta texten skickas till Microsoft Azure.",
+    trad_engines_title: "Översättningsmotor",
+    trad_engines_desc:
+      "Välj vem som översätter dina meddelanden. Priset som visas är leverantörens taxa, per miljon översatta tecken.",
+    trad_engines_loading: "Läser in motorerna…",
+    trad_engines_failed: "Listan över motorer kunde inte läsas in.",
+    trad_engines_retry: "Försök igen",
+    trad_engine_recommended: "Rekommenderas · standard",
+    trad_engine_price_free: "Gratis",
+    trad_engine_price: "{prix} per miljon tecken",
+    trad_engine_unavailable_server:
+      "Den här motorn är inte konfigurerad på servern: den går inte att välja just nu.",
+    trad_engine_unavailable_browser:
+      "Den här webbläsaren har ingen inbyggd översättningsmotor. Chrome och Edge har en, på dator.",
+    trad_engine_active_local:
+      "Aktiv motor: {moteur}. Dina meddelanden lämnar aldrig den här enheten.",
+    trad_engine_active_remote:
+      "Aktiv motor: {moteur}. Texten du låter översätta skickas till {moteur}.",
+    trad_engine_name_navigateur: "Webbläsaren (på den här enheten)",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "Gratis, och ingenting lämnar den här enheten: webbläsaren översätter själv. Fungerar i Chrome och Edge, på dator.",
+    trad_engine_note_azure:
+      "Microsoft sparar inte texten som skickas, använder den inte för att träna sina modeller och behåller inga spår av den.",
+    trad_engine_note_google:
+      "Debiteras per tecken oavsett alfabet: en kyrillisk bokstav eller ett tecken räknas som en latinsk bokstav. Texten skickas till Google.",
+    trad_engine_note_deepl:
+      "Ofta bäst kvalitet på europeiska språk, men språkkatalogen är smalare. Texten skickas till DeepL.",
+    trad_engine_note_libretranslate:
+      "Fri programvara på en egen server: gratis bortsett från serverkostnaden. Utan en direkt modell mellan två språk går översättningen via engelska och kvaliteten sjunker.",
     trad_local_title: "Översättning på enheten",
     trad_local_desc:
       "Din webbläsare laddar ner språkkomponenterna och översätter utan att skicka något. Välj de språk du tar emot: de översätts till {langue}.",
     trad_local_unsupported_cta:
-      "Du kan ändå översätta genom att slå på översättning online, med vetskapen att texten lämnar enheten.",
+      "Du kan välja en annan motor ovan, med vetskapen att texten då lämnar den här enheten.",
     trad_state_ready: "Redo att installera",
     trad_state_installed: "Installerat för den här webbplatsen",
     trad_state_unavailable: "Inte tillgängligt",
@@ -8815,29 +9004,27 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "De beräknas på nytt nästa gång du läser dem. Webbläsarens språkpaket påverkas inte.",
     trad_cache_clear_btn: "Radera",
     trad_cache_cleared: "Översättningarna raderade",
-    trad_consent_title: "Slå på översättning online?",
+    trad_consent_title: "Skicka dina meddelanden till {moteur}?",
     trad_consent_p1:
-      "I onlineläge skickas texten i de meddelanden du väljer att översätta till Microsoft Azure Translator för att översättas där. Den lämnar den här enheten.",
-    trad_consent_p2:
-      "Microsoft åtar sig att inte spara texten, inte använda den för att träna sina modeller och inte behålla några spår av den.",
+      "Texten i de meddelanden du väljer att översätta skickas till {moteur} för att översättas där. Den lämnar den här enheten.",
     trad_consent_p3:
       "Endast de meddelanden där du trycker på Översätt skickas. Dina övriga meddelanden, dina media och dina konversationer överförs aldrig.",
     trad_consent_p4:
-      "Standardläget är lokalt: översättningen sker då på din enhet och inget skickas till någon. Det fungerar bara i Chrome och Edge, på dator.",
+      "Webbläsarens motor är fortfarande standardvalet: gratis, och ingenting lämnar din enhet. Den fungerar bara i Chrome och Edge, på dator.",
     trad_consent_p5:
-      "Du kan när som helst gå tillbaka till lokalt läge under Inställningar › Översättning.",
-    trad_consent_stay_local: "Stanna i lokalt läge",
-    trad_consent_accept: "Slå på översättning online",
-    trad_online_enabled: "Översättning online påslagen",
-    trad_local_restored: "Lokalt läge återställt",
+      "Du kan när som helst gå tillbaka till webbläsarens motor under Inställningar › Översättning.",
+    trad_consent_stay_local: "Behåll webbläsaren",
+    trad_consent_accept: "Skicka till {moteur}",
+    trad_engine_changed: "Översättningsmotor: {moteur}",
+    trad_local_restored: "Webbläsarens motor återställd",
     thr_trad_action: "Översätt",
     thr_trad_hide: "Dölj översättningen",
     thr_trad_loading: "Översätter…",
-    thr_trad_by_local: "Översatt på den här enheten",
-    thr_trad_by_online: "Översatt online",
+    thr_trad_by_device: "Översatt på den här enheten",
+    thr_trad_by_engine: "Översatt av {moteur}",
     thr_trad_retry: "Försök igen",
     thr_trad_failed: "Översättningen misslyckades.",
-    thr_trad_enable_online_q: "Aktivera översättning online?",
+    thr_trad_choose_engine_q: "Välja en annan motor under Inställningar?",
     thr_trad_open_settings: "Öppna inställningarna",
   },
   no: {
@@ -9760,23 +9947,46 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_err_same_language: "Denne meldingen er allerede på språket ditt.",
     trad_err_local_unavailable:
       "Lokal oversettelse er ikke tilgjengelig i denne nettleseren. Den fungerer i Chrome og Edge på datamaskin.",
-    trad_err_online_disabled: "Slå på nettbasert oversettelse for å oversette denne meldingen.",
+    trad_err_engine_unavailable:
+      "Den valgte oversettelsesmotoren er ikke tilgjengelig. Velg en annen under Innstillinger.",
     settings_translation: "Oversettelse",
     trad_sub: "Oversett mottatte meldinger til språket ditt, helst på denne enheten.",
-    trad_mode_title: "Oversettelsesmodus",
-    trad_mode_default:
-      "Lokal modus er standard: oversettelsen skjer på denne enheten, og ingen meldinger sendes til noen.",
-    trad_online_toggle: "Oversettelse på nett",
-    trad_online_toggle_desc:
-      "Av blir alt værende på denne enheten. På sendes teksten i meldingene du velger å oversette, til Microsoft Azure Translator.",
-    trad_mode_local_active: "Lokal modus er aktiv – meldingene dine forlater ikke denne enheten.",
-    trad_mode_online_active:
-      "Nettmodus er aktiv – teksten som oversettes, sendes til Microsoft Azure.",
+    trad_engines_title: "Oversettelsesmotor",
+    trad_engines_desc:
+      "Velg hvem som oversetter meldingene dine. Prisen som vises, er leverandørens takst per million oversatte tegn.",
+    trad_engines_loading: "Laster inn motorene…",
+    trad_engines_failed: "Listen over motorer kunne ikke lastes inn.",
+    trad_engines_retry: "Prøv igjen",
+    trad_engine_recommended: "Anbefalt · standard",
+    trad_engine_price_free: "Gratis",
+    trad_engine_price: "{prix} per million tegn",
+    trad_engine_unavailable_server:
+      "Denne motoren er ikke satt opp på serveren: den kan ikke velges foreløpig.",
+    trad_engine_unavailable_browser:
+      "Denne nettleseren har ingen innebygd oversettelsesmotor. Chrome og Edge har det, på datamaskin.",
+    trad_engine_active_local: "Aktiv motor: {moteur}. Meldingene dine forlater ikke denne enheten.",
+    trad_engine_active_remote:
+      "Aktiv motor: {moteur}. Teksten du får oversatt, sendes til {moteur}.",
+    trad_engine_name_navigateur: "Nettleseren (på denne enheten)",
+    trad_engine_name_azure: "Azure AI Translator",
+    trad_engine_name_google: "Google Cloud Translation",
+    trad_engine_name_deepl: "DeepL",
+    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_note_navigateur:
+      "Gratis, og ingenting forlater denne enheten: nettleseren oversetter selv. Fungerer i Chrome og Edge, på datamaskin.",
+    trad_engine_note_azure:
+      "Microsoft lagrer ikke teksten som sendes, bruker den ikke til å trene modellene sine og beholder ingen spor av den.",
+    trad_engine_note_google:
+      "Fakturert per tegn uansett alfabet: en kyrillisk bokstav eller et skrifttegn teller som en latinsk bokstav. Teksten sendes til Google.",
+    trad_engine_note_deepl:
+      "Ofte best kvalitet på europeiske språk, men språkkatalogen er smalere. Teksten sendes til DeepL.",
+    trad_engine_note_libretranslate:
+      "Fri programvare på en egen server: gratis bortsett fra serverkostnaden. Uten en direkte modell mellom to språk går oversettelsen via engelsk, og kvaliteten synker.",
     trad_local_title: "Oversettelse på enheten",
     trad_local_desc:
       "Nettleseren laster ned språkkomponentene og oversetter uten å sende noe. Velg språkene du mottar: de oversettes til {langue}.",
     trad_local_unsupported_cta:
-      "Du kan likevel oversette ved å slå på oversettelse på nett, men da forlater teksten enheten.",
+      "Du kan velge en annen motor over, men da forlater teksten denne enheten.",
     trad_state_ready: "Klar til installasjon",
     trad_state_installed: "Installert for dette nettstedet",
     trad_state_unavailable: "Ikke tilgjengelig",
@@ -9802,29 +10012,27 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "De blir laget på nytt neste gang du leser dem. Nettleserens språkpakker berøres ikke.",
     trad_cache_clear_btn: "Slett",
     trad_cache_cleared: "Oversettelsene er slettet",
-    trad_consent_title: "Slå på oversettelse på nett?",
+    trad_consent_title: "Sende meldingene dine til {moteur}?",
     trad_consent_p1:
-      "I nettmodus sendes teksten i meldingene du velger å oversette, til Microsoft Azure Translator for å bli oversatt der. Den forlater denne enheten.",
-    trad_consent_p2:
-      "Microsoft forplikter seg til ikke å lagre denne teksten, ikke bruke den til å trene modellene sine og ikke beholde spor av den.",
+      "Teksten i meldingene du velger å oversette, sendes til {moteur} for å bli oversatt der. Den forlater denne enheten.",
     trad_consent_p3:
       "Bare meldingene du trykker Oversett på, sendes. De andre meldingene dine, mediene dine og samtalene dine overføres aldri.",
     trad_consent_p4:
-      "Standardmodusen er lokal: oversettelsen skjer da på enheten din, og ingenting sendes til noen. Den fungerer bare i Chrome og Edge, på datamaskin.",
+      "Nettleserens motor er fortsatt standardvalget: gratis, og ingenting forlater enheten din. Den fungerer bare i Chrome og Edge, på datamaskin.",
     trad_consent_p5:
-      "Du kan når som helst gå tilbake til lokal modus under Innstillinger › Oversettelse.",
-    trad_consent_stay_local: "Bli i lokal modus",
-    trad_consent_accept: "Slå på oversettelse på nett",
-    trad_online_enabled: "Oversettelse på nett er slått på",
-    trad_local_restored: "Lokal modus gjenopprettet",
+      "Du kan når som helst gå tilbake til nettleserens motor under Innstillinger › Oversettelse.",
+    trad_consent_stay_local: "Behold nettleseren",
+    trad_consent_accept: "Send til {moteur}",
+    trad_engine_changed: "Oversettelsesmotor: {moteur}",
+    trad_local_restored: "Nettleserens motor gjenopprettet",
     thr_trad_action: "Oversett",
     thr_trad_hide: "Skjul oversettelsen",
     thr_trad_loading: "Oversetter…",
-    thr_trad_by_local: "Oversatt på denne enheten",
-    thr_trad_by_online: "Oversatt på nett",
+    thr_trad_by_device: "Oversatt på denne enheten",
+    thr_trad_by_engine: "Oversatt av {moteur}",
     thr_trad_retry: "Prøv igjen",
     thr_trad_failed: "Oversettelsen mislyktes.",
-    thr_trad_enable_online_q: "Slå på oversettelse på nett?",
+    thr_trad_choose_engine_q: "Velge en annen motor under Innstillinger?",
     thr_trad_open_settings: "Åpne innstillingene",
   },
 }

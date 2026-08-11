@@ -7,6 +7,7 @@ import {
   type CodeErreurTraduction,
   type ResultatTraduction,
 } from "../../../../src/services/traduction-service"
+import { moteurSurAppareil, nomMoteur } from "../../../../src/services/traduction-fournisseurs"
 
 /**
  * Traduction d'un message, affichee DANS la bulle sous le texte d'origine.
@@ -29,7 +30,7 @@ import {
 const CLE_ERREUR: Record<CodeErreurTraduction | "inconnue", Cle> = {
   "meme-langue": "trad_err_same_language",
   "local-indisponible": "trad_err_local_unavailable",
-  "en-ligne-desactive": "trad_err_online_disabled",
+  "moteur-indisponible": "trad_err_engine_unavailable",
   quota: "trad_err_quota",
   service: "trad_err_service",
   inconnue: "thr_trad_failed",
@@ -82,11 +83,16 @@ export function MessageTranslation({ texte }: { texte: string }) {
           <div className="msg-trad-texte" lang={language}>
             {etat.resultat.texte}
           </div>
-          {/* L'origine de la traduction est annoncee message par message : en
-              mode en ligne, l'utilisateur doit pouvoir voir exactement ce qui
-              est sorti de son appareil. */}
+          {/* L'origine de la traduction est annoncee message par message, et
+              le fournisseur est NOMME : l'utilisateur doit pouvoir voir chez
+              qui ce texte-la est parti, sans avoir a se souvenir du reglage en
+              vigueur au moment ou la bulle a ete traduite. Le moteur vient du
+              resultat, pas du reglage courant : une traduction relue depuis le
+              cache reste creditee a celui qui l'a produite. */}
           <div className="msg-trad-pied">
-            {etat.resultat.moteur === "local" ? t("thr_trad_by_local") : t("thr_trad_by_online")}
+            {moteurSurAppareil(etat.resultat.moteur)
+              ? t("thr_trad_by_device")
+              : t("thr_trad_by_engine", { moteur: nomMoteur(etat.resultat.moteur, language) })}
           </div>
         </>
       )}
@@ -98,10 +104,10 @@ export function MessageTranslation({ texte }: { texte: string }) {
 }
 
 /**
- * Un echec n'est pas toujours une panne : le plus souvent, il manque une
- * autorisation. On explique donc, et on propose l'action qui debloque —
- * l'activation du mode en ligne se fait dans les Parametres, seul endroit ou
- * l'avertissement complet est presente avant le choix.
+ * Un echec n'est pas toujours une panne : le plus souvent, le moteur choisi ne
+ * peut pas repondre. On explique donc, et on propose l'action qui debloque —
+ * le changement de moteur se fait dans les Parametres, seul endroit ou le prix
+ * et le trajet des donnees sont presentes avant le choix.
  */
 function EchecTraduction({
   code,
@@ -112,12 +118,12 @@ function EchecTraduction({
 }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const versParametres = code === "local-indisponible" || code === "en-ligne-desactive"
+  const versParametres = code === "local-indisponible" || code === "moteur-indisponible"
 
   return (
     <div className="msg-trad-note">
       {t(CLE_ERREUR[code])}
-      {versParametres && <> {t("thr_trad_enable_online_q")}</>}
+      {versParametres && <> {t("thr_trad_choose_engine_q")}</>}
       {code !== "meme-langue" && (
         <div className="msg-trad-pied">
           {versParametres ? (
