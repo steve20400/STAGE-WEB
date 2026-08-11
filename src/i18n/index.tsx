@@ -53,9 +53,39 @@ export const LANGUAGE_FLAGS: Record<LanguageCode, string> = {
   no: "🇳🇴",
 }
 
-/** Libelle complet d'une langue : drapeau puis nom natif. */
-export function libelleLangue(code: LanguageCode): string {
-  return `${LANGUAGE_FLAGS[code]}  ${LANGUAGE_NAMES[code]}`
+/** Cle du catalogue portant le nom de chaque langue. */
+const CLE_NOM_LANGUE: Record<LanguageCode, TranslationKey> = {
+  fr: "french",
+  en: "english",
+  es: "spanish",
+  de: "german",
+  pt: "portuguese",
+  ru: "russian",
+  zh: "chinese",
+  sv: "swedish",
+  no: "norwegian",
+}
+
+/**
+ * Libelle complet d'une langue : drapeau puis nom, DANS LA LANGUE COURANTE.
+ *
+ * Le nom natif — « Deutsch », « Русский » — ne se lisait que par ceux qui
+ * parlent deja cette langue. Or la liste sert justement a en choisir une
+ * autre : quelqu'un qui lit en russe doit voir « Немецкий », pas un mot qu'il
+ * ne sait pas prononcer. Le catalogue porte les neuf noms dans les neuf
+ * langues, il suffisait de s'en servir.
+ *
+ * `dansLaLangue` permet d'annoncer une langue dans celle qu'on vient de
+ * choisir, pour que la confirmation parle deja la nouvelle.
+ */
+export function libelleLangue(code: LanguageCode, dansLaLangue?: LanguageCode): string {
+  const nom = traduire(dansLaLangue ?? langueInitiale(), CLE_NOM_LANGUE[code])
+  return `${LANGUAGE_FLAGS[code]}  ${nom}`
+}
+
+/** Nom d'une langue, sans drapeau, dans la langue demandee. */
+export function nomLangue(code: LanguageCode, dansLaLangue?: LanguageCode): string {
+  return traduire(dansLaLangue ?? langueInitiale(), CLE_NOM_LANGUE[code])
 }
 
 export type { LanguageCode }

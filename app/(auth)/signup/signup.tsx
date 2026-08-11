@@ -284,7 +284,7 @@ export default function SignUpPage() {
             >
               {LANGUAGE_CODES.map((code) => (
                 <option key={code} value={code}>
-                  {libelleLangue(code)}
+                  {libelleLangue(code, language)}
                 </option>
               ))}
             </select>

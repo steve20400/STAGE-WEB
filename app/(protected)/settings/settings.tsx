@@ -20,7 +20,7 @@ import {
 } from "../../../src/services/pseudo-appareil-service"
 import {
   LANGUAGE_CODES,
-  LANGUAGE_NAMES,
+  nomLangue,
   langueInitiale,
   libelleLangue,
   traduire,
@@ -2605,7 +2605,7 @@ export default function SettingsPage() {
                   onChange={(e) => {
                     const code = e.target.value as LanguageCode
                     setLanguage(code)
-                    info(traduire(code, "language_settings"), LANGUAGE_NAMES[code])
+                    info(traduire(code, "language_settings"), nomLangue(code, code))
                   }}
                   aria-label={t("language_settings")}
                   style={{
@@ -2622,7 +2622,7 @@ export default function SettingsPage() {
                 >
                   {LANGUAGE_CODES.map((code) => (
                     <option key={code} value={code}>
-                      {libelleLangue(code)}
+                      {libelleLangue(code, language)}
                     </option>
                   ))}
                 </select>
