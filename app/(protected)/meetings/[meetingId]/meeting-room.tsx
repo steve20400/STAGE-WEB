@@ -238,6 +238,12 @@ export default function MeetingRoomPage() {
           })}
         </p>
         <p>{t("meet_duration_minutes", { n: Math.floor(meeting.dureeSecondes / 60) })}</p>
+        {meeting.jeSuisOrganisateur && !meeting.terminee && (
+          <section className="meeting-settings-panel">
+            <div className="meeting-settings-title">Paramètres de la réunion</div>
+            <label className="meeting-auto-invite"><input type="checkbox" checked={meeting.invitationAuto} onChange={(e) => void changerModeInvitation(e.target.checked)} /><span><strong>Accepter automatiquement les demandes</strong><small>Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.</small></span></label>
+          </section>
+        )}
         {meeting.participants.length > 0 && (
           <>
             <p>{t("meet_participants", { count: meeting.participants.length })}</p>
@@ -335,7 +341,7 @@ export default function MeetingRoomPage() {
 
       {meeting.jeSuisOrganisateur && demandes.length > 0 && (
         <section className="meeting-invite-requests" aria-label="Demandes d'invitation">
-          <div className="meeting-invite-head"><strong>Demandes d'invitation</strong><label><input type="checkbox" checked={meeting.invitationAuto} onChange={(e) => void changerModeInvitation(e.target.checked)} /> Accepter automatiquement</label></div>
+          <div className="meeting-invite-head"><strong>Demandes d'invitation</strong></div>
           {demandes.map((d) => <div key={d.id} className="meeting-invite-request"><span>{d.demandeur.nom} souhaite inviter {d.invite.nom}</span><div><button onClick={() => void traiterDemande(d.id, true)}>Accepter</button><button onClick={() => void traiterDemande(d.id, false)}>Refuser</button></div></div>)}
         </section>
       )}
