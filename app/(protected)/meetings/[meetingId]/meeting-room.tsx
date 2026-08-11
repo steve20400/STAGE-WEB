@@ -10,6 +10,7 @@ import {
   listerDemandesInvitation,
   trancherDemandeInvitation,
   reglerInvitationAuto,
+  inviterAReunion,
   type DemandeInvitation,
 } from "../../../../src/services/meetings-service"
 import {
@@ -80,6 +81,7 @@ export default function MeetingRoomPage() {
   const [mainsLevees, setMainsLevees] = useState<Set<string>>(new Set())
   const [nonLus, setNonLus] = useState(0)
   const [demandes, setDemandes] = useState<DemandeInvitation[]>([])
+  const [numeroDirect, setNumeroDirect] = useState("")
 
   // Ouvrir le fil solde ce qui a ete rate pendant qu'il etait ferme.
   useEffect(() => {
@@ -158,6 +160,14 @@ export default function MeetingRoomPage() {
     if (!meetingId || !meeting) return
     try { await reglerInvitationAuto(Number(meetingId), automatic); setMeeting({ ...meeting, invitationAuto: automatic }) }
     catch (err) { showError(t("error"), err instanceof Error ? err.message : "Réglage impossible") }
+  }
+
+  const inviterDirectement = async () => {
+    if (!meetingId) return
+    const numero = numeroDirect.replace(/\D/g, "")
+    if (!/^(\d{6}|\d{8})$/.test(numero)) return showError(t("error"), "Saisissez un Alanya ID valide.")
+    try { await inviterAReunion(Number(meetingId), [numero]); setNumeroDirect(""); setMeeting(await fetchMeeting(Number(meetingId))) }
+    catch (err) { showError(t("error"), err instanceof Error ? err.message : "Invitation impossible") }
   }
 
   const maMain = mainsLevees.has(getMyUserId() ?? "")
@@ -242,6 +252,7 @@ export default function MeetingRoomPage() {
           <section className="meeting-settings-panel">
             <div className="meeting-settings-title">Paramètres de la réunion</div>
             <label className="meeting-auto-invite"><input type="checkbox" checked={meeting.invitationAuto} onChange={(e) => void changerModeInvitation(e.target.checked)} /><span><strong>Accepter automatiquement les demandes</strong><small>Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.</small></span></label>
+            <div className="meeting-direct-invite"><input value={numeroDirect} onChange={(e) => setNumeroDirect(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="Alanya ID" /><button onClick={() => void inviterDirectement()}>Ajouter</button></div>
           </section>
         )}
         {meeting.participants.length > 0 && (
