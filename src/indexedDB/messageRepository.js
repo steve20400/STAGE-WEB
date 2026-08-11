@@ -152,7 +152,13 @@ export const getCallLogsByUser = async (alanyaID) => {
 
 export const clearAllData = async () => {
     const db = await initIndexedDB();
-    const stores = ['users', 'Appareil', 'conversations', 'messages', 'outboxQueue', 'callLogs', 'previewMedia'];
+    // Liste lue dans la base, jamais écrite à la main : un magasin ajouté au
+    // schéma et oublié ici survivrait à la déconnexion, et le compte suivant
+    // lirait les données du précédent par le chemin cache-first. C'est la fuite
+    // inter-comptes déjà corrigée une fois sur ce projet ; l'énumération la rend
+    // impossible à réintroduire.
+    const stores = Array.from(db.objectStoreNames);
+    if (!stores.length) return;
     const tx = db.transaction(stores, 'readwrite');
     await Promise.all([
         ...stores.map((s) => tx.objectStore(s).clear()),

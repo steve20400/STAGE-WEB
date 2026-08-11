@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { useToast } from "../../../src/components/toast"
@@ -70,11 +70,38 @@ import {
   estRenseigne,
   fetchLoginHistory,
 } from "../../../src/services/user-access-service"
+import {
+  compterCacheTraductions,
+  definirModeTraduction,
+  lireModeTraduction,
+  moteurLocalPresent,
+  sAbonnerAuModeTraduction,
+  telechargerComposants,
+  viderCacheTraductions,
+  type ModeTraduction,
+} from "../../../src/services/traduction-service"
+// Sonde le couple de langues directement : `etatTraduction` du service repond
+// « en-ligne » des que ce mode est choisi, ce qui masquerait l'etat reel des
+// composants locaux — or c'est precisement ce que cette carte doit montrer,
+// le local restant le premier etage de la cascade dans les deux modes.
+import {
+  TelechargementRefuse,
+  disponibiliteCouple,
+  type DisponibiliteCouple,
+} from "../../../src/services/traduction-locale"
+import { type EtatCacheTraductions } from "../../../src/services/traduction-cache"
 import { sendSessionRevoked } from "../../../src/services/websocket-service"
 import { avatarDisplaySrc, fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 
-type SettingsSection = "profile" | "security" | "notifications" | "appearance" | "privacy" | "about"
+type SettingsSection =
+  | "profile"
+  | "security"
+  | "notifications"
+  | "privacy"
+  | "translation"
+  | "appearance"
+  | "about"
 
 interface Profile {
   name: string
@@ -1016,6 +1043,373 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
   )
 }
 
+/**
+ * Taille approximative des traductions gardees en local.
+ *
+ * Hors composant : la langue est relue a chaque appel, jamais figee a l'import.
+ */
+function tailleCacheLisible(octets: number, langue: LanguageCode): string {
+  const enMo = octets / (1024 * 1024)
+  if (enMo >= 1) return traduire(langue, "v2_size_mb", { taille: enMo.toFixed(1) })
+  return traduire(langue, "v2_size_kb", { taille: Math.max(1, Math.round(octets / 1024)) })
+}
+
+/**
+ * Consentement avant le passage en mode en ligne.
+ *
+ * Fenetre bloquante plutot qu'un simple interrupteur : ce reglage fait sortir le
+ * texte des messages de l'appareil, et cette consequence doit etre lue avant
+ * d'etre subie. Fermer la fenetre par la croix, par l'exterieur ou par le
+ * bouton de repli garde le mode local — un clic distrait ne change donc rien.
+ */
+function TranslationConsentDialog({
+  onCancel,
+  onAccept,
+}: {
+  onCancel: () => void
+  onAccept: () => void
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "var(--overlay)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+        zIndex: 9600,
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("trad_consent_title")}
+        onClick={(event) => event.stopPropagation()}
+        style={{
+          width: "min(470px, 100%)",
+          maxHeight: "86vh",
+          overflowY: "auto",
+          borderRadius: 16,
+          border: "1px solid var(--border-subtle)",
+          background: "var(--bg-surface)",
+          boxShadow: "0 24px 64px #00000080",
+          padding: 22,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "'Bricolage Grotesque', sans-serif",
+            fontSize: 20,
+            fontWeight: 800,
+            color: "var(--text-primary)",
+            marginBottom: 14,
+          }}
+        >
+          {t("trad_consent_title")}
+        </div>
+        <p className="trad-consent-p trad-consent-p-lead">{t("trad_consent_p1")}</p>
+        <p className="trad-consent-p">{t("trad_consent_p2")}</p>
+        <p className="trad-consent-p">{t("trad_consent_p3")}</p>
+        <p className="trad-consent-p">{t("trad_consent_p4")}</p>
+        <p className="trad-consent-p">{t("trad_consent_p5")}</p>
+        <div className="trad-consent-actions">
+          <button className="trad-btn-online" onClick={onAccept}>
+            {t("trad_consent_accept")}
+          </button>
+          <button className="trad-btn-stay" onClick={onCancel} autoFocus>
+            {t("trad_consent_stay_local")}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Section « Traduction » des Parametres.
+ *
+ * Composant a part, avec son propre etat : sonder la disponibilite des couples
+ * de langues et compter les traductions gardees n'a de sens que quand la
+ * section est ouverte, et ces mesures ne doivent pas se relancer a chaque
+ * frappe ailleurs dans les Parametres.
+ */
+function TranslationSettings() {
+  const { language, t } = useTranslation()
+  const { success, error: toastError, info } = useToast()
+
+  const [mode, setMode] = useState<ModeTraduction>(() => lireModeTraduction())
+  // Presence du moteur du navigateur : elle ne change pas en cours de session.
+  const [moteurPresent] = useState(() => moteurLocalPresent())
+  const [consentement, setConsentement] = useState(false)
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
+  // Un couple absent de la carte n'a pas encore ete sonde : l'interface annonce
+  // alors une verification, jamais une indisponibilite qu'elle ignore encore.
+  const [disponibilites, setDisponibilites] = useState<
+    Partial<Record<LanguageCode, DisponibiliteCouple>>
+  >({})
+  const [telechargement, setTelechargement] = useState<{
+    langue: LanguageCode
+    fraction: number
+  } | null>(null)
+  const [cache, setCache] = useState<EtatCacheTraductions | null>(null)
+
+  // Langues que l'on peut recevoir : toutes sauf celle de l'interface, qui est
+  // la cible. Un couple identique n'aurait rien a traduire.
+  const sources = useMemo(() => LANGUAGE_CODES.filter((code) => code !== language), [language])
+
+  // Le mode peut changer depuis un autre onglet du meme navigateur.
+  useEffect(() => sAbonnerAuModeTraduction(setMode), [])
+
+  const rafraichirCache = useCallback(() => {
+    void compterCacheTraductions().then(setCache)
+  }, [])
+
+  useEffect(() => rafraichirCache(), [rafraichirCache])
+
+  useEffect(() => {
+    if (!moteurPresent) return
+    let annule = false
+    setDisponibilites({})
+    // Sondage sequentiel : huit `availability()` lances d'un bloc font
+    // travailler le navigateur pendant que la page finit de s'afficher. Il est
+    // refait a chaque ouverture car un paquet est evince des que l'espace
+    // disque libre passe sous le seuil du navigateur.
+    void (async () => {
+      for (const code of sources) {
+        const etat = await disponibiliteCouple(code, language)
+        if (annule) return
+        setDisponibilites((precedent) => ({ ...precedent, [code]: etat }))
+      }
+    })()
+    return () => {
+      annule = true
+    }
+  }, [language, moteurPresent, sources])
+
+  const revenirEnLocal = () => {
+    definirModeTraduction("local")
+    info(t("trad_local_restored"), t("trad_mode_local_active"))
+  }
+
+  const accepterEnLigne = () => {
+    setConsentement(false)
+    definirModeTraduction("en-ligne")
+    success(t("trad_online_enabled"), t("trad_mode_online_active"))
+  }
+
+  /**
+   * Installe les composants d'un couple.
+   *
+   * Appele depuis le clic et rien d'autre : hors geste de l'utilisateur, le
+   * navigateur refuse le telechargement. Un seul couple a la fois, sans quoi
+   * plusieurs modeles se disputeraient la bande passante et le disque.
+   */
+  const lancerTelechargement = async (code: LanguageCode) => {
+    setTelechargement({ langue: code, fraction: 0 })
+    try {
+      const pret = await telechargerComposants(code, language, (fraction) =>
+        setTelechargement({ langue: code, fraction })
+      )
+      setDisponibilites((precedent) => ({
+        ...precedent,
+        [code]: pret ? "available" : "unavailable",
+      }))
+      if (pret) {
+        success(
+          t("trad_download_done"),
+          t("trad_download_done_detail", { langue: nomLangue(code, language) })
+        )
+      } else {
+        toastError(t("trad_download_failed"))
+      }
+    } catch (erreur) {
+      toastError(
+        erreur instanceof TelechargementRefuse
+          ? t("trad_download_refused")
+          : t("trad_download_failed")
+      )
+    } finally {
+      setTelechargement(null)
+    }
+  }
+
+  const demanderEffacement = () => {
+    setConfirmState({
+      title: t("trad_cache_confirm_title"),
+      description: t("trad_cache_confirm_desc"),
+      confirmLabel: t("trad_cache_clear_btn"),
+      tone: "warning",
+      onConfirm: async () => {
+        await viderCacheTraductions()
+        rafraichirCache()
+        info(t("trad_cache_cleared"), t("trad_cache_packs_note"))
+      },
+    })
+  }
+
+  const enLigne = mode === "en-ligne"
+  // Tous les couples sondes, et tous refuses : le moteur existe mais ne sert a
+  // rien ici. La condition exige que le sondage soit termine, sinon elle serait
+  // vraie une fraction de seconde au montage.
+  const aucunCoupleUtilisable = sources.every((code) => disponibilites[code] === "unavailable")
+
+  return (
+    <>
+      <div className="s-page-title">{t("settings_translation")}</div>
+      <p className="s-page-sub">{t("trad_sub")}</p>
+
+      <div className="s-card">
+        <div className="s-card-title">{t("trad_mode_title")}</div>
+        <div className="trad-note" style={{ marginTop: 0, marginBottom: 4 }}>
+          {t("trad_mode_default")}
+        </div>
+        <Toggle
+          value={enLigne}
+          onChange={(actif) => (actif ? setConsentement(true) : revenirEnLocal())}
+          label={t("trad_online_toggle")}
+          description={t("trad_online_toggle_desc")}
+        />
+        {/* Ligne permanente : l'utilisateur doit pouvoir lire ou part son texte
+            sans avoir a interpreter la position d'un interrupteur. */}
+        <div className={`trad-mode-state ${enLigne ? "online" : ""}`}>
+          {enLigne ? t("trad_mode_online_active") : t("trad_mode_local_active")}
+        </div>
+      </div>
+
+      <div className="s-card">
+        <div className="s-card-title">{t("trad_local_title")}</div>
+        {moteurPresent ? (
+          <>
+            <div className="trad-note" style={{ marginTop: 0, marginBottom: 14 }}>
+              {t("trad_local_desc", { langue: nomLangue(language, language) })}
+            </div>
+            <ul className="trad-pairs">
+              {sources.map((code) => {
+                const etat = disponibilites[code]
+                const enCours =
+                  telechargement && telechargement.langue === code ? telechargement : null
+                const pourcent = Math.round((enCours?.fraction ?? 0) * 100)
+                return (
+                  <li key={code} className="trad-pair">
+                    <div className="trad-pair-head">
+                      <span className="trad-pair-lang">{nomLangue(code, language)}</span>
+                      <span className={`trad-pair-state ${etat === "available" ? "on" : ""}`}>
+                        {enCours
+                          ? t("trad_downloading", { pourcent })
+                          : etat === undefined
+                            ? t("trad_state_checking")
+                            : etat === "available"
+                              ? t("trad_state_installed")
+                              : etat === "unavailable"
+                                ? t("trad_state_unavailable")
+                                : t("trad_state_ready")}
+                      </span>
+                      {(etat === "downloadable" || etat === "downloading") && !enCours && (
+                        <button
+                          className="trad-dl"
+                          disabled={telechargement !== null}
+                          onClick={() => void lancerTelechargement(code)}
+                        >
+                          {t("trad_download")}
+                        </button>
+                      )}
+                    </div>
+                    {enCours && (
+                      <div
+                        className="trad-progress"
+                        role="progressbar"
+                        aria-valuenow={pourcent}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      >
+                        <div className="trad-progress-fill" style={{ width: `${pourcent}%` }} />
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+            <div className="trad-note">{t("trad_pairs_note")}</div>
+            {/* Le moteur est la mais aucun couple ne repond : fonctionnalite
+                desactivee par une politique d'entreprise, ou langues hors du
+                catalogue du navigateur. L'utilisateur se retrouverait devant
+                une liste de refus sans issue, on lui redit donc ce qui reste
+                possible. */}
+            {aucunCoupleUtilisable && (
+              <>
+                <div className="trad-note">{t("trad_local_unsupported_cta")}</div>
+                {!enLigne && (
+                  <button
+                    className="trad-btn-online"
+                    style={{ marginTop: 14 }}
+                    onClick={() => setConsentement(true)}
+                  >
+                    {t("trad_consent_accept")}
+                  </button>
+                )}
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="trad-note" style={{ marginTop: 0 }}>
+              {t("trad_err_local_unavailable")}
+            </div>
+            <div className="trad-note">{t("trad_local_unsupported_cta")}</div>
+            {!enLigne && (
+              <button
+                className="trad-btn-online"
+                style={{ marginTop: 14 }}
+                onClick={() => setConsentement(true)}
+              >
+                {t("trad_consent_accept")}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="s-card">
+        <div className="s-card-title">{t("trad_cache_title")}</div>
+        <div className="trad-note" style={{ marginTop: 0, marginBottom: 14 }}>
+          {t("trad_cache_desc")}
+        </div>
+        <DangerZoneItem
+          label={
+            cache === null
+              ? t("trad_state_checking")
+              : cache.entrees === 0
+                ? t("trad_cache_empty")
+                : t("trad_cache_count", {
+                    nombre: cache.entrees,
+                    taille: tailleCacheLisible(cache.octets, language),
+                  })
+          }
+          description={t("trad_cache_packs_note")}
+          buttonLabel={t("trad_cache_clear")}
+          onClick={demanderEffacement}
+        />
+      </div>
+
+      {consentement && (
+        <TranslationConsentDialog
+          onCancel={() => setConsentement(false)}
+          onAccept={accepterEnLigne}
+        />
+      )}
+      {confirmState && (
+        <ConfirmDialog state={confirmState} onCancel={() => setConfirmState(null)} />
+      )}
+    </>
+  )
+}
+
 /** Ligne de la carte « Sessions actives ». */
 interface SessionAffichee {
   appareilId: number
@@ -1523,6 +1917,26 @@ export default function SettingsPage() {
       ),
     },
     {
+      id: "translation",
+      label: t("settings_translation"),
+      icon: (
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 5h9M9 3v2c0 4-2 7-5 8" />
+          <path d="M6 11c1.5 2.5 3.5 4 6 5" />
+          <path d="M13 21l4-9 4 9M14.6 18h4.8" />
+        </svg>
+      ),
+    },
+    {
       id: "appearance",
       label: t("settings_appearance"),
       icon: (
@@ -1794,6 +2208,81 @@ export default function SettingsPage() {
         /* strength meter */
         .strength-bar { height: 3px; background: var(--border-subtle); border-radius: 99px; overflow: hidden; margin-bottom: 5px; }
         .strength-fill { height: 100%; border-radius: 99px; transition: width .35s, background .35s; }
+
+        /* Traduction : notes, etat des couples de langues, consentement. */
+        .trad-note {
+          font-size: 11.5px; color: var(--text-faint); line-height: 1.55; margin-top: 12px;
+        }
+        .trad-mode-state {
+          display: flex; align-items: center; gap: 8px;
+          margin-top: 14px; padding: 10px 12px; border-radius: 9px;
+          font-size: 12px; line-height: 1.5;
+          background: var(--accent-dim); border: 1px solid var(--accent-border);
+          color: var(--accent);
+        }
+        .trad-mode-state::before {
+          content: ''; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+          background: currentColor;
+        }
+        /* Le mode en ligne se distingue au premier coup d'oeil : il n'a pas les
+           memes consequences que le mode local, il ne doit pas avoir la meme
+           couleur. */
+        .trad-mode-state.online {
+          background: var(--danger-dim); border-color: var(--danger-border); color: var(--danger);
+        }
+
+        .trad-pairs { list-style: none; margin: 0; padding: 0; }
+        .trad-pair { padding: 11px 0; border-bottom: 1px solid var(--border-subtle); }
+        .trad-pair:last-child { border-bottom: none; }
+        .trad-pair-head {
+          display: flex; align-items: center; gap: 10px; flex-wrap: wrap; row-gap: 6px;
+        }
+        .trad-pair-lang {
+          flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text-primary);
+        }
+        .trad-pair-state { font-size: 11.5px; color: var(--text-faint); }
+        .trad-pair-state.on { color: var(--success); }
+        .trad-dl {
+          flex-shrink: 0; padding: 7px 13px; border-radius: 8px;
+          border: 1px solid var(--border-default); background: var(--bg-elevated);
+          color: var(--text-secondary); font-family: 'DM Sans', sans-serif;
+          font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+        }
+        .trad-dl:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-border); }
+        .trad-dl:disabled { opacity: .5; cursor: not-allowed; }
+
+        .trad-progress {
+          height: 3px; margin-top: 9px; border-radius: 99px;
+          background: var(--border-subtle); overflow: hidden;
+        }
+        /* Aucune transition sur la largeur : le navigateur peut passer de 0 a
+           100 en un seul evenement, une animation ferait clignoter la barre. */
+        .trad-progress-fill { height: 100%; border-radius: 99px; background: var(--accent); }
+
+        .trad-consent-p {
+          font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;
+        }
+        .trad-consent-p-lead { color: var(--text-primary); font-weight: 500; }
+        .trad-consent-actions {
+          display: flex; justify-content: flex-end; align-items: center;
+          gap: 10px; margin-top: 18px; flex-wrap: wrap;
+        }
+        .trad-btn-online {
+          border: 1px solid var(--danger-border); background: var(--danger-dim);
+          color: var(--danger); border-radius: 9px; padding: 10px 14px;
+          font-size: 12px; font-weight: 600; cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+        }
+        .trad-btn-stay {
+          border: 1px solid transparent; background: var(--accent);
+          color: var(--bg-base); border-radius: 9px; padding: 10px 14px;
+          font-size: 12px; font-weight: 700; cursor: pointer;
+          font-family: 'DM Sans', sans-serif;
+        }
+        @media (max-width: 560px) {
+          .trad-consent-actions { flex-direction: column-reverse; align-items: stretch; }
+          .trad-consent-actions button { width: 100%; }
+        }
 
         /* font size selector */
         .font-opts { display: flex; gap: 8px; }
@@ -2611,6 +3100,8 @@ export default function SettingsPage() {
               </div>
             </>
           )}
+
+          {section === "translation" && <TranslationSettings />}
 
           {section === "appearance" && (
             <>
