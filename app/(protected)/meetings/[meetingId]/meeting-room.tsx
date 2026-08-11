@@ -7,6 +7,9 @@ import {
   fetchMeeting,
   joinMeeting,
   leaveMeeting,
+  listerDemandesInvitation,
+  trancherDemandeInvitation,
+  type DemandeInvitation,
 } from "../../../../src/services/meetings-service"
 import {
   joinMeetingRoom,
@@ -67,6 +70,7 @@ export default function MeetingRoomPage() {
   /** Identifiants dont la main est levee, tels que le serveur les diffuse. */
   const [mainsLevees, setMainsLevees] = useState<Set<string>>(new Set())
   const [nonLus, setNonLus] = useState(0)
+  const [demandes, setDemandes] = useState<DemandeInvitation[]>([])
 
   // Ouvrir le fil solde ce qui a ete rate pendant qu'il etait ferme.
   useEffect(() => {
@@ -124,6 +128,22 @@ export default function MeetingRoomPage() {
       })
     })
   }, [meetingId])
+
+  useEffect(() => {
+    if (!meeting?.jeSuisOrganisateur || !meetingId) return
+    const charger = () => void listerDemandesInvitation(Number(meetingId)).then(setDemandes).catch(() => undefined)
+    charger()
+    const id = window.setInterval(charger, 10000)
+    return () => window.clearInterval(id)
+  }, [meeting?.jeSuisOrganisateur, meetingId])
+
+  const traiterDemande = async (demandeId: number, accepter: boolean) => {
+    if (!meetingId) return
+    try {
+      await trancherDemandeInvitation(Number(meetingId), demandeId, accepter)
+      setDemandes((liste) => liste.filter((d) => d.id !== demandeId))
+    } catch (err) { showError(t("error"), err instanceof Error ? err.message : "Demande impossible") }
+  }
 
   const maMain = mainsLevees.has(getMyUserId() ?? "")
 
@@ -297,6 +317,13 @@ export default function MeetingRoomPage() {
         visible={!etroit || filOuvert}
         onMessageMasque={() => setNonLus((n) => n + 1)}
       />
+
+      {meeting.jeSuisOrganisateur && demandes.length > 0 && (
+        <section className="meeting-invite-requests" aria-label="Demandes d'invitation">
+          <strong>Demandes d'invitation</strong>
+          {demandes.map((d) => <div key={d.id} className="meeting-invite-request"><span>{d.demandeur.nom} souhaite inviter {d.invite.nom}</span><div><button onClick={() => void traiterDemande(d.id, true)}>Accepter</button><button onClick={() => void traiterDemande(d.id, false)}>Refuser</button></div></div>)}
+        </section>
+      )}
 
       {/* Le compteur dit ce qui s'est dit pendant que le panneau etait ferme :
           sans lui, on n'ouvrirait le fil que par hasard. */}
