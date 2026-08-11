@@ -9,6 +9,7 @@ import {
   leaveMeeting,
   listerDemandesInvitation,
   trancherDemandeInvitation,
+  reglerInvitationAuto,
   type DemandeInvitation,
 } from "../../../../src/services/meetings-service"
 import {
@@ -151,6 +152,12 @@ export default function MeetingRoomPage() {
       await trancherDemandeInvitation(Number(meetingId), demandeId, accepter)
       setDemandes((liste) => liste.filter((d) => d.id !== demandeId))
     } catch (err) { showError(t("error"), err instanceof Error ? err.message : "Demande impossible") }
+  }
+
+  const changerModeInvitation = async (automatic: boolean) => {
+    if (!meetingId || !meeting) return
+    try { await reglerInvitationAuto(Number(meetingId), automatic); setMeeting({ ...meeting, invitationAuto: automatic }) }
+    catch (err) { showError(t("error"), err instanceof Error ? err.message : "Réglage impossible") }
   }
 
   const maMain = mainsLevees.has(getMyUserId() ?? "")
@@ -328,7 +335,7 @@ export default function MeetingRoomPage() {
 
       {meeting.jeSuisOrganisateur && demandes.length > 0 && (
         <section className="meeting-invite-requests" aria-label="Demandes d'invitation">
-          <strong>Demandes d'invitation</strong>
+          <div className="meeting-invite-head"><strong>Demandes d'invitation</strong><label><input type="checkbox" checked={meeting.invitationAuto} onChange={(e) => void changerModeInvitation(e.target.checked)} /> Accepter automatiquement</label></div>
           {demandes.map((d) => <div key={d.id} className="meeting-invite-request"><span>{d.demandeur.nom} souhaite inviter {d.invite.nom}</span><div><button onClick={() => void traiterDemande(d.id, true)}>Accepter</button><button onClick={() => void traiterDemande(d.id, false)}>Refuser</button></div></div>)}
         </section>
       )}

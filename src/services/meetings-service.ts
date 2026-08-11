@@ -44,6 +44,7 @@ export interface Reunion {
   /** Identifiant de salle cote serveur, porte par l'appel. */
   salle: string | null
   terminee: boolean
+  invitationAuto: boolean
   /** Debut prevu. */
   debut: string | null
   /** Duree prevue, en secondes. */
@@ -74,6 +75,7 @@ interface ReunionBrute {
   type_media: number
   room?: string | null
   isEnd?: number
+  invitationAuto?: boolean
   start_time?: string | null
   duree?: number
   organiser?: PersonneBrute
@@ -111,6 +113,7 @@ function versReunion(brut: ReunionBrute, monId?: string): Reunion {
     type: brut.type_media === 2 ? "video" : "audio",
     salle: brut.room ?? null,
     terminee: brut.isEnd === 1,
+    invitationAuto: brut.invitationAuto === true,
     debut: brut.start_time ?? null,
     dureeSecondes: brut.duree ?? 3600,
     organisateur,
@@ -276,3 +279,5 @@ export async function endMeeting(id: number): Promise<void> {
 export async function deleteMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/delete`, { method: "DELETE" })
 }
+
+export async function reglerInvitationAuto(id: number, automatic: boolean): Promise<void> { await apiRequest(`/api/meetings/${id}/invite-mode`, { method: "PATCH", body: { automatic } }) }
