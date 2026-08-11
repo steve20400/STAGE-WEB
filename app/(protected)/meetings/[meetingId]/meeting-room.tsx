@@ -252,7 +252,10 @@ export default function MeetingRoomPage() {
           <section className="meeting-settings-panel">
             <div className="meeting-settings-title">Paramètres de la réunion</div>
             <label className="meeting-auto-invite"><input type="checkbox" checked={meeting.invitationAuto} onChange={(e) => void changerModeInvitation(e.target.checked)} /><span><strong>Accepter automatiquement les demandes</strong><small>Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.</small></span></label>
-            <div className="meeting-direct-invite"><input value={numeroDirect} onChange={(e) => setNumeroDirect(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="Alanya ID" /><button onClick={() => void inviterDirectement()}>Ajouter</button></div>
+            <div className="meeting-direct-invite"><input value={numeroDirect} readOnly inputMode="numeric" placeholder="Alanya ID" /><button onClick={() => void inviterDirectement()}>Ajouter</button></div>
+            <div className="meeting-id-dialer" aria-label="Pavé Alanya ID">
+              {["1","2","3","4","5","6","7","8","9","←","0"].map((key) => <button key={key} type="button" onClick={() => setNumeroDirect((current) => key === "←" ? current.slice(0, -1) : current.length < 8 ? `${current}${key}` : current)}>{key}</button>)}
+            </div>
           </section>
         )}
         {meeting.participants.length > 0 && (
