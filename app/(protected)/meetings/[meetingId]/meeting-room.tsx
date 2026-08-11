@@ -11,6 +11,8 @@ import {
   trancherDemandeInvitation,
   reglerInvitationAuto,
   inviterAReunion,
+  trouverProprietaireAlanya,
+  type ProprietaireAlanya,
   type DemandeInvitation,
 } from "../../../../src/services/meetings-service"
 import {
@@ -82,6 +84,7 @@ export default function MeetingRoomPage() {
   const [nonLus, setNonLus] = useState(0)
   const [demandes, setDemandes] = useState<DemandeInvitation[]>([])
   const [numeroDirect, setNumeroDirect] = useState("")
+  const [proprietaireNumero, setProprietaireNumero] = useState<ProprietaireAlanya | null>(null)
 
   // Ouvrir le fil solde ce qui a ete rate pendant qu'il etait ferme.
   useEffect(() => {
@@ -162,10 +165,18 @@ export default function MeetingRoomPage() {
     catch (err) { showError(t("error"), err instanceof Error ? err.message : "Réglage impossible") }
   }
 
+  useEffect(() => {
+    const numero = numeroDirect.replace(/\D/g, "")
+    setProprietaireNumero(null)
+    if (!/^(\d{3,10})$/.test(numero)) return
+    const timer = window.setTimeout(() => { void trouverProprietaireAlanya(numero).then(setProprietaireNumero).catch(() => undefined) }, 250)
+    return () => window.clearTimeout(timer)
+  }, [numeroDirect])
+
   const inviterDirectement = async () => {
     if (!meetingId) return
     const numero = numeroDirect.replace(/\D/g, "")
-    if (!/^(\d{6}|\d{8})$/.test(numero)) return showError(t("error"), "Saisissez un Alanya ID valide.")
+    if (!proprietaireNumero) return showError(t("error"), "Ce numéro ne correspond à aucun compte.")
     try { await inviterAReunion(Number(meetingId), [numero]); setNumeroDirect(""); setMeeting(await fetchMeeting(Number(meetingId))) }
     catch (err) { showError(t("error"), err instanceof Error ? err.message : "Invitation impossible") }
   }
@@ -254,9 +265,9 @@ export default function MeetingRoomPage() {
             <label className="meeting-auto-invite"><input type="checkbox" checked={meeting.invitationAuto} onChange={(e) => void changerModeInvitation(e.target.checked)} /><span><strong>Accepter automatiquement les demandes</strong><small>Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.</small></span></label>
             <div className="meeting-id-keypad" aria-label="Pavé Alanya ID">
               <div className="meeting-id-number">{numeroDirect ? numeroDirect.replace(/(\d{2})(?=\d)/g, "$1 ") : <span>Alanya ID</span>}</div>
-              <div className="meeting-id-help">{numeroDirect.length === 0 ? "Composez un Alanya ID" : /^(\d{6}|\d{8})$/.test(numeroDirect) ? "Numéro complet" : `${numeroDirect.length} chiffre${numeroDirect.length > 1 ? "s" : ""}`}</div>
+              <div className="meeting-id-help">{numeroDirect.length === 0 ? "Composez un Alanya ID" : proprietaireNumero ? `Compte trouvé : ${proprietaireNumero.pseudo ?? proprietaireNumero.publicNumber}` : `${numeroDirect.length} chiffre${numeroDirect.length > 1 ? "s" : ""}`}</div>
               <div className="meeting-id-keys">{["1","2","3","4","5","6","7","8","9","","0",""] .map((key,index) => key ? <button key={key} type="button" onClick={() => setNumeroDirect((current) => current.length < 8 ? `${current}${key}` : current)}>{key}</button> : <span key={`empty-${index}`} />)}</div>
-              <div className="meeting-id-actions"><button type="button" onClick={() => setNumeroDirect((current) => current.slice(0,-1))} disabled={!numeroDirect}>⌫ Effacer</button><button type="button" onClick={() => void inviterDirectement()} disabled={!/^(\d{6}|\d{8})$/.test(numeroDirect)}>Ajouter</button></div>
+              <div className="meeting-id-actions"><button type="button" onClick={() => setNumeroDirect((current) => current.slice(0,-1))} disabled={!numeroDirect}>⌫ Effacer</button><button type="button" onClick={() => void inviterDirectement()} disabled={!proprietaireNumero}>Ajouter</button></div>
             </div>
           </section>
         )}

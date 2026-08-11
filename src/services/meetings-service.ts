@@ -281,3 +281,9 @@ export async function deleteMeeting(id: number): Promise<void> {
 }
 
 export async function reglerInvitationAuto(id: number, automatic: boolean): Promise<void> { await apiRequest(`/api/meetings/${id}/invite-mode`, { method: "PATCH", body: { automatic } }) }
+
+export interface ProprietaireAlanya { id: string; publicNumber: string; pseudo: string | null; avatarUrl: string | null }
+export async function trouverProprietaireAlanya(numero: string): Promise<ProprietaireAlanya | null> {
+  const res = await apiRequest<{ matched?: ProprietaireAlanya[] }>("/api/users/match", { method: "POST", body: { numbers: [numero] } })
+  return res.matched?.[0] ?? null
+}
