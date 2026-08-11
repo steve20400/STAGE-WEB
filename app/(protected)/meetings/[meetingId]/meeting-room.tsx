@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
 import {
@@ -26,6 +26,12 @@ import { MeetingChat } from "../../../../src/components/meeting-chat"
 import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
+function MeetingRemoteVideo({ stream, name }: { stream?: MediaStream; name: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  useEffect(() => { if (ref.current && stream && ref.current.srcObject !== stream) { ref.current.srcObject = stream; void ref.current.play().catch(() => undefined) } }, [stream])
+  return stream ? <video ref={ref} autoPlay playsInline className="meeting-remote-video" aria-label={`Vidéo de ${name}`} /> : null
+}
+
 /** Vrai sous 900 px, la largeur ou la colonne du fil cesse d'etre lisible. */
 function useEcranEtroit(): boolean {
   const [etroit, setEtroit] = useState(
@@ -46,6 +52,7 @@ export default function MeetingRoomPage() {
   const { t } = useTranslation()
   const { success, error: showError } = useToast()
   const callState = useCallState()
+  const remoteStreams = useMemo(() => callState.remoteStreams, [callState.remoteStreams])
 
   const [meeting, setMeeting] = useState<Reunion | null>(null)
   const [loading, setLoading] = useState(true)
@@ -160,6 +167,7 @@ export default function MeetingRoomPage() {
   if (loading) {
     return (
       <div className={`meeting-room-root${filOuvert ? " fil-ouvert" : ""}`}>
+      {Object.entries(remoteStreams).map(([id, stream]) => <audio key={id} autoPlay ref={(el) => { if (el && el.srcObject !== stream) { el.srcObject = stream; void el.play().catch(() => undefined) } }} />)}
         <div className="loading">{t("loading")}</div>
       </div>
     )
@@ -206,11 +214,12 @@ export default function MeetingRoomPage() {
                       plus vite qu'une liste de noms. Sans photo, l'initiale —
                       jamais un vide. */}
                   <div className="participant-vignette">
-                    {p.avatarUrl ? (
+                    <MeetingRemoteVideo stream={remoteStreams[p.id]} name={p.nom} />
+                    {!remoteStreams[p.id] && (p.avatarUrl ? (
                       <img src={p.avatarUrl} alt="" />
                     ) : (
                       <span>{toInitials(p.nom)}</span>
-                    )}
+                    ))}
                     {p.connecte && <span className="participant-pastille" aria-hidden="true" />}
                     {/* Sur la vignette d'un AUTRE, la pastille constate un
                         etat — elle n'invite a rien. « Lever la main » y
