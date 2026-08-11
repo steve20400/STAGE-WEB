@@ -29,6 +29,14 @@ import { MeetingChat } from "../../../../src/components/meeting-chat"
 import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
+function MeetingControlIcon({ kind }: { kind: "mic" | "micOff" | "camera" | "cameraOff" | "hand" | "speaker" | "earpiece" }) {
+  const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }
+  if (kind === "camera" || kind === "cameraOff") return <svg {...common}>{kind === "cameraOff" && <line x1="3" y1="3" x2="21" y2="21"/>}<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>
+  if (kind === "hand") return <svg {...common}><path d="M7 11V5a1.5 1.5 0 0 1 3 0v5V3a1.5 1.5 0 0 1 3 0v7V5a1.5 1.5 0 0 1 3 0v7V8a1.5 1.5 0 0 1 3 0v6a7 7 0 0 1-14 0v-3Z"/></svg>
+  if (kind === "speaker" || kind === "earpiece") return <svg {...common}><path d="m5 9 4-4v14l-4-4H2V9h3Z"/><path d={kind === "speaker" ? "M13 9a4 4 0 0 1 0 6M16 6a8 8 0 0 1 0 12" : "M13 12h.01"}/></svg>
+  return <svg {...common}>{kind === "micOff" && <line x1="3" y1="3" x2="21" y2="21"/>}<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/></svg>
+}
+
 function MeetingRemoteVideo({ stream, name }: { stream?: MediaStream; name: string }) {
   const ref = useRef<HTMLVideoElement>(null)
   useEffect(() => { if (ref.current && stream && ref.current.srcObject !== stream) { ref.current.srcObject = stream; void ref.current.play().catch(() => undefined) } }, [stream])
@@ -371,7 +379,7 @@ export default function MeetingRoomPage() {
             title={callState.micOn ? t("mute_mic") : t("unmute_mic")}
             aria-label={callState.micOn ? t("mute_mic") : t("unmute_mic")}
           >
-            {callState.micOn ? "🎙" : "🔇"}
+            {callState.micOn ? <MeetingControlIcon kind="mic" /> : <MeetingControlIcon kind="micOff" />}
           </button>
 
           {/* Un bouton annonce ce qu'il VA faire, comme le micro juste a cote.
@@ -385,7 +393,7 @@ export default function MeetingRoomPage() {
               title={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
               aria-label={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
             >
-              {callState.camOn ? "🎥" : "🚫"}
+              {callState.camOn ? <MeetingControlIcon kind="camera" /> : <MeetingControlIcon kind="cameraOff" />}
             </button>
           )}
 
@@ -396,7 +404,7 @@ export default function MeetingRoomPage() {
             title={maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
             aria-label={maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
           >
-            ✋
+            <MeetingControlIcon kind="hand" />
           </button>
 
           {/* « Sortie audio des appels » est le libelle d'une ligne de
@@ -421,7 +429,7 @@ export default function MeetingRoomPage() {
                   : t("r2_switch_to_speaker")
               }
             >
-              {callState.audioOutput === "speaker" ? "🔊" : "🎧"}
+              {callState.audioOutput === "speaker" ? <MeetingControlIcon kind="speaker" /> : <MeetingControlIcon kind="earpiece" />}
             </button>
           )}
         </div>
