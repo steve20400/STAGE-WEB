@@ -252,9 +252,11 @@ export default function MeetingRoomPage() {
           <section className="meeting-settings-panel">
             <div className="meeting-settings-title">Paramètres de la réunion</div>
             <label className="meeting-auto-invite"><input type="checkbox" checked={meeting.invitationAuto} onChange={(e) => void changerModeInvitation(e.target.checked)} /><span><strong>Accepter automatiquement les demandes</strong><small>Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.</small></span></label>
-            <div className="meeting-direct-invite"><input value={numeroDirect} readOnly inputMode="numeric" placeholder="Alanya ID" /><button onClick={() => void inviterDirectement()}>Ajouter</button></div>
-            <div className="meeting-id-dialer" aria-label="Pavé Alanya ID">
-              {["1","2","3","4","5","6","7","8","9","←","0"].map((key) => <button key={key} type="button" onClick={() => setNumeroDirect((current) => key === "←" ? current.slice(0, -1) : current.length < 8 ? `${current}${key}` : current)}>{key}</button>)}
+            <div className="meeting-id-keypad" aria-label="Pavé Alanya ID">
+              <div className="meeting-id-number">{numeroDirect ? numeroDirect.replace(/(\d{2})(?=\d)/g, "$1 ") : <span>Alanya ID</span>}</div>
+              <div className="meeting-id-help">{numeroDirect.length === 0 ? "Composez un Alanya ID" : /^(\d{6}|\d{8})$/.test(numeroDirect) ? "Numéro complet" : `${numeroDirect.length} chiffre${numeroDirect.length > 1 ? "s" : ""}`}</div>
+              <div className="meeting-id-keys">{["1","2","3","4","5","6","7","8","9","","0",""] .map((key,index) => key ? <button key={key} type="button" onClick={() => setNumeroDirect((current) => current.length < 8 ? `${current}${key}` : current)}>{key}</button> : <span key={`empty-${index}`} />)}</div>
+              <div className="meeting-id-actions"><button type="button" onClick={() => setNumeroDirect((current) => current.slice(0,-1))} disabled={!numeroDirect}>⌫ Effacer</button><button type="button" onClick={() => void inviterDirectement()} disabled={!/^(\d{6}|\d{8})$/.test(numeroDirect)}>Ajouter</button></div>
             </div>
           </section>
         )}
