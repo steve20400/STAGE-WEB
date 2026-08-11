@@ -336,8 +336,16 @@ export async function traduireMessage(texte: string, cible: string): Promise<Res
     const enCache = await lireEnCache(demande, cibleNormalisee)
     if (enCache) return enCache
 
-    if (demande.source) {
-      const local = await essayerLocal([demande], cibleNormalisee, demande.source)
+    // Le moteur local passe AVANT le relais, meme quand la detection stricte a
+    // renonce : elle abandonne sur les textes courts — « Bonjour », « ok merci »
+    // — qui sont justement les plus nombreux dans une messagerie. Sans ce
+    // second essai, ces messages-la partaient tous en ligne, a rebours du mode
+    // par defaut, et payants.
+    const source =
+      demande.source ??
+      normaliserLangue((await detecterLangue(demande.texte, { souple: true })) ?? "")
+    if (source && source !== cibleNormalisee) {
+      const local = await essayerLocal([demande], cibleNormalisee, source)
       if (local[0]) return local[0]
     }
 

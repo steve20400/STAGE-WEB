@@ -3,8 +3,38 @@ import { openDB } from 'idb';
 const DB_NAME = 'alanya_messaging_client_db';
 const DB_VERSION = 4; // Incrémenté pour le magasin traductions
 
+/**
+ * Connexion unique, partagee par tout le client.
+ *
+ * `openDB` etait rappele a chaque acces — et le cache des traductions en fait
+ * trois par message. Chaque appel ouvrait une connexion neuve : autant de
+ * poignees sur la meme base, et surtout autant de demandes de mise a jour de
+ * version en attente les unes derriere les autres. On memoise donc la promesse.
+ */
+let connexion = null;
+
 export const initIndexedDB = () => {
-    return openDB(DB_NAME, DB_VERSION, {
+    if (connexion) return connexion;
+    connexion = openDB(DB_NAME, DB_VERSION, {
+        /**
+         * Un ONGLET RESTE OUVERT sur l'ancienne version : sans ce gestionnaire,
+         * la mise a jour ne se fait jamais et l'ouverture reste en suspens
+         * indefiniment — l'application demarre sur une base qui ne repond pas.
+         * On previent plutot que d'attendre en silence.
+         */
+        blocked() {
+            // eslint-disable-next-line no-console
+            console.warn('[idb] mise a jour bloquee par un autre onglet ouvert sur l ancienne version');
+        },
+        /** Un autre onglet veut monter de version : on libere la place. */
+        blocking(currentVersion, blockedVersion, event) {
+            connexion = null;
+            event.target?.close?.();
+        },
+        /** Connexion fermee par le navigateur : la prochaine demande en rouvrira une. */
+        terminated() {
+            connexion = null;
+        },
         upgrade(db, oldVersion, newVersion, transaction) {
 
             // ═══════════════════════════════════════════════════
@@ -106,4 +136,10 @@ export const initIndexedDB = () => {
             }
         },
     });
+    // Une ouverture qui echoue ne doit pas rester en cache : sinon toute la
+    // session retomberait sur la meme promesse rejetee.
+    connexion.catch(() => {
+        connexion = null;
+    });
+    return connexion;
 };

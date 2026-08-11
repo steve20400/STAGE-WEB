@@ -360,11 +360,23 @@ let detecteur: Promise<InstanceDetecteur> | null = null
  * traduction que d'en proposer une depuis la mauvaise langue, qui produirait un
  * charabia et, en mode en ligne, une depense pour rien.
  */
-export async function detecterLangue(texte: string): Promise<string | null> {
+/**
+ * Langue d'un texte, ou null si la detection n'ose pas se prononcer.
+ *
+ * `souple` abaisse les deux seuils. Reserve au moteur LOCAL : s'y tromper ne
+ * coute qu'une traduction mediocre, que l'on peut refermer. Renoncer, en
+ * revanche, envoie le message a un tiers et le facture — c'est le plus cher
+ * des deux echecs. Le seuil strict reste pour tout ce qui sort du navigateur.
+ */
+export async function detecterLangue(
+  texte: string,
+  options?: { souple?: boolean }
+): Promise<string | null> {
   if (!traductionLocalePresente()) return null
   const propre = texte.trim()
   // Sur deux ou trois caracteres, la detection tire au sort.
-  if (propre.length < 8) return null
+  const longueurMinimale = options?.souple ? 3 : 8
+  if (propre.length < longueurMinimale) return null
   try {
     if (!detecteur) {
       detecteur = globalThis
@@ -381,7 +393,8 @@ export async function detecterLangue(texte: string): Promise<string | null> {
     const instance = await detecteur
     const resultats = await enfiler(() => instance.detect(propre))
     const meilleur = resultats?.[0]
-    if (!meilleur || meilleur.confidence < 0.5) return null
+    const seuil = options?.souple ? 0.25 : 0.5
+    if (!meilleur || meilleur.confidence < seuil) return null
     const langue = normaliserLangue(meilleur.detectedLanguage)
     return langue || null
   } catch {
