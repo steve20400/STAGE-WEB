@@ -648,7 +648,7 @@ export default function CallRoomPage() {
                   aria-label={t("switch_camera")}
                 >
                   <div className="ctrl-btn-icon ctrl-on">↻</div>
-                  <span className="ctrl-btn-label">Retourner</span>
+                  <span className="ctrl-btn-label">{t("back")}</span>
                 </button>
               )}
 
@@ -726,7 +726,7 @@ export default function CallRoomPage() {
                       <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                     </svg>
                   </div>
-                  <span className="ctrl-btn-label">Chat</span>
+                  <span className="ctrl-btn-label">{t("call_chat")}</span>
                 </button>
               )}
 
@@ -769,8 +769,8 @@ export default function CallRoomPage() {
                   onClick={() => setShowMoreMenu((ouvert) => !ouvert)}
                   aria-expanded={showMoreMenu}
                   aria-haspopup="menu"
-                  aria-label="Autres actions"
-                  title="Autres actions"
+                  aria-label={t("more_actions")}
+                  title={t("more_actions")}
                 >
                   <div className="ctrl-btn-icon ctrl-on">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">

@@ -360,7 +360,7 @@ function DocumentViewer({
             />
             <button
               onClick={onClose}
-              aria-label="Fermer"
+              aria-label={t("close")}
               style={{
                 background: "none",
                 border: "none",
@@ -630,7 +630,7 @@ function PdfViewer({
       <div style={{ position: "relative" }}>
         <iframe
           src={url}
-          title="Apercu PDF"
+          title={t("thr_pdf_preview")}
           style={{
             width: "100%",
             height: full ? fullHeight : 220,
@@ -1110,6 +1110,7 @@ function RichText({ text, isMe }: { text: string; isMe: boolean }) {
 
 /** Preview de coordonnees GPS avec mini-carte OpenStreetMap. */
 function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolean }) {
+  const { t } = useTranslation()
   return (
     <div style={{ marginTop: 6 }}>
       <a
@@ -1131,7 +1132,7 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
           }}
         >
           <iframe
-            title="Position GPS"
+            title={t("thr_gps_position")}
             loading="lazy"
             src={`https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.01},${lat - 0.01},${lng + 0.01},${lat + 0.01}&layer=mapnik&marker=${lat},${lng}`}
             style={{
@@ -1545,7 +1546,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
           aria-label={t("search_in_document")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Rechercher"
+          placeholder={t("cinfo_search")}
           style={{
             minWidth: 0,
             flex: 1,
@@ -2004,6 +2005,7 @@ function MediaGallery({
   index: number
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const track = useRef<HTMLDivElement>(null)
   const host = useRef<HTMLDivElement>(null)
   const [current, setCurrent] = useState(index)
@@ -2098,7 +2100,7 @@ function MediaGallery({
           />
           <button
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={t("close")}
             style={{
               background: "none",
               border: "none",
@@ -2152,7 +2154,7 @@ function MediaGallery({
           <button
             className="gallery-nav gallery-nav-prev"
             onClick={() => step(-1)}
-            aria-label="Media precedent"
+            aria-label={t("thr_previous_media")}
           >
             <svg
               width="20"
@@ -2172,7 +2174,7 @@ function MediaGallery({
           <button
             className="gallery-nav gallery-nav-next"
             onClick={() => step(1)}
-            aria-label="Media suivant"
+            aria-label={t("thr_next_media")}
           >
             <svg
               width="20"
@@ -2229,6 +2231,7 @@ function ImageLightbox({
   name?: string
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const host = useRef<HTMLDivElement>(null)
   const { expanded, toggle } = useViewerFullscreen(host)
   const chip = { background: "#ffffff20", borderRadius: 8, padding: "8px 10px" } as const
@@ -2278,7 +2281,7 @@ function ImageLightbox({
           target="_blank"
           rel="noreferrer"
           onClick={(e) => e.stopPropagation()}
-          aria-label="Telecharger l'image"
+          aria-label={t("thr_download_image")}
           style={{ ...chip, border: "none", color: "#fff", display: "flex", alignItems: "center" }}
         >
           <svg
@@ -2295,7 +2298,7 @@ function ImageLightbox({
         </a>
         <button
           onClick={onClose}
-          aria-label="Fermer"
+          aria-label={t("close")}
           style={{ ...chip, border: "none", color: "#fff", cursor: "pointer" }}
         >
           <svg
@@ -2394,7 +2397,7 @@ function MediaComposer({
         </span>
         <button
           onClick={onCancel}
-          aria-label="Annuler l'envoi"
+          aria-label={t("thr_cancel_send")}
           style={{
             background: "none",
             border: "none",
@@ -2546,7 +2549,7 @@ function MediaComposer({
         />
         <button
           onClick={onSend}
-          aria-label="Envoyer"
+          aria-label={t("send")}
           style={{
             width: 44,
             height: 44,
@@ -3502,7 +3505,7 @@ function MessageBubble({
                           <button
                             onClick={downloadAudio}
                             aria-label={t("download_audio")}
-                            title="Telecharger"
+                            title={t("download")}
                             style={{
                               width: 26,
                               height: 26,
@@ -4511,9 +4514,7 @@ export default function ChatRoomPage() {
    */
   const revenirEnBas = () => {
     const corps = messagesBodyRef.current
-    const cible = frontiereNonLus
-      ? corps?.querySelector('[data-separateur-non-lus="1"]')
-      : null
+    const cible = frontiereNonLus ? corps?.querySelector('[data-separateur-non-lus="1"]') : null
     // Si la frontiere est deja sous les yeux, y sauter ne bougerait rien : le
     // geste suivant attendu est d'aller au bout. Un seul bouton, deux etapes.
     if (cible && corps) {
@@ -5046,7 +5047,7 @@ export default function ChatRoomPage() {
   return (
     <div className={`room-root ${infoPanelOpen ? "info-panel-open" : ""}`}>
       <div className="room-top">
-        <button className="back-btn" onClick={() => navigate("/chats")} aria-label="Retour">
+        <button className="back-btn" onClick={() => navigate("/chats")} aria-label={t("back")}>
           <svg
             width="16"
             height="16"
@@ -5112,8 +5113,8 @@ export default function ChatRoomPage() {
               {/* Appel audio */}
               <button
                 className="action-btn"
-                aria-label="Appel audio"
-                title="Appel audio"
+                aria-label={t("audio_call")}
+                title={t("audio_call")}
                 onClick={() => startCallFromChat("audio")}
               >
                 <svg
@@ -5131,8 +5132,8 @@ export default function ChatRoomPage() {
               {/* Appel video */}
               <button
                 className="action-btn"
-                aria-label="Appel video"
-                title="Appel video"
+                aria-label={t("video_call")}
+                title={t("video_call")}
                 onClick={() => startCallFromChat("video")}
               >
                 <svg
@@ -5188,8 +5189,8 @@ export default function ChatRoomPage() {
           {!infoPanelOpen && (
             <button
               className="action-btn"
-              aria-label="Infos conversation"
-              title="Infos"
+              aria-label={t("cinfo_title")}
+              title={t("cinfo_title")}
               onClick={() => {
                 if (window.matchMedia("(min-width: 901px)").matches) setInfoPanelOpen(true)
                 else navigate(`/chats/${chatId}/info`)
@@ -5684,7 +5685,7 @@ export default function ChatRoomPage() {
                 <textarea
                   ref={inputRef}
                   className="room-textarea"
-                  placeholder="Message..."
+                  placeholder={t("thr_message_placeholder")}
                   value={input}
                   onChange={handleInput}
                   onKeyDown={handleKeyDown}
@@ -5697,7 +5698,7 @@ export default function ChatRoomPage() {
                     className="send-btn"
                     onClick={sendMessage}
                     disabled={sending}
-                    aria-label="Envoyer"
+                    aria-label={t("send")}
                   >
                     <svg
                       width="15"
