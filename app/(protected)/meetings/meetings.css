@@ -509,3 +509,4 @@
     bottom: 16px;
   }
 }
+.meeting-direct-id{display:flex;gap:8px;margin:10px 0}.meeting-direct-id input{flex:1;min-width:0}.meeting-direct-id button{border:0;border-radius:8px;background:var(--accent);color:var(--accent-text);font-weight:700;padding:0 12px}.meeting-direct-id button:disabled{opacity:.45}

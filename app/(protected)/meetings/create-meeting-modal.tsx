@@ -1,6 +1,8 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useToast } from "../../../src/components/toast"
 import { loadContacts } from "../../../src/data/contacts"
+import { fetchContacts } from "../../../src/services/contacts-service"
+import { isValidAlanyaNumber, formatAlanyaNumber, normalizeAlanyaNumber } from "../../../src/lib/alanya-number"
 import { normalizePhoneNumber } from "../../../src/data/session-user"
 import { createMeeting } from "../../../src/services/meetings-service"
 import { useTranslation } from "../../../src/i18n"
@@ -41,9 +43,11 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
   const [endTime, setEndTime] = useState("")
   const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
+  const [manualNumber, setManualNumber] = useState("")
+  const [contacts, setContacts] = useState(() => loadContacts())
   const [loading, setLoading] = useState(false)
 
-  const contacts = loadContacts()
+  useEffect(() => { void fetchContacts().then(setContacts).catch(() => undefined) }, [])
   const filteredContacts = searchQuery.trim()
     ? contacts.filter((c) => {
         const query = searchQuery.toLowerCase()
@@ -175,6 +179,11 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
               className="search-input"
               autoFocus
             />
+
+            <div className="meeting-direct-id">
+              <input value={formatAlanyaNumber(manualNumber)} onChange={(e) => setManualNumber(normalizeAlanyaNumber(e.target.value))} placeholder="Alanya ID" inputMode="numeric" />
+              <button type="button" disabled={!isValidAlanyaNumber(manualNumber)} onClick={() => { setSelectedParticipants((prev) => new Set(prev).add(normalizeAlanyaNumber(manualNumber))); setManualNumber("") }}>Ajouter</button>
+            </div>
 
             <div className="participants-list">
               {filteredContacts.map((contact) => (

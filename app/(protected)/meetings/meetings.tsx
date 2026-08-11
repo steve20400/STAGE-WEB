@@ -233,25 +233,9 @@ export default function MeetingsPage() {
                     <button className="btn-primary" onClick={() => void handleJoin(meeting.id)}>
                       {t("meet_join")}
                     </button>
-                    {meeting.jeSuisOrganisateur ? (
-                      <button className="btn-danger" onClick={() => void handleEnd(meeting.id)}>
-                        {t("meet_end")}
-                      </button>
-                    ) : (
-                      <button
-                        className="btn-secondary"
-                        onClick={() => void handleDecline(meeting.id)}
-                      >
-                        {t("meet_decline")}
-                      </button>
-                    )}
                   </>
                 )}
-                {meeting.terminee && meeting.jeSuisOrganisateur && (
-                  <button className="btn-danger" onClick={() => void handleDelete(meeting.id)}>
-                    {t("delete")}
-                  </button>
-                )}
+
               </div>
             </div>
           ))
