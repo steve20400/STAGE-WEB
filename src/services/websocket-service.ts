@@ -511,19 +511,32 @@ export function subscribeToPresence(handler: (event: PresenceEvent) => void): ()
  * uniquement aux sockets du meme compte — on ne peut donc deconnecter que ses
  * propres appareils.
  */
-export function sendSessionRevoked(deviceId: string) {
-  sendRaw({ type: "session_revoked", deviceId })
+/** Raison portee par `session_revoked` quand c'est une connexion ailleurs. */
+export const RAISON_EVICTION = "eviction"
+
+/**
+ * @param raison `"eviction"` quand une connexion sur un autre appareil de la
+ *   meme famille ferme cette session ; absente quand l'utilisateur deconnecte
+ *   lui-meme un poste depuis « Sessions actives ». L'appareil vise s'en sert
+ *   pour dire la verite plutot que d'annoncer une intrusion a quelqu'un qui
+ *   vient simplement de ranger ses appareils.
+ */
+export function sendSessionRevoked(deviceId: string, raison?: string) {
+  sendRaw({ type: "session_revoked", deviceId, ...(raison ? { raison } : {}) })
 }
 
 /**
  * S'abonne a la revocation d'une session. Le handler recoit l'identifiant de
- * l'appareil vise : a chaque client de le comparer au sien.
+ * l'appareil vise — a chaque client de le comparer au sien — et la raison.
  */
-export function subscribeToSessionRevoked(handler: (deviceId: string) => void): () => void {
+export function subscribeToSessionRevoked(
+  handler: (deviceId: string, raison: string | null) => void
+): () => void {
   return addListener((event) => {
     if (event.type !== "session_revoked") return
     const deviceId = String(event.deviceId ?? "")
-    if (deviceId) handler(deviceId)
+    const raison = typeof event.raison === "string" ? event.raison : null
+    if (deviceId) handler(deviceId, raison)
   })
 }
 

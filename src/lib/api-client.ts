@@ -6,6 +6,7 @@ import {
   saveRefreshToken,
   saveSessionToken,
 } from "../data/session-auth"
+import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { langueInitiale, traduire } from "../i18n"
 
 export class ApiError extends Error {
@@ -90,7 +91,29 @@ export async function tryRefreshTokens(): Promise<boolean> {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refreshToken }),
         })
-        if (!response.ok) return false
+        if (!response.ok) {
+          /*
+           * ⚠️ LE SEUL CHEMIN qui couvre l'onglet FERMÉ au moment de
+           * l'éviction : il n'a pas reçu l'événement temps réel, et ne
+           * l'apprend qu'en tentant de se rafraîchir à sa réouverture. Sans ce
+           * cas, l'utilisateur retomberait sur l'écran de connexion sans la
+           * moindre explication.
+           *
+           * Le code est distinct de `BAD_REFRESH` parce que la rotation révoque
+           * l'ancien jeton à chaque rafraîchissement : sans cette distinction,
+           * un simple réessai après une réponse perdue afficherait « votre
+           * compte a été ouvert ailleurs », ce qui serait faux.
+           */
+          try {
+            const corps = (await response.json()) as { error?: { code?: string } }
+            if (corps?.error?.code === "SESSION_EVINCEE") {
+              poseMessageDeconnexion(MESSAGE_EVICTION)
+            }
+          } catch {
+            // Corps illisible : on reste sur un échec sans explication.
+          }
+          return false
+        }
         const pair = (await response.json()) as TokenPair
         if (!pair.accessToken || !pair.refreshToken) return false
         saveSessionToken(pair.accessToken)

@@ -20,7 +20,12 @@ import {
   enregistrerAppareilCourant,
   getOrCreateWebDeviceId,
 } from "../services/appareils-service"
-import { disconnectRealtime, subscribeToSessionRevoked } from "../services/websocket-service"
+import {
+  RAISON_EVICTION,
+  disconnectRealtime,
+  subscribeToSessionRevoked,
+} from "../services/websocket-service"
+import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
 import {
   deletePrototypeAccount,
@@ -229,8 +234,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return
 
-    return subscribeToSessionRevoked((deviceId) => {
+    return subscribeToSessionRevoked((deviceId, raison) => {
       if (deviceId !== getOrCreateWebDeviceId()) return
+      // Deux causes passent par le meme evenement, et elles n'appellent pas le
+      // meme message : une connexion ailleurs, ou un menage que l'utilisateur a
+      // fait lui-meme depuis « Sessions actives ». Sans la raison, on
+      // annoncerait une intrusion a quelqu'un qui vient de ranger ses appareils.
+      if (raison === RAISON_EVICTION) poseMessageDeconnexion(MESSAGE_EVICTION)
       void logout()
     })
   }, [user, logout])

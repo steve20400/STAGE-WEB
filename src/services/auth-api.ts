@@ -15,6 +15,7 @@ import {
   restorePrototypeSession,
 } from "../data/prototype-auth"
 import { ApiError, apiRequest } from "../lib/api-client"
+import { RAISON_EVICTION, sendSessionRevoked } from "./websocket-service"
 import { langueInitiale, traduire, type Cle } from "../i18n"
 
 /** Traduction hors composant : la langue est relue a chaque message. */
@@ -58,6 +59,13 @@ interface AuthTokensResponse {
   user?: BackendAuthUser
   accessToken?: string
   refreshToken?: string
+  /**
+   * Appareils que cette connexion vient de fermer — les autres navigateurs du
+   * compte. Le serveur les a deja coupes en base ; cette liste sert a les
+   * prevenir TOUT DE SUITE, sans quoi ils resteraient utilisables jusqu'a
+   * l'expiration de leur jeton d'acces, soit un quart d'heure.
+   */
+  sessionsFermees?: string[]
 }
 
 interface VerifyResponse {
@@ -97,6 +105,23 @@ function buildPrototypeUser(identifier: string) {
   } satisfies SessionUser
 }
 
+/**
+ * Previent TOUT DE SUITE les navigateurs que cette connexion vient de fermer.
+ *
+ * Le serveur les a deja coupes en base — c'est la garantie de fond. Mais l'API
+ * Next et `ws-server.mjs` sont deux process sans canal entre eux : sans cette
+ * annonce, les sessions sortantes resteraient utilisables jusqu'a l'expiration
+ * de leur jeton d'acces, soit un quart d'heure.
+ *
+ * `sendSessionRevoked` met la trame en attente et ouvre la connexion si elle ne
+ * l'est pas encore : au sortir d'un login, elle ne l'est justement jamais.
+ */
+function annonceLesEvictions(appareils: string[]) {
+  for (const deviceId of appareils) {
+    if (deviceId) sendSessionRevoked(deviceId, RAISON_EVICTION)
+  }
+}
+
 /** POST /api/auth/login — identifier = email ou numero Alanya. */
 export async function loginWithPassword(payload: LoginPayload) {
   const identifier = payload.phone.trim()
@@ -108,8 +133,22 @@ export async function loginWithPassword(payload: LoginPayload) {
       // deviceId rattache la session a ce navigateur : c'est ce qui permet de
       // la revoquer depuis « Sessions actives ». Sans lui, le serveur sait a
       // quel compte appartient le jeton, pas depuis quel appareil il vient.
-      body: { identifier, password: payload.password, deviceId: getOrCreateWebDeviceId() },
+      body: {
+        identifier,
+        password: payload.password,
+        deviceId: getOrCreateWebDeviceId(),
+        // La FAMILLE de l'appareil — 0 = web. Le serveur ne ferme alors que les
+        // autres navigateurs et laisse le telephone joignable. Sans cette
+        // annonce, il ne peut la deduire qu'a partir de la deuxieme connexion,
+        // le navigateur n'etant pas encore au registre a la premiere.
+        typeDevice: 0,
+      },
     })
+
+    // Les navigateurs evinces sont prevenus par le temps reel — l'API Next et
+    // `ws-server.mjs` sont deux process sans canal entre eux, c'est donc au
+    // client qui vient d'ouvrir la session de faire le lien.
+    annonceLesEvictions(response.sessionsFermees ?? [])
 
     return {
       user: toSessionUser(response.user, fallbackUser),

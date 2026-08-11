@@ -8,6 +8,7 @@ import {
   isValidAlanyaNumber,
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
+import { consommeMessageDeconnexion } from "../../../src/data/session-message"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./login-page.css"
 import { BrandName } from "../../../src/components/brand-name"
@@ -43,6 +44,17 @@ export default function LoginPage() {
   const [pwd, setPwd] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  /**
+   * Pourquoi la session precedente s'est fermee, quand ce n'est pas
+   * l'utilisateur qui l'a voulu. Lu UNE FOIS au montage — la lecture l'efface —
+   * pour qu'il ne reapparaisse pas a chaque retour sur cet ecran.
+   *
+   * `useState` avec initialiseur paresseux plutot qu'un `useEffect` : en mode
+   * strict de React, un effet est joue deux fois au montage, et la seconde
+   * lecture ne trouverait plus rien.
+   */
+  const [messageDeconnexion] = useState(() => consommeMessageDeconnexion())
 
   const canSubmit = useMemo(() => {
     return isValidIdentifier(phone) && pwd.length >= 4
@@ -104,6 +116,25 @@ export default function LoginPage() {
           <div className="form-pretitle">{t("login_pretitle")}</div>
           <h2 className="form-title">{t("login_back")}</h2>
           <p className="form-subtitle">{t("login_subtitle")}</p>
+
+          {/* Sans ce bandeau, quelqu'un ejecte parce que son compte vient
+              d'etre ouvert ailleurs retrouve l'ecran de connexion sans la
+              moindre explication — et le prend pour une panne. Ton neutre, et
+              non « danger » : ce n'est pas une erreur de sa part. */}
+          {messageDeconnexion ? (
+            <div
+              style={{
+                marginBottom: 16,
+                border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+                background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 12,
+              }}
+            >
+              {messageDeconnexion}
+            </div>
+          ) : null}
 
           {error ? (
             <div
