@@ -10,6 +10,7 @@ import {
 } from "../../../../src/services/meetings-service"
 import {
   joinMeetingRoom,
+  hangUp,
   setCallAudioOutput,
   toggleCamera,
   toggleMicrophone,
@@ -87,10 +88,10 @@ export default function MeetingRoomPage() {
 
   const handleJoinMeeting = async () => {
     if (!meeting || !meetingId) return
+    if (meeting.terminee) return showError(t("error"), "Cette réunion est terminée.")
 
     try {
       await joinMeeting(parseInt(meetingId, 10))
-      success(t("meet_joined"))
 
       // Le salon annonce lui-meme qui est deja la : inutile de lui passer la
       // liste des invites, qui ne dit pas qui est present.
@@ -136,7 +137,7 @@ export default function MeetingRoomPage() {
     if (!meetingId || !confirm(t("meet_end_confirm"))) return
     try {
       await endMeeting(parseInt(meetingId, 10))
-      success(t("meet_ended_toast"))
+      await hangUp()
       navigate("/meetings")
     } catch (err) {
       showError(t("error"), err instanceof Error ? err.message : t("meet_end_failed"))
@@ -148,8 +149,9 @@ export default function MeetingRoomPage() {
 
     try {
       await leaveMeeting(parseInt(meetingId, 10))
+      // Arrête WebRTC et toutes les pistes caméra/micro locales avant navigation.
+      await hangUp()
       navigate("/meetings")
-      success(t("meet_left"))
     } catch (err) {
       showError(t("error"), err instanceof Error ? err.message : t("meet_leave_failed"))
     }
@@ -389,8 +391,9 @@ export default function MeetingRoomPage() {
         </div>
       )}
 
+      {meeting.terminee && <div className="meeting-ended">Réunion terminée</div>}
       <div className="meeting-actions">
-        {!callState.activeCallId && (
+        {!callState.activeCallId && !meeting.terminee && (
           <button className="btn-join" onClick={() => void handleJoinMeeting()}>
             {t("meet_join_room")}
           </button>

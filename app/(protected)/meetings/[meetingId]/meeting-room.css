@@ -463,3 +463,4 @@
     display: none;
   }
 }
+.meeting-room-root .meeting-ended{grid-area:actions;padding:12px 16px;border-radius:12px;background:var(--danger-dim);color:var(--danger);font-weight:700;text-align:center}
