@@ -7,6 +7,7 @@ import {
   type MessagePayload,
 } from "firebase/messaging"
 import { apiRequest } from "../lib/api-client"
+import { getOrCreateWebDeviceId } from "./appareils-service"
 import { langueInitiale, traduire } from "../i18n"
 
 const firebaseConfig = {
@@ -112,7 +113,13 @@ export async function initPushNotifications(): Promise<void> {
       // 4. Envoi du token au backend
       await apiRequest("/api/push/register", {
         method: "POST",
-        body: { token, platform: "web" },
+        // ⚠️ `deviceId` rattache le jeton a CE navigateur. Sans lui, l'envoi ne
+        // cible qu'un compte : un poste deconnecte ou evince continuait de
+        // recevoir messages et appels, faute de savoir en base quel jeton lui
+        // appartenait. C'est ce qui permet au serveur de couper a la
+        // deconnexion, sans dependre d'un `DELETE` que l'onglet n'a pas
+        // toujours le temps — ni le jeton valide — d'envoyer.
+        body: { token, platform: "web", deviceId: getOrCreateWebDeviceId() },
       })
       console.log("[Push] Token registered successfully on backend.")
     } else {
