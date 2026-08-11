@@ -72,18 +72,30 @@ import {
 } from "../../../src/services/user-access-service"
 import {
   compterCacheTraductions,
-  definirModeTraduction,
-  lireModeTraduction,
+  definirMoteurTraduction,
+  lireMoteurTraduction,
   moteurLocalPresent,
-  sAbonnerAuModeTraduction,
+  sAbonnerAuMoteurTraduction,
   telechargerComposants,
   viderCacheTraductions,
-  type ModeTraduction,
 } from "../../../src/services/traduction-service"
+import {
+  MOTEURS_CONNUS,
+  MOTEUR_PAR_DEFAUT,
+  chargerFournisseurs,
+  moteurSurAppareil,
+  nomMoteur,
+  noteMoteur,
+  oublierFournisseurs,
+  type CatalogueFournisseurs,
+  type CodeMoteur,
+  type FournisseurAnnonce,
+} from "../../../src/services/traduction-fournisseurs"
 // Sonde le couple de langues directement : `etatTraduction` du service repond
-// « en-ligne » des que ce mode est choisi, ce qui masquerait l'etat reel des
-// composants locaux — or c'est precisement ce que cette carte doit montrer,
-// le local restant le premier etage de la cascade dans les deux modes.
+// « en-ligne » des qu'un moteur distant est choisi, ce qui masquerait l'etat
+// reel des composants du navigateur — or c'est precisement ce que cette carte
+// doit montrer, y compris a qui vient de choisir un autre moteur et voudrait
+// savoir ce qu'il faudrait installer pour revenir sur l'appareil.
 import {
   TelechargementRefuse,
   disponibiliteCouple,
@@ -1055,21 +1067,32 @@ function tailleCacheLisible(octets: number, langue: LanguageCode): string {
 }
 
 /**
- * Consentement avant le passage en mode en ligne.
+ * Consentement avant de confier le texte a un fournisseur distant.
  *
- * Fenetre bloquante plutot qu'un simple interrupteur : ce reglage fait sortir le
- * texte des messages de l'appareil, et cette consequence doit etre lue avant
- * d'etre subie. Fermer la fenetre par la croix, par l'exterieur ou par le
- * bouton de repli garde le mode local — un clic distrait ne change donc rien.
+ * Fenetre bloquante plutot qu'un simple clic dans la liste : ce choix fait
+ * sortir le texte des messages de l'appareil, et cette consequence doit etre
+ * lue avant d'etre subie. Fermer la fenetre par la croix, par l'exterieur ou
+ * par le bouton de repli garde le moteur precedent — un clic distrait ne change
+ * donc rien.
+ *
+ * Le fournisseur est NOMME partout : titre, premier paragraphe et bouton. La
+ * version precedente annoncait « Microsoft Azure » quel que soit le moteur
+ * reellement appele ; l'avertissement devenait faux des qu'un autre
+ * fournisseur entrait en jeu. Le paragraphe sur la conservation des donnees
+ * vient lui aussi du moteur choisi : chacun a sa propre politique, et une
+ * promesse valable pour l'un n'engage pas l'autre.
  */
 function TranslationConsentDialog({
+  moteur,
   onCancel,
   onAccept,
 }: {
+  moteur: CodeMoteur
   onCancel: () => void
   onAccept: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
+  const nom = nomMoteur(moteur, language)
 
   return (
     <div
@@ -1089,7 +1112,7 @@ function TranslationConsentDialog({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={t("trad_consent_title")}
+        aria-label={t("trad_consent_title", { moteur: nom })}
         onClick={(event) => event.stopPropagation()}
         style={{
           width: "min(470px, 100%)",
@@ -1111,16 +1134,18 @@ function TranslationConsentDialog({
             marginBottom: 14,
           }}
         >
-          {t("trad_consent_title")}
+          {t("trad_consent_title", { moteur: nom })}
         </div>
-        <p className="trad-consent-p trad-consent-p-lead">{t("trad_consent_p1")}</p>
-        <p className="trad-consent-p">{t("trad_consent_p2")}</p>
+        <p className="trad-consent-p trad-consent-p-lead">
+          {t("trad_consent_p1", { moteur: nom })}
+        </p>
+        <p className="trad-consent-p">{t(noteMoteur(moteur))}</p>
         <p className="trad-consent-p">{t("trad_consent_p3")}</p>
         <p className="trad-consent-p">{t("trad_consent_p4")}</p>
         <p className="trad-consent-p">{t("trad_consent_p5")}</p>
         <div className="trad-consent-actions">
           <button className="trad-btn-online" onClick={onAccept}>
-            {t("trad_consent_accept")}
+            {t("trad_consent_accept", { moteur: nom })}
           </button>
           <button className="trad-btn-stay" onClick={onCancel} autoFocus>
             {t("trad_consent_stay_local")}
@@ -1132,21 +1157,53 @@ function TranslationConsentDialog({
 }
 
 /**
+ * Prix affichable d'un fournisseur, dans la langue de lecture.
+ *
+ * Le montant et la devise viennent du serveur : les tarifs bougent, et un prix
+ * fige dans le client obligerait a redeployer le web pour corriger un chiffre.
+ * Hors composant : la langue est passee, jamais figee a l'import.
+ */
+function prixLisible(fournisseur: FournisseurAnnonce, langue: LanguageCode): string {
+  if (fournisseur.gratuit || fournisseur.prixParMillion <= 0) {
+    return traduire(langue, "trad_engine_price_free")
+  }
+  let montant: string
+  try {
+    montant = new Intl.NumberFormat(langue, {
+      style: "currency",
+      currency: fournisseur.devise,
+    }).format(fournisseur.prixParMillion)
+  } catch {
+    // Devise inconnue d'`Intl` : on rend le nombre et le code tels quels. Un
+    // prix brut reste lisible, une exception de formatage viderait la carte.
+    montant = `${fournisseur.prixParMillion} ${fournisseur.devise}`
+  }
+  return traduire(langue, "trad_engine_price", { prix: montant })
+}
+
+/**
  * Section « Traduction » des Parametres.
  *
  * Composant a part, avec son propre etat : sonder la disponibilite des couples
- * de langues et compter les traductions gardees n'a de sens que quand la
- * section est ouverte, et ces mesures ne doivent pas se relancer a chaque
- * frappe ailleurs dans les Parametres.
+ * de langues, lire le catalogue des fournisseurs et compter les traductions
+ * gardees n'a de sens que quand la section est ouverte, et ces mesures ne
+ * doivent pas se relancer a chaque frappe ailleurs dans les Parametres.
  */
 function TranslationSettings() {
   const { language, t } = useTranslation()
   const { success, error: toastError, info } = useToast()
 
-  const [mode, setMode] = useState<ModeTraduction>(() => lireModeTraduction())
+  const [moteur, setMoteur] = useState<CodeMoteur>(() => lireMoteurTraduction())
   // Presence du moteur du navigateur : elle ne change pas en cours de session.
   const [moteurPresent] = useState(() => moteurLocalPresent())
-  const [consentement, setConsentement] = useState(false)
+  // Catalogue des fournisseurs, lu au serveur : lui seul sait lesquels sont
+  // configures et a quel prix. `null` = pas encore lu ; l'echec est distingue,
+  // pour ne pas faire passer une panne de lecture pour une liste vide.
+  const [catalogue, setCatalogue] = useState<CatalogueFournisseurs | null>(null)
+  const [echecCatalogue, setEchecCatalogue] = useState(false)
+  // Moteur en attente de consentement — jamais applique tant que la fenetre
+  // n'a pas ete acceptee.
+  const [consentement, setConsentement] = useState<CodeMoteur | null>(null)
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
   // Un couple absent de la carte n'a pas encore ete sonde : l'interface annonce
   // alors une verification, jamais une indisponibilite qu'elle ignore encore.
@@ -1163,8 +1220,24 @@ function TranslationSettings() {
   // la cible. Un couple identique n'aurait rien a traduire.
   const sources = useMemo(() => LANGUAGE_CODES.filter((code) => code !== language), [language])
 
-  // Le mode peut changer depuis un autre onglet du meme navigateur.
-  useEffect(() => sAbonnerAuModeTraduction(setMode), [])
+  // Le moteur peut changer depuis un autre onglet du meme navigateur.
+  useEffect(() => sAbonnerAuMoteurTraduction(setMoteur), [])
+
+  const lireCatalogue = useCallback(() => {
+    setEchecCatalogue(false)
+    void chargerFournisseurs()
+      .then(setCatalogue)
+      .catch(() => setEchecCatalogue(true))
+  }, [])
+
+  useEffect(() => lireCatalogue(), [lireCatalogue])
+
+  const relireCatalogue = () => {
+    // La promesse partagee garde le dernier succes : sans cet oubli, le bouton
+    // « reessayer » ne rappellerait jamais le serveur.
+    oublierFournisseurs()
+    lireCatalogue()
+  }
 
   const rafraichirCache = useCallback(() => {
     void compterCacheTraductions().then(setCache)
@@ -1192,15 +1265,63 @@ function TranslationSettings() {
     }
   }, [language, moteurPresent, sources])
 
-  const revenirEnLocal = () => {
-    definirModeTraduction("local")
-    info(t("trad_local_restored"), t("trad_mode_local_active"))
+  /**
+   * Liste affichee : l'ordre vient du serveur — prix croissant, moteur par
+   * defaut en tete — puis les moteurs qu'il n'annonce pas.
+   *
+   * Ces derniers ne sont pas masques. Une option qui disparait sans un mot
+   * laisse croire qu'elle n'existe pas ; desactivee avec sa raison, elle dit au
+   * contraire ce qu'il faudrait pour l'obtenir.
+   */
+  const lignes = useMemo(() => {
+    const annonces = catalogue?.fournisseurs ?? []
+    const parId = new Map(annonces.map((fournisseur) => [fournisseur.id, fournisseur]))
+    const ordre = [
+      ...annonces.map((fournisseur) => fournisseur.id),
+      ...MOTEURS_CONNUS.filter((id) => !parId.has(id)),
+    ]
+    return ordre.map((id) => ({ id, annonce: parId.get(id) ?? null }))
+  }, [catalogue])
+
+  /**
+   * Le badge « recommande, par defaut » suit le defaut DU CLIENT, pas celui que
+   * le serveur annonce.
+   *
+   * Le serveur classe la liste, et son `defaut` sert a la trier ; mais ce qui
+   * s'applique reellement quand l'utilisateur n'a jamais choisi, c'est
+   * `MOTEUR_PAR_DEFAUT` — c'est vers lui que retombe `lireMoteurTraduction`.
+   * Coller le badge sur la reponse du serveur le poserait, le jour ou celle-ci
+   * changerait, sur un moteur payant qui fait sortir le texte de l'appareil,
+   * alors meme que ce n'est pas lui qui traduit par defaut. Le badge serait
+   * alors faux deux fois.
+   */
+  const moteurParDefaut = MOTEUR_PAR_DEFAUT
+
+  const choisirMoteur = (id: CodeMoteur) => {
+    if (id === moteur) return
+    // Le moteur de l'appareil n'envoie rien nulle part : il ne demande aucun
+    // consentement, et revenir a lui doit rester le geste le plus simple.
+    if (moteurSurAppareil(id)) {
+      definirMoteurTraduction(id)
+      info(
+        t("trad_local_restored"),
+        t("trad_engine_active_local", { moteur: nomMoteur(id, language) })
+      )
+      return
+    }
+    setConsentement(id)
   }
 
-  const accepterEnLigne = () => {
-    setConsentement(false)
-    definirModeTraduction("en-ligne")
-    success(t("trad_online_enabled"), t("trad_mode_online_active"))
+  const accepterMoteur = () => {
+    const choisi = consentement
+    if (!choisi) return
+    setConsentement(null)
+    definirMoteurTraduction(choisi)
+    const nom = nomMoteur(choisi, language)
+    success(
+      t("trad_engine_changed", { moteur: nom }),
+      t("trad_engine_active_remote", { moteur: nom })
+    )
   }
 
   /**
@@ -1253,7 +1374,8 @@ function TranslationSettings() {
     })
   }
 
-  const enLigne = mode === "en-ligne"
+  const surAppareil = moteurSurAppareil(moteur)
+  const nomMoteurActif = nomMoteur(moteur, language)
   // Tous les couples sondes, et tous refuses : le moteur existe mais ne sert a
   // rien ici. La condition exige que le sondage soit termine, sinon elle serait
   // vraie une fraction de seconde au montage.
@@ -1265,20 +1387,79 @@ function TranslationSettings() {
       <p className="s-page-sub">{t("trad_sub")}</p>
 
       <div className="s-card">
-        <div className="s-card-title">{t("trad_mode_title")}</div>
-        <div className="trad-note" style={{ marginTop: 0, marginBottom: 4 }}>
-          {t("trad_mode_default")}
+        <div className="s-card-title">{t("trad_engines_title")}</div>
+        <div className="trad-note" style={{ marginTop: 0 }}>
+          {t("trad_engines_desc")}
         </div>
-        <Toggle
-          value={enLigne}
-          onChange={(actif) => (actif ? setConsentement(true) : revenirEnLocal())}
-          label={t("trad_online_toggle")}
-          description={t("trad_online_toggle_desc")}
-        />
-        {/* Ligne permanente : l'utilisateur doit pouvoir lire ou part son texte
-            sans avoir a interpreter la position d'un interrupteur. */}
-        <div className={`trad-mode-state ${enLigne ? "online" : ""}`}>
-          {enLigne ? t("trad_mode_online_active") : t("trad_mode_local_active")}
+
+        {catalogue === null && !echecCatalogue && (
+          <div className="trad-note">{t("trad_engines_loading")}</div>
+        )}
+        {echecCatalogue && (
+          <div className="trad-note">
+            {t("trad_engines_failed")}{" "}
+            <button type="button" className="trad-relire" onClick={relireCatalogue}>
+              {t("trad_engines_retry")}
+            </button>
+          </div>
+        )}
+
+        {/* Un `radiogroup` ne peut pas contenir de `listitem` : les boutons y
+            sont donc directs, sans <ul> intermediaire. */}
+        <div className="trad-engines" role="radiogroup" aria-label={t("trad_engines_title")}>
+          {lignes.map(({ id, annonce }) => {
+            // Le moteur de l'appareil ne depend pas du serveur : sa
+            // disponibilite est celle du navigateur, meme catalogue en panne.
+            const utilisable = moteurSurAppareil(id) ? moteurPresent : annonce !== null
+            // Une raison par ligne, mais seulement quand elle apprend quelque
+            // chose. Tant que le catalogue n'est pas lu — en cours, ou en echec
+            // — la carte le dit deja une fois, en tete : la repeter sur chacun
+            // des moteurs distants noierait la seule ligne qui porte le bouton
+            // « reessayer ». Les lignes restent desactivees pour autant.
+            const raison: Cle | null = utilisable
+              ? null
+              : moteurSurAppareil(id)
+                ? "trad_engine_unavailable_browser"
+                : catalogue
+                  ? "trad_engine_unavailable_server"
+                  : null
+            const actif = id === moteur
+            return (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={actif}
+                disabled={!utilisable}
+                className={`trad-engine ${actif ? "on" : ""}`}
+                onClick={() => choisirMoteur(id)}
+              >
+                <span className="trad-engine-head">
+                  <span className="trad-engine-name">{nomMoteur(id, language)}</span>
+                  {id === moteurParDefaut && (
+                    <span className="trad-engine-badge">{t("trad_engine_recommended")}</span>
+                  )}
+                  <span className="trad-engine-price">
+                    {annonce
+                      ? prixLisible(annonce, language)
+                      : moteurSurAppareil(id)
+                        ? t("trad_engine_price_free")
+                        : "—"}
+                  </span>
+                </span>
+                <span className="trad-engine-note">{t(noteMoteur(id))}</span>
+                {raison && <span className="trad-engine-off">{t(raison)}</span>}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Ligne permanente : l'utilisateur doit pouvoir lire ou part son texte,
+            et CHEZ QUI, sans avoir a se rappeler ce qu'il a coche plus haut. */}
+        <div className={`trad-mode-state ${surAppareil ? "" : "online"}`}>
+          {surAppareil
+            ? t("trad_engine_active_local", { moteur: nomMoteurActif })
+            : t("trad_engine_active_remote", { moteur: nomMoteurActif })}
         </div>
       </div>
 
@@ -1340,20 +1521,9 @@ function TranslationSettings() {
                 desactivee par une politique d'entreprise, ou langues hors du
                 catalogue du navigateur. L'utilisateur se retrouverait devant
                 une liste de refus sans issue, on lui redit donc ce qui reste
-                possible. */}
+                possible — la liste des moteurs est juste au-dessus. */}
             {aucunCoupleUtilisable && (
-              <>
-                <div className="trad-note">{t("trad_local_unsupported_cta")}</div>
-                {!enLigne && (
-                  <button
-                    className="trad-btn-online"
-                    style={{ marginTop: 14 }}
-                    onClick={() => setConsentement(true)}
-                  >
-                    {t("trad_consent_accept")}
-                  </button>
-                )}
-              </>
+              <div className="trad-note">{t("trad_local_unsupported_cta")}</div>
             )}
           </>
         ) : (
@@ -1362,15 +1532,6 @@ function TranslationSettings() {
               {t("trad_err_local_unavailable")}
             </div>
             <div className="trad-note">{t("trad_local_unsupported_cta")}</div>
-            {!enLigne && (
-              <button
-                className="trad-btn-online"
-                style={{ marginTop: 14 }}
-                onClick={() => setConsentement(true)}
-              >
-                {t("trad_consent_accept")}
-              </button>
-            )}
           </>
         )}
       </div>
@@ -1399,8 +1560,9 @@ function TranslationSettings() {
 
       {consentement && (
         <TranslationConsentDialog
-          onCancel={() => setConsentement(false)}
-          onAccept={accepterEnLigne}
+          moteur={consentement}
+          onCancel={() => setConsentement(null)}
+          onAccept={accepterMoteur}
         />
       )}
       {confirmState && (
@@ -2224,11 +2386,50 @@ export default function SettingsPage() {
           content: ''; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
           background: currentColor;
         }
-        /* Le mode en ligne se distingue au premier coup d'oeil : il n'a pas les
-           memes consequences que le mode local, il ne doit pas avoir la meme
-           couleur. */
+        /* Un moteur distant se distingue au premier coup d'oeil : il n'a pas les
+           memes consequences que le moteur de l'appareil, il ne doit pas avoir
+           la meme couleur. */
         .trad-mode-state.online {
           background: var(--danger-dim); border-color: var(--danger-border); color: var(--danger);
+        }
+
+        /* Liste des moteurs : un choix par ligne, son prix a droite, sa note
+           dessous. Le prix doit se lire sans ouvrir quoi que ce soit — c'est la
+           moitie de la decision. */
+        .trad-engines {
+          list-style: none; margin: 14px 0 0; padding: 0;
+          display: flex; flex-direction: column; gap: 8px;
+        }
+        .trad-engine {
+          width: 100%; display: flex; flex-direction: column; gap: 6px; text-align: left;
+          padding: 12px 13px; border-radius: 10px; cursor: pointer;
+          border: 1px solid var(--border-subtle); background: var(--bg-elevated);
+          font-family: 'DM Sans', sans-serif; transition: border-color .15s, background .15s;
+        }
+        .trad-engine:hover:not(:disabled) { border-color: var(--accent-border); }
+        .trad-engine.on { border-color: var(--accent); background: var(--accent-dim); }
+        /* Desactive, mais toujours lisible : la raison sous le nom doit rester
+           dechiffrable, sinon autant ne rien afficher. */
+        .trad-engine:disabled { opacity: .6; cursor: not-allowed; }
+        .trad-engine-head {
+          display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; row-gap: 4px;
+        }
+        .trad-engine-name {
+          font-size: 13px; font-weight: 600; color: var(--text-primary);
+        }
+        .trad-engine-badge {
+          font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+          background: var(--success-dim); color: var(--success);
+        }
+        .trad-engine-price {
+          margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+        }
+        .trad-engine-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.55; }
+        .trad-engine-off { font-size: 11.5px; color: var(--danger); line-height: 1.55; }
+        .trad-relire {
+          border: none; background: none; padding: 0; cursor: pointer;
+          color: var(--accent); font-family: 'DM Sans', sans-serif;
+          font-size: 11.5px; font-weight: 600; text-decoration: underline;
         }
 
         .trad-pairs { list-style: none; margin: 0; padding: 0; }

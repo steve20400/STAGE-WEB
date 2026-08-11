@@ -13,12 +13,13 @@ import { clearAllData } from "../indexedDB/messageRepository"
  * sinon le registre des appareils du compte se remplit de doublons) et comptes
  * de demonstration du mode prototype.
  *
- * Le mode de traduction fait exception a cette regle et part avec le compte,
+ * Le moteur de traduction fait exception a cette regle et part avec le compte,
  * alors qu'il ressemble a un reglage d'appareil comme les bascules `notif_*`.
- * L'asymetrie de risque tranche : un « en ligne » laisse en place par
+ * L'asymetrie de risque tranche : un moteur distant laisse en place par
  * l'utilisateur precedent enverrait le texte des messages du compte suivant a
- * un tiers sans que personne l'ait decide. L'absence de valeur vaut « local »,
- * donc le defaut de securite est aussi le defaut de repli. La liste des
+ * un tiers sans que personne l'ait decide. L'absence de valeur vaut
+ * « navigateur », donc le defaut de securite est aussi le defaut de repli. La
+ * liste des
  * conversations traduites automatiquement et les traductions en cache
  * contiennent, elles, des fragments de messages : donnee de compte sans debat.
  */
@@ -29,6 +30,10 @@ const ACCOUNT_CACHE_KEYS = [
   "alanya-local-groups-v1",
   "alanya_last_preview_error",
   "alanya_preview_cache_generation",
+  "alanya-traduction-moteur-v1",
+  // Ancienne cle du reglage, remplacee par « moteur ». Elle reste listee : un
+  // navigateur qui n'a pas rouvert les Parametres depuis la mise a jour la
+  // porte encore, et elle ne doit pas suivre le compte suivant.
   "alanya-traduction-mode-v1",
   "alanya-traduction-auto-v1",
   "alanya_traduction_cache_generation",
