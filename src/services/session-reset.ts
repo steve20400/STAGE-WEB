@@ -12,6 +12,15 @@ import { clearAllData } from "../indexedDB/messageRepository"
  * notification, identifiant d'appareil (`cookies_WebID`, qui doit survivre
  * sinon le registre des appareils du compte se remplit de doublons) et comptes
  * de demonstration du mode prototype.
+ *
+ * Le mode de traduction fait exception a cette regle et part avec le compte,
+ * alors qu'il ressemble a un reglage d'appareil comme les bascules `notif_*`.
+ * L'asymetrie de risque tranche : un « en ligne » laisse en place par
+ * l'utilisateur precedent enverrait le texte des messages du compte suivant a
+ * un tiers sans que personne l'ait decide. L'absence de valeur vaut « local »,
+ * donc le defaut de securite est aussi le defaut de repli. La liste des
+ * conversations traduites automatiquement et les traductions en cache
+ * contiennent, elles, des fragments de messages : donnee de compte sans debat.
  */
 const ACCOUNT_CACHE_KEYS = [
   "alanya-contacts-v1",
@@ -20,6 +29,9 @@ const ACCOUNT_CACHE_KEYS = [
   "alanya-local-groups-v1",
   "alanya_last_preview_error",
   "alanya_preview_cache_generation",
+  "alanya-traduction-mode-v1",
+  "alanya-traduction-auto-v1",
+  "alanya_traduction_cache_generation",
 ]
 
 /** Marque le compte a qui appartiennent les caches actuellement en place. */

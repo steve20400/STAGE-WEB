@@ -67,7 +67,14 @@ import { getMyUserId } from "../../../../src/data/session-user"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { fetchCallsForConversation, type CallRecord } from "../../../../src/services/calls-service"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
+import {
+  detecterLangueMessage,
+  libererMoteurLocal,
+  moteurLocalPresent,
+  oublierTraductionsDuTexte,
+} from "../../../../src/services/traduction-service"
 import ChatInfoPage from "./chat-info"
+import { MessageTranslation } from "./message-translation"
 import "./chat-room-page.css"
 
 type Message = ChatMessageMock
@@ -2920,6 +2927,27 @@ function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: num
   )
 }
 
+/**
+ * Faut-il proposer spontanement la traduction d'un message ?
+ *
+ * Quand le navigateur sait detecter une langue, on n'affiche le bouton que sur
+ * une certitude — langue reconnue et differente de celle de lecture — sinon un
+ * « ok » de trois lettres, indetectable, porterait un bouton inutile sous
+ * chaque bulle.
+ *
+ * Quand il ne sait pas detecter (Firefox, Safari, mobile), le doute profite a
+ * l'utilisateur : sans cela la fonction serait tout simplement introuvable chez
+ * lui. L'entree du menu du message, elle, reste toujours disponible.
+ */
+async function traductionAProposer(texte: string, cible: string): Promise<boolean> {
+  // Teste avant toute chose : sans moteur, la reponse est la meme pour tout le
+  // monde, et calculer une empreinte puis interroger IndexedDB par bulle pour
+  // l'apprendre reviendrait a payer un cout certain pour un resultat connu.
+  if (!moteurLocalPresent()) return true
+  const source = await detecterLangueMessage(texte)
+  return source ? source !== cible : false
+}
+
 function MessageBubble({
   msg,
   isMe,
@@ -2962,8 +2990,9 @@ function MessageBubble({
   const actionsVisible = actionsReveal !== null
   const hoverRevealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Les messages systeme se composent dans la langue du lecteur.
-  const { t } = useTranslation()
+  // Les messages systeme se composent dans la langue du lecteur ; `language`
+  // est aussi la langue CIBLE de la traduction d'un message.
+  const { t, language } = useTranslation()
   /** Le menu deroulant s'ouvre vers le haut sauf s'il n'y a pas la place. */
   const [menuAbove, setMenuAbove] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -2977,6 +3006,32 @@ function MessageBubble({
   const [downloading, setDownloading] = useState(false)
   const lastPreviewTapRef = useRef(0)
   const dragStart = useRef<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false })
+
+  // --- Traduction du message ---
+  // Le texte a traduire, et rien d'autre : un media supprime ou une legende de
+  // fichier n'entrent pas dans le perimetre, et une chaine vide suffit a
+  // desactiver tout le bloc sans multiplier les conditions plus bas.
+  const texteATraduire = !msg.isDeleted && msg.type === "text" ? (msg.content ?? "").trim() : ""
+  const [traductionOuverte, setTraductionOuverte] = useState(false)
+  const [traductionProposee, setTraductionProposee] = useState(false)
+
+  useEffect(() => {
+    // Sonder la langue de ses propres messages n'apprendrait rien : on ecrit
+    // dans la sienne.
+    if (!texteATraduire || isMe) {
+      setTraductionProposee(false)
+      return
+    }
+    let vivant = true
+    void traductionAProposer(texteATraduire, language)
+      .then((utile) => {
+        if (vivant) setTraductionProposee(utile)
+      })
+      .catch(() => undefined)
+    return () => {
+      vivant = false
+    }
+  }, [texteATraduire, isMe, language])
 
   // Identifiant servant a colorer la citation (meme palette que les noms en groupe),
   // pour que la barre laterale rappelle l'auteur du message cite.
@@ -3317,6 +3372,15 @@ function MessageBubble({
                 >
                   {menuItem(t("reply"), () => onReply(msg))}
                   {msg.content ? menuItem(t("copy"), () => onCopy(msg)) : null}
+                  {/* Toujours proposee sur un message texte, meme quand le
+                    bouton sous la bulle ne l'est pas : la detection peut se
+                    tromper ou n'exister nulle part, l'action doit rester
+                    joignable. */}
+                  {texteATraduire
+                    ? menuItem(traductionOuverte ? t("thr_trad_hide") : t("thr_trad_action"), () =>
+                        setTraductionOuverte((ouverte) => !ouverte)
+                      )
+                    : null}
                   {/* Sur un lot, « Agrandir » ouvre la galerie : le menu porte sur la
                     grille entiere, pas sur son premier fichier. */}
                   {albumMsgs && onOpenAlbum
@@ -4053,6 +4117,12 @@ function MessageBubble({
                 </>
               )}
 
+              {/* Traduction : sous le texte d'origine, dans la meme bulle. Le
+                bloc n'existe que tant qu'il est ouvert — le refermer libere
+                l'affichage sans rien garder en memoire, la traduction elle-meme
+                etant deja au cache. */}
+              {traductionOuverte && texteATraduire && <MessageTranslation texte={texteATraduire} />}
+
               {/* Heure + coches a l'interieur de la bulle, en bas a droite (WhatsApp).
                 float: right -> le texte court reste sur la meme ligne, le texte
                 long passe au-dessus ; le parent en flow-root contient le flottant. */}
@@ -4076,6 +4146,23 @@ function MessageBubble({
                 </span>
               )}
             </div>
+            {/* Bascule SOUS la bulle : elle ne prend pas de place dans le
+              message et reste au meme endroit que la traduction soit affichee
+              ou non. Elle survit a la fermeture du bloc pour qu'on puisse
+              rouvrir sans repasser par le menu. */}
+            {texteATraduire && (traductionProposee || traductionOuverte) && (
+              <button
+                type="button"
+                className="msg-trad-bouton"
+                style={{ alignSelf: isMe ? "flex-end" : "flex-start" }}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setTraductionOuverte((ouverte) => !ouverte)
+                }}
+              >
+                {traductionOuverte ? t("thr_trad_hide") : t("thr_trad_action")}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -4376,15 +4463,21 @@ export default function ChatRoomPage() {
       if (cancelled) return
       // Supprime aussi du cache IndexedDB
       void removeMessageFromDB(event.messageId)
-      setMessages((prev) =>
-        event.scope === "me"
+      setMessages((prev) => {
+        // Les traductions sont rangees sous l'empreinte du TEXTE : une fois le
+        // contenu efface de l'etat, plus rien ne permet de les retrouver. C'est
+        // donc ici, et nulle part ailleurs, qu'elles doivent partir. L'appel est
+        // idempotent : une double invocation ne coute rien.
+        const supprime = prev.find((m) => m.id === event.messageId)
+        if (supprime?.content) void oublierTraductionsDuTexte(supprime.content)
+        return event.scope === "me"
           ? prev.filter((m) => m.id !== event.messageId)
           : prev.map((m) =>
               m.id === event.messageId
                 ? { ...m, isDeleted: true, content: "", mediaUrl: undefined }
                 : m
             )
-      )
+      })
     })
 
     // Apres une coupure du WebSocket, on recharge l'historique pour rattraper
@@ -4966,6 +5059,11 @@ export default function ChatRoomPage() {
     }
   }, [])
 
+  // Les modeles de traduction du navigateur pesent lourd en memoire et se
+  // recreent en quelques millisecondes : on les rend en quittant la
+  // conversation plutot que de les garder pour un fil qu'on ne lit plus.
+  useEffect(() => () => libererMoteurLocal(), [])
+
   // --- Actions sur un message ---
   const handleCopy = (msg: Message) => {
     void navigator.clipboard
@@ -4976,6 +5074,9 @@ export default function ChatRoomPage() {
 
   const handleDelete = (msg: Message, scope: "me" | "everyone") => {
     deleteChatMessage(msg.id, scope)
+    // Meme raison que dans l'abonnement a `message_deleted` : le contenu n'est
+    // encore lisible qu'avant la mise a jour optimiste.
+    if (msg.content) void oublierTraductionsDuTexte(msg.content)
     // L'evenement message_deleted confirmera ; mise a jour optimiste immediate.
     setMessages((prev) =>
       scope === "me"

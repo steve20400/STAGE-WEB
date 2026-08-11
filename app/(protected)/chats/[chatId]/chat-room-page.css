@@ -711,3 +711,80 @@ textarea.room-textarea::placeholder {
   font-size: 11px;
   color: var(--text-ghost);
 }
+
+/* --- Traduction d'un message ---------------------------------------------
+   Le resultat vit DANS la bulle, sous le texte d'origine, separe par un simple
+   filet : les deux versions se lisent d'un seul regard et le fil ne bouge pas.
+   Les couleurs sont heritees (currentColor, opacite) parce que la bulle recue
+   et la bulle envoyee n'ont pas le meme fond. */
+.msg-trad {
+  margin-top: 6px;
+}
+.msg-trad-sep {
+  height: 1px;
+  margin-bottom: 5px;
+  background: currentColor;
+  opacity: 0.22;
+}
+/* Une traduction garde les retours a la ligne de l'original. */
+.msg-trad-texte {
+  white-space: pre-wrap;
+}
+.msg-trad-pied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 10px;
+  opacity: 0.72;
+}
+.msg-trad-note {
+  font-size: 11.5px;
+  line-height: 1.35;
+  opacity: 0.85;
+}
+.msg-trad-attente {
+  font-size: 11.5px;
+  animation: msg-trad-pulse 1.1s ease-in-out infinite;
+}
+@keyframes msg-trad-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+.msg-trad-lien {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* Le bouton vit SOUS la bulle : il ne doit ni l'elargir ni entrer en
+   concurrence avec le texte du message. */
+.msg-trad-bouton {
+  margin-top: 1px;
+  padding: 1px 4px;
+  border: none;
+  background: none;
+  font-family: "DM Sans", sans-serif;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.msg-trad-bouton:hover {
+  color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-trad-attente {
+    animation: none;
+    opacity: 0.7;
+  }
+}

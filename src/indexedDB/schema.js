@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'alanya_messaging_client_db';
-const DB_VERSION = 3; // Incrémenté pour la migration avec Appareil + users
+const DB_VERSION = 4; // Incrémenté pour le magasin traductions
 
 export const initIndexedDB = () => {
     return openDB(DB_NAME, DB_VERSION, {
@@ -75,6 +75,22 @@ export const initIndexedDB = () => {
             if (!db.objectStoreNames.contains('previewMedia')) {
                 const previewStore = db.createObjectStore('previewMedia', { keyPath: 'key' });
                 previewStore.createIndex('cachedAt', 'cachedAt');
+            }
+
+            // Traductions de messages, classées par empreinte du CONTENU et non
+            // par identifiant de message : `saveBulkMessages` et
+            // `cacheBackendMessages` réécrivent l'objet message entier à chaque
+            // ouverture de conversation, une colonne portée par `messages`
+            // serait donc effacée en permanence. L'empreinte en tête de clé
+            // permet en plus de supprimer toutes les cibles d'un même texte par
+            // plage, et rend l'invalidation structurelle : un message édité
+            // change d'empreinte, donc de clé.
+            if (!db.objectStoreNames.contains('traductions')) {
+                const tradStore = db.createObjectStore('traductions', { keyPath: 'cle' });
+                // Éviction LRU, sur le modèle de l'index cachedAt de previewMedia.
+                tradStore.createIndex('luLe', 'luLe');
+                // Purge d'une langue cible entière quand l'utilisateur en accumule trop.
+                tradStore.createIndex('cible', 'cible');
             }
 
             // ═══════════════════════════════════════════════════
