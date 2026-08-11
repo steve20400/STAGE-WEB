@@ -1341,6 +1341,12 @@ export async function joinMeetingRoom(
   sendMeetingJoin(meetingId)
 }
 
+/** Même convention que le mobile : l'UUID le plus petit crée l'offre WebRTC. */
+function offreReunionPour(peerId: string): boolean {
+  const me = myUserId()
+  return Boolean(me && me < peerId)
+}
+
 /** Suite des evenements du salon, une fois qu'on y est entre. */
 async function traiterEvenementSalle(event: Record<string, unknown>) {
   if (salleReunion === null) return
@@ -1349,7 +1355,7 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     // Ceux qui etaient deja la : c'est a eux d'offrir, on se contente de tenir
     // la session prete a recevoir leur offre.
     const presents = Array.isArray(event.participants) ? (event.participants as string[]) : []
-    for (const id of presents) await connectToPeer(id, false)
+    for (const id of presents) await connectToPeer(id, offreReunionPour(id))
     return
   }
 
@@ -1361,7 +1367,7 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
       setState({ participantNames: { ...state.participantNames, [id]: nom } })
     }
     // Nouveau venu : nous sommes deja la, donc c'est nous qui offrons.
-    await connectToPeer(id, true)
+    await connectToPeer(id, offreReunionPour(id))
     return
   }
 
@@ -1383,7 +1389,7 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     else {
       // Signal arrive avant que la session existe : on l'ouvre en receveur,
       // puis on lui remet la trame.
-      await connectToPeer(from, false)
+      await connectToPeer(from, offreReunionPour(from))
       await peers.get(from)?.handleSignal(event.signal as WebrtcSignal)
     }
   }
