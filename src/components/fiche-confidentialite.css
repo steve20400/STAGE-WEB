@@ -1,0 +1,359 @@
+/* ============================================================
+   Fiche « ce que ce moteur fait de vos donnees ».
+
+   Deux choses ici : le petit bouton pose a cote de chaque
+   moteur dans les Parametres (.ftm-acces), et le panneau de
+   lecture qu'il ouvre (.ftm-voile / .ftm-panneau).
+
+   C'est un texte qu'on LIT, pas une carte de reglage. Trois
+   regles s'ensuivent, et elles expliquent presque tout ce
+   fichier :
+     - la MESURE est bornee a ~62 caracteres. Au-dela, l'oeil
+       perd la ligne suivante en revenant a la marge, et le
+       panneau large des grands ecrans deviendrait illisible
+       justement la ou il y a de la place.
+     - l'INTERLIGNE est de 1.75 sur les paragraphes, contre 1.3
+       ailleurs dans l'application : c'est ce qui separe un
+       libelle d'un texte suivi.
+     - la HIERARCHIE est franche. La question est un titre, le
+       verdict est un bloc colore, le detail est du texte gris.
+       On doit pouvoir ne lire que les verdicts.
+
+   Espacements : 4, 8, 12, 16, 20, 24 — la meme echelle que le
+   reste de l'application, sans exception.
+   ============================================================ */
+
+/* ---------------------------------------------------- Bouton d'acces */
+
+/* Frere du bouton de choix du moteur, jamais dedans. Il ne prend que sa
+   propre largeur et s'aligne en haut : la ligne du moteur garde sa hauteur,
+   son nom, son prix et sa note exactement ou ils etaient. */
+.ftm-acces {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.ftm-acces:hover {
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+}
+.ftm-acces:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------ Voile */
+
+.ftm-voile {
+  position: fixed;
+  inset: 0;
+  z-index: 9700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--overlay);
+  backdrop-filter: blur(6px);
+  animation: ftm-fondu 0.16s ease-out;
+}
+
+@keyframes ftm-fondu {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ftm-montee {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---------------------------------------------------------- Panneau */
+
+.ftm-panneau {
+  display: flex;
+  flex-direction: column;
+  width: min(600px, 100%);
+  max-height: 86vh;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--bg-surface);
+  box-shadow: 0 24px 64px #00000080;
+  font-family: "DM Sans", sans-serif;
+  animation: ftm-montee 0.18s ease-out;
+}
+/* Le panneau recoit le focus a l'ouverture : sans cette regle, le navigateur
+   dessinerait un cadre autour de toute la fiche, ce qui n'apprend rien. */
+.ftm-panneau:focus {
+  outline: none;
+}
+
+/* En-tete fixe : le titre nomme le moteur, et il doit rester lisible quand on
+   est descendu au bas d'une fiche longue — on oublie vite de qui on parlait. */
+.ftm-tete {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ftm-tete-texte {
+  min-width: 0;
+}
+
+.ftm-surtitre {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ftm-titre {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.ftm-fermer {
+  flex-shrink: 0;
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.ftm-fermer:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.ftm-fermer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------- Corps */
+
+.ftm-corps {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 20px 24px 24px;
+}
+
+/* La mesure. Elle est posee une fois, sur tout ce qui porte du texte suivi :
+   le panneau peut s'elargir sans que les lignes s'allongent. */
+.ftm-chapeau,
+.ftm-q,
+.ftm-verdict,
+.ftm-p,
+.ftm-pied p,
+.ftm-vide {
+  max-width: 62ch;
+}
+
+.ftm-chapeau {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.ftm-vide {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------- Questions */
+
+/* Numerotees : l'ordre des quatre questions va du plus concret — ce qui sort
+   de l'appareil — au plus lointain, et ce chemin doit se voir. Le compteur est
+   dessine a la main, `::marker` ne se met pas en pastille. */
+.ftm-questions {
+  counter-reset: ftm-q;
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+}
+
+.ftm-question {
+  counter-increment: ftm-q;
+}
+.ftm-question + .ftm-question {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ftm-q {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.ftm-q::before {
+  content: counter(ftm-q);
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Aligne la pastille sur la premiere ligne du titre plutot que sur sa base. */
+  transform: translateY(2px);
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Le verdict : une phrase, la seule que beaucoup liront. Le texte reste de la
+   couleur normale — un texte colore sur fond teinte passe sous le seuil de
+   contraste dans au moins un des quatre themes — et c'est la barre de gauche
+   qui porte le signal. */
+.ftm-verdict {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--border-default);
+  border-radius: 0 8px 8px 0;
+  background: var(--bg-elevated);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+.ftm-ton-sur {
+  border-left-color: var(--success);
+  background: var(--success-dim);
+}
+.ftm-ton-vigilance {
+  border-left-color: var(--warning);
+  background: var(--warning-dim);
+}
+.ftm-ton-risque {
+  border-left-color: var(--danger);
+  background: var(--danger-dim);
+}
+
+.ftm-p {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+}
+
+/* ------------------------------------------------------------- Pied */
+
+.ftm-pied {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.ftm-pied p + p {
+  margin-top: 4px;
+}
+
+/* -------------------------------------------------------- Lecteurs d'ecran */
+
+/* Le ton d'une reponse est une couleur ; annonce-le a ceux qui ne la voient
+   pas. Deplace hors de l'ecran plutot que masque : `display: none` le
+   retirerait aussi de la restitution vocale. */
+.ftm-hors-ecran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------- Petits ecrans */
+
+/* Sous 640 px, le panneau prend l'ecran. Une fenetre centree y laisserait des
+   marges de quelques pixels pour rien, et raccourcirait la mesure au point de
+   couper les mots. */
+@media (max-width: 640px) {
+  .ftm-voile {
+    padding: 0;
+  }
+  .ftm-panneau {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+  }
+  .ftm-tete {
+    padding: 16px 16px 12px;
+  }
+  .ftm-titre {
+    font-size: 18px;
+  }
+  .ftm-corps {
+    padding: 16px 16px 24px;
+  }
+  .ftm-chapeau {
+    font-size: 14.5px;
+  }
+  /* Cible tactile : 28 px se vise a la souris, pas au pouce. */
+  .ftm-acces {
+    width: 32px;
+    height: 32px;
+    margin-top: 4px;
+  }
+}
+
+/* L'animation d'entree n'est qu'un confort ; elle disparait pour qui a demande
+   moins de mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  .ftm-voile,
+  .ftm-panneau {
+    animation: none;
+  }
+}
