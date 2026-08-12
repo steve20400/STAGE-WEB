@@ -7,6 +7,7 @@ import { type SessionUser } from "../../../src/data/session-user"
 import { isTurnConfigured } from "../../../src/services/calls-service"
 import TurnTester from "../../../src/components/turn-tester"
 import RealtimeStatus from "../../../src/components/realtime-status"
+import BoutonFicheMoteur from "../../../src/components/fiche-confidentialite"
 import {
   debloquer,
   listerBloques,
@@ -1425,31 +1426,38 @@ function TranslationSettings() {
                   : null
             const actif = id === moteur
             return (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={actif}
-                disabled={!utilisable}
-                className={`trad-engine ${actif ? "on" : ""}`}
-                onClick={() => choisirMoteur(id)}
-              >
-                <span className="trad-engine-head">
-                  <span className="trad-engine-name">{nomMoteur(id, language)}</span>
-                  {id === moteurParDefaut && (
-                    <span className="trad-engine-badge">{t("trad_engine_recommended")}</span>
-                  )}
-                  <span className="trad-engine-price">
-                    {annonce
-                      ? prixLisible(annonce, language)
-                      : moteurSurAppareil(id)
-                        ? t("trad_engine_price_free")
-                        : "—"}
+              // Le bouton de la fiche est FRERE du choix, pas dedans : un
+              // bouton dans un bouton n'est pas du HTML valide, et le clic
+              // irait au mauvais des deux. La fiche reste ouvrable meme quand
+              // le moteur est indisponible — savoir ce qu'il ferait de vos
+              // messages ne depend pas de pouvoir l'utiliser aujourd'hui.
+              <div className="trad-engine-row" key={id}>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={actif}
+                  disabled={!utilisable}
+                  className={`trad-engine ${actif ? "on" : ""}`}
+                  onClick={() => choisirMoteur(id)}
+                >
+                  <span className="trad-engine-head">
+                    <span className="trad-engine-name">{nomMoteur(id, language)}</span>
+                    {id === moteurParDefaut && (
+                      <span className="trad-engine-badge">{t("trad_engine_recommended")}</span>
+                    )}
+                    <span className="trad-engine-price">
+                      {annonce
+                        ? prixLisible(annonce, language)
+                        : moteurSurAppareil(id)
+                          ? t("trad_engine_price_free")
+                          : "—"}
+                    </span>
                   </span>
-                </span>
-                <span className="trad-engine-note">{t(noteMoteur(id))}</span>
-                {raison && <span className="trad-engine-off">{t(raison)}</span>}
-              </button>
+                  <span className="trad-engine-note">{t(noteMoteur(id))}</span>
+                  {raison && <span className="trad-engine-off">{t(raison)}</span>}
+                </button>
+                <BoutonFicheMoteur moteur={id} />
+              </div>
             )
           })}
         </div>
@@ -2399,6 +2407,14 @@ export default function SettingsPage() {
         .trad-engines {
           list-style: none; margin: 14px 0 0; padding: 0;
           display: flex; flex-direction: column; gap: 8px;
+        }
+        /* Une ligne porte deux boutons : le choix du moteur, qui prend toute la
+           place, et le « i » de la fiche, qui ne prend que la sienne. Aligne en
+           haut : la note sous le nom peut faire deux lignes, la pastille reste
+           en face du nom. Les styles du « i » vivent avec la fiche, dans
+           fiche-confidentialite.css. */
+        .trad-engine-row {
+          display: flex; align-items: flex-start; gap: 8px;
         }
         .trad-engine {
           width: 100%; display: flex; flex-direction: column; gap: 6px; text-align: left;
