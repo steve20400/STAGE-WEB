@@ -1442,7 +1442,14 @@ function TranslationSettings() {
                 >
                   <span className="trad-engine-head">
                     <span className="trad-engine-name">{nomMoteur(id, language)}</span>
-                    {id === moteurParDefaut && (
+                    {/* « Recommande » ne s'affiche que sur une ligne
+                        REELLEMENT choisissable. Le moteur du navigateur est le
+                        defaut, mais il n'existe pas dans tous les navigateurs :
+                        recommander une option grisee, juste au-dessus de la
+                        phrase qui explique qu'elle est indisponible, est une
+                        contradiction — et la seule action possible serait de
+                        cliquer sur un bouton desactive. */}
+                    {id === moteurParDefaut && utilisable && (
                       <span className="trad-engine-badge">{t("trad_engine_recommended")}</span>
                     )}
                     <span className="trad-engine-price">

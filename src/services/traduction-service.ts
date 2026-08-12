@@ -280,10 +280,23 @@ interface ResultatRelais {
  * Sans lui, un defilement continu rejouerait l'appel a chaque bulle sur un
  * service deja casse ou un quota deja epuise. Il ne survit pas au rechargement :
  * c'est une politesse envers le fournisseur, pas une sanction.
+ *
+ * La CAUSE est retenue avec l'echeance. Sans elle, toutes les bulles refusees
+ * pendant la pause annoncaient « service indisponible » — y compris apres un
+ * 429, ou l'utilisateur a droit a la vraie explication : son quota du jour est
+ * epuise. Les deux messages n'appellent pas la meme patience, l'un se compte en
+ * secondes et l'autre en heures.
  */
 let pauseRelaisJusqua = 0
+let causePause: Extract<CodeErreurTraduction, "quota" | "service"> = "service"
 const PAUSE_QUOTA_MS = 5 * 60 * 1000
 const PAUSE_SERVICE_MS = 30 * 1000
+
+/** Met le relais en pause, en retenant pourquoi. */
+function suspendreRelais(cause: "quota" | "service", duree: number): void {
+  pauseRelaisJusqua = Date.now() + duree
+  causePause = cause
+}
 
 /** Code d'erreur du backend, quand il en donne un : { error: { message, code } }. */
 function codeBackend(erreur: ApiError): string {
@@ -300,7 +313,7 @@ async function appelerRelais(
   moteur: CodeMoteur,
   elements: ElementRelais[]
 ): Promise<ResultatRelais[]> {
-  if (Date.now() < pauseRelaisJusqua) throw new TraductionError("service")
+  if (Date.now() < pauseRelaisJusqua) throw new TraductionError(causePause)
   try {
     const reponse = await apiRequest<{ results?: ResultatRelais[] }>("/api/translate", {
       method: "POST",
@@ -310,12 +323,16 @@ async function appelerRelais(
   } catch (erreur) {
     if (erreur instanceof ApiError) {
       if (erreur.status === 429) {
-        pauseRelaisJusqua = Date.now() + PAUSE_QUOTA_MS
+        suspendreRelais("quota", PAUSE_QUOTA_MS)
         throw new TraductionError("quota")
       }
-      // Le moteur choisi n'est pas servi par ce serveur : ce n'est pas une
-      // panne passagere, et le message doit renvoyer vers les Parametres
-      // plutot que vers un bouton « reessayer » qui echouera toujours.
+      // Le moteur choisi n'est pas servi par ce serveur — nom inconnu, moteur
+      // d'appareil demande au relais, ou cle absente cote serveur. Ces trois
+      // cas sont PERMANENTS : le message doit renvoyer vers les Parametres
+      // plutot que vers un bouton « reessayer » qui echouera toujours, et
+      // surtout le relais ne doit PAS etre mis en pause. Une pause punirait les
+      // autres moteurs — dont celui que l'utilisateur va choisir en reponse a
+      // ce message — pour une panne qui n'existe pas.
       const code = codeBackend(erreur)
       if (
         code === "PROVIDER_UNKNOWN" ||
@@ -324,8 +341,10 @@ async function appelerRelais(
       ) {
         throw new TraductionError("moteur-indisponible")
       }
-      if (erreur.status >= 500 || erreur.status === 0) {
-        pauseRelaisJusqua = Date.now() + PAUSE_SERVICE_MS
+      // `PROVIDER_FAILED` est l'exact oppose : le moteur est bien servi, c'est
+      // l'appel qui a echoue. Passager, donc pause courte et « reessayer ».
+      if (code === "PROVIDER_FAILED" || erreur.status >= 500 || erreur.status === 0) {
+        suspendreRelais("service", PAUSE_SERVICE_MS)
       }
     }
     throw new TraductionError("service")
@@ -512,7 +531,20 @@ async function essayerLocal(
         resultats.push(null)
         continue
       }
-      await ecrireTraduction(demandes[index].empreinte, source, cible, texte, "navigateur")
+      const demande = demandes[index]
+      await ecrireTraduction(demande.empreinte, source, cible, texte, "navigateur")
+      // Second enregistrement sous la source inconnue quand la detection
+      // stricte avait renonce — ce qui est le cas ORDINAIRE des messages
+      // courts, « ok », « merci », « a demain », les plus nombreux d'une
+      // messagerie. La source utilisee ici vient de la detection souple, mais
+      // la prochaine lecture repassera par la stricte, n'obtiendra toujours
+      // rien, et ira donc chercher sous « auto ». Sans cette seconde ecriture,
+      // l'entree existait sans jamais pouvoir etre relue : le moteur du
+      // navigateur retraduisait ces messages-la a chaque affichage. C'est le
+      // meme jumelage que fait `traduireParRelais` pour l'etage en ligne.
+      if (!demande.source) {
+        await ecrireTraduction(demande.empreinte, SOURCE_INCONNUE, cible, texte, "navigateur")
+      }
       resultats.push({ texte, source, cible, moteur: "navigateur" })
     }
     return resultats

@@ -103,11 +103,26 @@ interface ReponseFournisseurs {
   fournisseurs?: unknown
 }
 
+/**
+ * Un moteur dont le prix est illisible est ECARTE, il n'est pas affiche a zero.
+ *
+ * La version precedente retombait sur 0, donc sur « Gratuit » : un champ
+ * absent, un `null`, un `NaN` ou une chaine venue d'un serveur plus recent
+ * suffisait a annoncer la gratuite d'un moteur facture. Annoncer un prix faux
+ * est la seule faute qu'on ne puisse pas rattraper apres coup — l'utilisateur a
+ * deja choisi. Rendre `null` fait tomber le moteur dans la liste des non
+ * annonces : il reste visible, desactive, avec sa raison, et il ne peut donc ni
+ * mentir sur son prix ni etre choisi par erreur.
+ *
+ * `gratuit` reste respecte quand il est explicitement vrai : c'est le serveur
+ * qui l'affirme, et un prix a zero le dit deja de toute facon.
+ */
 function lireFournisseur(brut: unknown): FournisseurAnnonce | null {
   if (!brut || typeof brut !== "object") return null
   const entree = brut as Record<string, unknown>
   if (!estCodeMoteur(entree.id)) return null
-  const prix = typeof entree.prixParMillion === "number" ? entree.prixParMillion : 0
+  const prix = entree.prixParMillion
+  if (typeof prix !== "number" || !Number.isFinite(prix) || prix < 0) return null
   return {
     id: entree.id,
     surAppareil: entree.surAppareil === true,
