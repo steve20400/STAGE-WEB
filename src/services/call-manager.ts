@@ -676,6 +676,10 @@ function registerPageHideCleanup() {
   window.addEventListener("pagehide", () => {
     const callId = state.activeCallId
     if (!callId) return
+    // Une reunion n'est pas un appel : son identifiant n'existe pas dans
+    // /api/calls, et la terminer n'aurait de toute facon pas de sens — on la
+    // QUITTE, par le salon. La salle s'en charge en partant.
+    if (salleReunion !== null) return
     const token = loadSessionToken()
     if (!token) return
     void fetch(`${API_BASE_URL}/api/calls/${callId}/end`, {
@@ -1335,6 +1339,11 @@ export async function joinMeetingRoom(
     micOn: true,
     camOn: type === "video",
     audioOutput: type === "video" ? "speaker" : defaultAudioOutput(),
+    // Entrer dans une salle remet la taille a « plein » : la salle rend
+    // elle-meme le media, et une taille reduite heritee d'un appel precedent y
+    // superposerait la fenetre flottante — avec ses propres <audio>, donc
+    // chaque voix jouee deux fois.
+    displayMode: "full",
     localStream: null,
     remoteStreams: {},
     endedAt: null,

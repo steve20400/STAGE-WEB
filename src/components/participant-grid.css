@@ -21,6 +21,47 @@
   padding: 8px;
 }
 
+/* Salle de reunion : la disposition de reference est le GRAND ECRAN, ou
+   l'application sert surtout. Des cadres larges, plusieurs colonnes, et des
+   lignes qui se partagent la hauteur disponible tant qu'elles y tiennent —
+   `1fr` fait remplir la salle a deux ou trois participants, le minimum en
+   pixels prend le relais quand il y en a trop et le defilement commence. */
+.pgrid-room {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-auto-rows: minmax(240px, 1fr);
+  gap: 12px;
+  padding: 0;
+}
+
+/* Telephone : une ou deux tuiles par ligne, FRANCHEMENT grandes, et on defile
+   pour voir les autres — exactement comme en appel video a plusieurs. On ne
+   retrecit pas indefiniment : passe un seuil, les visages ne se distinguent
+   plus, et une grille de timbres-poste ne vaut pas mieux qu'une liste de noms. */
+@media (max-width: 900px) {
+  .pgrid-room {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    grid-auto-rows: minmax(200px, 1fr);
+    gap: 10px;
+  }
+}
+
+/* Grand cadre : le nom se lit de loin, comme sur l'ecran d'appel plein format. */
+.pgrid-room .pg-name {
+  font-size: 13px;
+}
+.pgrid-room .pg-footer {
+  padding: 7px 10px;
+}
+
+/* En audio, la tuile de reunion reprend l'avatar du grand ecran d'appel : c'est
+   le meme media, seulement divise. */
+.pgrid-room.pgrid-audio .pg-avatar {
+  width: 88px;
+  height: 88px;
+  font-size: 28px;
+  border: 1px solid var(--accent-border);
+}
+
 /* Ecran moyen : meme grille, tuiles a la taille du petit ecran. */
 .pgrid-medium {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));

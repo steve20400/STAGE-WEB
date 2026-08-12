@@ -265,6 +265,34 @@ export async function leaveMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/leave`, { method: "POST", body: {} })
 }
 
+/**
+ * La MEME sortie, mais pendant le DECHARGEMENT de la page.
+ *
+ * Fermeture de l'onglet, rechargement, saut vers un autre site : le navigateur
+ * annule les requetes en vol du document qui disparait. Un `leaveMeeting()`
+ * ordinaire lance a cet instant ne part donc jamais — le participant reste
+ * « connecte » pour les autres et sa duree de presence n'est jamais close en
+ * base.
+ *
+ * `keepalive` est la seule reponse : le navigateur prend la requete a sa charge
+ * et la mene a son terme sans le document. `navigator.sendBeacon` survit lui
+ * aussi, mais ne sait poser AUCUN en-tete : la route exige
+ * `Authorization: Bearer`, une balise partirait anonyme et se ferait refuser en
+ * 401. Passer le jeton dans l'adresse serait pire — il finirait dans les
+ * journaux du serveur.
+ *
+ * Aucune promesse rendue : plus personne ne sera la pour l'attendre. L'echec
+ * eventuel est avale ici meme, faute de quoi il remonterait en rejet non traite
+ * pendant le dechargement.
+ */
+export function leaveMeetingAuDechargement(id: number): void {
+  void apiRequest(`/api/meetings/${id}/leave`, {
+    method: "POST",
+    body: {},
+    keepalive: true,
+  }).catch(() => undefined)
+}
+
 /** POST /api/meetings/:id/decline — refuse l'invitation. */
 export async function declineMeeting(id: number): Promise<void> {
   await apiRequest(`/api/meetings/${id}/decline`, { method: "POST", body: {} })

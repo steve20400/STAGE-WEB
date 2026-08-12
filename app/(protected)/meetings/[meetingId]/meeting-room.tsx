@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
 import {
@@ -7,6 +7,7 @@ import {
   fetchMeeting,
   joinMeeting,
   leaveMeeting,
+  leaveMeetingAuDechargement,
   listerDemandesInvitation,
   trancherDemandeInvitation,
   reglerInvitationAuto,
@@ -16,36 +17,112 @@ import {
   type DemandeInvitation,
 } from "../../../../src/services/meetings-service"
 import {
-  joinMeetingRoom,
   hangUp,
+  joinMeetingRoom,
   setCallAudioOutput,
   toggleCamera,
   toggleMicrophone,
 } from "../../../../src/services/call-manager"
+import { OUTPUT_VOLUME } from "../../../../src/services/audio-output"
 import { useCallState } from "../../../../src/hooks/use-call"
-import { getMyUserId, toInitials } from "../../../../src/data/session-user"
+import { getMyUserId, loadSessionUser, toInitials } from "../../../../src/data/session-user"
 import {
   sendMeetingHand,
   subscribeToMeetingEvents,
 } from "../../../../src/services/websocket-service"
 import { useTranslation } from "../../../../src/i18n"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
+import { ParticipantGrid } from "../../../../src/components/participant-grid"
 import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
-function MeetingControlIcon({ kind }: { kind: "mic" | "micOff" | "camera" | "cameraOff" | "hand" | "speaker" | "earpiece" }) {
-  const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }
-  if (kind === "camera" || kind === "cameraOff") return <svg {...common}>{kind === "cameraOff" && <line x1="3" y1="3" x2="21" y2="21"/>}<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg>
-  if (kind === "hand") return <svg {...common}><path d="M7 11V5a1.5 1.5 0 0 1 3 0v5V3a1.5 1.5 0 0 1 3 0v7V5a1.5 1.5 0 0 1 3 0v7V8a1.5 1.5 0 0 1 3 0v6a7 7 0 0 1-14 0v-3Z"/></svg>
-  if (kind === "speaker" || kind === "earpiece") return <svg {...common}><path d="m5 9 4-4v14l-4-4H2V9h3Z"/><path d={kind === "speaker" ? "M13 9a4 4 0 0 1 0 6M16 6a8 8 0 0 1 0 12" : "M13 12h.01"}/></svg>
-  return <svg {...common}>{kind === "micOff" && <line x1="3" y1="3" x2="21" y2="21"/>}<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/></svg>
+function MeetingControlIcon({
+  kind,
+}: {
+  kind: "mic" | "micOff" | "camera" | "cameraOff" | "hand" | "speaker" | "earpiece"
+}) {
+  const common = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  }
+  if (kind === "camera" || kind === "cameraOff")
+    return (
+      <svg {...common}>
+        {kind === "cameraOff" && <line x1="3" y1="3" x2="21" y2="21" />}
+        <rect x="2" y="6" width="14" height="12" rx="2" />
+        <path d="m16 10 5-3v10l-5-3" />
+      </svg>
+    )
+  if (kind === "hand")
+    return (
+      <svg {...common}>
+        <path d="M7 11V5a1.5 1.5 0 0 1 3 0v5V3a1.5 1.5 0 0 1 3 0v7V5a1.5 1.5 0 0 1 3 0v7V8a1.5 1.5 0 0 1 3 0v6a7 7 0 0 1-14 0v-3Z" />
+      </svg>
+    )
+  if (kind === "speaker" || kind === "earpiece")
+    return (
+      <svg {...common}>
+        <path d="m5 9 4-4v14l-4-4H2V9h3Z" />
+        <path d={kind === "speaker" ? "M13 9a4 4 0 0 1 0 6M16 6a8 8 0 0 1 0 12" : "M13 12h.01"} />
+      </svg>
+    )
+  return (
+    <svg {...common}>
+      {kind === "micOff" && <line x1="3" y1="3" x2="21" y2="21" />}
+      <rect x="9" y="2" width="6" height="11" rx="3" />
+      <path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8" />
+    </svg>
+  )
 }
 
+/**
+ * Vignette vivante d'un participant, dans la LISTE des invites.
+ *
+ * Muette, et il le faut : le son de la salle sort des `<audio>` dedies, un par
+ * participant. Un `<video>` sonore rejouerait ici chaque voix une seconde fois.
+ */
 function MeetingRemoteVideo({ stream, name }: { stream?: MediaStream; name: string }) {
   const ref = useRef<HTMLVideoElement>(null)
-  useEffect(() => { if (ref.current && stream && ref.current.srcObject !== stream) { ref.current.srcObject = stream; void ref.current.play().catch(() => undefined) } }, [stream])
-  return stream ? <video ref={ref} autoPlay playsInline className="meeting-remote-video" aria-label={`Vidéo de ${name}`} /> : null
+  useEffect(() => {
+    if (ref.current && stream && ref.current.srcObject !== stream) {
+      ref.current.srcObject = stream
+      void ref.current.play().catch(() => undefined)
+    }
+  }, [stream])
+  return stream ? (
+    <video
+      ref={ref}
+      autoPlay
+      playsInline
+      muted
+      className="meeting-remote-video"
+      aria-label={`Vidéo de ${name}`}
+    />
+  ) : null
 }
+
+/**
+ * Sortie programmee par le demontage de la salle, en attente d'echeance — et LA
+ * SALLE qu'elle concerne.
+ *
+ * Elle vit HORS du composant, et c'est tout l'interet : quand elle se declenche,
+ * le composant n'existe plus. Voir le nettoyage de demontage, plus bas, pour ce
+ * qu'elle protege — le double montage de React 18 en mode strict.
+ *
+ * L'identifiant l'accompagne parce qu'un montage n'a le droit d'annuler que la
+ * sortie de SA PROPRE salle. Sans lui, passer d'une reunion a une autre sans
+ * repasser par la liste — react-router garde alors le meme composant et change
+ * seulement le parametre — voyait le montage de la seconde annuler la sortie de
+ * la premiere : on restait « connecte » a une salle qu'on avait pourtant
+ * quittee, et pour toujours.
+ */
+let sortieProgrammee: { salle: string; minuteur: ReturnType<typeof setTimeout> } | null = null
 
 /** Vrai sous 900 px, la largeur ou la colonne du fil cesse d'etre lisible. */
 function useEcranEtroit(): boolean {
@@ -85,11 +162,121 @@ export default function MeetingRoomPage() {
   const [demandes, setDemandes] = useState<DemandeInvitation[]>([])
   const [numeroDirect, setNumeroDirect] = useState("")
   const [proprietaireNumero, setProprietaireNumero] = useState<ProprietaireAlanya | null>(null)
+  /**
+   * Lecture du son refusee par le navigateur. Sans cet etat, la salle est muette
+   * et rien ne le dit : on n'a alors ni explication, ni moyen de reessayer.
+   */
+  const [sonBloque, setSonBloque] = useState(false)
+
+  /**
+   * Dans la salle, et dans CELLE-CI. Le gestionnaire d'appels n'en tient qu'une
+   * a la fois : sans cette comparaison, la page d'une reunion afficherait les
+   * flux d'une autre.
+   */
+  const enSalle = callState.activeCallId === `meeting_${meetingId}`
+  const estVideo = callState.callType === "video"
+
+  const fluxDistants = useMemo(
+    () => Object.entries(callState.remoteStreams),
+    [callState.remoteStreams]
+  )
+
+  /**
+   * Noms tires de la reunion elle-meme.
+   *
+   * Le salon n'annonce le nom qu'a l'arrivee d'un nouveau venu ; ceux qui
+   * etaient DEJA la ne sont transmis que par leur identifiant. Sans ce repli,
+   * leurs tuiles portaient le nom de repli du call-manager — l'objet de la
+   * reunion, recopie sous chaque visage.
+   */
+  const nomsConnus = useMemo(() => {
+    const noms: Record<string, string> = {}
+    if (meeting) {
+      noms[meeting.organisateur.id] = meeting.organisateur.nom
+      for (const p of meeting.participants) noms[p.id] = p.nom
+    }
+    return noms
+  }, [meeting])
+
+  // L'ordre d'insertion des flux est l'ordre d'arrivee des participants.
+  const participantsDistants = useMemo(
+    () =>
+      fluxDistants.map(([id, stream]) => ({
+        id,
+        stream,
+        name: callState.participantNames[id] ?? nomsConnus[id] ?? t("participant"),
+      })),
+    [fluxDistants, callState.participantNames, nomsConnus, t]
+  )
+
+  const sortiesAudio = useRef<Map<string, HTMLAudioElement>>(new Map())
+
+  // Niveau de sortie : on regle le VOLUME et non la coupure, pour que la bascule
+  // haut-parleur / oreille ne se transforme pas en second bouton « muet ».
+  useEffect(() => {
+    const volume = estVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[callState.audioOutput]
+    for (const sortie of sortiesAudio.current.values()) {
+      sortie.muted = false
+      sortie.volume = volume
+    }
+  }, [callState.audioOutput, estVideo, fluxDistants])
+
+  /** Deblocage manuel : certains navigateurs n'acceptent qu'un geste dedie. */
+  const debloquerLeSon = useCallback(() => {
+    for (const sortie of sortiesAudio.current.values()) {
+      sortie.muted = false
+      void sortie
+        .play()
+        .then(() => setSonBloque(false))
+        .catch(() => undefined)
+    }
+  }, [])
+
+  /**
+   * Changer de camera echange la piste DANS le meme MediaStream : ni la
+   * reference du flux ni `camOn` ne bougent. Sans l'identifiant de la piste, un
+   * apercu local resterait branche sur l'ancienne image.
+   */
+  const idPisteLocale = callState.localStream?.getVideoTracks()[0]?.id ?? null
+  const apercuLocalRef = useRef<HTMLVideoElement | null>(null)
+  useEffect(() => {
+    const element = apercuLocalRef.current
+    if (!element || !callState.localStream) return
+    if (element.srcObject !== callState.localStream) {
+      element.srcObject = callState.localStream
+      void element.play().catch(() => undefined)
+    }
+  }, [callState.localStream, idPisteLocale, callState.camOn, participantsDistants.length])
 
   // Ouvrir le fil solde ce qui a ete rate pendant qu'il etait ferme.
   useEffect(() => {
     if (filOuvert) setNonLus(0)
   }, [filOuvert])
+
+  /**
+   * Etat du gestionnaire d'appels, lisible depuis un nettoyage.
+   *
+   * Un effet sans dependances capturerait sinon les valeurs du premier rendu —
+   * c'est-a-dire une salle ou l'on n'est pas encore entre.
+   */
+  const etatCourant = useRef(callState)
+  etatCourant.current = callState
+
+  /**
+   * Vrai tant que la BASE nous compte presents dans la salle, faux des qu'on en
+   * est ressorti.
+   *
+   * Le media et la base ne disent pas la meme chose : on peut etre inscrit
+   * comme present sans avoir le moindre flux — camera refusee au moment
+   * d'entrer, ou entree faite depuis la liste des reunions, qui appelle `join`
+   * avant meme d'ouvrir cet ecran. La ligne a fermer est celle de la base,
+   * c'est donc elle qu'on suit, et non l'appel en cours.
+   *
+   * Il sert aussi de verrou : le bouton « Quitter » navigue, ce qui demonte la
+   * page, ce qui rappellerait la sortie. Le second passage trouve le drapeau
+   * baisse et n'envoie rien — le serveur repondrait « deja deconnecte ».
+   */
+  const presentEnBase = useRef(false)
 
   useEffect(() => {
     if (!meetingId) return
@@ -99,6 +286,20 @@ export default function MeetingRoomPage() {
       try {
         const m = await fetchMeeting(parseInt(meetingId, 10))
         setMeeting(m)
+        /*
+         * Le serveur peut DEJA nous compter presents en arrivant ici : la liste
+         * des reunions appelle `join` puis navigue vers cette page. Sans cette
+         * lecture, on quittait l'ecran sans rien fermer — le bouton
+         * « Rejoindre » de la liste laissait une ligne « connectee » pour
+         * toujours, et une duree jamais close.
+         *
+         * Une reunion terminee, elle, n'a plus rien a fermer : le serveur a
+         * deconnecte tout le monde en la fermant.
+         */
+        const moi = getMyUserId()
+        if (moi && !m.terminee && m.participants.some((p) => p.id === moi && p.connecte)) {
+          presentEnBase.current = true
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : t("meet_room_load_failed")
         setError(msg)
@@ -111,12 +312,60 @@ export default function MeetingRoomPage() {
     void loadMeeting()
   }, [meetingId, showError, t])
 
+  /**
+   * LA sortie de la salle. Tous les chemins passent par ici — le bouton, le
+   * demontage de la page, la fermeture de l'onglet.
+   *
+   * Deux choses a faire, et il en manquait toujours une : couper le media, et
+   * fermer la participation EN BASE. `hangUp()` arrete les pistes — camera et
+   * micro s'eteignent pour de bon —, ferme les connexions et emet
+   * `meeting_leave` sur la socket deja ouverte. Mais lui seul ne dit RIEN a la
+   * base : sans l'appel a `/leave`, le participant y reste « connecte » et sa
+   * duree de presence n'est jamais close. C'est exactement ce qui arrivait par
+   * tout chemin autre que le bouton.
+   *
+   * `auDechargement` distingue le cas ou la page est en train de disparaitre :
+   * plus rien d'asynchrone n'y survit, tout doit partir dans le gestionnaire
+   * lui-meme.
+   */
+  const quitterLaSalle = useCallback(
+    async (auDechargement: boolean): Promise<void> => {
+      const id = Number(meetingId)
+      if (!id) return
+
+      const enAppelIci = etatCourant.current.activeCallId === `meeting_${meetingId}`
+      if (!enAppelIci && !presentEnBase.current) return
+
+      const aPrevenir = presentEnBase.current
+      presentEnBase.current = false
+
+      if (auDechargement) {
+        // Rien ne doit etre remis a une microtache : apres le retour de ce
+        // gestionnaire, le document peut avoir cesse d'exister. Les deux appels
+        // sont synchrones — la trame part sur la socket deja ouverte, la requete
+        // est remise au navigateur, qui la termine sans nous.
+        if (aPrevenir) leaveMeetingAuDechargement(id)
+        if (enAppelIci) void hangUp()
+        return
+      }
+
+      // Le media D'ABORD, la base ensuite : sans ce passage, on sortait de la
+      // reunion cote serveur en continuant a filmer et a etre vu.
+      if (enAppelIci) await hangUp()
+      if (aPrevenir) await leaveMeeting(id)
+    },
+    [meetingId]
+  )
+
   const handleJoinMeeting = async () => {
     if (!meeting || !meetingId) return
     if (meeting.terminee) return showError(t("error"), "Cette réunion est terminée.")
 
     try {
       await joinMeeting(parseInt(meetingId, 10))
+      // Des cet instant la base nous compte presents : quoi qu'il arrive
+      // ensuite, meme si le media echoue, il y aura une ligne a refermer.
+      presentEnBase.current = true
 
       // Le salon annonce lui-meme qui est deja la : inutile de lui passer la
       // liste des invites, qui ne dit pas qui est present.
@@ -145,7 +394,10 @@ export default function MeetingRoomPage() {
 
   useEffect(() => {
     if (!meeting?.jeSuisOrganisateur || !meetingId) return
-    const charger = () => void listerDemandesInvitation(Number(meetingId)).then(setDemandes).catch(() => undefined)
+    const charger = () =>
+      void listerDemandesInvitation(Number(meetingId))
+        .then(setDemandes)
+        .catch(() => undefined)
     charger()
     const id = window.setInterval(charger, 10000)
     return () => window.clearInterval(id)
@@ -156,20 +408,30 @@ export default function MeetingRoomPage() {
     try {
       await trancherDemandeInvitation(Number(meetingId), demandeId, accepter)
       setDemandes((liste) => liste.filter((d) => d.id !== demandeId))
-    } catch (err) { showError(t("error"), err instanceof Error ? err.message : "Demande impossible") }
+    } catch (err) {
+      showError(t("error"), err instanceof Error ? err.message : "Demande impossible")
+    }
   }
 
   const changerModeInvitation = async (automatic: boolean) => {
     if (!meetingId || !meeting) return
-    try { await reglerInvitationAuto(Number(meetingId), automatic); setMeeting({ ...meeting, invitationAuto: automatic }) }
-    catch (err) { showError(t("error"), err instanceof Error ? err.message : "Réglage impossible") }
+    try {
+      await reglerInvitationAuto(Number(meetingId), automatic)
+      setMeeting({ ...meeting, invitationAuto: automatic })
+    } catch (err) {
+      showError(t("error"), err instanceof Error ? err.message : "Réglage impossible")
+    }
   }
 
   useEffect(() => {
     const numero = numeroDirect.replace(/\D/g, "")
     setProprietaireNumero(null)
     if (!/^(\d{3,10})$/.test(numero)) return
-    const timer = window.setTimeout(() => { void trouverProprietaireAlanya(numero).then(setProprietaireNumero).catch(() => undefined) }, 250)
+    const timer = window.setTimeout(() => {
+      void trouverProprietaireAlanya(numero)
+        .then(setProprietaireNumero)
+        .catch(() => undefined)
+    }, 250)
     return () => window.clearTimeout(timer)
   }, [numeroDirect])
 
@@ -177,11 +439,18 @@ export default function MeetingRoomPage() {
     if (!meetingId) return
     const numero = numeroDirect.replace(/\D/g, "")
     if (!proprietaireNumero) return showError(t("error"), "Ce numéro ne correspond à aucun compte.")
-    try { await inviterAReunion(Number(meetingId), [numero]); setNumeroDirect(""); setMeeting(await fetchMeeting(Number(meetingId))) }
-    catch (err) { showError(t("error"), err instanceof Error ? err.message : "Invitation impossible") }
+    try {
+      await inviterAReunion(Number(meetingId), [numero])
+      setNumeroDirect("")
+      setMeeting(await fetchMeeting(Number(meetingId)))
+    } catch (err) {
+      showError(t("error"), err instanceof Error ? err.message : "Invitation impossible")
+    }
   }
 
   const maMain = mainsLevees.has(getMyUserId() ?? "")
+  /** Notre propre nom, pour l'initiale affichee quand on est seul dans la salle. */
+  const monNom = loadSessionUser()?.name ?? t("l2_me")
 
   const handleExclure = async (participantId: string, nom: string) => {
     if (!meetingId || !confirm(t("meet_exclude_confirm", { name: nom }))) return
@@ -200,7 +469,11 @@ export default function MeetingRoomPage() {
     if (!meetingId || !confirm(t("meet_end_confirm"))) return
     try {
       await endMeeting(parseInt(meetingId, 10))
-      await hangUp()
+      // Terminer deconnecte TOUT LE MONDE en base, nous compris, et clot les
+      // durees : il n'y a plus de ligne a fermer, un `/leave` de plus se ferait
+      // repondre « deja deconnecte ». Notre camera, elle, tourne toujours.
+      presentEnBase.current = false
+      if (etatCourant.current.activeCallId === `meeting_${meetingId}`) await hangUp()
       navigate("/meetings")
     } catch (err) {
       showError(t("error"), err instanceof Error ? err.message : t("meet_end_failed"))
@@ -211,19 +484,80 @@ export default function MeetingRoomPage() {
     if (!meetingId) return
 
     try {
-      await leaveMeeting(parseInt(meetingId, 10))
-      // Arrête WebRTC et toutes les pistes caméra/micro locales avant navigation.
-      await hangUp()
+      // Coupe le media PUIS ferme la ligne en base — voir `quitterLaSalle`.
+      await quitterLaSalle(false)
       navigate("/meetings")
     } catch (err) {
+      // Le media est deja coupe : on ne reste pas dans une salle vide parce que
+      // la requete a echoue.
+      navigate("/meetings")
       showError(t("error"), err instanceof Error ? err.message : t("meet_leave_failed"))
     }
   }
 
+  /**
+   * Quitter la PAGE quitte la salle.
+   *
+   * Un clic sur la croix, le menu lateral, le bouton « precedent » du
+   * navigateur : tous demontent cet ecran sans passer par « Quitter ». Sans ce
+   * nettoyage, la camera restait allumee, les autres continuaient de nous voir
+   * depuis une page qu'on avait quittee, et la base nous comptait presents.
+   *
+   * REACT 18 EN MODE STRICT monte, demonte et remonte immediatement chaque
+   * composant : un nettoyage qui partirait sur-le-champ ferait quitter la salle
+   * a la premiere seconde. On ne quitte donc pas DEPUIS le nettoyage, on
+   * PROGRAMME la sortie — et le montage suivant l'annule. Le faux demontage
+   * enchaine nettoyage puis remontage dans la meme tache ; le minuteur, lui,
+   * n'echoit qu'a la tache d'apres et n'a jamais lieu. Un vrai demontage n'est
+   * suivi d'aucun remontage : rien n'annule, la sortie part.
+   *
+   * L'annulation ne vaut que pour LA MEME salle : c'est ce qui distingue le
+   * faux demontage — on repart dans la reunion qu'on venait de quitter — d'un
+   * passage direct d'une reunion a une autre, ou la sortie de la premiere doit
+   * bel et bien partir.
+   *
+   * Le minuteur est declare hors du composant : a l'echeance, celui-ci a
+   * disparu — une ref a lui ne survivrait pas au remontage suivant.
+   */
+  useEffect(() => {
+    const salle = String(meetingId)
+    if (sortieProgrammee !== null && sortieProgrammee.salle === salle) {
+      clearTimeout(sortieProgrammee.minuteur)
+      sortieProgrammee = null
+    }
+    return () => {
+      const minuteur = setTimeout(() => {
+        // On ne remet a zero que SA propre sortie : entre-temps, une autre
+        // salle a pu programmer la sienne.
+        if (sortieProgrammee?.minuteur === minuteur) sortieProgrammee = null
+        // Personne n'attend cette promesse : l'echec est avale sur place, sinon
+        // il remonterait en rejet non traite depuis un composant disparu.
+        void quitterLaSalle(false).catch(() => undefined)
+      }, 0)
+      sortieProgrammee = { salle, minuteur }
+    }
+  }, [meetingId, quitterLaSalle])
+
+  /**
+   * Fermeture de l'onglet, rechargement, saut vers un autre site : le demontage
+   * n'a pas lieu, et une requete ordinaire lancee a cet instant est annulee avec
+   * le document. D'ou le chemin « au dechargement » — socket pour les autres
+   * participants, `fetch` en `keepalive` pour la base.
+   *
+   * `pagehide` plutot que `beforeunload` : c'est le seul qui parte a coup sur
+   * sur mobile, ou l'onglet est souvent balaye sans dechargement classique.
+   */
+  useEffect(() => {
+    const partir = () => {
+      void quitterLaSalle(true)
+    }
+    window.addEventListener("pagehide", partir)
+    return () => window.removeEventListener("pagehide", partir)
+  }, [quitterLaSalle])
+
   if (loading) {
     return (
       <div className={`meeting-room-root${filOuvert ? " fil-ouvert" : ""}`}>
-      {Object.entries(remoteStreams).map(([id, stream]) => <audio key={id} autoPlay ref={(el) => { if (el && el.srcObject !== stream) { el.srcObject = stream; void el.play().catch(() => undefined) } }} />)}
         <div className="loading">{t("loading")}</div>
       </div>
     )
@@ -241,13 +575,98 @@ export default function MeetingRoomPage() {
   }
 
   return (
-    <div className={`meeting-room-root${filOuvert ? " fil-ouvert" : ""}`}>
+    <div
+      className={`meeting-room-root${filOuvert ? " fil-ouvert" : ""}${enSalle ? " en-salle" : ""}`}
+    >
       <div className="meeting-header">
         <h1>{meeting.objet}</h1>
         <button className="btn-back" onClick={() => navigate("/meetings")} aria-label={t("close")}>
           ✕
         </button>
       </div>
+
+      {/*
+        LE MEDIA DE LA SALLE.
+
+        Une reunion est un appel a plusieurs avec un ordre du jour : elle emploie
+        donc la grille des appels de groupe, pas une copie. Ce qu'on voyait
+        jusqu'ici — des vignettes d'annuaire de 52 px — venait de la liste des
+        invites : elles disaient QUI est attendu, jamais ce que chacun envoie.
+        Aucun `<video>`, aucun `<audio>` : la salle etait aveugle et muette.
+
+        Le son ne passe PAS par les tuiles, qui restent muettes : un `<audio>`
+        par participant, ici. C'est ce qui laisse plusieurs voix se superposer,
+        et evite qu'un meme flux soit joue deux fois.
+      */}
+      {enSalle && (
+        <div className="meeting-media">
+          {fluxDistants.map(([id, stream]) => (
+            <audio
+              key={id}
+              autoPlay
+              ref={(el) => {
+                if (!el) {
+                  sortiesAudio.current.delete(id)
+                  return
+                }
+                if (el.srcObject !== stream) {
+                  el.srcObject = stream
+                  void el
+                    .play()
+                    .then(() => setSonBloque(false))
+                    .catch(() => setSonBloque(true))
+                }
+                el.muted = false
+                el.volume = estVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[callState.audioOutput]
+                sortiesAudio.current.set(id, el)
+              }}
+            />
+          ))}
+
+          {sonBloque && (
+            <button className="meeting-son-bloque" onClick={debloquerLeSon}>
+              {t("audio_blocked")}
+            </button>
+          )}
+
+          {participantsDistants.length > 0 ? (
+            <>
+              <ParticipantGrid participants={participantsDistants} isVideo={estVideo} size="room" />
+              {/* Sa propre image, en petit : on verifie d'un coup d'oeil ce que
+                  les autres recoivent, sans prendre la place de leurs cadres.
+                  Retournee comme un miroir — c'est ainsi qu'on se voit. */}
+              {estVideo && callState.localStream && (
+                <div className="meeting-apercu">
+                  {callState.camOn ? (
+                    <video ref={apercuLocalRef} autoPlay playsInline muted />
+                  ) : (
+                    <div className="meeting-apercu-coupee">{t("camera_off")}</div>
+                  )}
+                  <span className="meeting-apercu-nom">{t("l2_me")}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            /* Seul dans la salle : sa propre image occupe le cadre, faute
+               d'autre chose a montrer. Une reunion ou l'on arrive en avance ne
+               doit pas ressembler a une reunion en panne. */
+            <div className="meeting-seul">
+              {estVideo && callState.localStream && callState.camOn ? (
+                <video
+                  ref={apercuLocalRef}
+                  className="meeting-seul-video"
+                  autoPlay
+                  playsInline
+                  muted
+                />
+              ) : (
+                <div className="meeting-seul-avatar">{toInitials(monNom)}</div>
+              )}
+              <span className="meeting-seul-mention">{t("meet_pending")}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="meeting-info">
         {/* Le deux-points est DANS la traduction : l'espace qui le precede est
@@ -262,12 +681,69 @@ export default function MeetingRoomPage() {
         {meeting.jeSuisOrganisateur && !meeting.terminee && (
           <section className="meeting-settings-panel">
             <div className="meeting-settings-title">Paramètres de la réunion</div>
-            <label className="meeting-auto-invite"><input type="checkbox" checked={meeting.invitationAuto} onChange={(e) => void changerModeInvitation(e.target.checked)} /><span><strong>Accepter automatiquement les demandes</strong><small>Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.</small></span></label>
+            <label className="meeting-auto-invite">
+              <input
+                type="checkbox"
+                checked={meeting.invitationAuto}
+                onChange={(e) => void changerModeInvitation(e.target.checked)}
+              />
+              <span>
+                <strong>Accepter automatiquement les demandes</strong>
+                <small>
+                  Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.
+                </small>
+              </span>
+            </label>
             <div className="meeting-id-keypad" aria-label="Pavé Alanya ID">
-              <div className="meeting-id-number">{numeroDirect ? numeroDirect.replace(/(\d{2})(?=\d)/g, "$1 ") : <span>Alanya ID</span>}</div>
-              <div className="meeting-id-help">{numeroDirect.length === 0 ? "Composez un Alanya ID" : proprietaireNumero ? `Compte trouvé : ${proprietaireNumero.pseudo ?? proprietaireNumero.publicNumber}` : `${numeroDirect.length} chiffre${numeroDirect.length > 1 ? "s" : ""}`}</div>
-              <div className="meeting-id-keys">{["1","2","3","4","5","6","7","8","9","","0",""] .map((key,index) => key ? <button key={key} type="button" onClick={() => setNumeroDirect((current) => current.length < 8 ? `${current}${key}` : current)}>{key}</button> : <span key={`empty-${index}`} />)}</div>
-              <div className="meeting-id-actions"><button type="button" onClick={() => setNumeroDirect((current) => current.slice(0,-1))} disabled={!numeroDirect}>⌫ Effacer</button><button type="button" onClick={() => void inviterDirectement()} disabled={!proprietaireNumero}>Ajouter</button></div>
+              <div className="meeting-id-number">
+                {numeroDirect ? (
+                  numeroDirect.replace(/(\d{2})(?=\d)/g, "$1 ")
+                ) : (
+                  <span>Alanya ID</span>
+                )}
+              </div>
+              <div className="meeting-id-help">
+                {numeroDirect.length === 0
+                  ? "Composez un Alanya ID"
+                  : proprietaireNumero
+                    ? `Compte trouvé : ${proprietaireNumero.pseudo ?? proprietaireNumero.publicNumber}`
+                    : `${numeroDirect.length} chiffre${numeroDirect.length > 1 ? "s" : ""}`}
+              </div>
+              <div className="meeting-id-keys">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""].map((key, index) =>
+                  key ? (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() =>
+                        setNumeroDirect((current) =>
+                          current.length < 8 ? `${current}${key}` : current
+                        )
+                      }
+                    >
+                      {key}
+                    </button>
+                  ) : (
+                    <span key={`empty-${index}`} />
+                  )
+                )}
+              </div>
+              <div className="meeting-id-actions">
+                <button
+                  type="button"
+                  onClick={() => setNumeroDirect((current) => current.slice(0, -1))}
+                  disabled={!numeroDirect}
+                >
+                  ⌫ Effacer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void inviterDirectement()}
+                  disabled={!proprietaireNumero}
+                >
+                  Ajouter
+                </button>
+              </div>
             </div>
           </section>
         )}
@@ -283,11 +759,12 @@ export default function MeetingRoomPage() {
                       jamais un vide. */}
                   <div className="participant-vignette">
                     <MeetingRemoteVideo stream={remoteStreams[p.id]} name={p.nom} />
-                    {!remoteStreams[p.id] && (p.avatarUrl ? (
-                      <img src={p.avatarUrl} alt="" />
-                    ) : (
-                      <span>{toInitials(p.nom)}</span>
-                    ))}
+                    {!remoteStreams[p.id] &&
+                      (p.avatarUrl ? (
+                        <img src={p.avatarUrl} alt="" />
+                      ) : (
+                        <span>{toInitials(p.nom)}</span>
+                      ))}
                     {p.connecte && <span className="participant-pastille" aria-hidden="true" />}
                     {/* Sur la vignette d'un AUTRE, la pastille constate un
                         etat — elle n'invite a rien. « Lever la main » y
@@ -335,7 +812,9 @@ export default function MeetingRoomPage() {
             </div>
           </>
         )}
-        {callState.activeCallId && (
+        {/* « Appel en cours » ne vaut que pour CETTE salle : un appel mene
+            ailleurs n'a rien a annoncer ici. */}
+        {enSalle && (
           <div className="call-status">
             <div className="status-indicator active" />
             <span>{t("call_in_progress")}</span>
@@ -365,13 +844,6 @@ export default function MeetingRoomPage() {
         visible={!etroit || filOuvert}
         onMessageMasque={() => setNonLus((n) => n + 1)}
       />
-
-      {meeting.jeSuisOrganisateur && demandes.length > 0 && (
-        <section className="meeting-invite-requests" aria-label="Demandes d'invitation">
-          <div className="meeting-invite-head"><strong>Demandes d'invitation</strong></div>
-          {demandes.map((d) => <div key={d.id} className="meeting-invite-request"><span>{d.demandeur.nom} souhaite inviter {d.invite.nom}</span><div><button onClick={() => void traiterDemande(d.id, true)}>Accepter</button><button onClick={() => void traiterDemande(d.id, false)}>Refuser</button></div></div>)}
-        </section>
-      )}
 
       {/* Le compteur dit ce qui s'est dit pendant que le panneau etait ferme :
           sans lui, on n'ouvrirait le fil que par hasard. */}
@@ -406,95 +878,149 @@ export default function MeetingRoomPage() {
         </button>
       )}
 
-      {/* Commandes de la salle. Elles n'existent qu'une fois dedans : proposer
-          de couper un micro qui n'est pas ouvert n'aurait aucun sens. La camera
-          n'apparait qu'en video, et la sortie audio qu'en audio — au haut-parleur
-          de toute facon des qu'il y a de l'image. */}
-      {callState.activeCallId && (
-        <div className="meeting-controles">
-          <button
-            className={`meeting-controle${callState.micOn ? "" : " coupe"}`}
-            onClick={() => toggleMicrophone()}
-            aria-pressed={!callState.micOn}
-            title={callState.micOn ? t("mute_mic") : t("unmute_mic")}
-            aria-label={callState.micOn ? t("mute_mic") : t("unmute_mic")}
-          >
-            {callState.micOn ? <MeetingControlIcon kind="mic" /> : <MeetingControlIcon kind="micOff" />}
-          </button>
+      {/*
+        LA LIGNE DU BAS, en un seul element.
 
-          {/* Un bouton annonce ce qu'il VA faire, comme le micro juste a cote.
+        Les commandes et les actions se partageaient la meme cellule de grille,
+        l'une calee a gauche et l'autre a droite. Superposees, en realite : la
+        derniere declaree — les actions — etendait sa boite, transparente mais
+        bien presente, sur toute la cellule, et avalait les clics destines au
+        micro et a la camera. Une barre unique remet les deux groupes dans le
+        meme flux, ou ils se poussent au lieu de se couvrir.
+
+        Les demandes d'invitation et la mention « reunion terminee » visent la
+        MEME cellule : elles sont donc dans la barre elles aussi. Posees en
+        voisines dans la grille, elles se seraient superposees aux boutons et
+        auraient avale les clics, tout comme les actions le faisaient avant.
+        Dans un conteneur flex, leur `grid-area` reste sans effet.
+      */}
+      <div className="meeting-barre">
+        {meeting.jeSuisOrganisateur && demandes.length > 0 && (
+          <section className="meeting-invite-requests" aria-label="Demandes d'invitation">
+            <div className="meeting-invite-head">
+              <strong>Demandes d'invitation</strong>
+            </div>
+            {demandes.map((d) => (
+              <div key={d.id} className="meeting-invite-request">
+                <span>
+                  {d.demandeur.nom} souhaite inviter {d.invite.nom}
+                </span>
+                <div>
+                  <button onClick={() => void traiterDemande(d.id, true)}>Accepter</button>
+                  <button onClick={() => void traiterDemande(d.id, false)}>Refuser</button>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {meeting.terminee && <div className="meeting-ended">Réunion terminée</div>}
+
+        {/* Commandes de la salle. Elles n'existent qu'une fois dedans : proposer
+            de couper un micro qui n'est pas ouvert n'aurait aucun sens. La camera
+            n'apparait qu'en video, et la sortie audio qu'en audio — au haut-parleur
+            de toute facon des qu'il y a de l'image. */}
+        {enSalle && (
+          <div className="meeting-controles">
+            <button
+              className={`meeting-controle${callState.micOn ? "" : " coupe"}`}
+              onClick={() => toggleMicrophone()}
+              aria-pressed={!callState.micOn}
+              title={callState.micOn ? t("mute_mic") : t("unmute_mic")}
+              aria-label={callState.micOn ? t("mute_mic") : t("unmute_mic")}
+            >
+              {callState.micOn ? (
+                <MeetingControlIcon kind="mic" />
+              ) : (
+                <MeetingControlIcon kind="micOff" />
+              )}
+            </button>
+
+            {/* Un bouton annonce ce qu'il VA faire, comme le micro juste a cote.
               « Camera desactivee » decrivait l'etat, et une fois la camera
               coupee l'infobulle se resumait a « Video ». */}
-          {meeting.type === "video" && (
+            {meeting.type === "video" && (
+              <button
+                className={`meeting-controle${callState.camOn ? "" : " coupe"}`}
+                onClick={() => toggleCamera()}
+                aria-pressed={!callState.camOn}
+                title={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
+                aria-label={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
+              >
+                {callState.camOn ? (
+                  <MeetingControlIcon kind="camera" />
+                ) : (
+                  <MeetingControlIcon kind="cameraOff" />
+                )}
+              </button>
+            )}
+
             <button
-              className={`meeting-controle${callState.camOn ? "" : " coupe"}`}
-              onClick={() => toggleCamera()}
-              aria-pressed={!callState.camOn}
-              title={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
-              aria-label={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
+              className={`meeting-controle${maMain ? " actif" : ""}`}
+              onClick={() => sendMeetingHand(Number(meetingId), !maMain)}
+              aria-pressed={maMain}
+              title={maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
+              aria-label={maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
             >
-              {callState.camOn ? <MeetingControlIcon kind="camera" /> : <MeetingControlIcon kind="cameraOff" />}
+              <MeetingControlIcon kind="hand" />
             </button>
-          )}
 
-          <button
-            className={`meeting-controle${maMain ? " actif" : ""}`}
-            onClick={() => sendMeetingHand(Number(meetingId), !maMain)}
-            aria-pressed={maMain}
-            title={maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
-            aria-label={maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
-          >
-            <MeetingControlIcon kind="hand" />
-          </button>
-
-          {/* « Sortie audio des appels » est le libelle d'une ligne de
+            {/* « Sortie audio des appels » est le libelle d'une ligne de
               Parametres : dans la salle, il nommait un reglage au lieu de dire
               vers quoi la bascule envoie le son, et ne bougeait pas d'un etat a
               l'autre. */}
-          {meeting.type !== "video" && (
-            <button
-              className={`meeting-controle${callState.audioOutput === "speaker" ? " actif" : ""}`}
-              onClick={() =>
-                setCallAudioOutput(callState.audioOutput === "speaker" ? "earpiece" : "speaker")
-              }
-              aria-pressed={callState.audioOutput === "speaker"}
-              title={
-                callState.audioOutput === "speaker"
-                  ? t("r2_switch_to_earpiece")
-                  : t("r2_switch_to_speaker")
-              }
-              aria-label={
-                callState.audioOutput === "speaker"
-                  ? t("r2_switch_to_earpiece")
-                  : t("r2_switch_to_speaker")
-              }
-            >
-              {callState.audioOutput === "speaker" ? <MeetingControlIcon kind="speaker" /> : <MeetingControlIcon kind="earpiece" />}
+            {meeting.type !== "video" && (
+              <button
+                className={`meeting-controle${callState.audioOutput === "speaker" ? " actif" : ""}`}
+                onClick={() =>
+                  setCallAudioOutput(callState.audioOutput === "speaker" ? "earpiece" : "speaker")
+                }
+                aria-pressed={callState.audioOutput === "speaker"}
+                title={
+                  callState.audioOutput === "speaker"
+                    ? t("r2_switch_to_earpiece")
+                    : t("r2_switch_to_speaker")
+                }
+                aria-label={
+                  callState.audioOutput === "speaker"
+                    ? t("r2_switch_to_earpiece")
+                    : t("r2_switch_to_speaker")
+                }
+              >
+                {callState.audioOutput === "speaker" ? (
+                  <MeetingControlIcon kind="speaker" />
+                ) : (
+                  <MeetingControlIcon kind="earpiece" />
+                )}
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="meeting-actions">
+          {/* « Rejoindre » ou « Quitter » selon qu'on est dans CETTE salle : un
+            appel mene ailleurs affichait « Quitter la reunion » sur une salle ou
+            l'on n'etait pas entre, et cachait le bouton qui y menait. Une
+            reunion terminee, elle, ne se rejoint plus du tout. */}
+          {!enSalle && !meeting.terminee && (
+            <button className="btn-join" onClick={() => void handleJoinMeeting()}>
+              {t("meet_join_room")}
+            </button>
+          )}
+          {enSalle && (
+            <button className="btn-leave" onClick={() => void handleLeaveMeeting()}>
+              {t("meet_leave_room")}
+            </button>
+          )}
+          {/* Quitter, tout le monde le peut : la reunion continue sans nous.
+            Terminer la ferme pour tous — le serveur le reserve a
+            l'organisateur, l'ecran ne le propose donc qu'a lui. */}
+          {meeting.jeSuisOrganisateur && !meeting.terminee && (
+            <button className="btn-leave" onClick={() => void handleEndMeeting()}>
+              {t("meet_end")}
             </button>
           )}
         </div>
-      )}
-
-      {meeting.terminee && <div className="meeting-ended">Réunion terminée</div>}
-      <div className="meeting-actions">
-        {!callState.activeCallId && !meeting.terminee && (
-          <button className="btn-join" onClick={() => void handleJoinMeeting()}>
-            {t("meet_join_room")}
-          </button>
-        )}
-        {callState.activeCallId && (
-          <button className="btn-leave" onClick={() => void handleLeaveMeeting()}>
-            {t("meet_leave_room")}
-          </button>
-        )}
-        {/* Quitter, tout le monde le peut : la reunion continue sans nous.
-            Terminer la ferme pour tous — le serveur le reserve a
-            l'organisateur, l'ecran ne le propose donc qu'a lui. */}
-        {meeting.jeSuisOrganisateur && !meeting.terminee && (
-          <button className="btn-leave" onClick={() => void handleEndMeeting()}>
-            {t("meet_end")}
-          </button>
-        )}
       </div>
     </div>
   )

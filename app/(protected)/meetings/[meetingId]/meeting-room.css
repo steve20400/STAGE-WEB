@@ -27,6 +27,156 @@
   color: var(--text-primary);
 }
 
+/*
+ * Une fois DANS la salle, le media prend la place principale : c'est lui qu'on
+ * regarde, la liste des invites n'est plus qu'un rappel. Elle passe donc sous
+ * les cadres, bornee en hauteur, avec son propre defilement.
+ */
+.meeting-room-root.en-salle {
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "entete entete"
+    "media  fil"
+    "infos  fil"
+    "actions fil";
+}
+.meeting-room-root.en-salle .meeting-info {
+  /* Bornee, sinon l'annuaire repousse les visages hors de l'ecran. */
+  max-height: 26vh;
+}
+
+/* ---------- Media de la salle ---------- */
+
+.meeting-room-root .meeting-media {
+  grid-area: media;
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  padding: 10px;
+  display: flex;
+}
+/* La grille remplit le cadre : c'est elle qui defile, pas la page. */
+.meeting-room-root .meeting-media > .pgrid {
+  flex: 1 1 auto;
+  height: 100%;
+}
+
+/* Apercu de sa propre camera : petit, dans un coin, par-dessus la grille. Il
+   confirme ce que les autres recoivent sans manger la place de leurs cadres. */
+.meeting-room-root .meeting-apercu {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 168px;
+  height: 112px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+.meeting-room-root .meeting-apercu video {
+  width: 100%;
+  height: 100%;
+  /* Le flux REMPLIT son cadre au lieu d'y flotter entre deux bandes noires. */
+  object-fit: cover;
+  display: block;
+  /* Miroir : c'est ainsi qu'on se voit, et seulement pour soi — les autres
+     recoivent l'image dans le bon sens. */
+  transform: scaleX(-1);
+}
+.meeting-room-root .meeting-apercu-coupee {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.meeting-room-root .meeting-apercu-nom {
+  position: absolute;
+  left: 6px;
+  bottom: 5px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Seul dans la salle : sa propre image occupe le cadre. Arriver en avance est
+   ordinaire, cela ne doit pas ressembler a une reunion en panne. */
+.meeting-room-root .meeting-seul {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+.meeting-room-root .meeting-seul-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.meeting-room-root .meeting-seul-avatar {
+  width: 88px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+}
+.meeting-room-root .meeting-seul-mention {
+  position: relative;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Le navigateur a refuse la lecture : sans ce bouton, la salle reste muette et
+   rien ne l'explique. */
+.meeting-room-root .meeting-son-bloque {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 20px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* ---------- Entete ---------- */
 
 .meeting-room-root .meeting-header {
@@ -258,14 +408,30 @@
 
 /* ---------- Actions ---------- */
 
-/* Commandes de la salle : posees au-dessus des actions, elles se manipulent
-   pendant la reunion la ou « Quitter » se decide une fois. */
-.meeting-room-root .meeting-controles {
+/*
+ * La ligne du bas : les commandes a gauche, les actions a droite, dans UNE
+ * barre.
+ *
+ * Les deux occupaient auparavant la meme cellule de grille, l'une calee a
+ * gauche et l'autre a droite. Elles ne se cotoyaient pas, elles se
+ * SUPERPOSAIENT : la derniere declaree — les actions — etendait sa boite,
+ * transparente mais bien reelle, sur toute la cellule, et interceptait les clics
+ * du micro et de la camera. Aucun z-index n'aurait regle cela proprement ; un
+ * flux commun, si.
+ */
+.meeting-room-root .meeting-barre {
   grid-area: actions;
   display: flex;
+  align-items: end;
+  flex-wrap: wrap;
   gap: 8px;
-  align-self: end;
-  justify-self: end;
+}
+
+/* Les commandes se manipulent pendant la reunion, la ou « Quitter » se decide
+   une fois : elles viennent donc en premier, sous la main. */
+.meeting-room-root .meeting-controles {
+  display: flex;
+  gap: 8px;
 }
 .meeting-room-root .meeting-controle {
   width: 40px;
@@ -296,10 +462,12 @@
   border-color: var(--accent-border);
 }
 
+/* Poussees au bout de la barre : « Quitter » se trouve toujours au meme endroit,
+   quel que soit le nombre de commandes affichees — audio ou video. */
 .meeting-room-root .meeting-actions {
-  grid-area: actions;
   display: flex;
   gap: 8px;
+  margin-left: auto;
 }
 .meeting-room-root .btn-join,
 .meeting-room-root .btn-leave {
@@ -357,6 +525,49 @@
       "actions";
     padding: 16px;
     gap: 12px;
+  }
+
+  /* Sur telephone aussi, ce sont les visages qui comptent : le media garde tout
+     l'espace restant et l'annuaire se replie a une bande defilante. Les tuiles
+     restent grandes — une ou deux par ligne — et l'on defile pour voir les
+     autres, exactement comme en appel video a plusieurs. */
+  .meeting-room-root.en-salle {
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "entete"
+      "media"
+      "infos"
+      "actions";
+  }
+  .meeting-room-root.en-salle .meeting-info {
+    max-height: 22vh;
+    padding: 12px;
+  }
+  .meeting-room-root .meeting-media {
+    padding: 6px;
+  }
+  /* L'apercu recule dans le coin : la place est comptee, il ne doit pas couvrir
+     un visage. */
+  .meeting-room-root .meeting-apercu {
+    right: 10px;
+    bottom: 10px;
+    width: 104px;
+    height: 72px;
+  }
+
+  /*
+   * La barre du bas s'ecarte de la bascule du fil.
+   *
+   * Celle-ci est en `position: fixed` en bas a droite, hors de toute grille :
+   * elle se posait exactement sur le dernier bouton de la ligne — la coupure
+   * video sur un telephone etroit. Aucun z-index n'y changeait rien, les deux
+   * elements occupant reellement le meme carre. Un bouton flottant ne se pousse
+   * pas, on lui laisse sa place : 48 px de rond, 16 px de marge, plus 8 px pour
+   * que les deux ne se touchent pas — 72 px reserves. Les groupes passent a la
+   * ligne plutot que de se tasser sous lui.
+   */
+  .meeting-room-root .meeting-barre {
+    padding-right: 72px;
   }
 
   /* Le fil devient un panneau qui glisse PAR-DESSUS la reunion, laquelle reste
@@ -463,19 +674,284 @@
     display: none;
   }
 }
-.meeting-room-root .meeting-ended{grid-area:actions;padding:12px 16px;border-radius:12px;background:var(--danger-dim);color:var(--danger);font-weight:700;text-align:center}
-.meeting-room-root .participant-vignette:has(.meeting-remote-video){width:100%;height:150px;border-radius:10px;background:#080b10;overflow:hidden}.meeting-room-root .meeting-remote-video{width:100%;height:100%;object-fit:cover;background:#080b10}
-.meeting-invite-requests{grid-area:actions;border:1px solid var(--border-subtle);border-radius:12px;background:var(--bg-surface);padding:12px;font-size:12px}.meeting-invite-request{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:8px}.meeting-invite-request button{border:0;border-radius:6px;padding:5px 8px;margin-left:5px;background:var(--accent);color:var(--accent-text);font-weight:700}.meeting-invite-request button:last-child{background:var(--danger);color:#fff}@media(max-width:900px){.meeting-invite-request{align-items:flex-start;flex-direction:column}}
-@media (max-width:900px){
-  .meeting-room-root .meeting-controles{justify-self:start;align-self:start;flex-wrap:wrap;max-width:100%}
-  .meeting-room-root .meeting-actions{flex-wrap:wrap;padding-right:64px}
-  .salle-fil-bascule{bottom:84px}
-  .salle-fil-bascule.ouvert{bottom:16px}
+.meeting-room-root .meeting-ended {
+  grid-area: actions;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--danger-dim);
+  color: var(--danger);
+  font-weight: 700;
+  text-align: center;
 }
-.meeting-invite-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.meeting-invite-head label{font-size:11px;color:var(--text-muted);display:flex;gap:6px;align-items:center}
-.meeting-settings-panel{margin:12px 0;padding:12px;border:1px solid var(--border-subtle);border-radius:12px;background:var(--bg-elevated)}.meeting-settings-title{font-size:12px;font-weight:800;margin-bottom:10px}.meeting-auto-invite{display:flex;gap:9px;align-items:flex-start;font-size:12px;cursor:pointer}.meeting-auto-invite input{margin-top:2px;accent-color:var(--accent)}.meeting-auto-invite small{display:block;color:var(--text-muted);margin-top:3px;line-height:1.35}
-.meeting-direct-invite{display:flex;gap:8px;margin-top:12px}.meeting-direct-invite input{flex:1;min-width:0;border:1px solid var(--border-subtle);border-radius:8px;padding:8px;background:var(--bg-input);color:var(--text-primary)}.meeting-direct-invite button{border:0;border-radius:8px;padding:8px 12px;background:var(--accent);color:var(--accent-text);font-weight:700}
-.meeting-id-dialer{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;max-width:220px}.meeting-id-dialer button{border:1px solid var(--border-subtle);border-radius:8px;background:var(--bg-surface);color:var(--text-primary);padding:8px;font-weight:700;cursor:pointer}.meeting-id-dialer button:hover{background:var(--bg-hover);border-color:var(--accent-border)}
-.meeting-id-keypad{margin-top:12px;max-width:260px;padding:12px;border-radius:12px;background:var(--bg-surface);border:1px solid var(--border-subtle)}.meeting-id-number{text-align:center;min-height:28px;font-size:19px;font-weight:800;letter-spacing:.08em;color:var(--text-primary)}.meeting-id-number span{font-size:13px;letter-spacing:0;color:var(--text-muted)}.meeting-id-help{text-align:center;min-height:18px;font-size:11px;color:var(--text-muted);margin-bottom:8px}.meeting-id-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.meeting-id-keys button{height:38px;border:1px solid var(--border-subtle);border-radius:10px;background:var(--bg-elevated);color:var(--text-primary);font-size:16px;font-weight:700}.meeting-id-actions{display:flex;gap:8px;margin-top:9px}.meeting-id-actions button{flex:1;border:0;border-radius:8px;padding:8px;background:var(--border-subtle);color:var(--text-secondary);font-weight:700}.meeting-id-actions button:last-child{background:var(--accent);color:var(--accent-text)}.meeting-id-actions button:disabled{opacity:.45}
+.meeting-room-root .participant-vignette:has(.meeting-remote-video) {
+  width: 100%;
+  height: 150px;
+  border-radius: 10px;
+  background: #080b10;
+  overflow: hidden;
+}
+.meeting-room-root .meeting-remote-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #080b10;
+}
+.meeting-invite-requests {
+  grid-area: actions;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  padding: 12px;
+  font-size: 12px;
+}
+
+/* Ces deux blocs vivent DANS la barre du bas, pas dans la cellule de grille :
+   ils y prennent une ligne entiere, au-dessus des boutons, au lieu de se
+   superposer a eux et d'en avaler les clics. */
+.meeting-room-root .meeting-barre > .meeting-invite-requests,
+.meeting-room-root .meeting-barre > .meeting-ended {
+  flex: 0 0 100%;
+  grid-area: auto;
+}
+.meeting-invite-request {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.meeting-invite-request button {
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-left: 5px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+.meeting-invite-request button:last-child {
+  background: var(--danger);
+  color: #fff;
+}
+@media (max-width: 900px) {
+  .meeting-invite-request {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 900px) {
+  .meeting-room-root .meeting-controles {
+    justify-self: start;
+    align-self: start;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .meeting-room-root .meeting-actions {
+    flex-wrap: wrap;
+    padding-right: 64px;
+  }
+  .salle-fil-bascule {
+    bottom: 84px;
+  }
+  .salle-fil-bascule.ouvert {
+    bottom: 16px;
+  }
+}
+.meeting-invite-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+.meeting-invite-head label {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.meeting-settings-panel {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+.meeting-settings-title {
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.meeting-auto-invite {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  font-size: 12px;
+  cursor: pointer;
+}
+.meeting-auto-invite input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+.meeting-auto-invite small {
+  display: block;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.35;
+}
+.meeting-direct-invite {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.meeting-direct-invite input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+.meeting-direct-invite button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+.meeting-id-dialer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+  max-width: 220px;
+}
+.meeting-id-dialer button {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.meeting-id-dialer button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+}
+.meeting-id-keypad {
+  margin-top: 12px;
+  max-width: 260px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+.meeting-id-number {
+  text-align: center;
+  min-height: 28px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+}
+.meeting-id-number span {
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+.meeting-id-help {
+  text-align: center;
+  min-height: 18px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.meeting-id-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.meeting-id-keys button {
+  height: 38px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+.meeting-id-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+.meeting-id-actions button {
+  flex: 1;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--border-subtle);
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+.meeting-id-actions button:last-child {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.meeting-id-actions button:disabled {
+  opacity: 0.45;
+}
 /* Grille média réunion : grandes tuiles, rendu uniforme vidéo/avatar et lisibilité tactile. */
-.meeting-room-root .participants-grid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.meeting-room-root .participant-box{min-height:180px;justify-content:center;padding:12px;background:linear-gradient(145deg,var(--bg-elevated),var(--bg-surface));box-shadow:0 2px 10px rgba(0,0,0,.04)}.meeting-room-root .participant-vignette{width:76px;height:76px;font-size:23px}.meeting-room-root .participant-vignette:has(.meeting-remote-video){width:100%;height:150px;border-radius:12px}.meeting-room-root .participant-name{font-size:14px}.meeting-room-root .participant-status{padding:3px 8px;border-radius:99px;background:var(--bg-muted)}@media(max-width:900px){.meeting-room-root .participants-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.meeting-room-root .participant-box{min-height:145px;padding:10px}.meeting-room-root .participant-vignette:has(.meeting-remote-video){height:110px}.meeting-room-root .participant-vignette{width:58px;height:58px;font-size:18px}.meeting-room-root .participant-name{font-size:12px}}
+.meeting-room-root .participants-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+.meeting-room-root .participant-box {
+  min-height: 180px;
+  justify-content: center;
+  padding: 12px;
+  background: linear-gradient(145deg, var(--bg-elevated), var(--bg-surface));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+.meeting-room-root .participant-vignette {
+  width: 76px;
+  height: 76px;
+  font-size: 23px;
+}
+.meeting-room-root .participant-vignette:has(.meeting-remote-video) {
+  width: 100%;
+  height: 150px;
+  border-radius: 12px;
+}
+.meeting-room-root .participant-name {
+  font-size: 14px;
+}
+.meeting-room-root .participant-status {
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: var(--bg-muted);
+}
+@media (max-width: 900px) {
+  .meeting-room-root .participants-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .meeting-room-root .participant-box {
+    min-height: 145px;
+    padding: 10px;
+  }
+  .meeting-room-root .participant-vignette:has(.meeting-remote-video) {
+    height: 110px;
+  }
+  .meeting-room-root .participant-vignette {
+    width: 58px;
+    height: 58px;
+    font-size: 18px;
+  }
+  .meeting-room-root .participant-name {
+    font-size: 12px;
+  }
+}

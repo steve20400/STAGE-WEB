@@ -5,7 +5,9 @@ import { useTranslation } from "../i18n"
 import "./participant-grid.css"
 
 /**
- * Grille des participants d'un appel de groupe.
+ * Grille des participants d'un appel de groupe — et d'une reunion, qui EST un
+ * appel a plusieurs, avec un ordre du jour en plus. Le media est le meme, la
+ * grille aussi : la salle de reunion n'a pas sa copie.
  *
  * Jusqu'ici l'ecran d'appel ne branchait que `remoteStreams[0]` : les flux des
  * autres participants etaient recus mais jamais affiches. Cette grille les rend
@@ -16,7 +18,11 @@ import "./participant-grid.css"
  * - ecran moyen : la meme grille, avec des tuiles de la taille du petit ecran ;
  * - petit ecran : une seule tuile visible, celle du premier participant arrive
  *   apres nous, et un defilement vertical par tuile pour parcourir les autres un
- *   par un.
+ *   par un ;
+ * - salle de reunion (« room ») : des cadres larges sur plusieurs colonnes,
+ *   regles pour le grand ecran, qui restent FRANCHEMENT GRANDS sur telephone —
+ *   une ou deux tuiles par ligne, et on defile pour voir les autres. Passe un
+ *   seuil, retrecir ne montre plus des visages mais des timbres-poste.
  *
  * Le son ne passe PAS par ces tuiles : les elements `<video>` restent muets, et
  * l'ecran d'appel garde un `<audio>` par participant. C'est ce qui permet a
@@ -28,6 +34,13 @@ export interface Participant {
   stream: MediaStream
   name: string
 }
+
+/**
+ * Taille de la grille. Les trois premieres suivent la fenetre d'appel
+ * (`CallDisplayMode`) ; « room » est propre a la salle de reunion, ou la grille
+ * occupe la page entiere et n'a pas a se plier au format d'une vignette.
+ */
+export type TailleGrille = CallDisplayMode | "room"
 
 /**
  * Un flux distant peut etre `live` sans transporter d'image — camera coupee, ou
@@ -178,7 +191,7 @@ export function ParticipantGrid({
 }: {
   participants: Participant[]
   isVideo: boolean
-  size: CallDisplayMode
+  size: TailleGrille
 }) {
   if (participants.length === 0) return null
 
