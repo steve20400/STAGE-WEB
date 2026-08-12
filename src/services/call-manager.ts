@@ -76,8 +76,17 @@ export type IvrStep = "menu" | "attente"
  */
 export interface IvrOption {
   digit: number
+  /** `center.libelle` — nom interne de la ligne. Repli d'affichage seulement. */
   label: string
   disponible: boolean
+  /**
+   * `center.nom_service` — le nom du service tel qu'il doit etre MONTRE.
+   *
+   * Nul quand la colonne est vide ; le serveur normalise deja, mais on renormalise
+   * a la lecture. Les deux regles d'affichage n'en font pas le meme usage : sur le
+   * pave on retombe sur `label`, sous le nom du centre on n'affiche RIEN.
+   */
+  nomService: string | null
 }
 
 /**
@@ -99,6 +108,14 @@ export interface IvrSession {
   step: IvrStep
   /** Libelle du service choisi, pendant que l'agent sonne. */
   serviceChoisi: string | null
+  /**
+   * `nom_service` du service choisi, ou nul si la colonne est vide.
+   *
+   * Affiche sous le nom du centre pendant la mise en relation, et RIEN quand il
+   * est nul. Distinct de `serviceChoisi` : replier sur le libelle mettrait un nom
+   * interne sous les yeux de l'appelant.
+   */
+  nomServiceChoisi: string | null
   /** Dernier message du serveur (« … n'est pas encore disponible »). */
   message: string | null
   /** Touche envoyee, reponse pas encore arrivee -> clavier verrouille. */
@@ -463,6 +480,12 @@ function stopIvrAudio() {
   ivrAudio = null
 }
 
+/** Une chaine vide vaut absence : elle afficherait une ligne blanche. */
+function texteOuNull(brut: unknown): string | null {
+  const s = typeof brut === "string" ? brut.trim() : ""
+  return s.length > 0 ? s : null
+}
+
 function parseIvrOptions(brut: unknown): IvrOption[] {
   if (!Array.isArray(brut)) return []
   const options: IvrOption[] = []
@@ -479,6 +502,7 @@ function parseIvrOptions(brut: unknown): IvrOption[] {
       // Absent = disponible : un serveur anterieur ne connait pas ce champ, et
       // tout griser serait pire que de laisser essayer.
       disponible: o.disponible !== false,
+      nomService: texteOuNull(o.nomService),
     })
   }
   return options
@@ -950,6 +974,7 @@ async function handleServerEvent(event: CallServerEvent) {
       options: parseIvrOptions(event.options),
       step: "menu",
       serviceChoisi: null,
+      nomServiceChoisi: null,
       message: null,
       envoiEnCours: false,
     }
@@ -970,6 +995,7 @@ async function handleServerEvent(event: CallServerEvent) {
         ...session,
         step: "attente",
         serviceChoisi: (event.label as string | null) ?? null,
+        nomServiceChoisi: texteOuNull(event.nomService),
         message: null,
         envoiEnCours: false,
       },

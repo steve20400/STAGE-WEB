@@ -87,7 +87,11 @@ export function IvrPanel({ session }: { session: IvrSession }) {
   if (maintenue !== null) {
     if (!optionRevelee) titre = t("ivr_no_service")
     else {
-      titre = optionRevelee.label
+      // `nom_service` d'abord, `libelle` en repli — meme regle que le mobile,
+      // posee par le user le 12/08/2026. Deux clients qui n'afficheraient pas le
+      // meme nom pour la meme touche, c'est le genre de divergence qui ne se
+      // signale jamais toute seule.
+      titre = optionRevelee.nomService ?? optionRevelee.label
       if (!optionRevelee.disponible) sous = t("ivr_soon")
     }
   }
