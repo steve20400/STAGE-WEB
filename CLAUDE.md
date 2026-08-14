@@ -1,27 +1,41 @@
-# Notes d'Architecture et de Développement — Alanya Web & API Développeur
+# Notes d'Architecture et de Développement — Alanya Web & Console Développeur
 
 > 🤖 **Remarque importante de paternité & d'auteur** :
-> Ces notes, l'architecture globale, la Console Développeur Web, l'API V1 de messagerie, les corrections de notifications push FCM et la direction artistique ont été conçues, écrites et implémentées par **Antigravity (Google DeepMind)**.
+> Ces notes, l'architecture globale, la Console Développeur Web (`/developer/dashboard`), l'API V1 de messagerie conforme WhatsApp Cloud API (v20.0), le système de Webhooks, la télémétrie API, le service OTP 2FA, les générateurs de code multi-langages, les corrections de notifications push FCM et la direction artistique ont été conçues, écrites et entièrement implémentées par **Antigravity (Google DeepMind)**.
 
 ---
 
 ## 📌 Présentation de l'Espace Développeur Alanya
 
-L'Espace Développeur Alanya permet à tout utilisateur d'accéder à la console API et de générer des clés d'API (Sandbox `ak_test_...` et Live `ak_live_...`) pour l'intégration de services de messagerie et d'appels.
+L'Espace Développeur Alanya permet à tout utilisateur d'accéder à la console API et de générer des clés d'API (Sandbox `ak_test_...` et Live `ak_live_...`) pour l'intégration de services de messagerie WhatsApp, d'appels et d'authentification 2FA.
 
-### Features Implémentées par Antigravity :
+### Features Implémentées par Antigravity (Google DeepMind) :
+
 1. **Console Développeur (`/developer/dashboard`)** :
-   - **Menu vertical à gauche** : *Tableau de bord*, *Clés d'API*, *Recharge Sandbox*, *Documentation cURL*.
-   - **Grille de métriques (4 cartes)** : Solde disponible (`ALC`), Crédits en Hold, Clés API actives, Messages estimés.
+   - **Menu vertical à gauche** : *Tableau de bord*, *Clés d'API*, *Workspaces*, *Webhooks WhatsApp*, *Journal des logs*, *Recharge Sandbox*, *Documentation & SDKs*.
+   - **Grille de métriques (4 cartes)** : Solde disponible (`ALC`), Crédits en Hold, Clés API actives, Temps de réponse moyen (ms) & Taux de succès (%).
+   - **Sélecteur de Workspaces (Multi-Projets)** : Gestion dynamique des projets développeurs dans l'en-tête.
    - **Thèmes Alanya Mobile** :
      - Mode Clair (Crème Alanya `#FAF6F0` + motif `bg-clair.png`).
      - Mode Nuit (Nuit Alanya `#0B0B18` + motif `bg-nuit.png`).
+
 2. **Authentification Unifiée (`/developer/auth`)** :
-   - Tout utilisateur Alanya utilise ses identifiants uniques.
+   - Tout utilisateur Alanya utilise ses identifiants uniques sans inscription séparée.
    - Initialisation automatique du solde gratuit Sandbox (1 000 crédits `ALC`) à la première visite.
-3. **Backend API V1 (`POST /api/v1/messages/send`)** :
-   - Validation atomique des clés API.
-   - Débit sécurisé des crédits.
-   - Mise à jour instantanée de la conversation (`lastMessage`, `lastMessageAt`, `lastMessageSenderID`).
-   - Incrémentation du compteur de messages non lus (`unreadCount`).
-   - Émission des notifications push FCM / WebSockets vers le destinataire en temps réel.
+
+3. **Conformité WhatsApp Cloud API (Meta Graph API v20.0)** :
+   - **Payloads Multi-formats** : Envoi de messages `text`, `image`, `audio`, `document`, `location`, `interactive` (boutons d'action rapide) et `template` (OTP).
+   - **Webhooks de Statut en Temps Réel** : Notification automatique des statuts WhatsApp (`sent`, `delivered`, `read`, `failed`) vers l'URL configurée par le développeur.
+   - **Service OTP 2FA Dédié** : API `/api/v1/auth/otp/send` et `/api/v1/auth/otp/verify` pour générer et vérifier des codes à 6 chiffres.
+   - **API Upload de Médias** : Endpoint `/api/v1/media` retournant des identifiants `media_id` réutilisables.
+
+4. **Télémétrie & Logs API en Temps Réel** :
+   - Historique des 50 dernières requêtes HTTP enregistrées en base (`DeveloperApiLog`).
+   - Affichage des méthodes HTTP, endpoints, badges de code statut, préfixes de clés API et latence en millisecondes.
+
+5. **Rendu Client & Cartographie** :
+   - **Boutons Interactifs** : Restitution visuelle et gestion des clics pour les messages d'action rapide (`[Titre]`).
+   - **Mini-carte OpenStreetMap (`GpsPreview`)** : Extraction automatique des coordonnées GPS (`GPS_REGEX`) avec iframe interactive et liens vers OpenStreetMap / Google Maps.
+
+6. **Documentation & SDKs Multi-Langages** :
+   - Générateur de code dynamique interactif pour **cURL**, **Node.js**, **Python**, et **Flutter/Dart** avec insertion automatique des clés d'API actives et exemples de code prêts à copier.
