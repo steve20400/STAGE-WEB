@@ -37,7 +37,9 @@ export function resolveMediaUrl(relativeUrl: string, options?: { download?: bool
   if (!relativeUrl) return ""
   // Ignorer les URLs locales générées côté client (blob:, data:)
   if (/^(blob:|data:)/.test(relativeUrl)) return relativeUrl
-  const base = /^https?:\/\//.test(relativeUrl) ? relativeUrl : `${API_BASE_URL}${relativeUrl}`
+  // Si c'est déjà une URL HTTP/HTTPS externe complète, la retourner directement
+  if (/^https?:\/\//i.test(relativeUrl)) return relativeUrl
+  const base = `${API_BASE_URL}${relativeUrl}`
   const token = loadSessionToken() ?? ""
   const sep = base.includes("?") ? "&" : "?"
   const download = options?.download ? "&download=1" : ""
