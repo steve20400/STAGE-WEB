@@ -739,7 +739,7 @@ function StatusIcon({ status }: { status: MessageStatus }) {
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
 
 /** Detecte des coordonnees GPS (lat,lng) ou un lien Google Maps. */
-const GPS_REGEX = /(-?\d+\.\d{4,})\s*,\s*(-?\d+\.\d{4,})/
+const GPS_REGEX = /(-?\d+\.\d{2,})\s*,\s*(-?\d+\.\d{2,})/
 const GMAPS_REGEX =
   /(?:google\.\w+\/maps|maps\.google\.\w+|goo\.gl\/maps).*?[/@](-?\d+\.\d+),(-?\d+\.\d+)/
 
@@ -4111,6 +4111,37 @@ function MessageBubble({
                       {(() => {
                         const gps = extractGpsCoords(msg.content)
                         return gps ? <GpsPreview lat={gps.lat} lng={gps.lng} isMe={isMe} /> : null
+                      })()}
+                      {(() => {
+                        const buttonMatches = [...(msg.content || "").matchAll(/\[([^\]]+)\]/g)]
+                        if (buttonMatches.length > 0 && !msg.isDeleted) {
+                          return (
+                            <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                              {buttonMatches.map((m, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (onReply) onReply(msg)
+                                  }}
+                                  style={{
+                                    padding: "6px 12px",
+                                    borderRadius: "16px",
+                                    border: `1px solid ${isMe ? "rgba(255,255,255,0.4)" : "var(--accent)"}`,
+                                    background: isMe ? "rgba(255,255,255,0.15)" : "rgba(181, 123, 99, 0.12)",
+                                    color: isMe ? "#ffffff" : "var(--accent)",
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {m[1]}
+                                </button>
+                              ))}
+                            </div>
+                          )
+                        }
+                        return null
                       })()}
                     </span>
                   )}
