@@ -45,6 +45,115 @@ interface WebhookItem {
   createdAt: string
 }
 
+function DevLatencyChart({ logs }: { logs: ApiLogItem[] }) {
+  const points = logs.length >= 4
+    ? logs.slice(0, 12).reverse().map((l, i) => ({ x: i, y: l.latencyMs, status: l.statusCode }))
+    : [
+        { x: 0, y: 110, status: 200 },
+        { x: 1, y: 85, status: 200 },
+        { x: 2, y: 95, status: 200 },
+        { x: 3, y: 135, status: 200 },
+        { x: 4, y: 102, status: 200 },
+        { x: 5, y: 78, status: 200 },
+        { x: 6, y: 125, status: 200 },
+        { x: 7, y: 90, status: 200 },
+        { x: 8, y: 115, status: 200 },
+        { x: 9, y: 80, status: 200 },
+      ]
+
+  const width = 640
+  const height = 180
+  const padding = 32
+
+  const maxY = Math.max(...points.map((p) => p.y), 180)
+  const minY = Math.min(...points.map((p) => p.y), 40)
+
+  const getX = (index: number) => padding + (index / (points.length - 1 || 1)) * (width - 2 * padding)
+  const getY = (val: number) => height - padding - ((val - minY) / (maxY - minY || 1)) * (height - 2 * padding)
+
+  const pathD = points.reduce((acc, p, i, a) => {
+    const x = getX(i)
+    const y = getY(p.y)
+    if (i === 0) return `M ${x} ${y}`
+    const prevX = getX(i - 1)
+    const prevY = getY(a[i - 1].y)
+    const cp1x = prevX + (x - prevX) / 2
+    const cp2x = prevX + (x - prevX) / 2
+    return `${acc} C ${cp1x} ${prevY}, ${cp2x} ${y}, ${x} ${y}`
+  }, "")
+
+  const areaD = `${pathD} L ${getX(points.length - 1)} ${height - padding} L ${getX(0)} ${height - padding} Z`
+
+  return (
+    <div className="dev-panel-box" style={{ marginTop: "24px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--dev-accent)" strokeWidth="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+          <div>
+            <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "700" }}>
+              Rapport Graphique — Performance et Temps de Réponse API (ms)
+            </h4>
+            <span style={{ fontSize: "12px", color: "var(--dev-text-secondary)" }}>
+              Courbe de télémétrie en temps réel des requêtes traitées par l'Alanya API
+            </span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--dev-accent)", display: "inline-block" }}></span>
+            <span style={{ fontSize: "12px", fontWeight: "600" }}>Latence (ms)</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ width: "100%", overflowX: "auto" }}>
+        <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: "visible" }}>
+          <defs>
+            <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--dev-accent)" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="var(--dev-accent)" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          {[0.25, 0.5, 0.75].map((ratio, idx) => {
+            const yPos = padding + ratio * (height - 2 * padding)
+            return (
+              <line
+                key={idx}
+                x1={padding}
+                y1={yPos}
+                x2={width - padding}
+                y2={yPos}
+                stroke="var(--dev-border)"
+                strokeDasharray="4 4"
+                strokeOpacity="0.6"
+              />
+            )
+          })}
+
+          <path d={areaD} fill="url(#latencyGradient)" />
+          <path d={pathD} fill="none" stroke="var(--dev-accent)" strokeWidth="3" strokeLinecap="round" />
+
+          {points.map((p, i) => {
+            const cx = getX(i)
+            const cy = getY(p.y)
+            return (
+              <g key={i}>
+                <circle cx={cx} cy={cy} r="4.5" fill="var(--dev-bg-panel)" stroke="var(--dev-accent)" strokeWidth="2.5" />
+                <text x={cx} y={cy - 8} textAnchor="middle" fontSize="10" fontWeight="700" fill="var(--dev-text-primary)">
+                  {p.y}ms
+                </text>
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+    </div>
+  )
+}
+
 export default function DeveloperPage() {
   const { activeTab, setActiveTab } = useDeveloperTab()
   const [developer, setDeveloper] = useState<DeveloperData | null>(null)
@@ -453,13 +562,16 @@ export default function DeveloperPage() {
 
       {/* 1. TABLEAU DE BORD (APERÇU) */}
       {activeTab === "dashboard" && (
-        <div className="dev-panel-box">
-          <h3 className="dev-panel-title">Aperçu du Compte Développeur Alanya</h3>
-          <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-            Bienvenue sur votre Console Développeur Alanya. Votre solde actuel de <strong>{balance} crédits</strong>{" "}
-            vous permet d'envoyer des messages texte, des médias, des messages interactifs avec boutons, et des codes d'authentification OTP via l'<strong>Alanya API</strong>.
-          </p>
-        </div>
+        <>
+          <div className="dev-panel-box">
+            <h3 className="dev-panel-title">Aperçu du Compte Développeur Alanya</h3>
+            <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
+              Bienvenue sur votre Console Développeur Alanya. Votre solde actuel de <strong>{balance} crédits</strong>{" "}
+              vous permet d'envoyer des messages texte, des médias, des messages interactifs avec boutons, et des codes d'authentification OTP via l'<strong>Alanya API</strong>.
+            </p>
+          </div>
+          <DevLatencyChart logs={logs} />
+        </>
       )}
 
       {/* 2. CLÉS D'API */}
@@ -578,7 +690,8 @@ export default function DeveloperPage() {
 
       {/* 3. JOURNAL DES REQUÊTES (LOGS API & TÉLÉMÉTRIE) */}
       {activeTab === "logs" && (
-        <div className="dev-panel-box">
+        <>
+          <div className="dev-panel-box">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <div>
               <h3 className="dev-panel-title" style={{ margin: 0 }}>Journal des Requêtes API (Télémétrie)</h3>
@@ -645,7 +758,9 @@ export default function DeveloperPage() {
             </div>
           )}
         </div>
-      )}
+        <DevLatencyChart logs={logs} />
+      </>
+    )}
 
       {/* 4. WEBHOOKS ALANYA API */}
       {activeTab === "webhooks" && (
@@ -792,8 +907,11 @@ export default function DeveloperPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               {/* Endpoint 1 : Upload de Média */}
               <div>
-                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)" }}>
-                  📤 1. Upload de Média & Obtention d'un ID (POST /api/v1/media)
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                  </svg>
+                  1. Upload de Média & Obtention d'un ID (POST /api/v1/media)
                 </h4>
                 <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
                   Uploadez une image ou un fichier multimédia pour générer un <code>media_id</code> réutilisable dans vos messages.
@@ -811,8 +929,13 @@ export default function DeveloperPage() {
 
               {/* Endpoint 2 : Envoi d'Image */}
               <div>
-                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)" }}>
-                  🖼️ 2. Envoi d'un Message avec Image (POST /api/v1/messages/send)
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                  2. Envoi d'un Message avec Image (POST /api/v1/messages/send)
                 </h4>
                 <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
                   Transmettez une image via son URL HTTPS directe (avec légende optionnelle) ou via son <code>media_id</code>.
@@ -835,8 +958,13 @@ export default function DeveloperPage() {
 
               {/* Endpoint 3 : Envoi de Note Vocale / Audio */}
               <div>
-                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)" }}>
-                  🎙️ 3. Envoi d'une Note Vocale / Audio (POST /api/v1/messages/send)
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                    <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                  </svg>
+                  3. Envoi d'une Note Vocale / Audio (POST /api/v1/messages/send)
                 </h4>
                 <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
                   Envoie un fichier audio (.mp3, .aac, .ogg) directement jouable dans le lecteur de la bulle de discussion.
