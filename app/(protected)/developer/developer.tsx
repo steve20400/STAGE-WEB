@@ -64,7 +64,7 @@ export default function DeveloperPage() {
   const [newWsName, setNewWsName] = useState("")
   const [showNewWsModal, setShowNewWsModal] = useState(false)
   const [docLang, setDocLang] = useState<"curl" | "node" | "python" | "flutter">("curl")
-  const [docType, setDocType] = useState<"text" | "interactive" | "otp" | "webhook">("text")
+  const [docType, setDocType] = useState<"text" | "media" | "interactive" | "otp" | "webhook">("text")
   const [generatedRawKey, setGeneratedRawKey] = useState<string | null>(null)
   const [rechargeMsg, setRechargeMsg] = useState<string | null>(null)
   const [webhookMsg, setWebhookMsg] = useState<string | null>(null)
@@ -744,7 +744,7 @@ export default function DeveloperPage() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <h3 className="dev-panel-title" style={{ margin: 0 }}>Documentation WhatsApp Cloud API Standard</h3>
             <div style={{ display: "flex", gap: "8px" }}>
-              {(["text", "interactive", "otp", "webhook"] as const).map((type) => (
+              {(["text", "media", "interactive", "otp", "webhook"] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setDocType(type)}
@@ -759,6 +759,7 @@ export default function DeveloperPage() {
                   }}
                 >
                   {type === "text" && "Message Texte"}
+                  {type === "media" && "Médias & Vocaux"}
                   {type === "interactive" && "Boutons Interactifs"}
                   {type === "otp" && "Service OTP 2FA"}
                   {type === "webhook" && "Format Webhook"}
@@ -778,10 +779,50 @@ export default function DeveloperPage() {
   -H "Authorization: Bearer ${activeRawKey}" \\
   -d '{
     "messaging_product": "alanya",
-    "to": "237600000000",
+    "to": "600001",
     "type": "text",
     "text": {
       "body": "Bonjour depuis WhatsApp Cloud API sur Alanya !"
+    }
+  }'`}
+            </div>
+          )}
+
+          {docType === "media" && (
+            <div className="dev-code-block">
+{`// 1. Upload d'un Média pour obtenir un media_id
+curl -X POST https://alanyavox.com/api/v1/media \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${activeRawKey}" \\
+  -d '{
+    "url": "https://alanyavox.com/assets/sample.png",
+    "mimeType": "image/png"
+  }'
+
+// 2. Envoi d'un message avec Image
+curl -X POST https://alanyavox.com/api/v1/messages/send \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${activeRawKey}" \\
+  -d '{
+    "messaging_product": "alanya",
+    "to": "600001",
+    "type": "image",
+    "image": {
+      "link": "https://alanyavox.com/assets/sample.png",
+      "caption": "Voici le visuel d'intégration Alanya"
+    }
+  }'
+
+// 3. Envoi d'une Note Vocale / Audio
+curl -X POST https://alanyavox.com/api/v1/messages/send \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${activeRawKey}" \\
+  -d '{
+    "messaging_product": "alanya",
+    "to": "600001",
+    "type": "audio",
+    "audio": {
+      "link": "https://alanyavox.com/assets/sample_vocal.mp3"
     }
   }'`}
             </div>
