@@ -29,6 +29,8 @@ import StatusPage from "../app/(protected)/status/status"
 import MeetingsPage from "../app/(protected)/meetings/meetings"
 import MeetingRoomPage from "../app/(protected)/meetings/[meetingId]/meeting-room"
 import DeveloperPage from "../app/(protected)/developer/developer"
+import DeveloperLayout from "../app/(protected)/developer/developer-layout"
+import DeveloperAuthPage from "../app/(public)/developer/auth"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -257,13 +259,15 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     }
                   />
 
+                  <Route path="/developer/auth" element={<DeveloperAuthPage />} />
+                  <Route path="/developer" element={<Navigate to="/developer/dashboard" replace />} />
                   <Route
-                    path="/developer"
+                    path="/developer/dashboard"
                     element={
                       <ProtectedRoute>
-                        <ProtectedLayout>
+                        <DeveloperLayout>
                           <DeveloperPage />
-                        </ProtectedLayout>
+                        </DeveloperLayout>
                       </ProtectedRoute>
                     }
                   />

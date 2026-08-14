@@ -1,4 +1,4 @@
-﻿import { useTranslation } from "../../../src/i18n"
+import { useTranslation } from "../../../src/i18n"
 import { Link } from "react-router-dom"
 import { ThemeToggle } from "../../../src/components/theme-toggle"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
@@ -26,6 +26,9 @@ export default function WelcomePage() {
             <a href="#features">{t("welcome_nav_features")}</a>
             <Link to="/login" className="btn-nav">
               {t("login")}
+            </Link>
+            <Link to="/developer/auth" className="btn-nav" style={{ background: "var(--accent, #0284c7)", color: "#ffffff", borderColor: "var(--accent, #0284c7)", fontWeight: 600 }}>
+              ⚡ Espace Développeur
             </Link>
           </div>
         </nav>

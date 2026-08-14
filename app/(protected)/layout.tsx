@@ -225,7 +225,6 @@ const NAV_ITEMS: Array<Omit<NavItem, "label"> & { labelKey: Cle }> = [
   { href: "/meetings", labelKey: "meetings", icon: <Icons.Meeting /> },
   { href: "/ai", labelKey: "assistant", icon: <Icons.Sparkle /> },
   { href: "/contacts", labelKey: "contacts", icon: <Icons.Contacts /> },
-  { href: "/developer", labelKey: "settings", icon: <Icons.Code /> },
 ]
 
 const UNREAD_COUNTS: Record<string, number> = {}

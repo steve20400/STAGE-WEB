@@ -1,0 +1,181 @@
+/* Page d'Authentification Développeur */
+.dev-auth-root {
+  min-height: 100vh;
+  background-color: var(--bg-primary, #0f172a);
+  color: var(--text-primary, #f8fafc);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dev-auth-header {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+}
+
+.dev-auth-card {
+  width: 100%;
+  max-width: 480px;
+  background-color: var(--bg-secondary, #1e293b);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+}
+
+.dev-auth-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.dev-auth-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.dev-auth-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent, #38bdf8);
+  margin: 0;
+}
+
+.dev-auth-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--border-color, #334155);
+  margin-bottom: 24px;
+}
+
+.dev-auth-tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--text-secondary, #94a3b8);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+}
+
+.dev-auth-tab.active {
+  color: var(--accent, #38bdf8);
+  border-bottom-color: var(--accent, #38bdf8);
+}
+
+.dev-wizard-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.dev-step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--bg-primary, #0f172a);
+  border: 2px solid var(--border-color, #334155);
+  color: var(--text-secondary, #94a3b8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  z-index: 1;
+}
+
+.dev-step-dot.active {
+  border-color: var(--accent, #38bdf8);
+  color: #ffffff;
+  background-color: var(--accent, #0284c7);
+}
+
+.dev-step-dot.completed {
+  border-color: #10b981;
+  color: #ffffff;
+  background-color: #10b981;
+}
+
+.dev-input-group {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dev-input-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.dev-input-field {
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #334155);
+  background-color: var(--bg-primary, #0f172a);
+  color: var(--text-primary, #f8fafc);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.dev-input-field:focus {
+  border-color: var(--accent, #38bdf8);
+}
+
+.dev-otp-container {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.dev-otp-box {
+  width: 48px;
+  height: 54px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 2px solid var(--border-color, #334155);
+  background-color: var(--bg-primary, #0f172a);
+  color: var(--accent, #38bdf8);
+}
+
+.dev-otp-box:focus {
+  border-color: var(--accent, #38bdf8);
+}
+
+.dev-submit-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background-color: var(--accent, #0284c7);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: opacity 0.2s ease;
+}
+
+.dev-submit-btn:hover {
+  opacity: 0.9;
+}
