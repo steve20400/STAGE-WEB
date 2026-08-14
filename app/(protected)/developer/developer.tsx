@@ -257,11 +257,11 @@ export default function DeveloperPage() {
             {activeTab === "dashboard" && "Tableau de bord"}
             {activeTab === "keys" && "Gestion des Clés d'API"}
             {activeTab === "logs" && "Journal des Requêtes (Logs API)"}
-            {activeTab === "webhooks" && "Webhooks & Callbacks WhatsApp API"}
+            {activeTab === "webhooks" && "Webhooks & Callbacks Alanya API"}
             {activeTab === "sandbox" && "Recharge Sandbox Gratuit"}
-            {activeTab === "docs" && "Documentation & Conformance WhatsApp Cloud API"}
+            {activeTab === "docs" && "Documentation & Spécification Alanya API"}
           </h1>
-          <p className="dev-main-subtitle">Conforme au standard WhatsApp Business Cloud API — Alanya Dev</p>
+          <p className="dev-main-subtitle">Spécification officielle Alanya API Graph v1</p>
         </div>
 
         <div className="dev-header-actions" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
@@ -454,10 +454,10 @@ export default function DeveloperPage() {
       {/* 1. TABLEAU DE BORD (APERÇU) */}
       {activeTab === "dashboard" && (
         <div className="dev-panel-box">
-          <h3 className="dev-panel-title">Aperçu du Compte Développeur (WhatsApp Compatible)</h3>
+          <h3 className="dev-panel-title">Aperçu du Compte Développeur Alanya</h3>
           <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
             Bienvenue sur votre Console Développeur Alanya. Votre solde actuel de <strong>{balance} crédits</strong>{" "}
-            vous permet d'envoyer des messages texte, des médias, des messages interactifs avec boutons, et des codes d'authentification OTP conformes au standard **WhatsApp Cloud API**.
+            vous permet d'envoyer des messages texte, des médias, des messages interactifs avec boutons, et des codes d'authentification OTP via l'<strong>Alanya API</strong>.
           </p>
         </div>
       )}
@@ -647,10 +647,10 @@ export default function DeveloperPage() {
         </div>
       )}
 
-      {/* 4. WEBHOOKS WHATSAPP API */}
+      {/* 4. WEBHOOKS ALANYA API */}
       {activeTab === "webhooks" && (
         <div className="dev-panel-box">
-          <h3 className="dev-panel-title">Configuration des Webhooks (Callbacks WhatsApp)</h3>
+          <h3 className="dev-panel-title">Configuration des Webhooks (Callbacks Alanya)</h3>
           <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0" }}>
             Recevez les statuts de livraison en temps réel (`sent`, `delivered`, `read`) et les messages entrants sur votre serveur.
           </p>
@@ -738,11 +738,11 @@ export default function DeveloperPage() {
         </div>
       )}
 
-      {/* 6. DOCUMENTATION & CONFORMANCE WHATSAPP CLOUD API */}
+      {/* 6. DOCUMENTATION & SPÉCIFICATION ALANYA API */}
       {activeTab === "docs" && (
         <div className="dev-panel-box">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <h3 className="dev-panel-title" style={{ margin: 0 }}>Documentation WhatsApp Cloud API Standard</h3>
+            <h3 className="dev-panel-title" style={{ margin: 0 }}>Documentation Officielle Alanya API</h3>
             <div style={{ display: "flex", gap: "8px" }}>
               {(["text", "media", "interactive", "otp", "webhook"] as const).map((type) => (
                 <button
@@ -769,7 +769,7 @@ export default function DeveloperPage() {
           </div>
 
           <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0" }}>
-            Copiez le code prêt à exécuter conforme à WhatsApp Cloud API (Meta Graph API v20.0) :
+            Exemples de requêtes prêts à exécuter pour l'API Alanya (spécification v1) :
           </p>
 
           {docType === "text" && (
@@ -782,25 +782,43 @@ export default function DeveloperPage() {
     "to": "600001",
     "type": "text",
     "text": {
-      "body": "Bonjour depuis WhatsApp Cloud API sur Alanya !"
+      "body": "Bonjour depuis Alanya API !"
     }
   }'`}
             </div>
           )}
 
           {docType === "media" && (
-            <div className="dev-code-block">
-{`// 1. Upload d'un Média pour obtenir un media_id
-curl -X POST https://alanyavox.com/api/v1/media \\
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              {/* Endpoint 1 : Upload de Média */}
+              <div>
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)" }}>
+                  📤 1. Upload de Média & Obtention d'un ID (POST /api/v1/media)
+                </h4>
+                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
+                  Uploadez une image ou un fichier multimédia pour générer un <code>media_id</code> réutilisable dans vos messages.
+                </p>
+                <div className="dev-code-block">
+{`curl -X POST https://alanyavox.com/api/v1/media \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${activeRawKey}" \\
   -d '{
     "url": "https://alanyavox.com/assets/sample.png",
     "mimeType": "image/png"
-  }'
+  }'`}
+                </div>
+              </div>
 
-// 2. Envoi d'un message avec Image
-curl -X POST https://alanyavox.com/api/v1/messages/send \\
+              {/* Endpoint 2 : Envoi d'Image */}
+              <div>
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)" }}>
+                  🖼️ 2. Envoi d'un Message avec Image (POST /api/v1/messages/send)
+                </h4>
+                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
+                  Transmettez une image via son URL HTTPS directe (avec légende optionnelle) ou via son <code>media_id</code>.
+                </p>
+                <div className="dev-code-block">
+{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${activeRawKey}" \\
   -d '{
@@ -811,10 +829,20 @@ curl -X POST https://alanyavox.com/api/v1/messages/send \\
       "link": "https://alanyavox.com/assets/sample.png",
       "caption": "Voici le visuel d'intégration Alanya"
     }
-  }'
+  }'`}
+                </div>
+              </div>
 
-// 3. Envoi d'une Note Vocale / Audio
-curl -X POST https://alanyavox.com/api/v1/messages/send \\
+              {/* Endpoint 3 : Envoi de Note Vocale / Audio */}
+              <div>
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)" }}>
+                  🎙️ 3. Envoi d'une Note Vocale / Audio (POST /api/v1/messages/send)
+                </h4>
+                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
+                  Envoie un fichier audio (.mp3, .aac, .ogg) directement jouable dans le lecteur de la bulle de discussion.
+                </p>
+                <div className="dev-code-block">
+{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${activeRawKey}" \\
   -d '{
@@ -825,6 +853,8 @@ curl -X POST https://alanyavox.com/api/v1/messages/send \\
       "link": "https://alanyavox.com/assets/sample_vocal.mp3"
     }
   }'`}
+                </div>
+              </div>
             </div>
           )}
 
@@ -835,15 +865,29 @@ curl -X POST https://alanyavox.com/api/v1/messages/send \\
   -H "Authorization: Bearer ${activeRawKey}" \\
   -d '{
     "messaging_product": "alanya",
-    "to": "237600000000",
+    "to": "600001",
     "type": "interactive",
     "interactive": {
       "type": "button",
-      "body": { "text": "Confirmez-vous votre rendez-vous ?" },
+      "body": {
+        "text": "Confirmez-vous votre rendez-vous ?"
+      },
       "action": {
         "buttons": [
-          { "type": "reply", "reply": { "id": "btn_yes", "title": "Confirmer" } },
-          { "type": "reply", "reply": { "id": "btn_no", "title": "Annuler" } }
+          {
+            "type": "reply",
+            "reply": {
+              "id": "btn_yes",
+              "title": "Confirmer"
+            }
+          },
+          {
+            "type": "reply",
+            "reply": {
+              "id": "btn_no",
+              "title": "Annuler"
+            }
+          }
         ]
       }
     }
@@ -852,24 +896,36 @@ curl -X POST https://alanyavox.com/api/v1/messages/send \\
           )}
 
           {docType === "otp" && (
-            <div className="dev-code-block">
-{`// 1. Génération et Envoi de l'OTP
-curl -X POST https://alanyavox.com/api/v1/auth/otp/send \\
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <h4 style={{ margin: "0 0 6px 0", fontSize: "13px", fontWeight: "700" }}>1. Génération & Envoi de l'OTP</h4>
+                <div className="dev-code-block">
+{`curl -X POST https://alanyavox.com/api/v1/auth/otp/send \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${activeRawKey}" \\
-  -d '{ "recipientNumber": "600001" }'
-
-// 2. Vérification de l'OTP
-curl -X POST https://alanyavox.com/api/v1/auth/otp/verify \\
+  -d '{
+    "recipientNumber": "600001"
+  }'`}
+                </div>
+              </div>
+              <div>
+                <h4 style={{ margin: "0 0 6px 0", fontSize: "13px", fontWeight: "700" }}>2. Vérification du Code OTP</h4>
+                <div className="dev-code-block">
+{`curl -X POST https://alanyavox.com/api/v1/auth/otp/verify \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${activeRawKey}" \\
-  -d '{ "recipientNumber": "600001", "code": "123456" }'`}
+  -d '{
+    "recipientNumber": "600001",
+    "code": "123456"
+  }'`}
+                </div>
+              </div>
             </div>
           )}
 
           {docType === "webhook" && (
             <div className="dev-code-block">
-{`// Exemple de Callback de Statut reçu sur votre Webhook (WhatsApp Standard)
+{`// Exemple de Callback de Statut reçu sur votre Webhook Alanya
 {
   "object": "alanya_business_account",
   "entry": [
