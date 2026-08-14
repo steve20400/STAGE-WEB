@@ -1,4 +1,4 @@
-﻿import { useCallback, useState } from "react"
+import { useCallback, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../src/components/auth-provider"
 import { ThemeToggle } from "../../src/components/theme-toggle"
@@ -177,6 +177,21 @@ const Icons = {
       <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   ),
+  Code: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </svg>
+  ),
   Menu: () => (
     <svg
       width="18"
@@ -210,6 +225,7 @@ const NAV_ITEMS: Array<Omit<NavItem, "label"> & { labelKey: Cle }> = [
   { href: "/meetings", labelKey: "meetings", icon: <Icons.Meeting /> },
   { href: "/ai", labelKey: "assistant", icon: <Icons.Sparkle /> },
   { href: "/contacts", labelKey: "contacts", icon: <Icons.Contacts /> },
+  { href: "/developer", labelKey: "settings", icon: <Icons.Code /> },
 ]
 
 const UNREAD_COUNTS: Record<string, number> = {}

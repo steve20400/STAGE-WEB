@@ -28,6 +28,7 @@ import ContactsPage from "../app/(protected)/contacts/contacts"
 import StatusPage from "../app/(protected)/status/status"
 import MeetingsPage from "../app/(protected)/meetings/meetings"
 import MeetingRoomPage from "../app/(protected)/meetings/[meetingId]/meeting-room"
+import DeveloperPage from "../app/(protected)/developer/developer"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -256,6 +257,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     }
                   />
 
+                  <Route
+                    path="/developer"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <DeveloperPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="/settings"
                     element={
