@@ -28,7 +28,7 @@ export default function WelcomePage() {
               {t("login")}
             </Link>
             <Link to="/developer/auth" className="btn-nav" style={{ background: "var(--accent, #0284c7)", color: "#ffffff", borderColor: "var(--accent, #0284c7)", fontWeight: 600 }}>
-              ⚡ Espace Développeur
+              Espace Développeur
             </Link>
           </div>
         </nav>
