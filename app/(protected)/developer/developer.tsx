@@ -436,7 +436,7 @@ export default function DeveloperPage() {
   -H "X-Api-Key: ak_test_votre_cle_api_ici" \\
   -d '{
     "recipientNumber": "600001",
-    "content": "Bonjour depuis l'API Développeur Alanya"
+    "content": "Bonjour depuis Alanya"
   }'`}
           </div>
         </div>
