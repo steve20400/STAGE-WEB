@@ -12,6 +12,7 @@ import {
   trancherDemandeInvitation,
   reglerInvitationAuto,
   inviterAReunion,
+  demanderInvitation,
   trouverProprietaireAlanya,
   type ProprietaireAlanya,
   type DemandeInvitation,
@@ -25,6 +26,7 @@ import {
 } from "../../../../src/services/call-manager"
 import { OUTPUT_VOLUME } from "../../../../src/services/audio-output"
 import { useCallState } from "../../../../src/hooks/use-call"
+import { useContacts } from "../../../../src/hooks/use-contacts"
 import { getMyUserId, loadSessionUser, toInitials } from "../../../../src/data/session-user"
 import {
   sendMeetingHand,
@@ -33,6 +35,12 @@ import {
 import { useTranslation } from "../../../../src/i18n"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
+import {
+  formatAlanyaNumber,
+  isValidAlanyaNumber,
+  normalizeAlanyaNumber,
+  ALANYA_NUMBER_MAX_LENGTH,
+} from "../../../../src/lib/alanya-number"
 import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
@@ -167,6 +175,22 @@ export default function MeetingRoomPage() {
    * et rien ne le dit : on n'a alors ni explication, ni moyen de reessayer.
    */
   const [sonBloque, setSonBloque] = useState(false)
+
+  /**
+   * Panneau ouvert sous la barre : soit « ajouter », soit « menu ». Un seul a
+   * la fois — basculer ouvre l'un et ferme l'autre.
+   */
+  const [panneauOuvert, setPanneauOuvert] = useState<null | "ajouter" | "menu">(null)
+  const panneauRef = useRef<HTMLDivElement | null>(null)
+
+  /** Recherche dans la liste des contacts (panneau ajout). */
+  const [rechercheContact, setRechercheContact] = useState("")
+  /** Onglet actif dans le panneau d'ajout : contacts ou pavé numérique. */
+  const [ongletAjout, setOngletAjout] = useState<"contacts" | "numero">("contacts")
+  /** Chiffres composés dans le pavé Alanya ID du panneau d'ajout. */
+  const [chiffresAjout, setChiffresAjout] = useState("")
+
+  const { contacts } = useContacts()
 
   /**
    * Dans la salle, et dans CELLE-CI. Le gestionnaire d'appels n'en tient qu'une
@@ -435,6 +459,86 @@ export default function MeetingRoomPage() {
     return () => window.clearTimeout(timer)
   }, [numeroDirect])
 
+  /** Propriétaire du numéro composé dans le PANNEAU d'ajout. */
+  const [proprietaireAjout, setProprietaireAjout] = useState<ProprietaireAlanya | null>(null)
+  useEffect(() => {
+    const numero = chiffresAjout.replace(/\D/g, "")
+    setProprietaireAjout(null)
+    if (!/^(\d{3,10})$/.test(numero)) return
+    const timer = window.setTimeout(() => {
+      void trouverProprietaireAlanya(numero)
+        .then(setProprietaireAjout)
+        .catch(() => undefined)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [chiffresAjout])
+
+  /** Contacts filtrés par la recherche dans le panneau d'ajout. */
+  const contactsFiltres = useMemo(() => {
+    const q = rechercheContact.trim().toLowerCase()
+    if (!q) return contacts
+    return contacts.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q)
+    )
+  }, [contacts, rechercheContact])
+
+  /** Fermeture par clic extérieur : si on clique hors du panneau, on le ferme. */
+  useEffect(() => {
+    if (!panneauOuvert) return
+    const surClicExterieur = (e: PointerEvent) => {
+      const cible = e.target as Node | null
+      if (!cible) return
+      if (panneauRef.current?.contains(cible)) return
+      // On ne ferme pas si on clique sur un bouton de contrôle (il gère lui-même)
+      if (cible instanceof Element && cible.closest(".meeting-controles")) return
+      setPanneauOuvert(null)
+    }
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanneauOuvert(null)
+    }
+    document.addEventListener("pointerdown", surClicExterieur)
+    document.addEventListener("keydown", surTouche)
+    return () => {
+      document.removeEventListener("pointerdown", surClicExterieur)
+      document.removeEventListener("keydown", surTouche)
+    }
+  }, [panneauOuvert])
+
+  /** Ajouter une personne depuis le panneau — contacts ou pavé. */
+  const ajouterPersonneParNumero = async (numero: string, nom: string) => {
+    if (!meetingId) return
+    const num = normalizeAlanyaNumber(numero) || numero
+    try {
+      if (meeting?.jeSuisOrganisateur) {
+        await inviterAReunion(Number(meetingId), [num])
+        success(t("meet_invite_sent", { name: nom }))
+      } else {
+        await demanderInvitation(Number(meetingId), num)
+        success(t("meet_invite_requested"))
+      }
+      setPanneauOuvert(null)
+      setRechercheContact("")
+      setChiffresAjout("")
+      setOngletAjout("contacts")
+      // Recharger la réunion pour mettre à jour la liste
+      setMeeting(await fetchMeeting(Number(meetingId)))
+    } catch (err) {
+      showError(t("error"), err instanceof Error ? err.message : "Invitation impossible")
+    }
+  }
+
+  /** Valider le numéro composé dans le panneau d'ajout. */
+  const validerNumeroAjout = () => {
+    if (!isValidAlanyaNumber(chiffresAjout)) return
+    const contactMatch = contacts.find(
+      (c) => normalizeAlanyaNumber(c.phone) === chiffresAjout
+    )
+    void ajouterPersonneParNumero(
+      chiffresAjout,
+      contactMatch?.name ?? formatAlanyaNumber(chiffresAjout)
+    )
+  }
+
   const inviterDirectement = async () => {
     if (!meetingId) return
     const numero = numeroDirect.replace(/\D/g, "")
@@ -584,6 +688,23 @@ export default function MeetingRoomPage() {
           ✕
         </button>
       </div>
+
+      {/* NOTIFICATIONS D'INVITATION — positionnées AU-DESSUS du media, pas dans la barre du bas */}
+      {meeting.jeSuisOrganisateur && demandes.length > 0 && enSalle && (
+        <section className="meeting-invite-banner" aria-label="Demandes d'invitation">
+          {demandes.map((d) => (
+            <div key={d.id} className="meeting-invite-banner-item">
+              <span>
+                {d.demandeur.nom} souhaite inviter {d.invite.nom}
+              </span>
+              <div className="meeting-invite-banner-actions">
+                <button onClick={() => void traiterDemande(d.id, true)}>✓</button>
+                <button onClick={() => void traiterDemande(d.id, false)}>✕</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/*
         LE MEDIA DE LA SALLE.
@@ -895,7 +1016,9 @@ export default function MeetingRoomPage() {
         Dans un conteneur flex, leur `grid-area` reste sans effet.
       */}
       <div className="meeting-barre">
-        {meeting.jeSuisOrganisateur && demandes.length > 0 && (
+        {/* Invitation requests moved above the media; only show them in the old
+            position when NOT in the room */}
+        {meeting.jeSuisOrganisateur && demandes.length > 0 && !enSalle && (
           <section className="meeting-invite-requests" aria-label="Demandes d'invitation">
             <div className="meeting-invite-head">
               <strong>Demandes d'invitation</strong>
@@ -994,6 +1117,43 @@ export default function MeetingRoomPage() {
                 )}
               </button>
             )}
+
+            {/* Bouton « Ajouter une personne » — visible pour tout le monde */}
+            <button
+              className={`meeting-controle${panneauOuvert === "ajouter" ? " actif" : ""}`}
+              onClick={() =>
+                setPanneauOuvert((p) => (p === "ajouter" ? null : "ajouter"))
+              }
+              title={t("meet_add_person")}
+              aria-label={t("meet_add_person")}
+              aria-expanded={panneauOuvert === "ajouter"}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <line x1="20" y1="8" x2="20" y2="14" />
+                <line x1="23" y1="11" x2="17" y2="11" />
+              </svg>
+            </button>
+
+            {/* Bouton « Menu ⋮ » — organisateur seulement */}
+            {meeting.jeSuisOrganisateur && (
+              <button
+                className={`meeting-controle${panneauOuvert === "menu" ? " actif" : ""}`}
+                onClick={() =>
+                  setPanneauOuvert((p) => (p === "menu" ? null : "menu"))
+                }
+                title={t("meet_settings")}
+                aria-label={t("meet_settings")}
+                aria-expanded={panneauOuvert === "menu"}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="2" />
+                  <circle cx="12" cy="12" r="2" />
+                  <circle cx="12" cy="19" r="2" />
+                </svg>
+              </button>
+            )}
           </div>
         )}
 
@@ -1022,6 +1182,136 @@ export default function MeetingRoomPage() {
           )}
         </div>
       </div>
+
+      {/* PANNEAU D'AJOUT DE PERSONNE — sous la barre, au-dessus du chat */}
+      {panneauOuvert === "ajouter" && enSalle && (
+        <div className="meeting-panneau meeting-panneau-ajout" ref={panneauRef}>
+          <div className="meeting-panneau-titre">{t("meet_add_person")}</div>
+
+          <div className="meeting-panneau-onglets">
+            <button
+              className={ongletAjout === "contacts" ? "on" : ""}
+              onClick={() => setOngletAjout("contacts")}
+            >
+              {t("contacts")}
+            </button>
+            <button
+              className={ongletAjout === "numero" ? "on" : ""}
+              onClick={() => setOngletAjout("numero")}
+            >
+              {t("dial_an_id")}
+            </button>
+          </div>
+
+          {ongletAjout === "contacts" ? (
+            <>
+              <input
+                className="meeting-panneau-search"
+                type="text"
+                autoFocus
+                placeholder={t("search_name_or_number")}
+                value={rechercheContact}
+                onChange={(e) => setRechercheContact(e.target.value)}
+              />
+              <div className="meeting-panneau-list">
+                {contactsFiltres.length > 0 ? (
+                  contactsFiltres.map((c) => (
+                    <button
+                      key={c.id}
+                      className="meeting-panneau-contact"
+                      onClick={() => void ajouterPersonneParNumero(c.phone, c.name)}
+                    >
+                      <b>{c.name}</b>
+                      <span>{c.phone}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="meeting-panneau-vide">{t("meet_no_contact_found")}</div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="meeting-panneau-pave">
+              <div className="meeting-panneau-numero">
+                {chiffresAjout ? (
+                  formatAlanyaNumber(chiffresAjout)
+                ) : (
+                  <span className="meeting-panneau-numero-vide">Alanya ID</span>
+                )}
+              </div>
+              <div className="meeting-panneau-aide">
+                {chiffresAjout.length === 0
+                  ? t("dial_hint_number")
+                  : proprietaireAjout
+                    ? proprietaireAjout.pseudo ?? proprietaireAjout.publicNumber
+                    : isValidAlanyaNumber(chiffresAjout)
+                      ? t("number_complete")
+                      : t("digits_too_short", { n: chiffresAjout.length })}
+              </div>
+              <div className="meeting-panneau-touches">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""].map(
+                  (key, index) =>
+                    key ? (
+                      <button
+                        key={key}
+                        onClick={() =>
+                          setChiffresAjout((a) =>
+                            normalizeAlanyaNumber(a + key).slice(0, ALANYA_NUMBER_MAX_LENGTH)
+                          )
+                        }
+                      >
+                        {key}
+                      </button>
+                    ) : (
+                      <span key={`v-${index}`} aria-hidden />
+                    )
+                )}
+              </div>
+              <div className="meeting-panneau-pave-actions">
+                <button
+                  onClick={() => setChiffresAjout((a) => a.slice(0, -1))}
+                  disabled={chiffresAjout.length === 0}
+                >
+                  ⌫ {t("erase")}
+                </button>
+                <button
+                  onClick={validerNumeroAjout}
+                  disabled={!isValidAlanyaNumber(chiffresAjout)}
+                >
+                  {meeting?.jeSuisOrganisateur
+                    ? t("invite_this_number")
+                    : t("meet_invite_requested")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <button
+            className="meeting-panneau-fermer"
+            onClick={() => setPanneauOuvert(null)}
+          >
+            {t("cancel")}
+          </button>
+        </div>
+      )}
+
+      {/* PANNEAU DE PARAMÈTRES — organisateur seulement */}
+      {panneauOuvert === "menu" && enSalle && meeting.jeSuisOrganisateur && (
+        <div className="meeting-panneau meeting-panneau-menu" ref={panneauRef}>
+          <div className="meeting-panneau-titre">{t("meet_settings")}</div>
+          <label className="meeting-panneau-toggle">
+            <input
+              type="checkbox"
+              checked={meeting.invitationAuto}
+              onChange={(e) => void changerModeInvitation(e.target.checked)}
+            />
+            <span>
+              <strong>{t("meet_auto_invite")}</strong>
+              <small>{t("meet_auto_invite_hint")}</small>
+            </span>
+          </label>
+        </div>
+      )}
     </div>
   )
 }

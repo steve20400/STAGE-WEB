@@ -33,12 +33,16 @@
  * les cadres, bornee en hauteur, avec son propre defilement.
  */
 .meeting-room-root.en-salle {
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   grid-template-areas:
     "entete entete"
+    "banner banner"
     "media  fil"
     "infos  fil"
     "actions fil";
+}
+.meeting-room-root.en-salle .meeting-invite-banner {
+  grid-area: banner;
 }
 .meeting-room-root.en-salle .meeting-info {
   /* Bornee, sinon l'annuaire repousse les visages hors de l'ecran. */
@@ -532,9 +536,10 @@
      restent grandes — une ou deux par ligne — et l'on defile pour voir les
      autres, exactement comme en appel video a plusieurs. */
   .meeting-room-root.en-salle {
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
       "entete"
+      "banner"
       "media"
       "infos"
       "actions";
@@ -953,5 +958,322 @@
   }
   .meeting-room-root .participant-name {
     font-size: 12px;
+  }
+}
+
+/* ---------- Bandeau d'invitation au-dessus de la vidéo ---------- */
+
+.meeting-room-root .meeting-invite-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(var(--accent-rgb, 99, 102, 241), 0.1), rgba(var(--accent-rgb, 99, 102, 241), 0.04));
+  border: 1px solid var(--accent-border, var(--border-subtle));
+  animation: bannerSlide 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes bannerSlide {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.meeting-room-root .meeting-invite-banner-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  padding: 4px 0;
+}
+.meeting-room-root .meeting-invite-banner-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.meeting-room-root .meeting-invite-banner-actions button {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s, background 0.15s;
+}
+.meeting-room-root .meeting-invite-banner-actions button:first-child {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.meeting-room-root .meeting-invite-banner-actions button:first-child:hover {
+  filter: brightness(1.1);
+}
+.meeting-room-root .meeting-invite-banner-actions button:last-child {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+.meeting-room-root .meeting-invite-banner-actions button:last-child:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ---------- Panneaux flottants (ajout + paramètres) ---------- */
+
+.meeting-panneau {
+  position: fixed;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(480px, 60vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  overflow: hidden;
+  animation: panneauEntree 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes panneauEntree {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.meeting-panneau-titre {
+  padding: 14px 16px 10px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.meeting-panneau-fermer {
+  padding: 10px 16px;
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  background: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.meeting-panneau-fermer:hover {
+  background: var(--bg-hover);
+}
+
+/* Onglets contacts / pavé */
+.meeting-panneau-onglets {
+  display: flex;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.meeting-panneau-onglets button {
+  flex: 1;
+  padding: 10px 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+}
+.meeting-panneau-onglets button.on {
+  color: var(--accent);
+}
+.meeting-panneau-onglets button.on::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.meeting-panneau-onglets button:hover {
+  color: var(--text-primary);
+}
+
+/* Recherche contacts */
+.meeting-panneau-search {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+.meeting-panneau-search::placeholder {
+  color: var(--text-faint);
+}
+
+/* Liste de contacts */
+.meeting-panneau-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  max-height: 220px;
+}
+.meeting-panneau-contact {
+  display: flex;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  transition: background 0.12s;
+}
+.meeting-panneau-contact:hover {
+  background: var(--bg-hover);
+}
+.meeting-panneau-contact b {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meeting-panneau-contact span {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.meeting-panneau-vide {
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* Pavé numérique */
+.meeting-panneau-pave {
+  padding: 12px 16px;
+}
+.meeting-panneau-numero {
+  text-align: center;
+  min-height: 28px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+}
+.meeting-panneau-numero-vide {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text-faint);
+}
+.meeting-panneau-aide {
+  text-align: center;
+  min-height: 18px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.meeting-panneau-touches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  max-width: 220px;
+  margin: 0 auto;
+}
+.meeting-panneau-touches button {
+  height: 38px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.meeting-panneau-touches button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-border);
+}
+.meeting-panneau-pave-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  max-width: 220px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.meeting-panneau-pave-actions button {
+  flex: 1;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s, background 0.15s;
+}
+.meeting-panneau-pave-actions button:last-child {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.meeting-panneau-pave-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Panneau de paramètres */
+.meeting-panneau-toggle {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.meeting-panneau-toggle input {
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+.meeting-panneau-toggle small {
+  display: block;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.35;
+}
+
+/* Responsif panneaux */
+@media (max-width: 900px) {
+  .meeting-panneau {
+    bottom: 80px;
+    width: calc(100vw - 24px);
+  }
+  .meeting-room-root .meeting-invite-banner {
+    padding: 6px 12px;
+  }
+  .meeting-room-root .meeting-invite-banner-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 }
