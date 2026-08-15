@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../src/components/auth-provider"
 import { ThemeToggle } from "../../src/components/theme-toggle"
@@ -12,6 +12,7 @@ import {
   rejectIncomingCall,
 } from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
+import { isAgent as checkIsAgent } from "../../src/services/queue-service"
 import { avatarDisplaySrc } from "../../src/lib/avatar"
 import { useDrawerSwipe } from "../../src/hooks/use-drawer-swipe"
 import { useTranslation, type Cle } from "../../src/i18n"
@@ -259,6 +260,20 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
   const { t } = useTranslation()
   const pathname = location.pathname
 
+  // Décide seulement l'AFFICHAGE du lien "Clients abandonnés" — un
+  // non-agent ne doit rien voir (demande user 15/08/2026), pas même un
+  // message "réservé". La vraie garde reste le 403 serveur.
+  const [isAgent, setIsAgent] = useState(false)
+  useEffect(() => {
+    let annule = false
+    void checkIsAgent().then((v) => {
+      if (!annule) setIsAgent(v)
+    })
+    return () => {
+      annule = true
+    }
+  }, [])
+
   const user = {
     name: sessionUser?.name ?? t("default_user_name"),
     email: sessionUser?.email ?? "",
@@ -335,17 +350,20 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
 
         <div className="sb-nav-section">{t("nav_section_account")}</div>
 
-        {/* Reserve aux agents/centres cote serveur (403 sinon) — pas de
-            condition ici, cf. AbandonedClientsPage (demande user 15/08/2026). */}
-        <Link
-          to="/abandoned-clients"
-          className={`sb-link ${pathname === "/abandoned-clients" ? "active" : ""}`}
-          onClick={onClose}
-          title="Clients abandonnés"
-        >
-          <Icons.AbandonedClients />
-          <span className="sb-link-label">Clients abandonnés</span>
-        </Link>
+        {/* Un non-agent ne doit RIEN voir (demande user 15/08/2026) — pas un
+            lien qui menerait a un message "reserve". isAgent n'est qu'un
+            reflet d'affichage ; la vraie garde reste le 403 serveur. */}
+        {isAgent && (
+          <Link
+            to="/abandoned-clients"
+            className={`sb-link ${pathname === "/abandoned-clients" ? "active" : ""}`}
+            onClick={onClose}
+            title="Clients abandonnés"
+          >
+            <Icons.AbandonedClients />
+            <span className="sb-link-label">Clients abandonnés</span>
+          </Link>
+        )}
 
         <Link
           to="/settings"

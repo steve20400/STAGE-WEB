@@ -38,6 +38,23 @@ export interface QueueHistoryEntry {
   appelDureeSec: number | null
 }
 
+/**
+ * L'appelant est-il agent d'au moins un centre ? Sert UNIQUEMENT à décider
+ * si le menu "Clients abandonnés" doit être montré (demande user
+ * 15/08/2026 : un non-agent ne doit rien voir). La protection réelle reste
+ * sur `fetchAbandonedClients` (403).
+ */
+export async function isAgent(): Promise<boolean> {
+  try {
+    const data = await apiRequest<{ isAgent: boolean }>("/api/queue/agent-status")
+    return data.isAgent ?? false
+  } catch {
+    // Un menu qui disparaît sur une erreur reseau vaut mieux qu'un menu
+    // casse — l'agent le retrouvera au prochain chargement.
+    return false
+  }
+}
+
 export async function fetchLiveQueue(centerAlanyaID?: string): Promise<QueueLiveEntry[]> {
   const qs = centerAlanyaID ? `?centerAlanyaID=${encodeURIComponent(centerAlanyaID)}` : ""
   const data = await apiRequest<{ live: QueueLiveEntry[] }>(`/api/queue/live${qs}`)
