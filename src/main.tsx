@@ -21,6 +21,7 @@ import SignUpPage from "../app/(auth)/signup/signup"
 import WelcomePage from "../app/(public)/welcome/welcome"
 import NotFoundPage from "../app/(public)/not-found/not-found"
 import SettingsPage from "../app/(protected)/settings/settings"
+import AbandonedClientsPage from "../app/(protected)/abandoned-clients/abandoned-clients"
 import NewChatPage from "../app/(protected)/chats/new/new-chat"
 import ConvInfoPage from "../app/(protected)/chats/[chatId]/chat-info"
 import ChatsSplit, { ChatEmptyState } from "../app/(protected)/chats/chats-split"
@@ -278,6 +279,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <ProtectedRoute>
                         <ProtectedLayout>
                           <SettingsPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/abandoned-clients"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <AbandonedClientsPage />
                         </ProtectedLayout>
                       </ProtectedRoute>
                     }

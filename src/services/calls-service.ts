@@ -191,6 +191,23 @@ export async function startCallToNumber(
   return startCallRest(conversation.id, type)
 }
 
+/**
+ * POST /api/queue/callback — un agent rappelle un client SOUS LE NOM DU
+ * CENTRE (demande user 15/08/2026), typiquement un abandonne trouve via
+ * `fetchAbandonedClients` (queue-service.ts). `centerAlanyaID` doit etre un
+ * centre dont l'appelant est agent, sinon 403.
+ */
+export async function callbackCallRest(
+  centerAlanyaID: string,
+  customerId: string,
+  type: CallType = "audio"
+): Promise<StartedCall> {
+  return apiRequest<StartedCall>("/api/queue/callback", {
+    method: "POST",
+    body: { centerAlanyaID, customerId, type: type === "video" ? "VIDEO" : "AUDIO" },
+  })
+}
+
 export interface AcceptCallResult {
   id: string
   isGroup: boolean

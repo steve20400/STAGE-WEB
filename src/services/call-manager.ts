@@ -5,6 +5,7 @@ import { ringtoneUrl } from "./ringtones"
 import { defaultAudioOutput, type AudioOutputMode } from "./audio-output"
 import {
   acceptCallRest,
+  callbackCallRest,
   endCallRest,
   fetchIceServers,
   leaveCallRest,
@@ -62,6 +63,8 @@ export interface IncomingCallInfo {
   isGroup: boolean
   groupName: string | null
   memberCount: number
+  /** Alanya ID du centre qui a route cet appel vers moi (agent) — voir CallManagerState.activeIvrFromId. */
+  ivrFromId: string | null
 }
 
 /**
@@ -137,6 +140,12 @@ export interface CallManagerState {
   ivr: IvrSession | null
   activeCallId: string | null
   activeConvId: string | null
+  /**
+   * Centre qui a route l'appel EN COURS vers moi (agent) — voir
+   * `IncomingCallInfo.ivrFromId`. Nul pour un appel ordinaire. Sert au
+   * bouton "Liste d'attente" de l'ecran d'appel (demande user 15/08/2026).
+   */
+  activeIvrFromId: string | null
   peerName: string
   /** Photo du correspondant : affichee a la place des initiales quand elle existe. */
   peerAvatarUrl: string | null
@@ -402,6 +411,7 @@ function initialState(): CallManagerState {
     ivr: null,
     activeCallId: null,
     activeConvId: null,
+    activeIvrFromId: null,
     peerName: "",
     peerAvatarUrl: null,
     callType: "audio",
@@ -950,6 +960,7 @@ async function handleServerEvent(event: CallServerEvent) {
         isGroup: Boolean(event.isGroup),
         groupName: (event.groupName as string | null) ?? null,
         memberCount: Number(event.memberCount ?? 2),
+        ivrFromId: (event.ivrFromId as string | null) ?? null,
       },
       endedAt: null,
       error: null,
@@ -1273,6 +1284,8 @@ export async function startOutgoingCall(
   setState({
     activeCallId: started.id,
     activeConvId: convId,
+    // Un appel sortant ordinaire n'est jamais routé par un centre.
+    activeIvrFromId: null,
     peerName: started.isGroup ? (started.groupName ?? title) : title,
     // Appel direct : la photo de la personne appelee vient de POST /api/calls.
     peerAvatarUrl: started.isGroup ? null : (started.callees?.[0]?.avatarUrl ?? null),
@@ -1320,6 +1333,79 @@ export async function startOutgoingCall(
   return started.id
 }
 
+/**
+ * Rappelle un client SOUS LE NOM DU CENTRE (demande user 15/08/2026), depuis
+ * l'ecran "Clients abandonnes". Meme deroule que [startOutgoingCall] — seule
+ * la creation differe (`/api/queue/callback` au lieu de `/api/calls`) : le
+ * reste (flux local, minuteur de sonnerie, renvoi du call_ring) est
+ * identique, l'agent est ici aussi l'appelant reel.
+ */
+export async function startCallbackCall(
+  centerAlanyaID: string,
+  customerId: string,
+  title: string
+): Promise<string> {
+  ensureEventSubscription()
+
+  if (state.incoming) {
+    throw new Error(tr("call_answer_incoming_first"))
+  }
+  if (state.activeCallId !== null || state.role !== null) {
+    await hangUp()
+  }
+
+  const started = await callbackCallRest(centerAlanyaID, customerId)
+  sendCallRing(started.id)
+
+  const participantNames: Record<string, string> = {}
+  attendus.clear()
+  for (const callee of started.callees ?? []) {
+    participantNames[callee.userId] = callee.pseudo ?? callee.publicNumber ?? tr("v2_member")
+    attendus.add(callee.userId)
+  }
+
+  setState({
+    activeCallId: started.id,
+    activeConvId: started.convId,
+    activeIvrFromId: null,
+    peerName: title,
+    peerAvatarUrl: started.callees?.[0]?.avatarUrl ?? null,
+    callType: "audio",
+    role: "outgoing",
+    progress: "ringtone",
+    isGroup: false,
+    isInitiator: true,
+    participantNames,
+    audioOutput: defaultAudioOutput(),
+    endedAt: null,
+    error: null,
+  })
+
+  void backfillPeerAvatar(started.id, started.convId)
+
+  ringTimeoutId = setTimeout(() => {
+    if (state.role === "outgoing" && state.activeCallId === started.id) {
+      void hangUp()
+    }
+  }, RING_TIMEOUT_MS)
+
+  for (const delayMs of [4000, 10000]) {
+    setTimeout(() => {
+      if (state.role === "outgoing" && state.activeCallId === started.id) {
+        sendCallRing(started.id)
+      }
+    }, delayMs)
+  }
+
+  try {
+    await ensureLocalStream(false)
+  } catch {
+    setState({ error: tr("call_need_mic") })
+  }
+
+  return started.id
+}
+
 /** Démarre un appel de groupe pour une réunion. */
 /**
  * Entre dans la salle d'une reunion.
@@ -1357,6 +1443,7 @@ export async function joinMeetingRoom(
     // qu'il s'agit d'une reunion.
     activeCallId: `meeting_${meetingId}`,
     activeConvId: `meeting_${meetingId}`,
+    activeIvrFromId: null,
     peerName: title,
     peerAvatarUrl: null,
     callType: type,
@@ -1476,6 +1563,7 @@ export async function acceptIncomingCall(): Promise<string | null> {
   setState({
     activeCallId: incoming.callId,
     activeConvId: incoming.convId,
+    activeIvrFromId: incoming.ivrFromId,
     peerName: incoming.isGroup ? (incoming.groupName ?? incoming.callerName) : incoming.callerName,
     // Cote destinataire : c'est la photo de l'appelant que l'on affiche.
     peerAvatarUrl: incoming.isGroup ? null : incoming.callerAvatarUrl,

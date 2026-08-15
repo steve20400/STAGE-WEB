@@ -5,6 +5,7 @@ import { useHasLiveVideo } from "../../../../src/hooks/use-remote-video"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
 import { CallOptionsMenu } from "../../../../src/components/call-options-menu"
 import { IvrPanel } from "../../../../src/components/ivr-panel"
+import { QueueStatusPanel } from "../../../../src/components/queue-status-panel"
 import {
   acknowledgeCallEnded,
   hangUp as hangUpCall,
@@ -115,6 +116,7 @@ export default function CallRoomPage() {
   const [controlsVisible, setControlsVisible] = useState(true)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [showQueueStatus, setShowQueueStatus] = useState(false)
   const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
   const pipDrag = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({
     x: 0,
@@ -365,64 +367,99 @@ export default function CallRoomPage() {
 
         <div className="room-content">
           <div className="room-top">
-            <button
-              className="back-btn"
-              onClick={() => {
-                if (callState === "active") {
-                  setShowEndConfirm(true)
-                } else if (callState === "ringing") {
-                  setShowEndConfirm(true)
-                } else {
-                  navigate(returnTo, { replace: true })
-                }
-              }}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
+            <div className="room-top-left">
+              <button
+                className="back-btn"
+                onClick={() => {
+                  if (callState === "active") {
+                    setShowEndConfirm(true)
+                  } else if (callState === "ringing") {
+                    setShowEndConfirm(true)
+                  } else {
+                    navigate(returnTo, { replace: true })
+                  }
+                }}
               >
-                <path d="M19 12H5M12 5l-7 7 7 7" />
-              </svg>
-              {t("back")}
-            </button>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                >
+                  <path d="M19 12H5M12 5l-7 7 7 7" />
+                </svg>
+                {t("back")}
+              </button>
 
-            <div className="call-type-pill">
-              {callState === "active" && <div className="rec-dot" />}
-              {isVideo ? (
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                >
-                  <polygon points="23 7 16 12 23 17 23 7" />
-                  <rect x="1" y="5" width="15" height="14" rx="2" />
-                </svg>
-              ) : (
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                >
-                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-                </svg>
-              )}
-              {isVideo ? t("filter_video") : t("filter_audio")}
-              {call.isGroup ? ` (${t("a2_group")})` : ""}
+              <div className="call-type-pill">
+                {callState === "active" && <div className="rec-dot" />}
+                {isVideo ? (
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  >
+                    <polygon points="23 7 16 12 23 17 23 7" />
+                    <rect x="1" y="5" width="15" height="14" rx="2" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  >
+                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                  </svg>
+                )}
+                {isVideo ? t("filter_video") : t("filter_audio")}
+                {call.isGroup ? ` (${t("a2_group")})` : ""}
+              </div>
             </div>
+
+            {/* Uniquement pour un agent EN TRAIN de prendre un appel routé par
+                un centre (demande user 15/08/2026) — nul pour un appel ordinaire. */}
+            {call.activeIvrFromId && (
+              <button
+                className="queue-status-btn"
+                onClick={() => setShowQueueStatus(true)}
+                title="Liste d'attente"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+                </svg>
+                Liste d'attente
+              </button>
+            )}
           </div>
+
+          {showQueueStatus && call.activeIvrFromId && (
+            <QueueStatusPanel
+              centerAlanyaID={call.activeIvrFromId}
+              onClose={() => setShowQueueStatus(false)}
+            />
+          )}
 
           {audioBlocked && (
             <button className="audio-unblock" onClick={unblockAudio}>

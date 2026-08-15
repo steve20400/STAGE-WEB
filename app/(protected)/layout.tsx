@@ -150,6 +150,21 @@ const Icons = {
       <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
     </svg>
   ),
+  AbandonedClients: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+      <path d="M16 8l4-4m0 0h-3m3 0v3" />
+    </svg>
+  ),
   Logout: () => (
     <svg
       width="16"
@@ -319,6 +334,18 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
         })}
 
         <div className="sb-nav-section">{t("nav_section_account")}</div>
+
+        {/* Reserve aux agents/centres cote serveur (403 sinon) — pas de
+            condition ici, cf. AbandonedClientsPage (demande user 15/08/2026). */}
+        <Link
+          to="/abandoned-clients"
+          className={`sb-link ${pathname === "/abandoned-clients" ? "active" : ""}`}
+          onClick={onClose}
+          title="Clients abandonnés"
+        >
+          <Icons.AbandonedClients />
+          <span className="sb-link-label">Clients abandonnés</span>
+        </Link>
 
         <Link
           to="/settings"
