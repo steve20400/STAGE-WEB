@@ -223,3 +223,16 @@ Le build (`npm run build`) passe (`tsc -b` + `vite build` terminé sans erreur).
 ---
 ### 9. Fix `timestamp` du message sauvegé (`fda6afb` final)
 - `sendMessage` et `sendMediaMessage` (`chat.tsx`) : le message `saved` conserve le `timestamp` du message optimiste (`tmp-`) (`{ ...saved, timestamp: m.timestamp }`). Cela garantit que le `grouped` (tri par `timestamp`) place le message final au même endroit visuel que le preview optimiste, évitant que le preview ne remonte au-dessus des messages suivants.
+
+---
+
+## Tâche 10 — Intégration Évaluation Post-Appel (15 août 2026)
+
+### Fichiers créés / modifiés
+- `src/components/call-rating-modal.tsx` [NOUVEAU]
+
+### Description
+- Création du composant `CallRatingModal` pour permettre aux utilisateurs web d'évaluer leur communication après un appel avec un agent d'un centre d'appels.
+- Choix interactif de 1 à 5 étoiles dorées et zone de commentaire optionnelle.
+- Envoie la note et l'avis au backend via la route `POST /api/queue/rate`.
+
