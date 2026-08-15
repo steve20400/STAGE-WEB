@@ -173,7 +173,7 @@ export default function DeveloperPage() {
   const [newWsName, setNewWsName] = useState("")
   const [showNewWsModal, setShowNewWsModal] = useState(false)
   const [docLang, setDocLang] = useState<"curl" | "node" | "python" | "flutter">("curl")
-  const [docType, setDocType] = useState<"text" | "media" | "interactive" | "otp" | "webhook">("text")
+  const [docType, setDocType] = useState<"text" | "media" | "location" | "interactive" | "otp" | "webhook">("text")
   const [generatedRawKey, setGeneratedRawKey] = useState<string | null>(null)
   const [rechargeMsg, setRechargeMsg] = useState<string | null>(null)
   const [webhookMsg, setWebhookMsg] = useState<string | null>(null)
@@ -858,8 +858,8 @@ export default function DeveloperPage() {
         <div className="dev-panel-box">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <h3 className="dev-panel-title" style={{ margin: 0 }}>Documentation Officielle Alanya API</h3>
-            <div style={{ display: "flex", gap: "8px" }}>
-              {(["text", "media", "interactive", "otp", "webhook"] as const).map((type) => (
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {(["text", "media", "location", "interactive", "otp", "webhook"] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setDocType(type)}
@@ -875,6 +875,7 @@ export default function DeveloperPage() {
                 >
                   {type === "text" && "Message Texte"}
                   {type === "media" && "Médias & Vocaux"}
+                  {type === "location" && "Localisation GPS"}
                   {type === "interactive" && "Boutons Interactifs"}
                   {type === "otp" && "Service OTP 2FA"}
                   {type === "webhook" && "Format Webhook"}
@@ -886,6 +887,39 @@ export default function DeveloperPage() {
           <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0" }}>
             Exemples de requêtes prêts à exécuter pour l'API Alanya (spécification v1) :
           </p>
+
+          {docType === "location" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              <div>
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                  </svg>
+                  Envoi d'un Message de Localisation GPS (POST /api/v1/messages/send)
+                </h4>
+                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
+                  Transmettez des coordonnées GPS (latitude et longitude avec 2 décimales ou plus). L'application génère automatiquement la mini-carte OpenStreetMap interactive avec marqueur de position.
+                </p>
+                <div className="dev-code-block">
+{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${activeRawKey}" \\
+  -d '{
+    "messaging_product": "alanya",
+    "to": "600001",
+    "type": "location",
+    "location": {
+      "latitude": "3.8480",
+      "longitude": "11.5020",
+      "name": "Yaoundé",
+      "address": "Centre-ville, Yaoundé, Cameroun"
+    }
+  }'`}
+                </div>
+              </div>
+            </div>
+          )}
 
           {docType === "text" && (
             <div className="dev-code-block">

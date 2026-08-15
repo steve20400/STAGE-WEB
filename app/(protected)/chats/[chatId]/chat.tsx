@@ -4103,11 +4103,14 @@ function MessageBubble({
                       }
                     >
                       <RichText
-                        text={
-                          extractGpsCoords(msg.content)
-                            ? removeGpsCoordinates(msg.content)
-                            : msg.content
-                        }
+                        text={(() => {
+                          let cleanText = msg.content || ""
+                          if (extractGpsCoords(cleanText)) cleanText = removeGpsCoordinates(cleanText)
+                          if (!msg.isDeleted && /\[([^\]]+)\]/.test(cleanText)) {
+                            cleanText = cleanText.replace(/\[([^\]]+)\]/g, "").trim()
+                          }
+                          return cleanText
+                        })()}
                         isMe={isMe}
                       />
                       {(() => {
