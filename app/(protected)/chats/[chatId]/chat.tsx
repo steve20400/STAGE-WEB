@@ -2953,6 +2953,7 @@ function MessageBubble({
   isMe,
   replyMsg,
   onReply,
+  onQuickReply,
   onOpenImage,
   onDelete,
   onForward,
@@ -2968,6 +2969,7 @@ function MessageBubble({
   isMe: boolean
   replyMsg?: Message
   onReply: (m: Message) => void
+  onQuickReply?: (text: string) => void
   onOpenImage: (url: string, name?: string) => void
   onDelete: (m: Message, scope: "me" | "everyone") => void
   onForward: (m: Message) => void
@@ -4122,7 +4124,7 @@ function MessageBubble({
                                   key={idx}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (onReply) onReply(msg)
+                                    if (onQuickReply) onQuickReply(m[1])
                                   }}
                                   style={{
                                     padding: "6px 12px",
@@ -4758,6 +4760,38 @@ export default function ChatRoomPage() {
   void presenceTick
   const peerOnline =
     peerPresence ?? (lastPeerActivity !== null && Date.now() - lastPeerActivity < 2 * 60 * 1000)
+
+  // Envoi automatique lors d'un clic sur un bouton interactif
+  const sendQuickReplyText = useCallback(async (buttonTitle: string) => {
+    const text = buttonTitle.trim()
+    if (!text || sending) return
+
+    const tempId = `tmp-${Date.now()}`
+    const optimistic: Message = {
+      id: tempId,
+      senderId: "me",
+      content: text,
+      type: "text",
+      status: "sending",
+      timestamp: new Date(),
+    }
+
+    setMessages((prev) => [...prev, optimistic])
+    setSending(true)
+
+    try {
+      const saved = await sendChatMessage(chatId, text, "text")
+      setMessages((prev) => {
+        const alreadyReceived = prev.some((m) => m.id === saved.id)
+        if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
+        return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: m.timestamp } : m))
+      })
+    } catch (err) {
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "sending" } : m)))
+    } finally {
+      setSending(false)
+    }
+  }, [chatId, sending])
 
   // Envoi d'un message — POST /api/chats/{chatId}/messages
   const sendMessage = useCallback(async () => {
@@ -5415,7 +5449,9 @@ export default function ChatRoomPage() {
                     <MessageBubble
                       msg={head}
                       isMe={albumIsMe}
+                      replyMsg={head.replyTo ? messagesById.get(head.replyTo) : undefined}
                       onReply={setReplyTo}
+                      onQuickReply={sendQuickReplyText}
                       onOpenImage={(url, name) => setLightbox({ url, name })}
                       onDelete={(_, scope) => lot.forEach((m) => handleDelete(m, scope))}
                       onForward={setForwardMsg}
@@ -5459,6 +5495,7 @@ export default function ChatRoomPage() {
                     isMe={isMe}
                     replyMsg={reply}
                     onReply={setReplyTo}
+                    onQuickReply={sendQuickReplyText}
                     onOpenImage={(url, name) => setLightbox({ url, name })}
                     onDelete={handleDelete}
                     onForward={setForwardMsg}
