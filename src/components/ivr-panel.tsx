@@ -105,7 +105,10 @@ export function IvrPanel({ session }: { session: IvrSession }) {
             marginBottom: 12,
             borderRadius: 12,
             background: "color-mix(in srgb, var(--danger) 14%, transparent)",
-            color: "var(--danger)",
+            // ⚠️ Texte en BLANC (15/08/2026) : `var(--danger)` sur son propre
+            // fond teinté à 14% était illisible (rouge sur rouge). Le fond
+            // reste inchangé — seul le texte change.
+            color: "#fff",
             fontSize: 13,
             textAlign: "center",
           }}
@@ -211,7 +214,15 @@ function IvrTouche({
       style={{
         position: "relative",
         aspectRatio: "1.7",
-        border: "none",
+        // Repère des touches qui menent quelque part (15/08/2026) : un anneau
+        // AUTOUR du bouton plutôt qu'un point en bas — remplace l'ancien
+        // indicateur, demandé plus visible. Toujours discret : il ne dit pas
+        // QUOI, l'appui maintenu le dit toujours.
+        border: option
+          ? `2px solid ${
+              option.disponible ? "var(--accent)" : "color-mix(in srgb, var(--text) 35%, transparent)"
+            }`
+          : "none",
         borderRadius: 16,
         cursor: verrouille ? "default" : "pointer",
         userSelect: "none",
@@ -225,25 +236,6 @@ function IvrTouche({
       }}
     >
       {digit}
-      {/* Repere discret sur les touches qui menent quelque part. Il ne dit PAS
-          quoi — c'est l'appui maintenu qui le dit — mais il evite d'essayer les
-          dix touches une a une pour trouver les trois qui servent. */}
-      {option && (
-        <span
-          style={{
-            position: "absolute",
-            bottom: 8,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 5,
-            height: 5,
-            borderRadius: "50%",
-            background: option.disponible
-              ? "var(--accent)"
-              : "color-mix(in srgb, var(--text) 35%, transparent)",
-          }}
-        />
-      )}
     </button>
   )
 }
