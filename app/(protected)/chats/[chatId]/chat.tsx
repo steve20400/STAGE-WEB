@@ -754,7 +754,10 @@ function extractGpsCoords(text: string): { lat: number; lng: number } | null {
 /** Les coordonnées sont affichées sous la carte : on évite de les répéter au-dessus. */
 function removeGpsCoordinates(text: string): string {
   return text
+    .replace(/\(\s*(-?\d+\.\d{2,})\s*,\s*(-?\d+\.\d{2,})\s*\)/g, "")
     .replace(GPS_REGEX, "")
+    .replace(GMAPS_REGEX, "")
+    .replace(/\(\s*\)/g, "")
     .replace(/\s{2,}/g, " ")
     .trim()
 }
