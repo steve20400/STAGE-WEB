@@ -2969,7 +2969,7 @@ function MessageBubble({
   isMe: boolean
   replyMsg?: Message
   onReply: (m: Message) => void
-  onQuickReply?: (text: string) => void
+  onQuickReply?: (text: string, replyToMsg?: Message) => void
   onOpenImage: (url: string, name?: string) => void
   onDelete: (m: Message, scope: "me" | "everyone") => void
   onForward: (m: Message) => void
@@ -4124,7 +4124,7 @@ function MessageBubble({
                                   key={idx}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    if (onQuickReply) onQuickReply(m[1])
+                                    if (onQuickReply) onQuickReply(m[1], msg)
                                   }}
                                   style={{
                                     padding: "6px 12px",
@@ -4762,7 +4762,7 @@ export default function ChatRoomPage() {
     peerPresence ?? (lastPeerActivity !== null && Date.now() - lastPeerActivity < 2 * 60 * 1000)
 
   // Envoi automatique lors d'un clic sur un bouton interactif
-  const sendQuickReplyText = useCallback(async (buttonTitle: string) => {
+  const sendQuickReplyText = useCallback(async (buttonTitle: string, replyToMsg?: Message) => {
     const text = buttonTitle.trim()
     if (!text || sending) return
 
@@ -4774,13 +4774,14 @@ export default function ChatRoomPage() {
       type: "text",
       status: "sending",
       timestamp: new Date(),
+      replyTo: replyToMsg?.id,
     }
 
     setMessages((prev) => [...prev, optimistic])
     setSending(true)
 
     try {
-      const saved = await sendChatMessage(chatId, text, "text")
+      const saved = await sendChatMessage(chatId, text, "text", { replyToId: replyToMsg?.id })
       setMessages((prev) => {
         const alreadyReceived = prev.some((m) => m.id === saved.id)
         if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
