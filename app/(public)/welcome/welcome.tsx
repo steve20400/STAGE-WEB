@@ -84,9 +84,9 @@ export default function WelcomePage() {
           <div id="about" className="hero-right">
             <div className="phone">
               <div className="phone-bar">
-                <div className="avatar-sm">KM</div>
+                <div className="avatar-sm">SM</div>
                 <div>
-                  <div className="phone-name">Kevin Manga</div>
+                  <div className="phone-name">STEVE AUREL MANFO</div>
                   <div className="phone-status">{t("welcome_demo_status")}</div>
                 </div>
               </div>
