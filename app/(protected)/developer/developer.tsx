@@ -890,13 +890,14 @@ export default function DeveloperPage() {
 
           {docType === "location" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              {/* Endpoint 1 : Message de Localisation simple */}
               <div>
                 <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/>
                     <circle cx="12" cy="10" r="3"/>
                   </svg>
-                  Envoi d'un Message de Localisation GPS (POST /api/v1/messages/send)
+                  1. Localisation GPS Simple (POST /api/v1/messages/send)
                 </h4>
                 <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
                   Transmettez des coordonnées GPS (latitude et longitude avec 2 décimales ou plus). L'application génère automatiquement la mini-carte OpenStreetMap interactive avec marqueur de position.
@@ -914,6 +915,32 @@ export default function DeveloperPage() {
       "longitude": "11.5020",
       "name": "Yaoundé",
       "address": "Centre-ville, Yaoundé, Cameroun"
+    }
+  }'`}
+                </div>
+              </div>
+
+              {/* Endpoint 2 : Speech Publicitaire / Texte + Localisation */}
+              <div>
+                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  2. Speech Vendeur / Publicité avec Localisation (POST /api/v1/messages/send)
+                </h4>
+                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
+                  Joignez un texte descriptif ou un discours commercial (ex: promotion, annonce vendeur) directement à vos coordonnées GPS. Le texte et la mini-carte interactive s'afficheront ensemble dans la même bulle.
+                </p>
+                <div className="dev-code-block">
+{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${activeRawKey}" \\
+  -d '{
+    "messaging_product": "alanya",
+    "to": "600001",
+    "type": "text",
+    "text": {
+      "body": "Venez visiter notre boutique au centre-ville ! Promotion spéciale de 20% aujourd’hui sur tous nos articles. (3.8480, 11.5020)"
     }
   }'`}
                 </div>
