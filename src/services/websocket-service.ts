@@ -581,6 +581,7 @@ const CALL_EVENT_TYPES = new Set([
   "ivr_menu",
   "ivr_hold",
   "ivr_error",
+  "queue_rating_available",
 ])
 const MEETING_EVENT_TYPES = new Set([
   "meeting_signal",

@@ -176,6 +176,16 @@ export interface CallManagerState {
    * « Transferer » et le depart, rien ne bouge et l'action parait sans effet.
    */
   transferPending: boolean
+  /**
+   * `idHist` recu via `queue_rating_available`, en attente d'etre montre.
+   *
+   * Arrive quasi toujours APRES la remise a `initialState()` par `hangUp` :
+   * notre propre raccrochage nettoie l'etat local avant que le serveur ait
+   * fini de traiter l'`ended` qu'on vient de lui envoyer — c'est pour ca que
+   * ce champ SURVIT a la remise a zero (voir la fonction de nettoyage), comme
+   * `error`. Consomme une seule fois via `consumePendingRating`.
+   */
+  pendingRatingIdHist: string | null
 }
 
 interface WebrtcSignal {
@@ -409,6 +419,7 @@ function initialState(): CallManagerState {
     error: null,
     displayMode: "full",
     transferPending: false,
+    pendingRatingIdHist: null,
   }
 }
 
@@ -553,6 +564,13 @@ function setState(patch: Partial<CallManagerState>) {
 
 export function getCallState(): CallManagerState {
   return state
+}
+
+/** Lit puis efface l'evaluation en attente — a appeler au plus une fois par appel. */
+export function consumePendingRating(): string | null {
+  const v = state.pendingRatingIdHist
+  if (v) setState({ pendingRatingIdHist: null })
+  return v
 }
 
 export function subscribeToCallState(listener: () => void): () => void {
@@ -861,6 +879,7 @@ function clearCall(markEnded: boolean) {
     ...initialState(),
     endedAt: ended ? Date.now() : null,
     error: state.error,
+    pendingRatingIdHist: state.pendingRatingIdHist,
   }
   for (const listener of stateListeners) listener()
 }
@@ -1044,6 +1063,16 @@ async function handleServerEvent(event: CallServerEvent) {
     setTimeout(() => {
       if (state.ivr?.callId === callId) void hangUp()
     }, 4000)
+    return
+  }
+
+  if (event.type === "queue_rating_available") {
+    // Envoye par le serveur a la cloture d'un appel passe par un centre (voir
+    // `handleCallState` de ws-server.mjs), une fois que l'appel a reellement
+    // atteint un agent. On le garde sans condition sur l'appel actif — voir
+    // la doc du champ dans `CallManagerState`.
+    const idHist = event.idHist ? String(event.idHist) : null
+    if (idHist) setState({ pendingRatingIdHist: idHist })
     return
   }
 
