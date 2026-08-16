@@ -31,7 +31,8 @@ export interface QueueHistoryEntry {
   customerId: string
   customerName: string | null
   customerAvatarUrl: string | null
-  statut: "MIS_EN_RELATION" | "ABANDON" | "TIMEOUT" | "REJETE"
+  /** RECONTACTER : rappelé par un agent après son abandon, et il a décroché. */
+  statut: "MIS_EN_RELATION" | "ABANDON" | "TIMEOUT" | "REJETE" | "RECONTACTER"
   joinedAt: string
   leftAt: string | null
   attenteDureeSec: number | null
