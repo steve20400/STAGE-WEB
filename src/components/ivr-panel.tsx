@@ -218,9 +218,16 @@ function IvrTouche({
         // AUTOUR du bouton plutôt qu'un point en bas — remplace l'ancien
         // indicateur, demandé plus visible. Toujours discret : il ne dit pas
         // QUOI, l'appui maintenu le dit toujours.
+        //
+        // ⚠️ `--success` (VERT) et non `--accent` : l'accent d'Alanya est
+        // l'argile/terracotta, du MARRON — l'ancien point le portait déjà, ce
+        // qui passait inaperçu à 5 px mais saute aux yeux en anneau. Le vert
+        // est ce qui est demandé, et c'est ce que le mobile affiche
+        // (`AlanyaColors.forest`). `--success` reste vert dans les quatre
+        // combinaisons de thème, palette « soft » comprise.
         border: option
           ? `2px solid ${
-              option.disponible ? "var(--accent)" : "color-mix(in srgb, var(--text) 35%, transparent)"
+              option.disponible ? "var(--success)" : "color-mix(in srgb, var(--text) 35%, transparent)"
             }`
           : "none",
         borderRadius: 16,
