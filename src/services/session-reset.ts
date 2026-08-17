@@ -37,6 +37,15 @@ const ACCOUNT_CACHE_KEYS = [
   "alanya-traduction-mode-v1",
   "alanya-traduction-auto-v1",
   "alanya_traduction_cache_generation",
+  // Sonneries importees : cette liste ne retient pas un choix mais des URL de
+  // medias televerses sur le compte (`/api/media/{id}`) avec leurs libelles.
+  // Laissee en place, elle affiche au compte suivant des sonneries qui ne sont
+  // pas les siennes, et les ecouter va chercher les medias d'un autre.
+  // A distinguer de `alanya-ringtone-incoming`, `-outgoing` et `-message`, qui
+  // ne retiennent que le son choisi dans un catalogue commun a tous : ceux-la
+  // sont des preferences d'appareil, comme le theme, et restent hors de cette
+  // liste.
+  "alanya-ringtones-custom-v1",
 ]
 
 /** Marque le compte a qui appartiennent les caches actuellement en place. */
