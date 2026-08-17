@@ -1,0 +1,1069 @@
+/* ============================================================================
+   Listes de contacts — habillage de la section posee dans la page du repertoire.
+
+   Ce que cette feuille dessine, et rien d'autre :
+     - la rangee d'une liste existante : pastille de couleur, nom, nombre de
+       membres, marque de sonnerie, actions modifier / supprimer ;
+     - le bouton de creation ;
+     - la fenetre de creation-modification : nom, sonnerie, couleur, choix des
+       membres avec recherche et cases a cocher, pied d'actions ;
+     - la confirmation de suppression, variante etroite de la meme fenetre ;
+     - l'etat vide.
+
+   ---------------------------------------------------------------------------
+   REGLE 1 — TOUT est prefixe `clist-`.
+   Une page de ce depot charge plusieurs feuilles a la fois (la page des
+   contacts emprunte deja `calls-page.css`), et deux feuilles se sont deja
+   disputees une meme classe : la derniere chargee gagnait, au hasard de
+   l'ordre des imports. Aucun nom generique ici — pas de `.row`, pas de
+   `.modal`, pas de `.checked`. Les etats eux-memes sont prefixes
+   (`.clist-membre-on` et non `.on`).
+   Les morceaux de la page sont ecrits en descendants de `.clist-root` ; la
+   fenetre vit dans un voile pose au-dessus de tout, donc hors de cette
+   racine, et se rattache a `.clist-voile` / `.clist-modal`.
+
+   REGLE 2 — AUCUNE couleur en dur.
+   L'application a QUATRE themes (clair, nuit, et leurs deux variantes
+   « soft »). Une couleur ecrite en dur serait juste dans un theme et
+   illisible dans les trois autres. Tout passe par les variables de
+   `src/styles/globals.css`. Deux exceptions assumees, commentees sur place :
+   le noir translucide des ombres portees, et `--brand-text` (blanc dans les
+   quatre themes) comme seul texte lisible sur le rouge d'alerte.
+
+   REGLE 3 — la couleur propre d'une liste arrive par `--clist-teinte`.
+   Le modele porte une couleur libre (`ListeContacts.couleur`) : elle ne peut
+   donc pas etre ecrite ici. L'interface la pose en style inline sur l'element
+   concerne — `style={{ "--clist-teinte": "var(--av-1-fg)" }}` — et chaque
+   regle retombe sur `var(--accent)` quand rien n'est pose.
+
+   Echelle d'espacement : 4, 6, 8, 10, 12, 14, 18, 22 — celle du reste de
+   l'application. Rayons : 16 (fenetre), 12 (rangee, cadre de liste), 10 (champs
+   et boutons), 6 (case a cocher), 50% (pastilles).
+
+   Ordre des regles : le grand ecran d'abord — c'est la ou l'application est
+   surtout utilisee — puis les points de rupture retaillent vers le telephone.
+   ========================================================================== */
+
+/* ═══════════════════════════════════════════════ Racine et en-tete de section */
+
+/* Pas de fond ni de hauteur imposes : la section est un bloc parmi d'autres
+   dans la page des contacts, qui a deja son motif de fond. Lui donner un fond
+   ici le recouvrirait. Pas de marge exterieure non plus, c'est la page qui
+   place la section. */
+.clist-root {
+  font-family: "DM Sans", sans-serif;
+  color: var(--text-primary);
+}
+
+.clist-root .clist-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Le retour a la ligne et l'ecart minimal sont la pour la meme raison que
+     dans `.page-title-row` : sans eux, le titre et son bouton se touchent des
+     que la colonne se resserre. */
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+}
+
+/* Le titre et son compteur forment un seul bloc, qui cede la place au bouton
+   et se tronque au lieu de le pousser hors de la colonne. */
+.clist-root .clist-titre-bloc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Titre de SECTION, pas de page : 17 px contre les 28 px du `.calls-title`
+   au-dessus, pour que la hierarchie entre les deux se voie. */
+.clist-root .clist-titre {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  line-height: 1.3;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clist-root .clist-compteur {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Bouton de creation. Meme grammaire que `.new-call-btn`, avec une hauteur
+   portee a 40 px : c'est le minimum qu'un pouce vise sans rater. */
+.clist-root .clist-nouvelle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    opacity 0.15s,
+    transform 0.1s;
+}
+.clist-root .clist-nouvelle:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+.clist-root .clist-nouvelle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.clist-root .clist-nouvelle svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════ Rangees des listes */
+
+.clist-root .clist-rangees {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* La rangee ne se dessine qu'au survol, comme `.call-item` juste au-dessus
+   dans la meme page : une suite de cartes pleines ferait deux listes de styles
+   differents sur un seul ecran. `:focus-within` reprend le meme dessin, sinon
+   la navigation au clavier avancerait dans une liste qui ne reagit pas. */
+.clist-root .clist-rangee {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.clist-root .clist-rangee:hover,
+.clist-root .clist-rangee:focus-within {
+  background: var(--bg-surface);
+  border-color: var(--border-subtle);
+}
+
+/* Pastille de couleur de la liste. Le halo est un `color-mix` de la meme
+   teinte : il donne du poids a un point de 12 px sans ajouter de couleur a
+   accorder. */
+.clist-root .clist-pastille {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--clist-teinte, var(--accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clist-teinte, var(--accent)) 18%, transparent);
+}
+
+/* `couleur` est nullable cote service : sans teinte, un contour vide plutot
+   qu'une pastille couleur d'accent qui ferait croire a un choix. */
+.clist-root .clist-pastille-vide {
+  background: transparent;
+  border: 2px solid var(--border-default);
+  box-shadow: none;
+}
+
+/* Corps cliquable de la rangee (ouvre la modification). Ecrit comme une remise
+   a zero de bouton : l'element porteur peut etre un `<button>` sans heriter du
+   dessin des boutons du navigateur. */
+.clist-root .clist-corps {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  min-height: 40px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.clist-root .clist-corps:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.clist-root .clist-nom {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clist-root .clist-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.clist-root .clist-membres {
+  white-space: nowrap;
+}
+
+/* Marque de sonnerie, montree seulement quand la liste en porte une. Le texte
+   colore sur `--accent-dim` reste lisible : cette teinte ne fait qu'environ
+   10 % d'opacite sur le fond, l'ecart de contraste tient dans les quatre
+   themes — c'est deja le dessin de `.filter-btn.on`. */
+.clist-root .clist-sonnerie {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+.clist-root .clist-sonnerie-icone {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+/* Une sonnerie importee garde son nom de fichier, parfois long : il se tronque
+   au lieu d'etirer la rangee. */
+.clist-root .clist-sonnerie-nom {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clist-root .clist-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Boutons d'icone de la rangee : 40 px, la cible tactile minimale. Ils restent
+   visibles en permanence — les reveler au survol les rendrait introuvables au
+   doigt, ou une liste ne se survole pas. */
+.clist-root .clist-bouton-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.clist-root .clist-bouton-icone svg {
+  width: 16px;
+  height: 16px;
+}
+.clist-root .clist-bouton-icone:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.clist-root .clist-bouton-icone:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.clist-root .clist-bouton-icone:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Variante destructive : le rouge n'apparait qu'au survol, pour ne pas faire
+   d'une rangee au repos un avertissement permanent. */
+.clist-root .clist-bouton-icone-danger:hover {
+  background: var(--danger-dim);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+/* ═════════════════════════════════════════════════════════════ Etat vide */
+
+/* Le cadre en pointilles dit « il y a une place ici, elle est libre » — un
+   cadre plein se lirait comme une carte vide, donc comme une panne. */
+.clist-root .clist-vide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+}
+
+.clist-root .clist-vide-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-faint);
+}
+.clist-root .clist-vide-icone svg {
+  width: 22px;
+  height: 22px;
+}
+
+.clist-root .clist-vide-titre {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Mesure bornee : la phrase d'explication ne doit pas s'etaler sur toute la
+   largeur d'un grand ecran, l'oeil perdrait la ligne suivante. */
+.clist-root .clist-vide-texte {
+  max-width: 46ch;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+/* L'etat vide peut reprendre le bouton de creation ; il lui faut juste de
+   l'air au-dessus. */
+.clist-root .clist-vide .clist-nouvelle {
+  margin-top: 18px;
+}
+
+/* ═══════════════════════════════════════════ Fenetre : voile et cadre */
+
+/* z-index : au-dessus de la confirmation de suppression d'un contact de la
+   meme page (8500), sous la fiche de confidentialite (9700) et le pseudo
+   d'appareil (9800), qui doivent pouvoir passer par-dessus. */
+.clist-voile {
+  position: fixed;
+  inset: 0;
+  z-index: 8600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--overlay);
+  backdrop-filter: blur(6px);
+  animation: clist-fondu 0.16s ease-out;
+}
+
+@keyframes clist-fondu {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes clist-montee {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.clist-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  /* `dvh` en second : sur mobile, `vh` compte la barre d'adresse comme si elle
+     n'existait pas et le pied de la fenetre finit sous l'ecran. La premiere
+     declaration reste pour les navigateurs qui ignorent `dvh`. */
+  max-height: 86vh;
+  max-height: 86dvh;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  /* Ombre en noir translucide : une ombre tiree d'une variable de theme
+     disparaitrait sur fond sombre. C'est la convention deja en place dans les
+     autres fenetres du depot. */
+  box-shadow: 0 24px 64px #00000080;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  /* Le rayon doit couper l'en-tete et le pied, qui ont leur propre fond. */
+  overflow: hidden;
+  animation: clist-montee 0.18s ease-out;
+}
+/* La fenetre recoit le focus a l'ouverture : sans cette regle le navigateur
+   dessinerait un cadre autour de tout le formulaire, ce qui n'apprend rien. */
+.clist-modal:focus {
+  outline: none;
+}
+
+/* En-tete fixe : on doit toujours savoir quelle liste on modifie, meme
+   descendu au bas d'une longue selection de membres. */
+.clist-modal-tete {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.clist-modal-titre {
+  min-width: 0;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.clist-fermer {
+  flex-shrink: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.clist-fermer svg {
+  width: 16px;
+  height: 16px;
+}
+.clist-fermer:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.clist-fermer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Corps defilant. `min-height: 0` est indispensable : sans lui, un enfant
+   flex refuse de rapetisser sous sa taille de contenu et c'est la fenetre
+   entiere qui deborde de l'ecran au lieu de faire defiler l'interieur. */
+.clist-modal-corps {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Arrive en bas, la molette ne doit pas se mettre a faire defiler la page
+     restee derriere le voile. */
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 22px 22px;
+}
+
+/* ═══════════════════════════════════════════════ Champs du formulaire */
+
+.clist-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.clist-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Ligne d'etiquette avec une valeur a droite (« Membres » ... « 4 membre(s) »). */
+.clist-champ-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.clist-champ-valeur {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.clist-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.clist-input::placeholder {
+  color: var(--text-ghost);
+}
+.clist-input:focus {
+  border-color: var(--accent-border);
+}
+/* Pilote par l'attribut plutot que par une classe : le cadre rouge et
+   l'annonce du lecteur d'ecran ne peuvent alors pas se desynchroniser. */
+.clist-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.clist-erreur {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--danger);
+}
+.clist-erreur svg {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+}
+
+/* Sonnerie : le menu et l'ecoute d'un extrait sur une ligne. Le menu prend la
+   place restante, le bouton garde la sienne ; sous 200 px de menu ils passent
+   l'un sous l'autre plutot que de se comprimer. */
+.clist-sonnerie-ligne {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Menu natif, comme celui des sonneries des Parametres : un menu redessine
+   perd le comportement attendu sur mobile (roue de selection). */
+.clist-select {
+  flex: 1 1 200px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13.5px;
+}
+.clist-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.clist-ecouter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.clist-ecouter svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+.clist-ecouter:hover:not(:disabled) {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+}
+.clist-ecouter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.clist-ecouter:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.clist-aide {
+  max-width: 62ch;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+
+/* Choix de la couleur de la liste. Chaque bouton recoit sa teinte par
+   `--clist-teinte` ; le dessin, lui, est le meme pour tous. */
+.clist-couleurs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.clist-couleur {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    transform 0.1s;
+}
+.clist-couleur::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--clist-teinte, var(--accent));
+}
+.clist-couleur:hover {
+  transform: scale(1.06);
+}
+.clist-couleur:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* La couleur choisie se signale par un ANNEAU epais, pas seulement par une
+   teinte : un ecart de couleur seul ne se voit pas de tous les yeux. A porter
+   avec `aria-pressed` pour que la selection s'entende aussi. */
+.clist-couleur-on {
+  border-width: 2px;
+  border-color: var(--clist-teinte, var(--accent));
+}
+.clist-couleur-on::before {
+  width: 20px;
+  height: 20px;
+}
+
+/* ══════════════════════════════════════════════ Selection des membres */
+
+.clist-recherche {
+  position: relative;
+}
+.clist-recherche-icone {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.clist-recherche-input {
+  width: 100%;
+  min-height: 44px;
+  /* Retrait a gauche : la loupe occupe la place. */
+  padding: 10px 12px 10px 36px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.clist-recherche-input::placeholder {
+  color: var(--text-ghost);
+}
+.clist-recherche-input:focus {
+  border-color: var(--accent-border);
+}
+
+/* Le repertoire peut compter des centaines de contacts : cette zone a SA
+   propre hauteur et SON propre defilement. Sans cela, la fenetre grandirait
+   avec le carnet d'adresses et le pied — donc « Enregistrer » — sortirait de
+   l'ecran. */
+.clist-liste-membres {
+  margin-top: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-base);
+  list-style: none;
+}
+
+.clist-membre {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  /* 48 px : c'est la LIGNE qui est la cible, pas la case a cocher. */
+  min-height: 48px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.clist-membre:hover {
+  background: var(--bg-hover);
+}
+/* Retrait NEGATIF : le cadre de focus est dessine a l'interieur de la ligne.
+   Pose vers l'exterieur, il serait rogne par le bord de la zone defilante. */
+.clist-membre:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Ligne cochee : fond teinte ET case remplie. Deux signaux pour un seul etat,
+   parce que le fond seul est trop tenu dans les themes clairs. */
+.clist-membre-on {
+  background: var(--accent-dim);
+}
+
+.clist-membre-av {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  /* Repli seulement : les couleurs d'avatar viennent de `CONTACT_COLORS`, en
+     style inline sur l'element. */
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+}
+.clist-membre-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.clist-membre-texte {
+  flex: 1;
+  min-width: 0;
+}
+.clist-membre-nom {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clist-membre-num {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Case CARREE : dans cette application le rond sert au choix unique. La forme
+   dit deja qu'on peut en cocher plusieurs. */
+.clist-case {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-default);
+  border-radius: 6px;
+  color: transparent;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.clist-case svg {
+  width: 12px;
+  height: 12px;
+}
+.clist-membre-on .clist-case {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.clist-membres-vide {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ═══════════════════════════════════════════════════ Pied et validation */
+
+/* Pied fixe, avec son propre fond : la liste des membres defile dessous, elle
+   ne doit pas apparaitre au travers. */
+.clist-modal-pied {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+/* Texte pousse a gauche du pied (compte des membres retenus, par exemple). */
+.clist-pied-info {
+  margin-right: auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.clist-annuler,
+.clist-valider,
+.clist-supprimer {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
+}
+
+.clist-annuler {
+  border: 1px solid var(--border-default);
+  background: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.clist-annuler:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.clist-valider {
+  border: none;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+.clist-valider:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+/* Action destructive. `--brand-text` vaut #ffffff dans les quatre themes : sur
+   le rouge d'alerte, c'est le seul texte qui reste lisible, et le prendre dans
+   une variable evite d'ecrire une couleur en dur. */
+.clist-supprimer {
+  border: none;
+  background: var(--danger);
+  color: var(--brand-text);
+  font-weight: 700;
+}
+.clist-supprimer:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.clist-annuler:focus-visible,
+.clist-valider:focus-visible,
+.clist-supprimer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.clist-valider:disabled,
+.clist-supprimer:disabled,
+.clist-annuler:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ══════════════════════════════════════ Confirmation de suppression */
+
+/* Meme fenetre, plus etroite : la question tient en deux lignes, une largeur
+   de formulaire la ferait paraitre plus grave qu'elle n'est. */
+.clist-modal-confirme {
+  width: min(420px, 100%);
+}
+.clist-confirme-texte {
+  max-width: 52ch;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+/* ═════════════════════════════════════════════════════════ Utilitaire */
+
+/* Ce que l'oeil lit dans une icone (la cloche de sonnerie, la coche d'une case)
+   doit s'entendre. Deplace hors de l'ecran et non masque : `display: none` le
+   retirerait aussi de la restitution vocale. */
+.clist-hors-ecran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ══════════════════════════════════════════════════ Points de rupture */
+
+/* Sous 640 px la fenetre prend tout l'ecran. Une fenetre centree y laisserait
+   des marges de quelques pixels pour rien, tout en volant de la hauteur a la
+   liste des membres. */
+@media (max-width: 640px) {
+  .clist-voile {
+    padding: 0;
+    align-items: stretch;
+  }
+  .clist-modal,
+  .clist-modal-confirme {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: none;
+    border-radius: 0;
+  }
+  .clist-modal-tete {
+    padding: 16px 16px 12px;
+  }
+  .clist-modal-titre {
+    font-size: 18px;
+  }
+  .clist-modal-corps {
+    padding: 16px 16px 20px;
+  }
+  .clist-modal-pied {
+    padding: 12px 16px;
+  }
+  /* La liste des membres garde une hauteur bornee meme en plein ecran : sinon
+     le champ de recherche partirait vers le haut des le premier defilement, et
+     on chercherait un contact sans plus voir ou taper son nom. */
+  .clist-liste-membres {
+    max-height: 50vh;
+  }
+}
+
+/* Colonne etroite : la rangee se resserre, et le bouton de creation passe
+   seul a la ligne en pleine largeur — a cette largeur, un bouton aligne a
+   droite sous le titre se vise mal. */
+@media (max-width: 460px) {
+  .clist-root .clist-tete .clist-nouvelle {
+    flex: 1 1 100%;
+  }
+  .clist-root .clist-rangee {
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  .clist-root .clist-vide {
+    padding: 32px 16px;
+  }
+}
+
+/* 360 px, la largeur des Android courants : les boutons du pied se partagent
+   la ligne au lieu de deborder. `flex-basis: 0` les rend egaux, quelle que
+   soit la longueur de leur libelle. */
+@media (max-width: 400px) {
+  .clist-modal-pied .clist-annuler,
+  .clist-modal-pied .clist-valider,
+  .clist-modal-pied .clist-supprimer {
+    flex: 1 1 0;
+    padding: 0 12px;
+  }
+  .clist-pied-info {
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+  .clist-sonnerie-ligne .clist-ecouter {
+    flex: 1 1 100%;
+  }
+}
+
+/* ═════════════════════════════════════ Mouvement reduit (preference systeme) */
+
+/* Les entrees en fondu et les deplacements au survol ne sont qu'un confort.
+   Les changements de COULEUR, eux, restent : ils portent une information
+   (survol, selection) et ne provoquent pas de gene vestibulaire. */
+@media (prefers-reduced-motion: reduce) {
+  .clist-voile,
+  .clist-modal {
+    animation: none;
+  }
+  .clist-root .clist-nouvelle:hover,
+  .clist-couleur:hover {
+    transform: none;
+  }
+  .clist-root .clist-nouvelle,
+  .clist-couleur {
+    transition: none;
+  }
+}

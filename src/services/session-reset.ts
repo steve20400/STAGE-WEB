@@ -25,6 +25,13 @@ import { clearAllData } from "../indexedDB/messageRepository"
  */
 const ACCOUNT_CACHE_KEYS = [
   "alanya-contacts-v1",
+  // Miroir des listes de contacts. Donnee de COMPTE et non preference d'appareil,
+  // malgre son air de reglage de sonnerie : il porte les membres des listes, donc
+  // l'identifiant et le numero Alanya de gens du repertoire du compte precedent.
+  // Laisse en place, il s'affiche au compte suivant avant la premiere reponse du
+  // serveur, et `sonneriePourAppelant()` arbitre la sonnerie d'un appel entrant sur
+  // les listes de quelqu'un d'autre.
+  "alanya-listes-contacts-v1",
   "alanya-local-conversations-v1",
   "alanya-local-messages-v1",
   "alanya-local-groups-v1",
