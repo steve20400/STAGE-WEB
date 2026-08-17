@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, type MouseEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation, type Cle } from "../../../../src/i18n"
 import {
   TraductionError,
+  detecterLangueMessage,
+  moteurLocalPresent,
+  telechargerComposants,
   traduireMessage,
   type CodeErreurTraduction,
   type ResultatTraduction,
@@ -41,7 +44,20 @@ type Etat =
   | { phase: "pret"; resultat: ResultatTraduction }
   | { phase: "erreur"; code: CodeErreurTraduction | "inconnue" }
 
-export function MessageTranslation({ texte }: { texte: string }) {
+export function MessageTranslation({
+  texte,
+  automatique = false,
+}: {
+  texte: string
+  /**
+   * Vrai quand le bloc s'ouvre de lui-meme, sans qu'on l'ait demande.
+   *
+   * Il ne change pas ce qui est traduit, seulement le poids visuel : en
+   * automatique la traduction est CE QU'ON LIT, l'original n'etant plus qu'une
+   * reference. Le mode a la demande garde l'equilibre inverse.
+   */
+  automatique?: boolean
+}) {
   const { t, language } = useTranslation()
   const [etat, setEtat] = useState<Etat>({ phase: "chargement" })
   // Un compteur plutot qu'un booleen : deux echecs de suite doivent relancer
@@ -73,7 +89,7 @@ export function MessageTranslation({ texte }: { texte: string }) {
     // La zone vivante est le bloc entier : le passage de l'attente au resultat
     // se fait au meme endroit, et un lecteur d'ecran annonce la traduction sans
     // qu'il faille lui redonner le focus.
-    <div className="msg-trad" aria-live="polite">
+    <div className={`msg-trad${automatique ? " msg-trad-auto" : ""}`} aria-live="polite">
       <div className="msg-trad-sep" aria-hidden />
       {etat.phase === "chargement" && (
         <div className="msg-trad-attente">{t("thr_trad_loading")}</div>
@@ -97,7 +113,12 @@ export function MessageTranslation({ texte }: { texte: string }) {
         </>
       )}
       {etat.phase === "erreur" && (
-        <EchecTraduction code={etat.code} onReessayer={() => setEssai((n) => n + 1)} />
+        <EchecTraduction
+          code={etat.code}
+          texte={texte}
+          automatique={automatique}
+          onReessayer={() => setEssai((n) => n + 1)}
+        />
       )}
     </div>
   )
@@ -111,22 +132,95 @@ export function MessageTranslation({ texte }: { texte: string }) {
  */
 function EchecTraduction({
   code,
+  texte,
+  automatique,
   onReessayer,
 }: {
   code: CodeErreurTraduction | "inconnue"
+  /** Sert a connaitre la langue de depart, donc le couple a installer. */
+  texte: string
+  automatique: boolean
   onReessayer: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const navigate = useNavigate()
-  const versParametres = code === "local-indisponible" || code === "moteur-indisponible"
+  const [progression, setProgression] = useState<number | null>(null)
+  const [installEchouee, setInstallEchouee] = useState(false)
+  /**
+   * Langue de depart resolue AVANT tout clic.
+   *
+   * Chrome n'autorise l'installation que pendant l'activation transitoire qui
+   * suit un geste, et cette fenetre se referme au bout de quelques secondes.
+   * Detecter la langue dans le gestionnaire de clic consommerait ce delai en
+   * attente asynchrone et l'installation partirait hors activation — d'ou une
+   * detection faite d'avance, pour que le clic n'ait plus qu'a lancer.
+   */
+  const [source, setSource] = useState<string | null>(null)
+
+  const moteurPresent = moteurLocalPresent()
+  const paquetManquant = code === "local-indisponible" && moteurPresent
+
+  useEffect(() => {
+    if (!paquetManquant) return
+    let vivant = true
+    void detecterLangueMessage(texte)
+      .then((langue) => {
+        if (vivant) setSource(langue)
+      })
+      .catch(() => undefined)
+    return () => {
+      vivant = false
+    }
+  }, [paquetManquant, texte])
+
+  const peutInstaller = paquetManquant && source !== null && progression === null
+  // Sans moteur du navigateur, ou sans langue de depart identifiable, il n'y a
+  // rien a installer : le seul recours reste le choix d'un autre moteur.
+  const versParametres =
+    (code === "local-indisponible" && !peutInstaller && progression === null) ||
+    code === "moteur-indisponible"
+
+  const installer = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    if (!source) return
+    setInstallEchouee(false)
+    setProgression(0)
+    // Appel direct, sans `await` prealable : l'activation du clic doit encore
+    // etre valide au moment ou le navigateur ouvre le telechargement.
+    telechargerComposants(source, language, (fraction) => setProgression(fraction))
+      .then((installe) => {
+        setProgression(null)
+        if (installe) onReessayer()
+        else setInstallEchouee(true)
+      })
+      .catch(() => {
+        setProgression(null)
+        setInstallEchouee(true)
+      })
+  }
+
+  if (progression !== null) {
+    return (
+      <div className="msg-trad-note">
+        {t("thr_trad_installing", { pct: Math.round(progression * 100) })}
+      </div>
+    )
+  }
 
   return (
     <div className="msg-trad-note">
-      {t(CLE_ERREUR[code])}
-      {versParametres && <> {t("thr_trad_choose_engine_q")}</>}
+      {installEchouee ? t("thr_trad_install_failed") : t(CLE_ERREUR[code])}
+      {/* En automatique on epargne la question : l'utilisateur n'a rien demande,
+          lui poser un choix de moteur sous chaque bulle serait du harcelement.
+          L'action reste offerte juste en dessous. */}
+      {versParametres && !automatique && <> {t("thr_trad_choose_engine_q")}</>}
       {code !== "meme-langue" && (
         <div className="msg-trad-pied">
-          {versParametres ? (
+          {peutInstaller ? (
+            <button type="button" className="msg-trad-lien" onClick={installer}>
+              {t("thr_trad_install")}
+            </button>
+          ) : versParametres ? (
             <button
               type="button"
               className="msg-trad-lien"

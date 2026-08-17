@@ -68,10 +68,12 @@ import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { fetchCallsForConversation, type CallRecord } from "../../../../src/services/calls-service"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import {
+  definirTraductionAuto,
   detecterLangueMessage,
   libererMoteurLocal,
   moteurLocalPresent,
   oublierTraductionsDuTexte,
+  traductionAutoActive,
 } from "../../../../src/services/traduction-service"
 import ChatInfoPage from "./chat-info"
 import { MessageTranslation } from "./message-translation"
@@ -2967,6 +2969,7 @@ function MessageBubble({
   onJumpToMessage,
   albumMsgs,
   onOpenAlbum,
+  autoTraduction,
 }: {
   msg: Message
   isMe: boolean
@@ -2985,6 +2988,8 @@ function MessageBubble({
   /** Lot de medias envoyes ensemble : la bulle affiche une grille au lieu d'un media. */
   albumMsgs?: Message[]
   onOpenAlbum?: (index: number) => void
+  /** Traduction automatique active pour cette discussion (reglage par appareil). */
+  autoTraduction: boolean
 }) {
   // Les actions n'apparaissent pas au survol immediat : le bouton surgissait
   // dans la rangee et decalait la bulle a chaque passage de souris. Il est
@@ -3013,17 +3018,44 @@ function MessageBubble({
   const dragStart = useRef<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false })
 
   // --- Traduction du message ---
-  // Le texte a traduire, et rien d'autre : un media supprime ou une legende de
-  // fichier n'entrent pas dans le perimetre, et une chaine vide suffit a
-  // desactiver tout le bloc sans multiplier les conditions plus bas.
-  const texteATraduire = !msg.isDeleted && msg.type === "text" ? (msg.content ?? "").trim() : ""
+  /**
+   * Tout texte ECRIT PAR UN HUMAIN est traduisible, quel que soit le type de
+   * message : le texte d'une bulle, mais aussi la legende d'une photo, d'une
+   * video, d'un vocal ou d'un document. `content` porte les deux — c'est le
+   * texte pour un message texte, la legende pour un media — et une legende en
+   * russe sous une photo est exactement le cas ou l'on a besoin de traduire.
+   *
+   * Deux exclusions, et elles sont de nature differente :
+   *
+   *  - les messages SYSTEME, deja composes dans la langue du lecteur : les
+   *    traduire ferait un aller-retour pour retomber sur le meme texte ;
+   *  - les COORDONNEES d'un message de position, retirees du texte soumis.
+   *    « 4.0511, 9.7679 » n'a pas de traduction, et le moteur facturerait un
+   *    appel pour rendre les memes chiffres. Ce qui accompagne les coordonnees,
+   *    lui, se traduit — d'ou un retrait plutot qu'un rejet du message entier.
+   */
+  const texteATraduire = useMemo(() => {
+    if (msg.isDeleted || msg.type === "system") return ""
+    const brut = (msg.content ?? "").trim()
+    if (!brut) return ""
+    const prose = extractGpsCoords(brut) ? removeGpsCoordinates(brut) : brut
+    return prose.trim()
+  }, [msg.isDeleted, msg.type, msg.content])
   const [traductionOuverte, setTraductionOuverte] = useState(false)
   const [traductionProposee, setTraductionProposee] = useState(false)
+  /**
+   * En mode automatique la bulle n'attend aucun geste : le bloc s'ouvre seul,
+   * et les boutons disparaissent puisqu'ils n'ont plus rien a declencher. Ses
+   * propres messages restent hors sujet — on ecrit dans sa langue.
+   */
+  const traductionAutomatique = autoTraduction && !isMe && texteATraduire !== ""
+  const blocTraductionVisible = traductionAutomatique || traductionOuverte
 
   useEffect(() => {
     // Sonder la langue de ses propres messages n'apprendrait rien : on ecrit
-    // dans la sienne.
-    if (!texteATraduire || isMe) {
+    // dans la sienne. En automatique, le bouton n'existe pas : sonder la langue
+    // pour decider de l'afficher serait une depense sans objet.
+    if (!texteATraduire || isMe || autoTraduction) {
       setTraductionProposee(false)
       return
     }
@@ -3036,7 +3068,7 @@ function MessageBubble({
     return () => {
       vivant = false
     }
-  }, [texteATraduire, isMe, language])
+  }, [texteATraduire, isMe, language, autoTraduction])
 
   // Identifiant servant a colorer la citation (meme palette que les noms en groupe),
   // pour que la barre laterale rappelle l'auteur du message cite.
@@ -3377,11 +3409,12 @@ function MessageBubble({
                 >
                   {menuItem(t("reply"), () => onReply(msg))}
                   {msg.content ? menuItem(t("copy"), () => onCopy(msg)) : null}
-                  {/* Toujours proposee sur un message texte, meme quand le
-                    bouton sous la bulle ne l'est pas : la detection peut se
-                    tromper ou n'exister nulle part, l'action doit rester
-                    joignable. */}
-                  {texteATraduire
+                  {/* Toujours proposee quand la traduction se fait a la demande,
+                    meme si le bouton sous la bulle ne l'est pas : la detection
+                    peut se tromper ou n'exister nulle part, l'action doit rester
+                    joignable. En automatique elle disparait — la traduction est
+                    deja sous les yeux, l'entree ne ferait que repeter l'etat. */}
+                  {texteATraduire && !traductionAutomatique
                     ? menuItem(traductionOuverte ? t("thr_trad_hide") : t("thr_trad_action"), () =>
                         setTraductionOuverte((ouverte) => !ouverte)
                       )
@@ -4160,7 +4193,9 @@ function MessageBubble({
                 bloc n'existe que tant qu'il est ouvert — le refermer libere
                 l'affichage sans rien garder en memoire, la traduction elle-meme
                 etant deja au cache. */}
-              {traductionOuverte && texteATraduire && <MessageTranslation texte={texteATraduire} />}
+              {blocTraductionVisible && texteATraduire && (
+                <MessageTranslation texte={texteATraduire} automatique={traductionAutomatique} />
+              )}
 
               {/* Heure + coches a l'interieur de la bulle, en bas a droite (WhatsApp).
                 float: right -> le texte court reste sur la meme ligne, le texte
@@ -4189,7 +4224,7 @@ function MessageBubble({
               message et reste au meme endroit que la traduction soit affichee
               ou non. Elle survit a la fermeture du bloc pour qu'on puisse
               rouvrir sans repasser par le menu. */}
-            {texteATraduire && (traductionProposee || traductionOuverte) && (
+            {texteATraduire && !traductionAutomatique && (traductionProposee || traductionOuverte) && (
               <button
                 type="button"
                 className="msg-trad-bouton"
@@ -4292,6 +4327,20 @@ export default function ChatRoomPage() {
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
   const [infoPanelOpen, setInfoPanelOpen] = useState(false)
+
+  /**
+   * Traduction automatique de cette discussion.
+   *
+   * Active par defaut, coupee discussion par discussion. L'initialisation est
+   * paresseuse : `traductionAutoActive` touche `localStorage`, et le faire a
+   * chaque rendu couterait une lecture synchrone par bulle affichee.
+   */
+  const [autoTraduction, setAutoTraduction] = useState(() => traductionAutoActive(chatId))
+  // Changer de conversation sans remonter le composant doit relire le reglage
+  // de la NOUVELLE conversation, sinon on herite de celui de la precedente.
+  useEffect(() => {
+    setAutoTraduction(traductionAutoActive(chatId))
+  }, [chatId])
 
   /**
    * Verrou de conversation, entre appareils d'un meme compte.
@@ -5383,6 +5432,30 @@ export default function ChatRoomPage() {
               </svg>
             </button>
           )}
+          {/* Traduction automatique de cette discussion. Le globe reprend l'etat
+              allume du verrou (`action-btn-on`) : un meme signal visuel pour un
+              meme sens — « ce reglage est actif sur cette conversation ». */}
+          <button
+            className={`action-btn${autoTraduction ? " action-btn-on" : ""}`}
+            aria-label={t("thr_trad_auto_title")}
+            title={autoTraduction ? t("thr_trad_auto_hint_on") : t("thr_trad_auto_hint_off")}
+            aria-pressed={autoTraduction}
+            onClick={() => setAutoTraduction(definirTraductionAuto(chatId, !autoTraduction))}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3.5 9h17M3.5 15h17" />
+              <path d="M12 3c-2.4 2.6-2.4 15.4 0 18M12 3c2.4 2.6 2.4 15.4 0 18" />
+            </svg>
+          </button>
           {!infoPanelOpen && (
             <button
               className="action-btn"
@@ -5469,6 +5542,7 @@ export default function ChatRoomPage() {
                       }
                       albumMsgs={lot}
                       onOpenAlbum={(index) => setGallery({ msgs: lot, index })}
+                      autoTraduction={autoTraduction}
                     />
                   </MessageErrorBoundary>
                 )
@@ -5511,6 +5585,7 @@ export default function ChatRoomPage() {
                     senderName={resolvedName}
                     quoteAuthor={quoteAuthor}
                     onJumpToMessage={jumpToMessage}
+                    autoTraduction={autoTraduction}
                   />
                 </MessageErrorBoundary>
               )

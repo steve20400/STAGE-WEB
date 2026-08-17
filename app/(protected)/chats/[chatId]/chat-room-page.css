@@ -717,8 +717,19 @@ textarea.room-textarea::placeholder {
    filet : les deux versions se lisent d'un seul regard et le fil ne bouge pas.
    Les couleurs sont heritees (currentColor, opacite) parce que la bulle recue
    et la bulle envoyee n'ont pas le meme fond. */
+/* La traduction est posee sur un fond legerement detache de la bulle : c'est ce
+   qui lui donne un contraste PLUS ELEVE que l'original sans avoir a assombrir le
+   texte, impossible dans une bulle ou l'encre est deja au maximum.
+   `currentColor` fait tout le travail des themes : 9 % du texte de la bulle,
+   donc un voile sombre sur la bulle claire du correspondant et un voile clair
+   sur la bulle terracotta de l'envoyeur, sans connaitre ni l'un ni l'autre. La
+   premiere declaration reste le repli des navigateurs sans `color-mix`. */
 .msg-trad {
   margin-top: 6px;
+  padding: 6px 8px 5px;
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.12);
+  background: color-mix(in srgb, currentColor 9%, transparent);
 }
 .msg-trad-sep {
   height: 1px;
@@ -729,6 +740,17 @@ textarea.room-textarea::placeholder {
 /* Une traduction garde les retours a la ligne de l'original. */
 .msg-trad-texte {
   white-space: pre-wrap;
+  font-weight: 500;
+}
+/* Ouverte d'elle-meme, la traduction est le texte que l'on vient lire : le
+   filet de separation n'a plus a marquer une frontiere que le fond marque
+   deja, et le poids monte d'un cran de plus. */
+.msg-trad-auto .msg-trad-sep {
+  display: none;
+}
+.msg-trad-auto .msg-trad-texte {
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 .msg-trad-pied {
   display: flex;

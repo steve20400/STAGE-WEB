@@ -111,10 +111,22 @@ if (typeof window !== "undefined") {
 /* ------------------------------------- Traduction automatique par conversation */
 
 /**
- * Conversations dont l'utilisateur a demande la traduction continue. Stocke en
- * localStorage et NON dans le magasin `conversations` : `cacheConversations`
- * ecrase l'objet entier par un `put()` a chaque synchronisation, le drapeau
- * disparaitrait a la premiere mise a jour de la liste.
+ * Traduction continue, conversation par conversation.
+ *
+ * ACTIVE PAR DEFAUT : recevoir un message dans une langue qu'on ne lit pas est
+ * la situation ou l'on a besoin d'aide sans savoir la demander, et exiger un
+ * clic sur chaque bulle ferait de la fonction un reglage d'expert. On
+ * n'enregistre donc que les EXCEPTIONS — les conversations ou l'utilisateur a
+ * coupe la traduction. Une carte vide veut dire « tout se traduit ».
+ *
+ * Le format supporte l'ancien reglage sans migration : les entrees `true`
+ * ecrites quand le defaut etait l'inverse restent lues comme actives.
+ *
+ * Stocke en localStorage et NON dans le magasin `conversations` :
+ * `cacheConversations` ecrase l'objet entier par un `put()` a chaque
+ * synchronisation, le drapeau disparaitrait a la premiere mise a jour de la
+ * liste. Le stockage local est de toute facon le bon endroit — la langue de
+ * lecture est celle de l'appareil, pas du compte.
  */
 const CLE_AUTO = "alanya-traduction-auto-v1"
 
@@ -130,18 +142,23 @@ function lireAuto(): Record<string, boolean> {
 }
 
 export function traductionAutoActive(conversationId: string): boolean {
-  return lireAuto()[conversationId] === true
+  if (!conversationId) return false
+  return lireAuto()[conversationId] !== false
 }
 
-export function definirTraductionAuto(conversationId: string, active: boolean): void {
+/** Rend l'etat enregistre, pour que l'appelant affiche ce qui a ete retenu. */
+export function definirTraductionAuto(conversationId: string, active: boolean): boolean {
+  if (!conversationId) return false
   const carte = lireAuto()
-  if (active) carte[conversationId] = true
-  else delete carte[conversationId]
+  // Le defaut etant « actif », reactiver revient a effacer l'exception.
+  if (active) delete carte[conversationId]
+  else carte[conversationId] = false
   try {
     localStorage.setItem(CLE_AUTO, JSON.stringify(carte))
   } catch {
     // Preference perdue au rechargement : sans consequence sur la vie privee.
   }
+  return active
 }
 
 /* ---------------------------------------------------------------- Erreurs */
