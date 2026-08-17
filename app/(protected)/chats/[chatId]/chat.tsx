@@ -39,6 +39,12 @@ import {
   toFrontMessage,
 } from "../../../../src/services/messages-service"
 import {
+  apercuStructure,
+  contactsDepuisContenu,
+  nomAffichable,
+  positionDepuisContenu,
+} from "../../../../src/services/message-payload"
+import {
   fetchChatConversations,
   fetchConversationById,
 } from "../../../../src/services/chats-service"
@@ -740,25 +746,66 @@ function StatusIcon({ status }: { status: MessageStatus }) {
 /** Extrait les URLs d'un texte. */
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi
 
-/** Detecte des coordonnees GPS (lat,lng) ou un lien Google Maps. */
-const GPS_REGEX = /(-?\d+\.\d{2,})\s*,\s*(-?\d+\.\d{2,})/
+/**
+ * Détecte des coordonnées GPS DANS UN TEXTE — annonce d'un vendeur, message
+ * d'une autre plateforme. Un partage de position est désormais un vrai message
+ * de type `location` et ne passe pas par ici.
+ *
+ * 🔴 **UN COUPLE DE DÉCIMAUX NU N'EST PLUS RECONNU, et c'est une correction.**
+ * L'ancienne règle acceptait deux décimaux n'importe où : « j'ai payé 12.50,
+ * 30.75 » affichait une carte au Soudan — et, plus grave, `removeGpsCoordinates`
+ * RETIRE du texte affiché ce qui a été reconnu, donc les montants
+ * disparaissaient du message. Les bornes seules ne suffisaient pas : ces deux
+ * nombres SONT des coordonnées valides.
+ *
+ * Il faut maintenant une marque explicite : parenthèses, lien de carte, ou URI
+ * `geo:`. Même correction que côté mobile (`gps_preview.dart`) — cette règle
+ * est partagée, elle ne doit pas diverger d'un client à l'autre.
+ */
+const GPS_PARENTHESES_REGEX = /\(\s*(-?\d+\.\d{2,})\s*,\s*(-?\d+\.\d{2,})\s*\)/
+const GEO_URI_REGEX = /geo:\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/
 const GMAPS_REGEX =
   /(?:google\.\w+\/maps|maps\.google\.\w+|goo\.gl\/maps).*?[/@](-?\d+\.\d+),(-?\d+\.\d+)/
 
+function coordonneesValides(a: string, b: string): { lat: number; lng: number } | null {
+  const lat = parseFloat(a)
+  const lng = parseFloat(b)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+  return { lat, lng }
+}
+
 function extractGpsCoords(text: string): { lat: number; lng: number } | null {
   const gm = text.match(GMAPS_REGEX)
-  if (gm) return { lat: parseFloat(gm[1]), lng: parseFloat(gm[2]) }
-  const gps = text.match(GPS_REGEX)
-  if (gps) return { lat: parseFloat(gps[1]), lng: parseFloat(gps[2]) }
+  if (gm) {
+    const r = coordonneesValides(gm[1], gm[2])
+    if (r) return r
+  }
+  const geo = text.match(GEO_URI_REGEX)
+  if (geo) {
+    const r = coordonneesValides(geo[1], geo[2])
+    if (r) return r
+  }
+  const par = text.match(GPS_PARENTHESES_REGEX)
+  if (par) {
+    const r = coordonneesValides(par[1], par[2])
+    if (r) return r
+  }
   return null
 }
 
-/** Les coordonnées sont affichées sous la carte : on évite de les répéter au-dessus. */
+/**
+ * Les coordonnées sont affichées sous la carte : on évite de les répéter.
+ *
+ * ⚠️ Les motifs retirés sont EXACTEMENT ceux que `extractGpsCoords` reconnaît.
+ * Le couple de décimaux nu n'en fait plus partie : le garder ici effacerait un
+ * montant cité dans le message.
+ */
 function removeGpsCoordinates(text: string): string {
   return text
-    .replace(/\(\s*(-?\d+\.\d{2,})\s*,\s*(-?\d+\.\d{2,})\s*\)/g, "")
-    .replace(GPS_REGEX, "")
-    .replace(GMAPS_REGEX, "")
+    .replace(new RegExp(GPS_PARENTHESES_REGEX, "g"), "")
+    .replace(new RegExp(GEO_URI_REGEX, "g"), "")
+    .replace(new RegExp(GMAPS_REGEX, "g"), "")
     .replace(/\(\s*\)/g, "")
     .replace(/\s{2,}/g, " ")
     .trim()
@@ -1220,6 +1267,112 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
           {lat.toFixed(6)}, {lng.toFixed(6)}
         </div>
       </a>
+    </div>
+  )
+}
+
+/**
+ * Fiche de contact reçue (message de type `contact`).
+ *
+ * La charge utile est du JSON dans `content` — format imposé par le serveur,
+ * voir `services/message-payload.ts`. Sans ce rendu, le web affichait ce JSON
+ * en clair dans la bulle.
+ *
+ * ⚠️ Une charge illisible n'affiche PAS une carte vide : on rend la mention
+ * générique, et on ne prétend pas connaître un contact qu'on ne sait pas lire.
+ */
+function ContactCard({ content, isMe }: { content: string | null; isMe: boolean }) {
+  const contacts = contactsDepuisContenu(content)
+  if (!contacts) {
+    return <div style={{ opacity: 0.8, fontSize: 13 }}>👤 Contact</div>
+  }
+  const bordure = isMe ? "#ffffff28" : "var(--border-subtle)"
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 200 }}>
+      {contacts.map((c, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "6px 8px",
+            borderRadius: 8,
+            border: `1px solid ${bordure}`,
+            background: isMe ? "#ffffff10" : "var(--bg-elevated)",
+          }}
+        >
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: "50%",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: isMe ? "#ffffff20" : "var(--accent-soft, #E8B84B33)",
+              fontWeight: 600,
+              fontSize: 14,
+              overflow: "hidden",
+            }}
+          >
+            {c.avatarUrl ? (
+              <img
+                src={c.avatarUrl}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              nomAffichable(c).charAt(0).toUpperCase()
+            )}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: 13.5,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {nomAffichable(c)}
+            </div>
+            {c.phones.length > 0 && nomAffichable(c) !== c.phones[0] && (
+              <div style={{ fontSize: 12, opacity: 0.75 }}>{c.phones[0]}</div>
+            )}
+            {c.alanyaId && (
+              <div style={{ fontSize: 10.5, opacity: 0.65 }}>Sur Alanya</div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Position reçue (message de type `location`). Réutilise la mini-carte. */
+function LocationCard({ content, isMe }: { content: string | null; isMe: boolean }) {
+  const position = positionDepuisContenu(content)
+  if (!position) {
+    return <div style={{ opacity: 0.8, fontSize: 13 }}>📍 Position</div>
+  }
+  return (
+    <div style={{ minWidth: 200 }}>
+      {position.label && (
+        <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>
+          📍 {position.label}
+        </div>
+      )}
+      <GpsPreview lat={position.lat} lng={position.lng} isMe={isMe} />
+      {position.accuracy !== null && (
+        // La précision change le sens de ce qu'on reçoit : une position à
+        // 1 200 m près désigne un quartier, pas un lieu.
+        <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>
+          Précision {Math.round(position.accuracy)} m
+        </div>
+      )}
     </div>
   )
 }
@@ -2635,12 +2788,25 @@ function hasQuotedMedia(msg: Message): boolean {
     msg.type === "image" ||
     msg.type === "video" ||
     msg.type === "audio" ||
-    msg.type === "file"
+    msg.type === "file" ||
+    // Contact et position passent par le même chemin, non pour leur vignette
+    // mais pour leur LIBELLÉ : sans cela, la branche `quote.content` afficherait
+    // leur charge JSON telle quelle.
+    msg.type === "contact" ||
+    msg.type === "location"
   )
 }
 
-/** Libelle d'un media cite : sa legende si elle existe, sinon son nom, sinon son genre. */
+/**
+ * Libellé d'un message cité, sur une ligne.
+ *
+ * ⚠️ Le libellé structuré passe AVANT le contenu : une fiche de contact ou une
+ * position porte du JSON dans `content`, et une citation qui tient sur une
+ * ligne afficherait `{"v":1,…}`.
+ */
 function quotedMediaLabel(msg: Message): string {
+  const structure = apercuStructure(msg.type, msg.content ?? null)
+  if (structure) return structure
   const caption = msg.content?.trim()
   if (caption) return caption
   if (msg.fileName) return msg.fileName
@@ -4125,10 +4291,19 @@ function MessageBubble({
                       )
                     })()}
 
+                  {/* Fiche de contact et position : leur `content` est du JSON,
+                    il ne doit JAMAIS passer par le rendu de texte ci-dessous. */}
+                  {!msg.isDeleted && msg.type === "contact" && (
+                    <ContactCard content={msg.content ?? null} isMe={isMe} />
+                  )}
+                  {!msg.isDeleted && msg.type === "location" && (
+                    <LocationCard content={msg.content ?? null} isMe={isMe} />
+                  )}
+
                   {/* Legende du media : elle accompagne aussi les documents et les
                     audios, sinon le texte saisi au moment de l'envoi serait perdu
                     a l'affichage. */}
-                  {msg.content && (
+                  {msg.content && msg.type !== "contact" && msg.type !== "location" && (
                     <span
                       style={
                         msg.type === "image"

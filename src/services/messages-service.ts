@@ -61,6 +61,10 @@ function mapType(type?: string): MessageType {
   if (t === "VIDEO") return "video"
   if (t === "FILE") return "file"
   if (t === "SYSTEM") return "system"
+  // Sans ces deux lignes, une fiche de contact ou une position reçue retombait
+  // sur "text" et affichait sa charge JSON brute dans la bulle.
+  if (t === "CONTACT") return "contact"
+  if (t === "LOCATION") return "location"
   return "text"
 }
 
@@ -81,6 +85,8 @@ function toBackendType(type: MessageType): string {
   if (type === "video") return "VIDEO"
   if (type === "file") return "FILE"
   if (type === "system") return "SYSTEM"
+  if (type === "contact") return "CONTACT"
+  if (type === "location") return "LOCATION"
   return "TEXT"
 }
 

@@ -1,5 +1,16 @@
 export type MessageStatus = "sending" | "sent" | "delivered" | "read"
-export type MessageType = "text" | "file" | "image" | "audio" | "video" | "system"
+// `contact` et `location` : fiches de contact et positions partagées. Leur
+// charge utile est du JSON dans `content` — voir `services/message-payload.ts`,
+// miroir du format que le serveur impose aux trois clients.
+export type MessageType =
+  | "text"
+  | "file"
+  | "image"
+  | "audio"
+  | "video"
+  | "system"
+  | "contact"
+  | "location"
 
 export interface ConversationMock {
   id: string
