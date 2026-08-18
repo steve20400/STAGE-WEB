@@ -7,6 +7,22 @@ import { BrandName } from "../../../src/components/brand-name"
 
 export default function WelcomePage() {
   const { t } = useTranslation()
+  /**
+   * Initiales du contact de demonstration, deduites de son nom traduit.
+   *
+   * Les recopier a la main les aurait laissees en francais quand le nom passe au
+   * chinois ou au russe. `Array.from` plutot qu'un index : une lettre peut tenir
+   * sur deux unites de chaine, et couper au milieu afficherait un caractere
+   * casse. Un nom en un seul mot rend sa premiere lettre, ce qui suffit.
+   */
+  const nomDemo = t("welcome_demo_name")
+  const initialesDemo = nomDemo
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((mot) => Array.from(mot)[0] ?? "")
+    .join("")
+    .toUpperCase()
   return (
     <>
       <div className="alanya-root">
@@ -84,9 +100,14 @@ export default function WelcomePage() {
           <div id="about" className="hero-right">
             <div className="phone">
               <div className="phone-bar">
-                <div className="avatar-sm">SM</div>
+                {/* Un exemple, pas quelqu'un. Le nom etait celui d'une personne
+                    reelle, ecrit en dur : il donnait a la demonstration l'air
+                    d'une capture d'ecran privee, et il restait en francais dans
+                    les neuf langues. Il se traduit desormais, et les initiales
+                    s'en deduisent au lieu d'etre recopiees a cote. */}
+                <div className="avatar-sm">{initialesDemo}</div>
                 <div>
-                  <div className="phone-name">STEVE AUREL MANFO</div>
+                  <div className="phone-name">{t("welcome_demo_name")}</div>
                   <div className="phone-status">{t("welcome_demo_status")}</div>
                 </div>
               </div>
