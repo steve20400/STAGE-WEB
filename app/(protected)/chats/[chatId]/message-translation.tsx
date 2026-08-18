@@ -30,7 +30,7 @@ import { moteurSurAppareil, nomMoteur } from "../../../../src/services/traductio
  * : ce dernier est fige a la langue du moment ou l'erreur a ete construite,
  * alors que la bulle doit suivre la langue courante.
  */
-const CLE_ERREUR: Record<CodeErreurTraduction | "inconnue", Cle> = {
+export const CLE_ERREUR: Record<CodeErreurTraduction | "inconnue", Cle> = {
   "meme-langue": "trad_err_same_language",
   "local-indisponible": "trad_err_local_unavailable",
   "moteur-indisponible": "trad_err_engine_unavailable",
@@ -43,6 +43,15 @@ type Etat =
   | { phase: "chargement" }
   | { phase: "pret"; resultat: ResultatTraduction }
   | { phase: "erreur"; code: CodeErreurTraduction | "inconnue" }
+
+/**
+ * Emis quand une traduction AUTOMATIQUE echoue, avec `{ code }` en detail.
+ *
+ * Passe par un evenement plutot que par une remontee de props : la bulle est
+ * enfouie sous plusieurs composants, et faire traverser un rappel a toute cette
+ * pile pour un signal aussi rare coute plus cher qu'il ne rapporte.
+ */
+export const EVENEMENT_ECHEC_AUTO = "alanya:traduction-echec-auto"
 
 export function MessageTranslation({
   texte,
@@ -84,6 +93,29 @@ export function MessageTranslation({
       vivant = false
     }
   }, [texte, language, essai])
+
+  /**
+   * En automatique, un echec ne s'ecrit PAS sous la bulle.
+   *
+   * L'utilisateur n'a rien demande : lui repeter sous chaque message qu'une
+   * traduction n'a pas pu se faire — ou qu'elle etait inutile, le message etant
+   * deja dans sa langue — remplit le fil d'une ligne grise par bulle, pour une
+   * information qui est la MEME partout. Elle se dit une fois, en passant, par
+   * la notification que `chat.tsx` declenche sur cet evenement.
+   *
+   * En manuel, au contraire, l'explication reste : quelqu'un a clique, il a
+   * droit a une reponse a l'endroit ou il l'attend.
+   */
+  useEffect(() => {
+    if (!automatique || etat.phase !== "erreur") return
+    try {
+      window.dispatchEvent(new CustomEvent(EVENEMENT_ECHEC_AUTO, { detail: { code: etat.code } }))
+    } catch {
+      // Hors navigateur : personne n'ecoute.
+    }
+  }, [automatique, etat])
+
+  if (automatique && etat.phase === "erreur") return null
 
   return (
     // La zone vivante est le bloc entier : le passage de l'attente au resultat

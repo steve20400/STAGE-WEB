@@ -158,8 +158,23 @@ export function definirTraductionAuto(conversationId: string, active: boolean): 
   } catch {
     // Preference perdue au rechargement : sans consequence sur la vie privee.
   }
+  // Le reglage se change depuis les informations de la conversation, alors que
+  // c'est le fil des messages qui l'applique — deux composants qui ne se
+  // connaissent pas, et que le panneau soit incruste a cote du fil ou ouvert en
+  // pleine page sur telephone. Un evenement les accorde sans faire remonter
+  // l'etat jusqu'a un ancetre commun qui n'existe pas.
+  try {
+    window.dispatchEvent(
+      new CustomEvent(EVENEMENT_TRADUCTION_AUTO, { detail: { conversationId, active } })
+    )
+  } catch {
+    // Hors navigateur : personne n'ecoute, il n'y a rien a accorder.
+  }
   return active
 }
+
+/** Emis a chaque changement du reglage, avec `{ conversationId, active }` en detail. */
+export const EVENEMENT_TRADUCTION_AUTO = "alanya:traduction-auto"
 
 /* ---------------------------------------------------------------- Erreurs */
 

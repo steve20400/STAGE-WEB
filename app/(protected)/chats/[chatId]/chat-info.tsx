@@ -6,6 +6,10 @@ import { loadLocalConversations } from "../../../../src/data/local-conversations
 import { findLocalGroup } from "../../../../src/data/local-groups"
 import { fetchContacts } from "../../../../src/services/contacts-service"
 import {
+  definirTraductionAuto,
+  traductionAutoActive,
+} from "../../../../src/services/traduction-service"
+import {
   fetchConversationById,
   addMembersToGroup,
   deleteGroupConversation,
@@ -145,6 +149,14 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
   const [tab, setTab] = useState<"membres" | "fichiers">("membres")
   const [muteNotifs, setMute] = useState(false)
+  /**
+   * Traduction automatique de cette conversation. Lecture paresseuse : la
+   * fonction touche `localStorage`, et ce panneau se remonte a chaque ouverture.
+   */
+  const [autoTrad, setAutoTrad] = useState(() => traductionAutoActive(conv.id))
+  useEffect(() => {
+    setAutoTrad(traductionAutoActive(conv.id))
+  }, [conv.id])
   /**
    * Ligne de blocage visant ce correspondant, ou null. On garde la ligne et non
    * un simple booleen : c'est son identifiant qui sert a debloquer.
@@ -617,6 +629,32 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           </div>
 
           <div className="cip-section">
+            {/* Traduction automatique de cette conversation. Elle vivait dans
+                l'en-tete du fil, ou un globe la rendait disponible en un clic —
+                trop pour un reglage qu'on pose une fois et qu'on oublie, et
+                l'en-tete doit porter des gestes, pas des preferences. Elle
+                rejoint donc la sourdine et le blocage : le meme interrupteur,
+                dont l'etat se lit d'un coup d'oeil. */}
+            <div className="notif-row" style={{ marginBottom: 12 }}>
+              <span className="notif-label">{t("thr_trad_auto_title")}</span>
+              <button
+                className="tgl"
+                style={{ background: autoTrad ? "var(--accent)" : "var(--border-default)" }}
+                onClick={() => setAutoTrad(definirTraductionAuto(conv.id, !autoTrad))}
+                aria-checked={autoTrad}
+                role="switch"
+                title={autoTrad ? t("thr_trad_auto_hint_on") : t("thr_trad_auto_hint_off")}
+              >
+                <div
+                  className="tgl-knob"
+                  style={{
+                    left: autoTrad ? "20px" : "2.5px",
+                    background: autoTrad ? "var(--accent-text)" : "var(--text-muted)",
+                  }}
+                />
+              </button>
+            </div>
+
             <div className="notif-row">
               <span className="notif-label">{t("cinfo_mute")}</span>
               <button

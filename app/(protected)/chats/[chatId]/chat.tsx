@@ -74,7 +74,7 @@ import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { fetchCallsForConversation, type CallRecord } from "../../../../src/services/calls-service"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import {
-  definirTraductionAuto,
+  EVENEMENT_TRADUCTION_AUTO,
   detecterLangueMessage,
   libererMoteurLocal,
   moteurLocalPresent,
@@ -82,7 +82,7 @@ import {
   traductionAutoActive,
 } from "../../../../src/services/traduction-service"
 import ChatInfoPage from "./chat-info"
-import { MessageTranslation } from "./message-translation"
+import { CLE_ERREUR, EVENEMENT_ECHEC_AUTO, MessageTranslation } from "./message-translation"
 import "./chat-room-page.css"
 
 type Message = ChatMessageMock
@@ -213,6 +213,8 @@ function ViewerFullscreenButton({
   style?: React.CSSProperties
 }) {
   const { t } = useTranslation()
+
+
   return (
     <button
       onClick={(event) => {
@@ -4433,7 +4435,7 @@ export default function ChatRoomPage() {
   const navigate = useNavigate()
   const chatId = params.chatId as string
   const returnTo = `/chats/${chatId}`
-  const { error, success } = useToast()
+  const { error, success, info } = useToast()
 
   const contacts = useMemo(() => loadContacts(), [])
   const fallbackContact = useMemo(
@@ -4516,6 +4518,16 @@ export default function ChatRoomPage() {
   useEffect(() => {
     setAutoTraduction(traductionAutoActive(chatId))
   }, [chatId])
+  // Le reglage se change desormais dans les informations de la conversation, un
+  // composant qui n'est pas un ancetre de celui-ci : c'est l'evenement qui les
+  // accorde. On relit plutot que de croire le detail transporte, pour que le fil
+  // affiche toujours ce qui est REELLEMENT enregistre.
+  useEffect(() => {
+    const surChangement = () => setAutoTraduction(traductionAutoActive(chatId))
+    window.addEventListener(EVENEMENT_TRADUCTION_AUTO, surChangement)
+    return () => window.removeEventListener(EVENEMENT_TRADUCTION_AUTO, surChangement)
+  }, [chatId])
+
 
   /**
    * Verrou de conversation, entre appareils d'un meme compte.
@@ -4541,6 +4553,36 @@ export default function ChatRoomPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const { t } = useTranslation()
+
+  /**
+   * Un echec de traduction automatique se dit UNE FOIS, en passant.
+   *
+   * Chaque bulle qui n'a pas pu etre traduite emet le meme signal ; l'ecrire sous
+   * chacune remplissait le fil d'une ligne grise repetee, pour une information
+   * qui ne varie pas. La notification disparait d'elle-meme : c'est un
+   * renseignement, pas une decision a prendre.
+   *
+   * « Meme langue » n'entre pas ici. Ce n'est pas un echec : le message etait
+   * deja lisible, il n'y avait rien a traduire, et l'annoncer reviendrait a
+   * signaler un probleme la ou tout va bien.
+   */
+  const echecSignale = useRef<string | null>(null)
+  useEffect(() => {
+    echecSignale.current = null
+  }, [chatId])
+  useEffect(() => {
+    const surEchec = (evenement: Event) => {
+      const code = (evenement as CustomEvent<{ code: keyof typeof CLE_ERREUR }>).detail?.code
+      if (!code || code === "meme-langue") return
+      // Une fois par conversation et par cause : changer de moteur puis echouer
+      // autrement est un fait nouveau, que l'utilisateur a interet a connaitre.
+      if (echecSignale.current === code) return
+      echecSignale.current = code
+      info(t("thr_trad_auto_title"), t(CLE_ERREUR[code]))
+    }
+    window.addEventListener(EVENEMENT_ECHEC_AUTO, surEchec)
+    return () => window.removeEventListener(EVENEMENT_ECHEC_AUTO, surEchec)
+  }, [chatId, info, t])
   const messagesBodyRef = useRef<HTMLDivElement>(null)
 
   /**
@@ -5607,30 +5649,10 @@ export default function ChatRoomPage() {
               </svg>
             </button>
           )}
-          {/* Traduction automatique de cette discussion. Le globe reprend l'etat
-              allume du verrou (`action-btn-on`) : un meme signal visuel pour un
-              meme sens — « ce reglage est actif sur cette conversation ». */}
-          <button
-            className={`action-btn${autoTraduction ? " action-btn-on" : ""}`}
-            aria-label={t("thr_trad_auto_title")}
-            title={autoTraduction ? t("thr_trad_auto_hint_on") : t("thr_trad_auto_hint_off")}
-            aria-pressed={autoTraduction}
-            onClick={() => setAutoTraduction(definirTraductionAuto(chatId, !autoTraduction))}
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <path d="M3.5 9h17M3.5 15h17" />
-              <path d="M12 3c-2.4 2.6-2.4 15.4 0 18M12 3c2.4 2.6 2.4 15.4 0 18" />
-            </svg>
-          </button>
+          {/* La traduction automatique n'a plus de bouton ici : c'est un reglage
+              de la conversation, pas une action qu'on refait a chaque message. Sa
+              place est dans les informations de la discussion, avec la sourdine et
+              le blocage. L'en-tete garde les gestes, pas les preferences. */}
           {!infoPanelOpen && (
             <button
               className="action-btn"
