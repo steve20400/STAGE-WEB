@@ -20,6 +20,7 @@ import {
   sendCallSignal,
   sendCallState,
   sendIvrDtmf,
+  sendIvrBack,
   subscribeToCallEvents,
   subscribeToMeetingEvents,
   sendMeetingSignal,
@@ -71,7 +72,13 @@ export interface IncomingCallInfo {
  * Etape d'un appel passe a un standard (centre d'appels). Deux seulement : des
  * que l'agent decroche, la session disparait et l'appel redevient ordinaire.
  */
-export type IvrStep = "menu" | "attente"
+/**
+ * Les etapes d'un standard, les deux sortes confondues.
+ *
+ * `attente` n'existe que pour un centre d'APPELS (on attend un agent),
+ * `lecture` que pour un centre VOCAL (un son tourne en boucle).
+ */
+export type IvrStep = "menu" | "attente" | "lecture"
 
 /**
  * Une touche du menu. `disponible` vient du serveur : un service peut etre
@@ -108,7 +115,25 @@ export interface IvrSession {
   promptUrl: string | null
   holdUrl: string | null
   options: IvrOption[]
+  /**
+   * Ce standard est-il un CENTRE VOCAL ? (`mode: "vocal"` sur `ivr_menu`.)
+   *
+   * ⚠️ Faux par defaut : un serveur plus ancien n'envoie pas ce champ, et le
+   * seul standard qu'il sache ouvrir est un centre d'appels. Le defaut inverse
+   * transformerait tous les standards existants en centres vocaux le jour d'un
+   * retour en arriere du serveur.
+   */
+  vocal: boolean
   step: IvrStep
+  /**
+   * Ce qui joue en ce moment, pendant `step: "lecture"` — nul hors de cet etat.
+   *
+   * Vient d'`ivr_play` et non d'une recherche dans `options` par la touche : un
+   * retour a l'accueil peut avoir remplace la liste entre-temps.
+   */
+  titreEnLecture: string | null
+  /** La touche dont le son joue, pour la mettre en evidence sur le pave. */
+  toucheEnLecture: number | null
   /** Libelle du service choisi, pendant que l'agent sonne. */
   serviceChoisi: string | null
   /**
@@ -604,12 +629,41 @@ export function subscribeToCallState(listener: () => void): () => void {
  */
 export function sendIvrChoice(digit: number) {
   const session = state.ivr
-  if (!session || session.step !== "menu" || session.envoiEnCours) return
+  if (!session || session.envoiEnCours) return
+  /*
+   * ⚠️ UN CENTRE VOCAL ACCEPTE UNE TOUCHE PENDANT LA LECTURE (demande du user,
+   * 18/08/2026) : on passe d'un son a l'autre sans repasser par l'accueil. Un
+   * centre d'appels, lui, n'accepte rien pendant qu'un agent sonne.
+   */
+  const peutTaper =
+    session.step === "menu" || (session.vocal && session.step === "lecture")
+  if (!peutTaper) return
   setState({ ivr: { ...session, envoiEnCours: true, message: null } })
-  // L'invite s'arrete a l'appui : la laisser courir sous la musique d'attente
-  // donnerait deux sons superposes.
-  stopIvrAudio()
+  /*
+   * ⚠️ ON NE COUPE RIEN SUR UN CENTRE VOCAL, et c'est ce qui rend le refus
+   * indolore : si la touche est acceptee, `ivr_play` rappelle `playIvrAudio`,
+   * qui coupe lui-meme ce qui jouait ; si elle est refusee, l'accueil ou le son
+   * en cours n'a jamais ete interrompu. Couper d'abord laisserait un silence
+   * definitif derriere un simple appui a cote.
+   *
+   * Sur un centre d'appels le geste reste necessaire : l'invite tournerait
+   * sinon sous la musique d'attente, deux sons superposes.
+   */
+  if (!session.vocal) stopIvrAudio()
   sendIvrDtmf(session.callId, digit)
+}
+
+/**
+ * « Retour a l'accueil » d'un centre vocal.
+ *
+ * Ne change RIEN localement : le serveur repond par un `ivr_menu` complet, qui
+ * rebatit la session et relance l'invite. Anticiper l'etat ici ferait diverger
+ * les deux si le message se perdait, et laisserait surtout un ecran sans son.
+ */
+export function sendIvrBackToMenu() {
+  const session = state.ivr
+  if (!session || !session.vocal || session.step !== "lecture") return
+  sendIvrBack(session.callId)
 }
 
 /* ----------------- Mesh + signalisation ----------------- */
@@ -1006,7 +1060,14 @@ async function handleServerEvent(event: CallServerEvent) {
       promptUrl: (event.promptUrl as string | null) ?? null,
       holdUrl: (event.holdUrl as string | null) ?? null,
       options: parseIvrOptions(event.options),
+      // ⚠️ CE MESSAGE ARRIVE AUSSI AU RETOUR A L'ACCUEIL d'un centre vocal : le
+      // serveur y repond en renvoyant `ivr_menu` plutot qu'en inventant un
+      // message dedie. Session neuve et invite relancee sont exactement ce
+      // qu'on veut alors.
+      vocal: event.mode === "vocal",
       step: "menu",
+      titreEnLecture: null,
+      toucheEnLecture: null,
       serviceChoisi: null,
       nomServiceChoisi: null,
       message: null,
@@ -1017,7 +1078,38 @@ async function handleServerEvent(event: CallServerEvent) {
       peerName: session.centerName,
       peerAvatarUrl: (event.centerAvatarUrl as string | null) ?? state.peerAvatarUrl,
     })
-    if (session.promptUrl) playIvrAudio(session.promptUrl, false)
+    // ⚠️ `promptLoop` VIENT DU SERVEUR, il n'est plus decide ici. Il valait
+    // `true` depuis toujours cote serveur, et le mobile le respectait : le web
+    // etait le seul a jouer l'invite une fois. Divergence sans consequence
+    // visible jusqu'ici (aucune interface web n'affiche de standard), mais un
+    // centre vocal dont l'accueil s'arrete au bout d'un tour laisserait un
+    // ecran muet sans rien pour l'expliquer.
+    if (session.promptUrl) playIvrAudio(session.promptUrl, event.promptLoop !== false)
+    return
+  }
+
+  if (event.type === "ivr_play") {
+    // Centre vocal : la touche ne fait sonner personne, elle joue un son.
+    const session = state.ivr
+    if (!session || String(event.callId ?? "") !== session.callId) return
+    const url = (event.audioUrl as string | null) ?? null
+    if (!url) return
+    const digit = typeof event.digit === "number" ? event.digit : null
+    setState({
+      ivr: {
+        ...session,
+        step: "lecture",
+        toucheEnLecture: digit,
+        // `nomService` d'abord, `label` en repli — le second est le nom du
+        // centre vocal, que le serveur envoie pour les touches sans titre.
+        titreEnLecture: texteOuNull(event.nomService) ?? ((event.label as string | null) ?? null),
+        message: null,
+        envoiEnCours: false,
+      },
+    })
+    // EN BOUCLE, et la regle vient du SERVEUR (`loop`) plutot que d'etre ecrite
+    // ici : la changer ne demandera aucun deploiement du client.
+    playIvrAudio(url, event.loop !== false)
     return
   }
 
@@ -1046,8 +1138,34 @@ async function handleServerEvent(event: CallServerEvent) {
     const callId = String(event.callId ?? "")
     const retry = event.retry === true
     const message = String(event.message ?? tr("ivr_failed"))
-    stopIvrAudio()
+
+    /*
+     * ⚠️ UN REFUS QUI NE CHANGE RIEN NE DOIT RIEN COUPER (centre vocal).
+     *
+     * Une touche invalide ou indisponible laisse le serveur EXACTEMENT ou il
+     * etait — au menu, ou en train de jouer un son. Couper l'audio et repasser
+     * au menu comme pour un centre d'appels arreterait le son pour une touche
+     * qui n'a rien lance, et afficherait une etape que le serveur ne partage
+     * pas. `retry: false` reste une vraie fin, traitee comme partout ailleurs.
+     */
+    const enCours = state.ivr
+    const refusSansEffet =
+      enCours !== null && enCours.vocal && retry && callId === enCours.callId
+    if (!refusSansEffet) stopIvrAudio()
+
     const session = state.ivr
+    if (refusSansEffet && session) {
+      const maj = parseIvrOptions(event.options)
+      setState({
+        ivr: {
+          ...session,
+          options: maj.length > 0 ? maj : session.options,
+          message,
+          envoiEnCours: false,
+        },
+      })
+      return
+    }
     if (!session || callId !== session.callId) {
       // Refus AVANT toute session : le centre n'a aucun service joignable.
       setState({ error: message })

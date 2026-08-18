@@ -580,6 +580,11 @@ const CALL_EVENT_TYPES = new Set([
   "call_state",
   "ivr_menu",
   "ivr_hold",
+  // ⚠️ Centre vocal (18/08/2026). Cette liste FILTRE : un type absent n'atteint
+  // jamais le gestionnaire d'appels, et sans la moindre erreur. Oublier
+  // `ivr_play` ici aurait donne un menu vocal ou aucune touche ne joue rien,
+  // impossible a diagnostiquer depuis le code du standard.
+  "ivr_play",
   "ivr_error",
   "queue_rating_available",
 ])
@@ -752,6 +757,14 @@ export function sendCallInvite(callId: string, publicNumber: string) {
 /** Touche tapee dans le menu d'un standard (centre d'appels). */
 export function sendIvrDtmf(callId: string, digit: number) {
   sendRaw({ type: "ivr_dtmf", callId, digit })
+}
+
+/**
+ * « Retour a l'accueil » d'un centre vocal : coupe le son en cours et redemande
+ * le menu, que le serveur renvoie par un `ivr_menu`.
+ */
+export function sendIvrBack(callId: string) {
+  sendRaw({ type: "ivr_back", callId })
 }
 
 // 8 s : sur une 4G lente, l'aller-retour peut depasser 5 s ; un timeout trop
