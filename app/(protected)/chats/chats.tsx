@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback, type CSSProperties } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
 import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data"
 import {
@@ -15,6 +15,12 @@ import { getMyUserId, toInitials } from "../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
 import { listerBlocages } from "../../../src/services/blocked-service"
+import {
+  listerListes,
+  listesEnCache,
+  type ListeContacts,
+} from "../../../src/services/contact-lists-service"
+import { teinteCss } from "../contacts/contact-lists-affichage"
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import "./chats-page.css"
 
@@ -28,12 +34,58 @@ function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
   return ""
 }
 
+/**
+ * Les filtres du systeme, dans l'ordre de la rangee. Les listes de contacts
+ * viennent APRES eux et ne s'y melangent jamais : un filtre du systeme decrit
+ * un etat de la conversation (non lue, reservee), une liste designe un cercle
+ * de personnes que l'utilisateur a lui-meme constitue. Les confondre ferait
+ * croire que « Famille » est une notion de l'application.
+ */
+const FILTRES_SYSTEME = ["all", "unread", "groups", "locked", "blocked"] as const
+
+type FiltreSysteme = (typeof FILTRES_SYSTEME)[number]
+
+/**
+ * Un seul filtre est actif a la fois : un etat unique, plutot que deux qu'il
+ * faudrait tenir accordes a chaque clic. Le prefixe empeche l'identifiant d'une
+ * liste — une chaine libre venue du serveur — de se faire passer pour un filtre
+ * du systeme.
+ */
+type Filtre = FiltreSysteme | `liste:${string}`
+
+const PREFIXE_LISTE = "liste:"
+
+function idListeDuFiltre(filtre: Filtre): string | null {
+  return filtre.startsWith(PREFIXE_LISTE) ? filtre.slice(PREFIXE_LISTE.length) : null
+}
+
+/**
+ * Pastille de couleur d'une liste, la MEME que dans la page des contacts :
+ * c'est elle qui relie les deux ecrans, et elle est posee en style inline pour
+ * la meme raison que `--clist-teinte` la-bas — la teinte appartient au modele,
+ * aucune feuille de styles ne peut la connaitre a l'avance.
+ */
+function stylePastille(teinte: string | null): CSSProperties {
+  return {
+    flexShrink: 0,
+    boxSizing: "border-box",
+    width: 8,
+    height: 8,
+    borderRadius: "50%",
+    // Sans couleur choisie, un contour vide plutot qu'un point couleur d'accent,
+    // qui ferait croire a un choix : c'est le dessin de `.clist-pastille-vide`.
+    background: teinte ?? "transparent",
+    border: teinte ? undefined : "1.5px solid var(--border-default)",
+  }
+}
+
 export default function ChatsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { user: sessionUser } = useAuth()
   const [query, setQuery] = useState("")
-  const [filter, setFilter] = useState<"all" | "unread" | "groups" | "blocked" | "locked">("all")
+  const [filter, setFilter] = useState<Filtre>("all")
+  const idListeActive = idListeDuFiltre(filter)
 
   /**
    * Numeros concernes par un blocage, DANS LES DEUX SENS : ceux que j'ai
@@ -73,6 +125,77 @@ export default function ChatsPage() {
       return numero !== "" && numerosBloques.has(numero)
     },
     [numerosBloques]
+  )
+
+  /**
+   * Listes de contacts, proposees en filtres a la suite de ceux du systeme. Le
+   * miroir du service les rend sans attendre le reseau : la rangee est complete
+   * des le premier rendu, et le GET ne fait que la corriger.
+   */
+  const [listes, setListes] = useState<ListeContacts[]>(() => listesEnCache())
+  useEffect(() => {
+    let annule = false
+    void listerListes().then((rendues) => {
+      if (!annule) setListes(rendues)
+    })
+    return () => {
+      annule = true
+    }
+  }, [])
+
+  /**
+   * Une liste supprimee ailleurs — l'ecran des contacts, un autre appareil du
+   * compte — disparait de la rangee au rafraichissement. Si c'est elle qui
+   * filtrait, on revient a « Tous » : sinon la liste des discussions resterait
+   * vide, sans plus aucun bouton allume pour dire pourquoi.
+   */
+  useEffect(() => {
+    if (!idListeActive) return
+    if (listes.some((liste) => liste.id === idListeActive)) return
+    setFilter("all")
+  }, [listes, idListeActive])
+
+  /**
+   * Membres de la liste qui filtre, prets a comparer. Deux ensembles construits
+   * une fois plutot qu'un parcours du tableau par conversation : la liste des
+   * discussions se refiltre a chaque message recu.
+   *
+   * Les identifiants sont mis en minuscules comme le fait le service, dont la
+   * comparaison suit celle du serveur. Les numeros ne sont qu'un second essai,
+   * pour une conversation venue d'un cache ancien dont le membre n'aurait pas
+   * d'identifiant exploitable ; les deux facons d'alimenter une liste (contact
+   * choisi, numero compose) aboutissent au meme compte, donc au meme resultat.
+   */
+  const membresDuFiltre = useMemo(() => {
+    const liste = idListeActive ? listes.find((autre) => autre.id === idListeActive) : undefined
+    if (!liste) return null
+    return {
+      identifiants: new Set(liste.membres.map((membre) => membre.id.toLowerCase())),
+      numeros: new Set(
+        liste.membres.map((membre) => membre.numero.replace(/\D/g, "")).filter(Boolean)
+      ),
+    }
+  }, [listes, idListeActive])
+
+  /**
+   * Vrai si le correspondant d'un tete-a-tete est membre de la liste active.
+   *
+   * Un groupe n'a pas de correspondant : une liste rassemble des personnes, pas
+   * des salons, et un groupe qui compterait un membre de la liste n'est pas
+   * pour autant une conversation avec ce cercle. Le correspondant se lit comme
+   * pour les blocages juste au-dessus — le membre qui n'est pas soi.
+   */
+  const estDansListeActive = useCallback(
+    (c: ConversationMock) => {
+      if (!membresDuFiltre || c.isGroup) return false
+      const moi = getMyUserId()
+      const pair = c.membersInfo?.find((m) => m.id !== moi)
+      if (!pair) return false
+      if (membresDuFiltre.identifiants.has(pair.id.toLowerCase())) return true
+      const numero = (pair.publicNumber ?? "").replace(/\D/g, "")
+      return numero !== "" && membresDuFiltre.numeros.has(numero)
+    },
+    [membresDuFiltre]
   )
 
   const [conversations, setConversations] = useState<ConversationMock[]>([])
@@ -143,6 +266,9 @@ export default function ChatsPage() {
   const filtered = useMemo(() => {
     return conversations
       .filter((c) => {
+        // Une liste choisie tient lieu de filtre a elle seule : l'etat n'en
+        // porte qu'un a la fois, et aucun filtre du systeme n'est actif alors.
+        if (idListeActive) return estDansListeActive(c)
         if (filter === "unread") return c.unread > 0
         if (filter === "groups") return c.isGroup
         if (filter === "blocked") return estConversationBloquee(c)
@@ -153,7 +279,7 @@ export default function ChatsPage() {
         return true
       })
       .filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
-  }, [conversations, query, filter, estConversationBloquee])
+  }, [conversations, query, filter, idListeActive, estDansListeActive, estConversationBloquee])
 
   const pinned = filtered.filter((c) => c.isPinned)
   const regular = filtered.filter((c) => !c.isPinned)
@@ -280,12 +406,15 @@ export default function ChatsPage() {
           />
         </div>
 
-        {/* Filtres */}
+        {/* Filtres : ceux du systeme, puis les listes de contacts. La rangee
+            defile lateralement (voir .filter-row), elle encaisse donc autant de
+            listes que le compte en porte sans changer de hauteur. */}
         <div className="filter-row">
-          {(["all", "unread", "groups", "locked", "blocked"] as const).map((f) => (
+          {FILTRES_SYSTEME.map((f) => (
             <button
               key={f}
               className={`filter-btn ${filter === f ? "active" : ""}`}
+              aria-pressed={filter === f}
               onClick={() => setFilter(f)}
             >
               {f === "all"
@@ -299,6 +428,44 @@ export default function ChatsPage() {
                       : `${t("filter_locked")} (${conversations.filter((c) => c.lock != null).length})`}
             </button>
           ))}
+
+          {/* Trait de separation : les listes commencent ici. Sans lui, une
+              liste nommee « Non lues » se lirait comme un filtre du systeme. */}
+          {listes.length > 0 && (
+            <span
+              aria-hidden
+              style={{
+                flexShrink: 0,
+                alignSelf: "center",
+                width: 1,
+                height: 16,
+                margin: "0 5px",
+                background: "var(--border-subtle)",
+              }}
+            />
+          )}
+
+          {listes.map((liste) => {
+            const cible: Filtre = `${PREFIXE_LISTE}${liste.id}`
+            return (
+              <button
+                key={liste.id}
+                type="button"
+                className={`filter-btn ${filter === cible ? "active" : ""}`}
+                aria-pressed={filter === cible}
+                onClick={() => setFilter(cible)}
+                title={liste.nom}
+                style={{ gap: 7 }}
+              >
+                <span aria-hidden style={stylePastille(teinteCss(liste.couleur))} />
+                {/* Un nom va jusqu'a 60 caracteres : borne ici, sinon une seule
+                    liste occuperait toute la rangee et cacherait les autres. */}
+                <span style={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {liste.nom}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -309,8 +476,15 @@ export default function ChatsPage() {
             <div className="empty-icon">...</div>
             <div className="empty-txt">
               {t("no_conversation_found")}
-              <br />
-              {`"${query}"`}
+              {/* Le terme cherche seulement s'il y en a un : un filtre qui ne
+                  ramene rien affichait jusqu'ici une paire de guillemets vides,
+                  qui se lisait comme un defaut d'affichage. */}
+              {query !== "" && (
+                <>
+                  <br />
+                  {`"${query}"`}
+                </>
+              )}
             </div>
           </div>
         ) : (
