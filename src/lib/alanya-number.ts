@@ -38,7 +38,7 @@ export function isValidAlanyaNumber(value: string): boolean {
  *
  * Les groupes reprennent exactement ceux de l'application mobile, pour qu'un
  * meme identifiant se lise pareil sur les deux clients :
- *   3  -> xxx            4  -> xx xx           6  -> xxx xxx
+ *   3  -> xxx            4  -> xx xx           6  -> xx xx xx
  *   8  -> xx xx xx xx    10 -> x xxx xxx xxx
  * Les longueurs intermediaires (5, 7, 9) retombent sur des groupes de deux.
  */
@@ -51,7 +51,15 @@ export function formatAlanyaNumber(value: string): string {
     case 4:
       return `${d.slice(0, 2)} ${d.slice(2)}`
     case 6:
-      return `${d.slice(0, 3)} ${d.slice(3)}`
+      // xx xx xx depuis le 18/08/2026, en remplacement de « xxx xxx » (demande
+      // du user). Aligne cette longueur sur les 4 et 8 chiffres, deja lues deux
+      // par deux : un identifiant ne change plus de rythme selon sa longueur.
+      //
+      // /!\ CHANGE EN MEME TEMPS QUE `alanya_id_formatter.dart` COTE MOBILE.
+      // Le commentaire de cette fonction promet que les deux clients affichent
+      // le meme decoupage ; le modifier d'un seul cote rendrait cette promesse
+      // fausse sans qu'aucun controle ne le signale.
+      return `${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4)}`
     case 8:
       return `${d.slice(0, 2)} ${d.slice(2, 4)} ${d.slice(4, 6)} ${d.slice(6)}`
     case 10:
