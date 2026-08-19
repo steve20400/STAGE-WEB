@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from "../lib/api-client"
+import { isValidAlanyaNumber } from "../lib/alanya-number"
 
 /**
  * Listes de contacts : des groupes nommes, propres a un compte, qui servent
@@ -595,4 +596,80 @@ export async function modifierListe(id: string, patch: PatchListe): Promise<Resu
 export async function supprimerListe(id: string): Promise<void> {
   await apiRequest<void>(`/api/contact-lists/${id}`, { method: "DELETE" })
   majMiroir(miroirCourant().filter((liste) => liste.id !== id))
+}
+
+/* ------------------------------------------------------- Recherche par numero */
+
+/**
+ * Le compte que porte un numero compose.
+ *
+ * Meme forme qu'un membre de liste, et ce n'est pas une coincidence : le serveur
+ * rend le MEME objet des deux cotes (`{ id, publicNumber, name, isContact }`),
+ * parce que c'est la meme resolution. La meme lecture defensive le relit donc,
+ * `membreDepuisServeur`, et un champ ajoute un jour a l'un le sera a l'autre.
+ */
+export type CompteTrouve = MembreListe
+
+/** Reponse de la recherche, telle qu'elle sort du backend. */
+interface ReponseRecherche {
+  found: boolean
+  /** Absent quand `found` est faux. Relu par `membreDepuisServeur`, d'ou `unknown`. */
+  account?: unknown
+}
+
+/**
+ * GET /api/accounts/lookup?number=... — qui est le titulaire de ce numero.
+ *
+ * C'est la resolution que `POST /api/contact-lists` fait deja sur
+ * `memberNumbers`, mais montree AVANT l'enregistrement : sous les chiffres
+ * composes doit se lire le NOM du titulaire, pas un etat technique, et
+ * l'utilisateur doit voir qui il ajoute avant de l'ajouter.
+ *
+ * Rend `null` pour « aucun compte ne porte ce numero », et LEVE quand la
+ * recherche elle-meme a echoue. La distinction n'est pas cosmetique, c'est
+ * exactement celle que l'appelant affiche : rendre `null` sur une panne reseau
+ * ferait ecrire « aucun compte » sous un numero parfaitement valide, c'est-a-dire
+ * accuser le numero d'un defaut qui est le notre. Seule une reponse ILLISIBLE
+ * rend `null` sans lever — la forme est alors trop douteuse pour qu'on affirme
+ * quoi que ce soit, et l'absence de compte est la conclusion prudente.
+ *
+ * Le numero est normalise puis mesure AVANT tout depart sur le reseau : une
+ * saisie en cours ne declenche aucune requete.
+ *
+ * La mesure se fait par `isValidAlanyaNumber` et NON par `FORME_NUMERO`, bien que
+ * les deux disent aujourd'hui la meme chose (trois a dix chiffres). Ce n'est pas
+ * indifferent, car ils ne tiennent pas leur autorite du meme endroit :
+ *
+ *  - `FORME_NUMERO` sert les routes d'ECRITURE, ou il protege d'un defaut precis —
+ *    `publicNumberSchema` refuse la REQUETE ENTIERE sur un seul numero mal forme,
+ *    donc un membre invalide ferait perdre les membres valides du meme envoi. Son
+ *    autorite est le schema du backend ;
+ *  - ici la question est autre : ces chiffres valent-ils qu'on interroge le
+ *    serveur, ou l'utilisateur tape-t-il encore ? L'autorite est alors ce que
+ *    l'interface tient pour un numero complet, et c'est exactement la garde que
+ *    `contact-list-modal.tsx` passe juste avant d'appeler ici.
+ *
+ * Les brancher sur la meme constante serait un piege silencieux : que la borne du
+ * front s'elargisse un jour sans celle du backend, et l'ecran demanderait un nom
+ * que cette fonction refuserait de chercher, sans requete ni erreur. Il ecrirait
+ * alors « aucun compte » sous un numero parfaitement valide — precisement le
+ * mensonge que le paragraphe ci-dessus interdit.
+ */
+export async function rechercherCompte(numero: string): Promise<CompteTrouve | null> {
+  const chiffres = normaliserNumero(numero)
+  if (!isValidAlanyaNumber(chiffres)) return null
+
+  const reponse = await apiRequest<ReponseRecherche>(
+    `/api/accounts/lookup?number=${encodeURIComponent(chiffres)}`
+  )
+
+  // Meme prudence qu'au reste du fichier : `apiRequest` rend la charge analysee
+  // telle quelle, donc `undefined` sur un corps 2xx vide et `null` sur un corps
+  // litteral `null`. Le transtypage le masque, et lire `.found` dessus leverait
+  // un TypeError la ou l'appelant n'attend qu'une absence de compte.
+  if (!estObjet(reponse)) return null
+  if (reponse.found !== true) return null
+  // `account` absent ou d'une autre forme malgre `found` : `membreDepuisServeur`
+  // rend `null` plutot que de laisser passer un membre sans identifiant.
+  return membreDepuisServeur(reponse.account)
 }

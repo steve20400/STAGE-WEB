@@ -1,7 +1,8 @@
 import { getMyUserId, loadSessionUser } from "../data/session-user"
 import { loadSessionToken } from "../data/session-auth"
 import { ApiError } from "../lib/api-client"
-import { ringtoneUrl } from "./ringtones"
+import { isCustomRingtone, RINGTONES, ringtoneSource, ringtoneUrl } from "./ringtones"
+import { sonneriePourAppelant } from "./contact-lists-service"
 import { defaultAudioOutput, type AudioOutputMode } from "./audio-output"
 import {
   acceptCallRest,
@@ -475,7 +476,19 @@ let incomingRingtoneAudio: HTMLAudioElement | null = null
 
 function startOutgoingRingtone() {
   if (typeof window === "undefined") return
-  const callsEnabled = localStorage.getItem("notif_calls") !== "false"
+  // Lecture GARDEE, et ce n'est pas une precaution de principe : un navigateur
+  // qui refuse le stockage au site leve `SecurityError` a la simple lecture, et
+  // cette fonction est appelee depuis `setState()` AVANT que les abonnes soient
+  // prevenus. L'exception traversait donc `setState`, la boucle des abonnes
+  // n'etait jamais atteinte, et l'appel entrant restait dans l'etat interne sans
+  // que rien ne s'affiche ni ne sonne : un appel perdu en silence. Le doute
+  // profite a l'appel — sans reglage lisible, on sonne.
+  let callsEnabled = true
+  try {
+    callsEnabled = localStorage.getItem("notif_calls") !== "false"
+  } catch {
+    callsEnabled = true
+  }
   if (!callsEnabled) return
 
   const url = ringtoneUrl("outgoing")
@@ -554,12 +567,90 @@ function parseIvrOptions(brut: unknown): IvrOption[] {
   return options
 }
 
-function startIncomingRingtone() {
-  if (typeof window === "undefined") return
-  const callsEnabled = localStorage.getItem("notif_calls") !== "false"
-  if (!callsEnabled) return
+/**
+ * Vrai si la sonnerie designee peut donner un son jouable.
+ *
+ * C'est le controle que le chemin ORDINAIRE fait par `isKnownFile()` dans
+ * `ringtoneFile()`, et que celui-ci n'avait pas : la chaine vient du serveur, via
+ * le miroir des listes, et partait telle quelle dans `ringtoneSource()`.
+ * `isKnownFile()` n'est pas exporte, et il ne conviendrait pas tel quel — la
+ * distinction ci-dessous n'a de sens que pour une sonnerie de LISTE :
+ *
+ *  - sonnerie FOURNIE (un nom de fichier) : `RINGTONES` est le catalogue complet,
+ *    fige a la compilation, identique sur tous les appareils. Un nom absent ne
+ *    designe rien, ni ici ni ailleurs, ni aujourd'hui ni demain — on l'ecarte ;
+ *  - sonnerie IMPORTEE (une URL `/api/media/...`) : `customRingtones()` est une
+ *    liste LOCALE a cet appareil, alors que la sonnerie d'une liste appartient au
+ *    COMPTE. Une sonnerie importee depuis le mobile ou depuis un autre navigateur
+ *    est parfaitement jouable ici — le media vit sur le serveur, seul l'inventaire
+ *    de ce qui a ete importe est local. Exiger qu'elle figure au catalogue local
+ *    rendrait muettes des sonneries valides, c'est-a-dire creerait le defaut qu'on
+ *    repare. On ne verifie donc que la forme, et c'est le repli du `catch` qui
+ *    rattrape le media efface ou refuse.
+ */
+function sonnerieResoluble(sonnerie: string): boolean {
+  if (isCustomRingtone(sonnerie)) return true
+  return RINGTONES.some((entree) => entree.file === sonnerie)
+}
 
-  const url = ringtoneUrl("incoming")
+/**
+ * URL de la sonnerie que la liste de contacts de l'appelant impose, ou `null`
+ * pour laisser le choix ordinaire de l'appareil s'appliquer.
+ *
+ * Tout est enveloppe, sans exception qui puisse en sortir : cette recherche est
+ * un CONFORT pose sur le trajet d'un appel entrant, et `setState()` n'a pas de
+ * filet. Une exception qui remonterait — miroir de listes abime, stockage refuse
+ * par le navigateur, jeton de session absent au moment de resoudre un media —
+ * empecherait l'ecran d'appel de s'afficher, c'est-a-dire ferait rater l'appel
+ * pour une histoire de son. Au moindre doute, la sonnerie ordinaire.
+ */
+function sonnerieDeListe(callerId: string): string | null {
+  try {
+    const sonnerie = sonneriePourAppelant(callerId)
+    if (!sonnerie) return null
+    // Ecarte AVANT de retenir, comme `ringtoneFile()` : une sonnerie qui ne
+    // designe plus rien ne doit pas meme etre tentee.
+    if (!sonnerieResoluble(sonnerie)) return null
+    // Une URL vide est ce que rend le resolveur de medias quand il n'a rien a
+    // resoudre : injouable, donc autant garder la sonnerie ordinaire.
+    return ringtoneSource(sonnerie) || null
+  } catch (err) {
+    console.warn("[CallManager] sonnerie de liste ignoree :", err)
+    return null
+  }
+}
+
+/**
+ * Jeton de la sonnerie entrante en cours.
+ *
+ * Le repli ci-dessous s'arme dans le `catch` de `play()`, donc APRES coup : entre
+ * le lancement et le rejet de la promesse, l'appel a pu etre decroche, refuse,
+ * abandonne par l'appelant, ou pris sur un autre appareil. Sans ce jeton, le
+ * repli rallumerait la sonnerie d'un appel deja termine — un telephone qui sonne
+ * dans le vide, sans plus rien pour l'arreter. `stopIncomingRingtone()`
+ * l'incremente pour cette seule raison.
+ */
+let jetonSonnerieEntrante = 0
+
+/**
+ * Joue `url` en boucle, et retombe sur `repli` si elle se revele injouable.
+ *
+ * Ce repli EST le correctif : le controle prealable ne voit ni un media efface
+ * (404) ni un jeton de session perime (401), qui ne se manifestent qu'ICI, au
+ * rejet de la promesse. Sans lui, une sonnerie de liste devenue inaccessible rend
+ * l'appel entrant TOTALEMENT silencieux — et un appel qu'on n'entend pas est un
+ * appel rate, ce qui est pire que n'importe quelle mauvaise sonnerie.
+ *
+ * Un seul repli, jamais en chaine : `repli` vaut `null` au second tour. La
+ * sonnerie ordinaire echoue elle aussi quand le navigateur refuse la lecture
+ * automatique — l'onglet n'a jamais ete clique — et il n'y a alors plus rien a
+ * tenter, seulement une boucle a ne pas ouvrir.
+ */
+function jouerSonnerieEntrante(url: string, repli: string | null, jeton: number) {
+  // L'element est conserve d'un appel a l'autre. La comparaison porte sur l'URL
+  // DEJA resolue, celle qu'on va jouer : deux appelants de listes differentes
+  // donnent deux URLs differentes, donc l'element est bien reconstruit au lieu
+  // de rejouer la sonnerie de l'appel precedent.
   if (!incomingRingtoneAudio || incomingRingtoneAudio.dataset.source !== url) {
     incomingRingtoneAudio = new Audio(url)
     incomingRingtoneAudio.dataset.source = url
@@ -567,10 +658,44 @@ function startIncomingRingtone() {
   }
   incomingRingtoneAudio.play().catch((err) => {
     console.warn("[CallManager] sonnerie d'appel entrant injouable :", err)
+    if (repli === null) return
+    // La sonnerie annoncee n'est plus celle qu'on attend : ne rien rallumer.
+    if (jeton !== jetonSonnerieEntrante) return
+    jouerSonnerieEntrante(repli, null, jeton)
   })
 }
 
+function startIncomingRingtone(callerId: string) {
+  if (typeof window === "undefined") return
+  // Lecture GARDEE, et ce n'est pas une precaution de principe : un navigateur
+  // qui refuse le stockage au site leve `SecurityError` a la simple lecture, et
+  // cette fonction est appelee depuis `setState()` AVANT que les abonnes soient
+  // prevenus. L'exception traversait donc `setState`, la boucle des abonnes
+  // n'etait jamais atteinte, et l'appel entrant restait dans l'etat interne sans
+  // que rien ne s'affiche ni ne sonne : un appel perdu en silence. Le doute
+  // profite a l'appel — sans reglage lisible, on sonne.
+  let callsEnabled = true
+  try {
+    callsEnabled = localStorage.getItem("notif_calls") !== "false"
+  } catch {
+    callsEnabled = true
+  }
+  // Coupe tout AVANT meme de chercher une sonnerie de liste : le reglage general
+  // prime, une liste ne rend pas la voix a des appels rendus muets.
+  if (!callsEnabled) return
+
+  // Un appel de groupe ne demande aucune regle a part : `callerId` y designe
+  // toujours celui qui appelle, pas le groupe.
+  const ordinaire = ringtoneUrl("incoming")
+  const url = sonnerieDeListe(callerId) ?? ordinaire
+  // Pas de repli quand c'est deja la sonnerie ordinaire qui joue : il n'y aurait
+  // rien de plus sur en dessous.
+  jouerSonnerieEntrante(url, url === ordinaire ? null : ordinaire, ++jetonSonnerieEntrante)
+}
+
 function stopIncomingRingtone() {
+  // Invalide un repli encore en vol : voir `jetonSonnerieEntrante`.
+  jetonSonnerieEntrante++
   if (incomingRingtoneAudio) {
     incomingRingtoneAudio.pause()
     incomingRingtoneAudio.currentTime = 0
@@ -583,7 +708,7 @@ function setState(patch: Partial<CallManagerState>) {
   state = { ...state, ...patch }
 
   if (state.incoming && !prevIncoming) {
-    startIncomingRingtone()
+    startIncomingRingtone(state.incoming.callerId)
   } else if (!state.incoming && prevIncoming) {
     stopIncomingRingtone()
   }

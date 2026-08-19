@@ -1,0 +1,253 @@
+/* ============================================================================
+   Pave numerique reutilisable — habillage de `pave-numerique.tsx`.
+
+   D'OU VIENNENT CES VALEURS. Du composeur d'appel, `app/(protected)/calls/
+   dialer.css` : meme grille de trois colonnes, memes touches rondes de
+   `min(320px, 100%)` de large, meme famille de titre pour le numero, memes
+   couleurs de survol et d'appui. L'utilisateur doit retrouver SON clavier,
+   qu'il compose un appel ou qu'il ajoute un numero a une liste. Les deux
+   feuilles restent separees parce que les deux usages divergent sur le reste :
+   le composeur est un ecran plein, ce pave-ci est un bloc pose dans une
+   fenetre. Les ecarts assumes sont commentes sur place.
+
+   REGLE 1 — tout est prefixe `pave-`.
+   Une page charge plusieurs feuilles a la fois et deux d'entre elles se sont
+   deja disputees une meme classe, la derniere chargee gagnant au hasard de
+   l'ordre des imports. Ce composant peut atterrir dans n'importe quelle page :
+   aucun nom generique ici.
+
+   REGLE 2 — aucune couleur en dur.
+   L'application a quatre themes (clair, nuit, et leurs deux variantes
+   « soft »). Tout passe par les variables de `src/styles/globals.css`.
+
+   Cibles tactiles : jamais moins de 44 px, y compris les deux boutons
+   d'effacement, qui sont les plus petits de l'ensemble.
+   ========================================================================== */
+
+.pave-root {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  /* Pas de fond ni de bordure : le pave est un bloc pose dans une fenetre qui
+     a deja les siens. Une carte de plus ferait un cadre dans un cadre. */
+  font-family: "DM Sans", sans-serif;
+  color: var(--text-primary);
+}
+
+/* La racine porte `tabIndex` pour recevoir l'ecoute du clavier physique (voir
+   le commentaire du composant). Au clic, le contour n'apprendrait rien ; a la
+   tabulation, il est le seul repere qui dise « les chiffres arrivent ici ». */
+.pave-root:focus {
+  outline: none;
+}
+.pave-root:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════ Numero compose */
+
+.pave-ecran {
+  width: 100%;
+  min-width: 0;
+  padding: 0 8px;
+  text-align: center;
+}
+
+/* Plus petit que les 30-46 px du composeur plein ecran : ici le numero
+   partage la fenetre avec un titre, un champ de nom et un pied de boutons.
+   Il reste le plus gros texte du bloc, ce qui suffit a dire qu'il en est le
+   sujet. `min-height` reserve sa ligne : sans elle, le bloc entier sauterait
+   au premier chiffre frappe. */
+.pave-numero {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: clamp(26px, 8vw, 38px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  line-height: 1.2;
+  min-height: 1.2em;
+  word-break: break-all;
+}
+
+.pave-vide {
+  color: var(--text-ghost);
+  letter-spacing: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════ Les touches */
+
+.pave-touches {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: min(320px, 100%);
+}
+
+.pave-touche {
+  aspect-ratio: 1;
+  /* Le rapport carre donnerait des touches enormes des que la fenetre
+     s'elargit : le plafond les tient, le plancher garantit la cible tactile
+     dans une colonne etroite. */
+  max-height: 74px;
+  min-height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.pave-touche:hover {
+  background: var(--bg-surface);
+}
+.pave-touche:active {
+  background: var(--accent-dim);
+}
+.pave-touche:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════ Rangee d'effacement */
+
+/* Meme equilibre que dans le composeur : deux colonnes laterales de largeur
+   egale tiennent l'element central au milieu du clavier, quelle que soit la
+   longueur du libelle. La colonne de gauche est vide — c'est la que le
+   composeur met son bouton d'appel, que ce pave n'a pas. */
+.pave-actions {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
+  width: min(320px, 100%);
+  margin-top: 2px;
+}
+
+/* Effacement TOTAL : ecrit en toutes lettres. Deux icones de gomme cote a cote
+   ne se distingueraient pas, et se tromper ici coute tout le numero. */
+.pave-vider {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-secondary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.pave-vider:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.pave-vider:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Effacement d'UN chiffre : la fleche-gomme du composeur, sans cadre. C'est le
+   geste courant, il doit rester leger a l'oeil. */
+.pave-effacer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.pave-effacer:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.pave-effacer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Rien a effacer : les deux boutons s'eteignent au lieu de disparaitre. Un
+   bouton qui s'en va deplace la rangee et fait rater le suivant. */
+.pave-vider:disabled,
+.pave-effacer:disabled {
+  color: var(--text-ghost);
+  cursor: not-allowed;
+}
+
+/* ══════════════════════════════════════════════════ Points de rupture */
+
+/* Fenetre basse (telephone en paysage, petite fenetre de navigateur) : on
+   resserre pour que le numero, le clavier et l'effacement tiennent ensemble
+   sans defilement — c'est deja la regle du composeur. */
+@media (max-height: 620px) {
+  .pave-root {
+    gap: 8px;
+  }
+  .pave-numero {
+    font-size: clamp(22px, 6vw, 28px);
+  }
+  .pave-touches {
+    gap: 8px;
+  }
+  .pave-touche {
+    max-height: 56px;
+    font-size: 20px;
+  }
+}
+
+/* 360 px, la largeur des Android courants : les touches gardent leur cible de
+   44 px, seuls les ecarts se resserrent. */
+@media (max-width: 400px) {
+  .pave-touches {
+    gap: 10px;
+  }
+  .pave-touche {
+    max-height: 64px;
+  }
+  .pave-vider {
+    padding: 0 12px;
+  }
+}
+
+/* ═══════════════════════════════════ Mouvement reduit (preference systeme) */
+
+/* Seules les transitions de confort tombent. Les changements de COULEUR au
+   survol et a l'appui restent : ils disent qu'une touche a bien ete pressee,
+   et ne provoquent aucune gene vestibulaire. */
+@media (prefers-reduced-motion: reduce) {
+  .pave-touche,
+  .pave-vider,
+  .pave-effacer {
+    transition: none;
+  }
+}
+
+/* Le nom du titulaire, colle sous les chiffres et DANS l'ecran du pave.
+   Hauteur reservee : sans elle, l'apparition du nom pousse les touches vers le
+   bas au moment ou le doigt vise deja la suivante. */
+.pave-sous-numero {
+  min-height: 18px;
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

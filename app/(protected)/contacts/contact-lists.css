@@ -13,9 +13,13 @@
    ---------------------------------------------------------------------------
    REGLE 1 — TOUT est prefixe `clist-`.
    Une page de ce depot charge plusieurs feuilles a la fois (la page des
-   contacts emprunte deja `calls-page.css`), et deux feuilles se sont deja
-   disputees une meme classe : la derniere chargee gagnait, au hasard de
-   l'ordre des imports. Aucun nom generique ici — pas de `.row`, pas de
+   contacts importe deja `calls-page.css`), et deux feuilles se sont deja
+   disputees une meme classe. Attention au piege : ce n'est PAS la derniere
+   feuille importee par la page qui gagne. La construction concatene toutes
+   les feuilles du depot en un seul `index-*.css`, y compris celles des pages
+   ou l'on n'ira jamais ; a specificite egale, c'est la derniere du BUNDLE qui
+   l'emporte. Une classe non prefixee peut donc etre repeinte par une page
+   sans aucun rapport. Aucun nom generique ici — pas de `.row`, pas de
    `.modal`, pas de `.checked`. Les etats eux-memes sont prefixes
    (`.clist-membre-on` et non `.on`).
    Les morceaux de la page sont ecrits en descendants de `.clist-root` ; la
@@ -239,7 +243,7 @@
 /* Marque de sonnerie, montree seulement quand la liste en porte une. Le texte
    colore sur `--accent-dim` reste lisible : cette teinte ne fait qu'environ
    10 % d'opacite sur le fond, l'ecart de contraste tient dans les quatre
-   themes — c'est deja le dessin de `.filter-btn.on`. */
+   themes — c'est le meme couple que `.clist-mode-on`, plus bas. */
 .clist-root .clist-sonnerie {
   display: inline-flex;
   align-items: center;
@@ -697,6 +701,95 @@
 
 /* ══════════════════════════════════════════════ Selection des membres */
 
+/* Deux rangees de pastilles ouvrent ce bloc : le choix du mode (« depuis les
+   contacts » / « par numero »), puis les membres deja retenus, que l'on retire
+   d'un clic.
+
+   Elles empruntaient `filter-group` et `filter-btn` a `calls-page.css`, sous
+   le motif que la page des contacts charge deja cette feuille. L'import est
+   bien la, mais le rendu ne s'y joue pas : la construction concatene TOUTES
+   les feuilles en un seul `index-*.css`, et `chats-page.css` y redeclare
+   `.filter-btn` sans le scoper, a specificite egale et plus loin dans le
+   fichier. C'est donc elle qui gagnait sur les proprietes en conflit, et la
+   fenetre affichait `height: 28px` / `padding: 0 14px` la ou l'on croyait
+   poser `padding: 8px 16px`.
+   Ce qui suit reprend le rendu CONSTATE dans le bundle — donc celui de
+   `chats-page.css` pour ces deux proprietes — et non celui qui etait ecrit
+   dans `calls-page.css` : a l'ecran, rien ne bouge. Sous nos propres noms,
+   un decoupage du CSS par route ou une simple retouche de `chats-page.css`
+   ne restylent plus cette fenetre a notre insu.
+
+   `jeton` et non `pastille` : `.clist-pastille` designe deja, plus haut, le
+   point de couleur d'une liste. */
+.clist-modes,
+.clist-jetons {
+  display: flex;
+  /* Une seule ligne qui defile lateralement, barre masquee. Laisser la rangee
+     passer a la ligne ferait grandir la fenetre a chaque membre ajoute, et le
+     pied — donc « Enregistrer » — descendrait a mesure qu'on selectionne. */
+  flex-wrap: nowrap;
+  gap: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Le geste horizontal va au defilement de la rangee, le vertical reste au
+     corps de la fenetre. */
+  touch-action: pan-x;
+  scrollbar-width: none;
+}
+.clist-modes::-webkit-scrollbar,
+.clist-jetons::-webkit-scrollbar {
+  display: none;
+}
+
+/* Un seul dessin, deux noms. Les deux rangees se ressemblent aujourd'hui, mais
+   un mode se choisit et se garde, un jeton se retire : le jour ou l'un des deux
+   doit changer d'allure, l'autre n'a pas a suivre.
+   Pas de regle de focus ici : `globals.css` pose deja le meme cadre pour tout
+   le monde, et c'est ce que ces boutons montrent aujourd'hui. */
+.clist-mode,
+.clist-jeton {
+  flex: 0 0 auto;
+  /* Hauteur imposee et retrait horizontal seul : les libelles n'ont ni la meme
+     longueur ni le meme nombre de lignes possibles, la rangee doit rester
+     rectiligne. Le `border-box` global compte les 2 px de bordure dedans. */
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  /* Ecart entre le libelle d'un jeton, sa mention « pas un contact » et sa
+     croix de retrait. */
+  gap: 5px;
+  padding: 0 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.clist-mode:hover,
+.clist-jeton:hover {
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+/* Mode retenu. Ecrit `.clist-mode.clist-mode-on`, et non `.clist-mode-on` seul
+   comme le reste de la feuille : il lui faut au moins la specificite de
+   `.clist-mode:hover`, sinon survoler le mode deja retenu le repeindrait en
+   gris. C'etait l'equilibre exact de `.filter-btn.on`, il devait etre garde.
+   A porter avec `aria-pressed`, pour que le choix s'entende aussi. */
+.clist-mode.clist-mode-on {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
 .clist-recherche {
   position: relative;
 }
@@ -976,6 +1069,18 @@
 }
 
 /* ══════════════════════════════════════════════════ Points de rupture */
+
+/* Sous 768 px les rangees de pastilles passent a la ligne au lieu de defiler.
+   Au doigt, un defilement horizontal loge dans une fenetre qui defile deja
+   verticalement se prend mal : le geste part dans le mauvais sens une fois sur
+   deux. C'etait deja le point de rupture de `calls-page.css`, il est repris
+   tel quel pour que rien ne bouge. */
+@media (max-width: 768px) {
+  .clist-modes,
+  .clist-jetons {
+    flex-wrap: wrap;
+  }
+}
 
 /* Sous 640 px la fenetre prend tout l'ecran. Une fenetre centree y laisserait
    des marges de quelques pixels pour rien, tout en volant de la hauteur a la

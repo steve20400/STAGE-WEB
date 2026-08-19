@@ -21,6 +21,7 @@ import {
   listerBloques,
   type PersonneBloquee,
 } from "../../../src/services/blocked-service"
+import { ContactListsSection } from "./contact-lists-section"
 import "../calls/calls-page.css"
 
 /**
@@ -197,7 +198,15 @@ export default function ContactsPage() {
           </form>
         )}
 
-        <div className="calls-controls" style={{ marginTop: 14 }}>
+        {/* Les listes sont posees DANS l'en-tete de la page : elle porte deja le
+            retrait lateral, et son point de rupture, donc la section s'aligne sur
+            le titre a toutes les largeurs. Elles viennent avant la recherche, qui
+            appartient au repertoire juste en dessous. */}
+        <div style={{ marginTop: 20 }}>
+          <ContactListsSection contacts={contacts} />
+        </div>
+
+        <div className="calls-controls" style={{ marginTop: 20 }}>
           <div className="search-wrap">
             <svg
               width="14"
