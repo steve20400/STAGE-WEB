@@ -79,11 +79,22 @@ const TITULAIRE_VIDE: EtatTitulaire = { numero: "", etat: "muet", nom: null }
 function useTitulaire(
   chiffres: string,
   actif: boolean,
-  onTitulaire?: (compte: CompteTrouve | null) => void
+  onTitulaire?: (compte: CompteTrouve | null, numero: string) => void
 ): EtatTitulaire | null {
   const [etat, setEtat] = useState<EtatTitulaire>(TITULAIRE_VIDE)
   // La reference evite de relancer la recherche parce que le parent a redefini
   // sa fonction au rendu — cas normal quand elle n'est pas memorisee.
+  // Le numero CHERCHE voyage avec la reponse, et ce n'est pas une commodite.
+  //
+  // `prevenir.current` est reecrit a chaque rendu : le rappel qui parle est donc
+  // celui du DERNIER rendu, dont la fermeture designe les chiffres AFFICHES et non
+  // ceux qui ont ete cherches. Un parent qui appariait la reponse avec sa propre
+  // variable de fermeture pouvait donc coller le compte du numero precedent au
+  // numero courant. Le drapeau `vivant` ne l'en protege pas : il ne s'eteint qu'au
+  // nettoyage de l'effet, une tache APRES le rendu, et une reponse resolue dans
+  // cette fenetre passe encore. Le pave affichait alors correctement le nom du
+  // numero courant — c'est-a-dire rien — pendant que le bouton du parent
+  // s'allumait sur un compte perime.
   const prevenir = useRef(onTitulaire)
   prevenir.current = onTitulaire
 
@@ -110,7 +121,7 @@ function useTitulaire(
     // part sur le reseau. Annoncer « aucun compte » des le premier chiffre
     // serait faux — l'utilisateur n'a pas fini de taper.
     if (!isValidAlanyaNumber(chiffres)) {
-      prevenir.current?.(null)
+      prevenir.current?.(null, chiffres)
       taireSur(chiffres)
       return
     }
@@ -126,7 +137,7 @@ function useTitulaire(
             // Le parent recoit le compte AVANT l'affichage : c'est ce qui lui
             // evite de lancer sa propre recherche pour la meme question, et donc
             // d'afficher un nom pendant que son bouton reste eteint.
-            prevenir.current?.(compte ?? null)
+            prevenir.current?.(compte ?? null, chiffres)
             if (!compte) {
               setEtat({ numero: chiffres, etat: "inconnu", nom: null })
             } else if (compte.nom) {
@@ -142,7 +153,7 @@ function useTitulaire(
             // reponse vraie — annoncer un compte introuvable ferait accuser le
             // numero d'un defaut qui est le notre.
             if (vivant) {
-              prevenir.current?.(null)
+              prevenir.current?.(null, chiffres)
               taireSur(chiffres)
             }
           })
@@ -251,7 +262,7 @@ export function PaveNumerique({
    * pendant que le bouton reste eteint parce que l'autre requete n'a pas encore
    * repondu.
    */
-  onTitulaire?: (compte: CompteTrouve | null) => void
+  onTitulaire?: (compte: CompteTrouve | null, numero: string) => void
   /**
    * Met `sousLeNumero` en valeur comme le fait le pave quand il cherche
    * lui-meme : encre pleine et graisse, au lieu du gris d'accompagnement.

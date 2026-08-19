@@ -869,7 +869,7 @@ export default function MeetingRoomPage() {
                    reference : le rappel qui parle est celui du rendu qui a
                    lance la recherche, donc `chiffresDirects` designe le numero
                    CHERCHE et non le dernier tape. */
-                onTitulaire={(compte) => setTitulaireDirect({ numero: chiffresDirects, compte })}
+                onTitulaire={(compte, numero) => setTitulaireDirect({ numero, compte })}
               />
               {/* L'etat de la SAISIE. Le nom du titulaire, lui, se lit sous les
                   chiffres, dans le pave. */}
