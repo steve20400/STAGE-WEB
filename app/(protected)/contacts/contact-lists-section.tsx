@@ -10,7 +10,11 @@ import {
   type ListeContacts,
   type ResultatEcriture,
 } from "../../../src/services/contact-lists-service"
-import { previewRingtone, stopRingtonePreview } from "../../../src/services/ringtones"
+import {
+  previewRingtone,
+  rafraichirCatalogue,
+  stopRingtonePreview,
+} from "../../../src/services/ringtones"
 import { ContactListModal } from "./contact-list-modal"
 import { nomSonnerie, teinteCss } from "./contact-lists-affichage"
 import "./contact-lists.css"
@@ -62,6 +66,16 @@ export function ContactListsSection({ contacts }: { contacts: Contact[] }) {
     void listerListes().then((rendues) => {
       if (!annule) setListes(rendues)
     })
+    // Le catalogue des sonneries importees vit sur le compte, mais son miroir
+    // local est vide sur un appareil qui n'a jamais ouvert les Parametres. Sans
+    // cette relecture, la fenetre de modification n'offrirait que les cinq sons
+    // fournis, et une liste sonnant deja avec un son importe afficherait le
+    // libelle de repli au lieu de son nom — c'est-a-dire exactement le defaut
+    // que le catalogue partage devait faire disparaitre.
+    //
+    // Rien n'est attendu de la reponse : elle met le miroir a jour, et
+    // customRingtones() le relit au moment ou la fenetre s'ouvre.
+    void rafraichirCatalogue().catch(() => undefined)
     return () => {
       annule = true
     }

@@ -41,6 +41,7 @@ import {
   RINGTONE_LABELS,
   customRingtones,
   importRingtone,
+  rafraichirCatalogue,
   removeCustomRingtone,
   type CustomRingtone,
   previewRingtone,
@@ -198,9 +199,15 @@ const NOM_SORTIE_AUDIO: Record<AudioOutputMode, Cle> = {
 
 /**
  * Choix des sonneries. Les trois sons proposes par defaut sont ceux de
- * l'application mobile, reprisa l'octet pres, pour que les deux plateformes
- * sonnent pareil. Le choix est une preference d'appareil : il survit a la
- * deconnexion.
+ * l'application mobile, repris a l'octet pres, pour que les deux plateformes
+ * sonnent pareil.
+ *
+ * Deux portees a ne pas confondre, et l'ecran doit le dire :
+ *  - le CATALOGUE des sonneries importees appartient au COMPTE. Il est relu au
+ *    serveur a l'ouverture de la section, pour qu'une sonnerie importee depuis un
+ *    autre appareil s'y trouve sans avoir a la reimporter ;
+ *  - le CHOIX fait pour chacun des trois evenements reste une preference
+ *    d'APPAREIL, comme le theme : discrete au bureau, forte sur le telephone.
  */
 function RingtonePicker() {
   const { t } = useTranslation()
@@ -213,12 +220,42 @@ function RingtonePicker() {
   const [playing, setPlaying] = useState<string | null>(null)
   const [imported, setImported] = useState<CustomRingtone[]>(() => customRingtones())
   const [importing, setImporting] = useState(false)
+  /** URL dont le retrait est en cours : son bouton se desarme, sinon un second clic part sur une ligne deja supprimee. */
+  const [retrait, setRetrait] = useState<string | null>(null)
   const [sortieAudio, setSortieAudio] = useState<AudioOutputMode>(() => defaultAudioOutput())
   const fileInput = useRef<HTMLInputElement>(null)
   const { success, error: toastError } = useToast()
 
+  const relireChoix = () =>
+    setChoices({
+      incoming: ringtoneFile("incoming"),
+      outgoing: ringtoneFile("outgoing"),
+      message: ringtoneFile("message"),
+    })
+
   // Ne pas laisser un extrait tourner apres avoir quitte les reglages.
   useEffect(() => stopRingtonePreview, [])
+
+  /*
+   * Le catalogue du compte, relu a l'ouverture de la section. `rafraichirCatalogue()`
+   * ne rejette pas : une panne reseau rend le miroir local, donc l'ecran ne se vide
+   * pas et le premier rendu — deja servi par `customRingtones()` — reste valable.
+   *
+   * Les choix sont resynchronises dans la foulee : une sonnerie supprimee depuis un
+   * autre appareil quitte le catalogue, et `ringtoneFile()` rend alors le son par
+   * defaut. Le menu doit montrer ce repli plutot qu'une entree morte.
+   */
+  useEffect(() => {
+    let monte = true
+    void rafraichirCatalogue().then((catalogue) => {
+      if (!monte) return
+      setImported(catalogue)
+      relireChoix()
+    })
+    return () => {
+      monte = false
+    }
+  }, [])
 
   const onImport = async (file: File | undefined) => {
     if (!file) return
@@ -239,14 +276,26 @@ function RingtonePicker() {
     }
   }
 
-  const onRemove = (entree: CustomRingtone) => {
-    removeCustomRingtone(entree.url)
+  /*
+   * Le retrait passe par le serveur, puisque le catalogue y vit. Un refus laisse la
+   * sonnerie en place ici comme ailleurs, et il faut le dire : la taire ferait
+   * croire a une suppression que le prochain rafraichissement annulerait.
+   */
+  const onRemove = async (entree: CustomRingtone) => {
+    setRetrait(entree.url)
+    try {
+      await removeCustomRingtone(entree.url)
+    } catch (err) {
+      toastError(
+        t("set_ringtone_remove_failed"),
+        err instanceof Error ? err.message : t("set_unknown_error")
+      )
+      return
+    } finally {
+      setRetrait(null)
+    }
     setImported(customRingtones())
-    setChoices({
-      incoming: ringtoneFile("incoming"),
-      outgoing: ringtoneFile("outgoing"),
-      message: ringtoneFile("message"),
-    })
+    relireChoix()
     success(t("set_ringtone_removed"), t("set_ringtone_removed_detail", { nom: entree.label }))
   }
 
@@ -389,7 +438,8 @@ function RingtonePicker() {
                 <button
                   type="button"
                   className="ringtone-remove"
-                  onClick={() => onRemove(entree)}
+                  onClick={() => void onRemove(entree)}
+                  disabled={retrait === entree.url}
                   aria-label={t("set_remove_named", { nom: entree.label })}
                   title={t("set_remove")}
                 >
@@ -413,6 +463,9 @@ function RingtonePicker() {
       </div>
 
       <div className="s-hint">{t("set_ringtones_hint")}</div>
+      {/* La portee des deux reglages, dite explicitement : le catalogue suit le
+          compte, le choix reste sur l'appareil. */}
+      <div className="s-hint">{t("set_ringtones_shared")}</div>
     </div>
   )
 }
@@ -2279,7 +2332,9 @@ export default function SettingsPage() {
           border: none; background: none; color: var(--text-ghost); cursor: pointer;
           display: flex; align-items: center; justify-content: center;
         }
-        .ringtone-remove:hover { color: var(--danger); background: var(--danger-dim); }
+        .ringtone-remove:hover:not(:disabled) { color: var(--danger); background: var(--danger-dim); }
+        /* Le retrait passe par le serveur : le bouton reste visible mais inerte le temps de l'aller-retour. */
+        .ringtone-remove:disabled { cursor: progress; opacity: 0.5; }
 
         .ringtone-row {
           display: flex; align-items: center; justify-content: space-between;

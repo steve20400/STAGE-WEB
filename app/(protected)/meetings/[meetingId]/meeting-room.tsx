@@ -13,8 +13,6 @@ import {
   reglerInvitationAuto,
   inviterAReunion,
   demanderInvitation,
-  trouverProprietaireAlanya,
-  type ProprietaireAlanya,
   type DemandeInvitation,
 } from "../../../../src/services/meetings-service"
 import {
@@ -36,6 +34,7 @@ import { useTranslation } from "../../../../src/i18n"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
 import { PaveNumerique } from "../../../../src/components/pave-numerique"
+import type { CompteTrouve } from "../../../../src/services/contact-lists-service"
 import {
   formatAlanyaNumber,
   isValidAlanyaNumber,
@@ -110,6 +109,9 @@ function MeetingRemoteVideo({ stream, name }: { stream?: MediaStream; name: stri
       playsInline
       muted
       className="meeting-remote-video"
+      /* EN DUR FAUTE DE CLE : aucune entree du catalogue ne dit « Video de
+         {name} », et en inventer une pendant qu'il est ecrit ailleurs
+         ferait deux cles pour la meme phrase. A reprendre des qu'elle existe. */
       aria-label={`Vidéo de ${name}`}
     />
   ) : null
@@ -169,7 +171,20 @@ export default function MeetingRoomPage() {
   const [nonLus, setNonLus] = useState(0)
   const [demandes, setDemandes] = useState<DemandeInvitation[]>([])
   const [numeroDirect, setNumeroDirect] = useState("")
-  const [proprietaireNumero, setProprietaireNumero] = useState<ProprietaireAlanya | null>(null)
+  /**
+   * Ce que le pave a trouve sous les chiffres composes, ET les chiffres auxquels
+   * sa reponse se rapporte.
+   *
+   * Le numero accompagne le compte parce que le pave ne previent qu'a
+   * l'aboutissement de SA recherche : entre la frappe d'un chiffre de plus et la
+   * reponse suivante, le compte du numero PRECEDENT serait encore en main, et le
+   * bouton « Ajouter » resterait allume au-dessus d'un numero qui n'est plus le
+   * sien. Compare aux chiffres affiches, il s'eteint des la frappe.
+   */
+  const [titulaireDirect, setTitulaireDirect] = useState<{
+    numero: string
+    compte: CompteTrouve | null
+  }>({ numero: "", compte: null })
   /**
    * Lecture du son refusee par le navigateur. Sans cet etat, la salle est muette
    * et rien ne le dit : on n'a alors ni explication, ni moyen de reessayer.
@@ -383,7 +398,7 @@ export default function MeetingRoomPage() {
 
   const handleJoinMeeting = async () => {
     if (!meeting || !meetingId) return
-    if (meeting.terminee) return showError(t("error"), "Cette réunion est terminée.")
+    if (meeting.terminee) return showError(t("error"), t("meet_ended_toast"))
 
     try {
       await joinMeeting(parseInt(meetingId, 10))
@@ -433,6 +448,8 @@ export default function MeetingRoomPage() {
       await trancherDemandeInvitation(Number(meetingId), demandeId, accepter)
       setDemandes((liste) => liste.filter((d) => d.id !== demandeId))
     } catch (err) {
+      // EN DUR FAUTE DE CLE : le catalogue n'a rien pour l'echec d'un arbitrage
+      // de demande d'invitation. A reprendre des que la cle existe.
       showError(t("error"), err instanceof Error ? err.message : "Demande impossible")
     }
   }
@@ -443,39 +460,33 @@ export default function MeetingRoomPage() {
       await reglerInvitationAuto(Number(meetingId), automatic)
       setMeeting({ ...meeting, invitationAuto: automatic })
     } catch (err) {
-      showError(t("error"), err instanceof Error ? err.message : "Réglage impossible")
+      // « Reglage non enregistre » et non « Reglage impossible » : la case est
+      // deja revenue a sa position d'avant, c'est bien l'enregistrement qui a
+      // manque.
+      showError(t("error"), err instanceof Error ? err.message : t("set_setting_not_saved"))
     }
   }
 
   /*
-   * Recherche du compte vise par l'invitation DIRECTE de l'organisateur.
+   * PLUS AUCUNE RECHERCHE DE TITULAIRE N'EST MENEE DEPUIS CET ECRAN, ni pour le
+   * panneau d'ajout ni pour l'invitation directe de l'organisateur : le pave
+   * partage la mene une fois (`afficherTitulaire`) et rend le compte trouve
+   * (`onTitulaire`).
    *
-   * Elle survit a la migration vers le pave partage alors que sa jumelle du
-   * panneau d'ajout a disparu, et la difference n'est pas un oubli : ici, le
-   * resultat ne sert pas a ecrire un nom — le pave s'en charge — mais a ALLUMER
-   * le bouton « Ajouter ». C'est une regle metier, pas un affichage, et la
-   * mission etait de changer le clavier sans toucher a ce qui decide.
+   * Il y en avait deux, pour la MEME question et a deux rythmes differents : le
+   * pave peignait le nom du titulaire a 350 ms pendant qu'une seconde requete,
+   * ici, decidait a 250 ms si le bouton « Ajouter » s'allumait. L'ecran se
+   * contredisait a chaque frappe — le nom complet lisible sous les chiffres, le
+   * bouton eteint dessous, et rien pour expliquer pourquoi on ne pouvait pas
+   * inviter quelqu'un de manifestement identifie. Une seule source de verite
+   * supprime la contradiction en meme temps que la requete.
    */
-  useEffect(() => {
-    const numero = numeroDirect.replace(/\D/g, "")
-    setProprietaireNumero(null)
-    if (!/^(\d{3,10})$/.test(numero)) return
-    const timer = window.setTimeout(() => {
-      void trouverProprietaireAlanya(numero)
-        .then(setProprietaireNumero)
-        .catch(() => undefined)
-    }, 250)
-    return () => window.clearTimeout(timer)
-  }, [numeroDirect])
 
-  /*
-   * LA RECHERCHE DU TITULAIRE DU NUMERO COMPOSE DANS LE PANNEAU D'AJOUT A
-   * DISPARU D'ICI, et c'est le pave partage qui la mene desormais
-   * (`afficherTitulaire`). Elle ne servait qu'a ecrire un nom sous les chiffres,
-   * jamais a autoriser ou refuser l'invitation : la refaire ici doublerait la
-   * requete et laisserait deux reponses se contredire. Celle de l'invitation
-   * directe, plus bas, reste — elle, elle COMMANDE un bouton.
-   */
+  /** Chiffres composes, sans les espaces d'affichage. */
+  const chiffresDirects = normalizeAlanyaNumber(numeroDirect)
+
+  /** Le compte trouve, mais seulement s'il parle bien des chiffres AFFICHES. */
+  const compteDirect = titulaireDirect.numero === chiffresDirects ? titulaireDirect.compte : null
 
   /** Contacts filtrés par la recherche dans le panneau d'ajout. */
   const contactsFiltres = useMemo(() => {
@@ -527,7 +538,7 @@ export default function MeetingRoomPage() {
       // Recharger la réunion pour mettre à jour la liste
       setMeeting(await fetchMeeting(Number(meetingId)))
     } catch (err) {
-      showError(t("error"), err instanceof Error ? err.message : "Invitation impossible")
+      showError(t("error"), err instanceof Error ? err.message : t("a2_invite_failed"))
     }
   }
 
@@ -545,16 +556,15 @@ export default function MeetingRoomPage() {
 
   const inviterDirectement = async () => {
     if (!meetingId) return
-    const numero = numeroDirect.replace(/\D/g, "")
     // Garde de derniere ligne : le bouton est deja eteint sans compte trouve, et
     // la validation au clavier applique la meme condition.
-    if (!proprietaireNumero) return showError(t("error"), t("dial_unknown_number"))
+    if (!compteDirect) return showError(t("error"), t("dial_unknown_number"))
     try {
-      await inviterAReunion(Number(meetingId), [numero])
+      await inviterAReunion(Number(meetingId), [chiffresDirects])
       setNumeroDirect("")
       setMeeting(await fetchMeeting(Number(meetingId)))
     } catch (err) {
-      showError(t("error"), err instanceof Error ? err.message : "Invitation impossible")
+      showError(t("error"), err instanceof Error ? err.message : t("a2_invite_failed"))
     }
   }
 
@@ -695,7 +705,11 @@ export default function MeetingRoomPage() {
         </button>
       </div>
 
-      {/* NOTIFICATIONS D'INVITATION — positionnées AU-DESSUS du media, pas dans la barre du bas */}
+      {/* NOTIFICATIONS D'INVITATION — positionnées AU-DESSUS du media, pas dans la barre du bas
+
+          EN DUR FAUTE DE CLE : « Demandes d'invitation » et « X souhaite inviter
+          Y » n'existent nulle part au catalogue, ici comme dans le repli de la
+          barre du bas. A reprendre des que les cles existent. */}
       {meeting.jeSuisOrganisateur && demandes.length > 0 && enSalle && (
         <section className="meeting-invite-banner" aria-label="Demandes d'invitation">
           {demandes.map((d) => (
@@ -807,7 +821,10 @@ export default function MeetingRoomPage() {
         <p>{t("meet_duration_minutes", { n: Math.floor(meeting.dureeSecondes / 60) })}</p>
         {meeting.jeSuisOrganisateur && !meeting.terminee && (
           <section className="meeting-settings-panel">
-            <div className="meeting-settings-title">Paramètres de la réunion</div>
+            {/* Le meme intitule et le meme libelle que le panneau « Menu » de la
+                barre du bas, qui porte deja la meme case : deux ecritures du
+                meme reglage ne doivent pas se dire autrement. */}
+            <div className="meeting-settings-title">{t("meet_settings")}</div>
             <label className="meeting-auto-invite">
               <input
                 type="checkbox"
@@ -815,10 +832,8 @@ export default function MeetingRoomPage() {
                 onChange={(e) => void changerModeInvitation(e.target.checked)}
               />
               <span>
-                <strong>Accepter automatiquement les demandes</strong>
-                <small>
-                  Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.
-                </small>
+                <strong>{t("meet_auto_invite")}</strong>
+                <small>{t("meet_auto_invite_hint")}</small>
               </span>
             </label>
             {/* LE PAVE DE LA PAGE DES APPELS, et non plus un clavier maison.
@@ -841,10 +856,20 @@ export default function MeetingRoomPage() {
                   // cette condition, valider au clavier sur un numero sans compte
                   // afficherait une erreur la ou le bouton, eteint, ne propose
                   // rien.
-                  if (proprietaireNumero) void inviterDirectement()
+                  if (compteDirect) void inviterDirectement()
                 }}
                 compact
                 afficherTitulaire
+                /* Le compte que le pave vient de trouver, celui-la meme dont il
+                   ecrit le nom sous les chiffres. C'est ce rappel qui remplace
+                   la seconde requete : le nom affiche et le bouton allume
+                   repondent desormais a la meme reponse, au meme instant.
+
+                   Les chiffres sont pris dans la fermeture et non dans une
+                   reference : le rappel qui parle est celui du rendu qui a
+                   lance la recherche, donc `chiffresDirects` designe le numero
+                   CHERCHE et non le dernier tape. */
+                onTitulaire={(compte) => setTitulaireDirect({ numero: chiffresDirects, compte })}
               />
               {/* L'etat de la SAISIE. Le nom du titulaire, lui, se lit sous les
                   chiffres, dans le pave. */}
@@ -859,7 +884,7 @@ export default function MeetingRoomPage() {
                 <button
                   type="button"
                   onClick={() => void inviterDirectement()}
-                  disabled={!proprietaireNumero}
+                  disabled={!compteDirect}
                 >
                   {t("l2_add")}
                 </button>
@@ -1028,15 +1053,19 @@ export default function MeetingRoomPage() {
                   {d.demandeur.nom} souhaite inviter {d.invite.nom}
                 </span>
                 <div>
-                  <button onClick={() => void traiterDemande(d.id, true)}>Accepter</button>
-                  <button onClick={() => void traiterDemande(d.id, false)}>Refuser</button>
+                  <button onClick={() => void traiterDemande(d.id, true)}>{t("accept")}</button>
+                  <button onClick={() => void traiterDemande(d.id, false)}>{t("decline")}</button>
                 </div>
               </div>
             ))}
           </section>
         )}
 
-        {meeting.terminee && <div className="meeting-ended">Réunion terminée</div>}
+        {/* `meet_ended_toast` porte exactement cette phrase — « Reunion
+            terminee » — dans les neuf langues. Son nom vient de son premier
+            emploi, une notification de la liste des reunions ; c'est le libelle
+            qui compte, et il n'y en a pas d'autre pour cet etat. */}
+        {meeting.terminee && <div className="meeting-ended">{t("meet_ended_toast")}</div>}
 
         {/* Commandes de la salle. Elles n'existent qu'une fois dedans : proposer
             de couper un micro qui n'est pas ouvert n'aurait aucun sens. La camera

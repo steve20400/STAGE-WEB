@@ -391,6 +391,7 @@ export const WEB_TRANSLATION_KEYS = [
   "set_ringtone_upload_failed",
   "set_ringtone_removed",
   "set_ringtone_removed_detail",
+  "set_ringtone_remove_failed",
   "set_ringtones",
   "set_ringtone_for",
   "set_ringtones_imported_group",
@@ -406,6 +407,7 @@ export const WEB_TRANSLATION_KEYS = [
   "set_importing",
   "set_import_ringtone",
   "set_ringtones_hint",
+  "set_ringtones_shared",
   "set_push_diag",
   "set_push_init_done",
   "set_push_init_error",
@@ -1276,6 +1278,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_removed: "Sonnerie retirée",
     set_ringtone_removed_detail:
       "Les événements qui utilisaient « {nom} » reprennent leur son par défaut.",
+    set_ringtone_remove_failed: "Retrait impossible",
     set_ringtones: "Sonneries",
     set_ringtone_for: "Sonnerie pour {evenement}",
     set_ringtones_imported_group: "Importées",
@@ -1293,6 +1296,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "Importer une sonnerie",
     set_ringtones_hint:
       "Les sons proposés en premier sont ceux de l'application mobile. Un son importé est téléversé sur votre compte, donc réutilisable, et se choisit pour n'importe lequel des trois événements. Cinq mégaoctets au maximum. L'écoute s'arrête au bout de quatre secondes.",
+    set_ringtones_shared:
+      "Les sonneries importées suivent votre compte : vous les retrouvez sur tous vos appareils, sans avoir à les réimporter. Le son choisi pour chaque événement, lui, reste propre à cet appareil.",
     set_push_diag: "Diagnostic Push FCM",
     set_push_init_done: "Demande d'initialisation terminée. Vérifiez les statuts ci-dessous.",
     set_push_init_error: "Erreur d'initialisation : {message}",
@@ -2347,6 +2352,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_upload_failed: "The file could not be uploaded.",
     set_ringtone_removed: "Ringtone removed",
     set_ringtone_removed_detail: "Events that used “{nom}” revert to their default sound.",
+    set_ringtone_remove_failed: "Removal failed",
     set_ringtones: "Ringtones",
     set_ringtone_for: "Ringtone for {evenement}",
     set_ringtones_imported_group: "Imported",
@@ -2364,6 +2370,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "Import a ringtone",
     set_ringtones_hint:
       "The sounds listed first are those of the mobile app. An imported sound is uploaded to your account, so it can be reused, and assigned to any of the three events. Five megabytes maximum. Playback stops after four seconds.",
+    set_ringtones_shared:
+      "Imported ringtones follow your account: you find them on every one of your devices, with no need to import them again. The sound chosen for each event, however, stays specific to this device.",
     set_push_diag: "FCM push diagnostics",
     set_push_init_done: "Initialisation request complete. Check the statuses below.",
     set_push_init_error: "Initialisation error: {message}",
@@ -3415,6 +3423,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_removed: "Tono eliminado",
     set_ringtone_removed_detail:
       "Los eventos que usaban «{nom}» vuelven a su sonido predeterminado.",
+    set_ringtone_remove_failed: "No se pudo quitar",
     set_ringtones: "Tonos",
     set_ringtone_for: "Tono para {evenement}",
     set_ringtones_imported_group: "Importados",
@@ -3432,6 +3441,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "Importar un tono",
     set_ringtones_hint:
       "Los sonidos que aparecen primero son los de la app móvil. Un sonido importado se sube a tu cuenta, por lo que puede reutilizarse, y se asigna a cualquiera de los tres eventos. Cinco megabytes como máximo. La reproducción se detiene a los cuatro segundos.",
+    set_ringtones_shared:
+      "Los tonos importados siguen a tu cuenta: los encuentras en todos tus dispositivos, sin volver a importarlos. El sonido elegido para cada evento, en cambio, es propio de este dispositivo.",
     set_push_diag: "Diagnóstico Push FCM",
     set_push_init_done: "Solicitud de inicialización completada. Revisa los estados abajo.",
     set_push_init_error: "Error de inicialización: {message}",
@@ -4489,6 +4500,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_upload_failed: "Die Datei konnte nicht hochgeladen werden.",
     set_ringtone_removed: "Klingelton entfernt",
     set_ringtone_removed_detail: "Ereignisse mit „{nom}“ verwenden wieder ihren Standardton.",
+    set_ringtone_remove_failed: "Entfernen nicht möglich",
     set_ringtones: "Klingeltöne",
     set_ringtone_for: "Klingelton für {evenement}",
     set_ringtones_imported_group: "Importiert",
@@ -4506,6 +4518,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "Klingelton importieren",
     set_ringtones_hint:
       "Die zuerst angezeigten Töne stammen aus der mobilen App. Ein importierter Ton wird in deinem Konto gespeichert, ist also wiederverwendbar, und lässt sich jedem der drei Ereignisse zuweisen. Höchstens fünf Megabyte. Die Wiedergabe endet nach vier Sekunden.",
+    set_ringtones_shared:
+      "Importierte Klingeltöne gehören zu deinem Konto: Du findest sie auf allen deinen Geräten wieder, ohne sie erneut importieren zu müssen. Der für ein Ereignis gewählte Ton bleibt dagegen auf dieses Gerät beschränkt.",
     set_push_diag: "FCM-Push-Diagnose",
     set_push_init_done: "Initialisierung abgeschlossen. Prüfe die Status unten.",
     set_push_init_error: "Initialisierungsfehler: {message}",
@@ -5565,6 +5579,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_upload_failed: "Não foi possível carregar o ficheiro.",
     set_ringtone_removed: "Toque removido",
     set_ringtone_removed_detail: "Os eventos que usavam «{nom}» voltam ao som predefinido.",
+    set_ringtone_remove_failed: "Não foi possível remover",
     set_ringtones: "Toques",
     set_ringtone_for: "Toque para {evenement}",
     set_ringtones_imported_group: "Importados",
@@ -5582,6 +5597,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "Importar um toque",
     set_ringtones_hint:
       "Os sons apresentados primeiro são os da aplicação móvel. Um som importado é carregado na sua conta, logo pode ser reutilizado, e atribuído a qualquer um dos três eventos. Cinco megabytes no máximo. A reprodução para ao fim de quatro segundos.",
+    set_ringtones_shared:
+      "Os toques importados acompanham a sua conta: encontra-os em todos os seus dispositivos, sem os voltar a importar. Já o som escolhido para cada evento fica próprio deste dispositivo.",
     set_push_diag: "Diagnóstico Push FCM",
     set_push_init_done: "Pedido de inicialização concluído. Verifique os estados abaixo.",
     set_push_init_error: "Erro de inicialização: {message}",
@@ -6632,6 +6649,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_upload_failed: "Не удалось загрузить файл.",
     set_ringtone_removed: "Мелодия удалена",
     set_ringtone_removed_detail: "События с мелодией «{nom}» вернулись к звуку по умолчанию.",
+    set_ringtone_remove_failed: "Не удалось удалить",
     set_ringtones: "Мелодии",
     set_ringtone_for: "Мелодия для: {evenement}",
     set_ringtones_imported_group: "Импортированные",
@@ -6649,6 +6667,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "Импортировать мелодию",
     set_ringtones_hint:
       "Первыми показаны звуки мобильного приложения. Импортированный звук загружается в ваш аккаунт, поэтому его можно использовать снова и назначить любому из трёх событий. Не более пяти мегабайт. Прослушивание останавливается через четыре секунды.",
+    set_ringtones_shared:
+      "Импортированные мелодии привязаны к вашему аккаунту: они доступны на всех ваших устройствах, повторно импортировать их не нужно. А звук, выбранный для каждого события, остаётся только на этом устройстве.",
     set_push_diag: "Диагностика Push FCM",
     set_push_init_done: "Запрос на инициализацию выполнен. Проверьте статусы ниже.",
     set_push_init_error: "Ошибка инициализации: {message}",
@@ -7692,6 +7712,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_upload_failed: "文件上传失败。",
     set_ringtone_removed: "铃声已移除",
     set_ringtone_removed_detail: "使用 “{nom}” 的事件已恢复默认提示音。",
+    set_ringtone_remove_failed: "无法移除",
     set_ringtones: "铃声",
     set_ringtone_for: "{evenement} 的铃声",
     set_ringtones_imported_group: "已导入",
@@ -7709,6 +7730,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "导入铃声",
     set_ringtones_hint:
       "排在前面的是手机应用自带的提示音。导入的音频会上传到您的账户，可重复使用，并可指定给三种事件中的任意一种。最大 5 MB。试听在四秒后自动停止。",
+    set_ringtones_shared:
+      "导入的铃声跟随您的账户：在您的所有设备上都能找到，无需重新导入。而为每种事件选择的提示音仅适用于本设备。",
     set_push_diag: "FCM 推送诊断",
     set_push_init_done: "初始化请求已完成。请查看下方状态。",
     set_push_init_error: "初始化错误：{message}",
@@ -8732,6 +8755,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_upload_failed: "Filen kunde inte laddas upp.",
     set_ringtone_removed: "Ringsignal borttaget",
     set_ringtone_removed_detail: "Händelser som använde ”{nom}” återgår till standardljudet.",
+    set_ringtone_remove_failed: "Det gick inte att ta bort",
     set_ringtones: "Ringsignal",
     set_ringtone_for: "Ringsignal för {evenement}",
     set_ringtones_imported_group: "Importerade",
@@ -8749,6 +8773,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "Importera ett ringsignal",
     set_ringtones_hint:
       "Ljuden som visas först är mobilappens. Ett importerat ljud laddas upp till ditt konto, kan därför återanvändas och tilldelas någon av de tre händelserna. Högst fem megabyte. Uppspelningen stoppar efter fyra sekunder.",
+    set_ringtones_shared:
+      "Importerade ringsignaler följer ditt konto: du hittar dem på alla dina enheter utan att importera dem igen. Ljudet du väljer för varje händelse gäller däremot bara den här enheten.",
     set_push_diag: "FCM-push-diagnostik",
     set_push_init_done: "Initieringsbegäran klar. Kontrollera statusarna nedan.",
     set_push_init_error: "Initieringsfel: {message}",
@@ -9800,6 +9826,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_ringtone_upload_failed: "Filen kunne ikke lastes opp.",
     set_ringtone_removed: "Ringetone fjernet",
     set_ringtone_removed_detail: "Hendelser som brukte «{nom}», får standardlyden tilbake.",
+    set_ringtone_remove_failed: "Kunne ikke fjerne",
     set_ringtones: "Ringetoner",
     set_ringtone_for: "Ringetone for {evenement}",
     set_ringtones_imported_group: "Importerte",
@@ -9817,6 +9844,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_import_ringtone: "Importer en ringetone",
     set_ringtones_hint:
       "Lydene som vises først, er mobilappens. En importert lyd lastes opp til kontoen din, kan derfor gjenbrukes og tilordnes hvilken som helst av de tre hendelsene. Maks fem megabyte. Avspillingen stopper etter fire sekunder.",
+    set_ringtones_shared:
+      "Importerte ringetoner følger kontoen din: du finner dem på alle enhetene dine uten å importere dem på nytt. Lyden du velger for hver hendelse, gjelder derimot bare denne enheten.",
     set_push_diag: "FCM-push-diagnostikk",
     set_push_init_done: "Initialiseringsforespørselen er fullført. Sjekk statusene nedenfor.",
     set_push_init_error: "Initialiseringsfeil: {message}",
