@@ -18,6 +18,7 @@ import {
   isValidAlanyaNumber,
   normalizeAlanyaNumber,
 } from "../lib/alanya-number"
+import { PaveNumerique } from "./pave-numerique"
 import "./call-options-menu.css"
 
 /** Cles, pas libelles : le menu se traduit au rendu, pas au chargement du module. */
@@ -26,9 +27,6 @@ const LIBELLE_TAILLE: Record<CallDisplayMode, Cle> = {
   medium: "size_medium_screen",
   full: "size_large_screen",
 }
-
-/** Disposition d'un clavier de telephone, la meme que celle du composeur. */
-const TOUCHES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""] as const
 
 /**
  * Les deux AUTRES tailles : une fenetre ne se propose jamais elle-meme.
@@ -82,6 +80,11 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
   const [onglet, setOnglet] = useState<"contacts" | "numero">("contacts")
   const [chiffres, setChiffres] = useState("")
   const panneauRef = useRef<HTMLDivElement | null>(null)
+  /**
+   * Enveloppe du pave, tenue pour une seule raison : savoir si une frappe a
+   * DEJA ete traitee par lui (voir l'ecoute du clavier physique, plus bas).
+   */
+  const zonePave = useRef<HTMLDivElement | null>(null)
 
   // Le menu repart toujours de sa racine : rouvrir sur le sous-menu des tailles
   // donnerait l'impression d'un menu different d'une fois a l'autre.
@@ -200,34 +203,66 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
     return contacts.find((c) => normalizeAlanyaNumber(c.phone) === chiffres) ?? null
   }, [chiffres, contacts])
 
-  const taper = useCallback((touche: string) => {
-    setChiffres((actuel) =>
-      normalizeAlanyaNumber(actuel + touche).slice(0, ALANYA_NUMBER_MAX_LENGTH)
-    )
-  }, [])
-
-  const effacer = useCallback(() => setChiffres((actuel) => actuel.slice(0, -1)), [])
-
   const validerLeNumero = useCallback(() => {
     if (!isValidAlanyaNumber(chiffres)) return
     valider(chiffres, contactDuNumero?.name ?? formatAlanyaNumber(chiffres))
   }, [chiffres, contactDuNumero, valider])
 
-  // On est dans un navigateur : le clavier physique doit composer aussi.
+  /**
+   * Le clavier physique doit composer aussi : on est dans un navigateur.
+   *
+   * Depuis la migration vers le pave partage, l'ecoute est PARTAGEE, et c'est la
+   * seule subtilite qui reste ici. Le pave, lui, ecoute sur SA racine — il est
+   * fait pour vivre dans une fenetre qui contient d'autres champs de saisie, et
+   * un ecouteur global y volerait les chiffres tapes ailleurs (la recherche de
+   * l'onglet contacts, par exemple). Il prend le focus a l'affichage
+   * (`autoFocus`), donc chiffres, retour arriere et Entree lui arrivent tant
+   * que le focus y reste.
+   *
+   * Cette ecoute-ci reste sur `document` parce que le focus peut sortir du pave
+   * sans quitter le dialogue — un clic sur le titre, sur les onglets, sur le
+   * fond de la fenetre — et le clavier devait deja composer dans ces cas la
+   * avant la migration. D'ou la GARDE : une frappe partie de l'interieur du
+   * pave a deja ete traitee par lui, et la retraiter ici doublerait le chiffre.
+   *
+   * Echap n'est traite que d'ici : le pave laisse expressement passer cette
+   * touche a la fenetre qui le porte, faute de savoir ce qu'elle en fera.
+   */
   useEffect(() => {
     if (dialogue === null || onglet !== "numero") return
     const surTouche = (e: KeyboardEvent) => {
       if (e.key === "Escape") return fermerDialogue()
-      if (e.key === "Enter") return validerLeNumero()
-      if (e.key === "Backspace") {
-        e.preventDefault()
-        return effacer()
+
+      const cible = e.target
+      if (cible instanceof Node && zonePave.current?.contains(cible)) return
+
+      if (e.key === "Enter") {
+        // Entree sur un bouton, c'est presser CE bouton : le navigateur en fait
+        // deja un clic. Valider en plus enverrait l'invitation au moment meme ou
+        // l'on presse « Annuler ».
+        if (cible instanceof HTMLElement && cible.closest("button")) return
+        return validerLeNumero()
       }
-      if (/^[0-9]$/.test(e.key)) taper(e.key)
+      if (e.key === "Backspace") {
+        // Sans cela, certains navigateurs remontent d'une page a la frappe d'un
+        // retour arriere hors champ de saisie.
+        e.preventDefault()
+        return setChiffres((actuel) => actuel.slice(0, -1))
+      }
+      if (/^[0-9]$/.test(e.key)) {
+        // Le plafond est applique ICI aussi, et pas seulement dans le pave : le
+        // pave borne ce qu'il AFFICHE, mais l'etat reste tenu par ce composant.
+        // Sans cette coupe, un onzieme chiffre frappe hors du pave laisserait un
+        // numero trop long dans l'etat — invalide pour `isValidAlanyaNumber`,
+        // donc bouton eteint — sous des chiffres qui, eux, paraissent complets.
+        setChiffres((actuel) =>
+          normalizeAlanyaNumber(actuel + e.key).slice(0, ALANYA_NUMBER_MAX_LENGTH)
+        )
+      }
     }
     document.addEventListener("keydown", surTouche)
     return () => document.removeEventListener("keydown", surTouche)
-  }, [dialogue, onglet, effacer, fermerDialogue, taper, validerLeNumero])
+  }, [dialogue, onglet, fermerDialogue, validerLeNumero])
 
   return (
     <>
@@ -347,51 +382,54 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                   </div>
                 </>
               ) : (
-                <div className="call-opt-pave">
-                  <div className="call-opt-numero" aria-live="polite">
-                    {chiffres ? (
-                      formatAlanyaNumber(chiffres)
-                    ) : (
-                      <span className="call-opt-numero-vide">Alanya ID</span>
-                    )}
-                  </div>
-                  <div className="call-opt-numero-aide" aria-live="polite">
-                    {chiffres.length === 0
-                      ? t("dial_hint_number")
-                      : contactDuNumero
-                        ? contactDuNumero.name
+                <>
+                  {/* L'ENVELOPPE NE CONTIENT QUE LE PAVE ET SA LIGNE D'ETAT, et
+                      le bouton de validation lui est reste dehors : elle sert de
+                      repere a l'ecoute du clavier physique — « cette frappe
+                      vient-elle du pave ? » —, et un bouton dedans y aurait fait
+                      passer pour deja traitees les frappes recues alors qu'il a
+                      le focus. Un chiffre tape apres une tabulation jusqu'au
+                      bouton se serait perdu sans rien dire. La ligne d'etat, un
+                      simple `div`, ne prend jamais le focus : elle peut rester. */}
+                  <div className="call-opt-pave" ref={zonePave}>
+                    {/* LE PAVE PARTAGE, en variante resserree — ce menu vit dans
+                        un dialogue de 360 px pose par-dessus un appel en cours,
+                        et le pave plein y ferait defiler ce qui doit tenir d'un
+                        coup d'oeil.
+
+                        `afficherTitulaire` : le NOM COMPLET du titulaire se lit
+                        sous les chiffres, dans l'ecran du pave. Il remplace la
+                        reconnaissance de contact que ce fichier faisait lui-meme
+                        sur le repertoire local et ne s'y ajoute pas — une seule
+                        ligne de nom, sinon deux reponses a la meme question se
+                        contrediraient des que le repertoire est en retard sur le
+                        serveur. Ce qu'on y gagne : le repertoire ne connait que
+                        les contacts enregistres, la recherche connait tous les
+                        comptes ; inviter ou transferer vers quelqu'un qu'on n'a
+                        pas enregistre cesse donc de se faire a l'aveugle.
+
+                        Pas de `sousLeNumero` : ce prop l'emporterait sur la
+                        recherche et rendrait la ligne muette. */}
+                    <PaveNumerique
+                      valeur={chiffres}
+                      onChange={setChiffres}
+                      onValider={validerLeNumero}
+                      autoFocus
+                      compact
+                      afficherTitulaire
+                    />
+
+                    {/* L'etat de la SAISIE, qui n'est pas celui du numero : il
+                        dit si l'on peut valider, la ou la ligne du titulaire,
+                        dans le pave, dit vers qui l'on part. */}
+                    <div className="call-opt-numero-aide" aria-live="polite">
+                      {chiffres.length === 0
+                        ? t("dial_hint_number")
                         : numeroValide
                           ? t("number_complete")
                           : t("digits_too_short", { n: chiffres.length })}
+                    </div>
                   </div>
-
-                  <div className="call-opt-touches">
-                    {TOUCHES.map((touche, index) =>
-                      touche === "" ? (
-                        // Les cases vides tiennent la grille : le 0 reste centre
-                        // sous le 8, comme sur un telephone.
-                        <span key={`vide-${index}`} aria-hidden />
-                      ) : (
-                        <button
-                          key={touche}
-                          className="call-opt-touche"
-                          onClick={() => taper(touche)}
-                          aria-label={touche}
-                        >
-                          {touche}
-                        </button>
-                      )
-                    )}
-                  </div>
-
-                  <button
-                    className="call-opt-effacer"
-                    onClick={effacer}
-                    disabled={chiffres.length === 0}
-                    aria-label={t("erase_last_digit")}
-                  >
-                    ⌫ {t("erase")}
-                  </button>
 
                   <button
                     className="call-opt-valider"
@@ -403,7 +441,7 @@ export function CallOptionsMenu({ open, onClose, returnTo = "/calls" }: CallOpti
                       ? t("invite_this_number")
                       : t("transfer_to_this_number")}
                   </button>
-                </div>
+                </>
               )}
 
               <button className="call-opt-annuler" onClick={fermerDialogue}>

@@ -195,6 +195,28 @@
 /* Fenetre basse (telephone en paysage, petite fenetre de navigateur) : on
    resserre pour que le numero, le clavier et l'effacement tiennent ensemble
    sans defilement — c'est deja la regle du composeur. */
+/* 360 px, la largeur des Android courants : les touches gardent leur cible de
+   44 px, seuls les ecarts se resserrent.
+
+   CE BLOC PASSE AVANT CELUI DE LA HAUTEUR, ET L'ORDRE EST LE CORRECTIF. Les deux
+   requetes ont la meme specificite : sur un ecran a la fois etroit ET bas, la
+   derniere ecrite l'emporte. Quand la largeur venait apres, ses touches de 64 px
+   annulaient les 56 px voulus par la hauteur, et les 32 px ainsi repris
+   poussaient les boutons d'appel du composeur SOUS la ligne de flottaison —
+   mesure a 376x521 : les deux seuls boutons qui permettent d'appeler n'etaient
+   plus visibles a l'ouverture. La hauteur doit gagner : c'est elle qui manque. */
+@media (max-width: 400px) {
+  .pave-touches {
+    gap: 10px;
+  }
+  .pave-touche {
+    max-height: 64px;
+  }
+  .pave-vider {
+    padding: 0 12px;
+  }
+}
+
 @media (max-height: 620px) {
   .pave-root {
     gap: 8px;
@@ -211,19 +233,6 @@
   }
 }
 
-/* 360 px, la largeur des Android courants : les touches gardent leur cible de
-   44 px, seuls les ecarts se resserrent. */
-@media (max-width: 400px) {
-  .pave-touches {
-    gap: 10px;
-  }
-  .pave-touche {
-    max-height: 64px;
-  }
-  .pave-vider {
-    padding: 0 12px;
-  }
-}
 
 /* ═══════════════════════════════════ Mouvement reduit (preference systeme) */
 
@@ -238,16 +247,102 @@
   }
 }
 
+/* ══════════════════════════════════════════ Le titulaire, sous les chiffres */
+
 /* Le nom du titulaire, colle sous les chiffres et DANS l'ecran du pave.
    Hauteur reservee : sans elle, l'apparition du nom pousse les touches vers le
-   bas au moment ou le doigt vise deja la suivante. */
+   bas au moment ou le doigt vise deja la suivante.
+
+   CENTRE, comme les chiffres : cale a gauche, le nom ne se lirait pas comme
+   appartenant au numero qui le surplombe.
+
+   IL SE LIT EN ENTIER, quitte a passer sur deux lignes — c'est la reponse a la
+   question que pose la composition, « qui est-ce ? », et une reponse tronquee a
+   l'ellipse ne repond pas. `overflow-wrap` coupe les noms sans espace plutot
+   que de les laisser elargir le pave. La coupe a deux lignes borne tout de
+   meme la pousse : un nom pathologique ne doit pas chasser le clavier hors de
+   l'ecran. */
 .pave-sous-numero {
-  min-height: 18px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  min-height: 1.4em;
   margin-top: 2px;
   font-size: 12.5px;
   line-height: 1.35;
+  text-align: center;
   color: var(--text-secondary);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+
+/* Le NOM trouve, et lui seul : c'est la reponse, elle se detache de l'attente
+   et du « aucun compte », qui restent des mentions de service. */
+.pave-titulaire {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* L'attente, au contraire, s'efface : elle ne dit rien du titulaire et ne doit
+   pas se faire prendre pour un nom au premier coup d'oeil. */
+.pave-titulaire-attente {
+  color: var(--text-ghost);
+}
+
+/* ═══════════════════════════════════════════════ Variante resserree */
+
+/* POUR QUI. Un pave pose dans un menu deroulant d'appel (`call-options-menu
+   .call-opt-dialog`, 360 px de large moins 22 px de marge interne) ou dans le
+   panneau lateral d'une salle de reunion (`meeting-panneau-pave`, ou le clavier
+   maison tient dans 220 px). Le pave plein tape a 320 px de large avec des
+   touches de 74 px : il y deborde, ou fait defiler un menu qui ne devrait pas
+   defiler.
+
+   CE QUI CEDE ET CE QUI NE CEDE PAS. Les ecarts et le PLAFOND des touches
+   cedent ; la cible tactile de 44 px ne cede pas, elle est la meme regle pour
+   tout le monde. Les touches maison de ces deux ecrans descendent a 38 px de
+   haut — on ne les imite pas la-dessus, on ne recopie que leur largeur.
+
+   Ces regles gagnent sur celles du point de rupture en hauteur (deux classes
+   contre une), ce qui est sans consequence : elles sont deja plus serrees que
+   lui partout ou les deux se prononcent. */
+
+.pave-compact {
+  gap: 8px;
+}
+
+.pave-compact .pave-numero {
+  font-size: clamp(20px, 6vw, 26px);
+  letter-spacing: 1px;
+}
+
+.pave-compact .pave-sous-numero {
+  font-size: 11.5px;
+}
+
+.pave-compact .pave-touches {
+  gap: 8px;
+  width: min(240px, 100%);
+}
+
+.pave-compact .pave-touche {
+  max-height: 54px;
+  font-size: 20px;
+}
+
+.pave-compact .pave-actions {
+  grid-template-columns: 44px 1fr 44px;
+  width: min(240px, 100%);
+}
+
+.pave-compact .pave-vider {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 11.5px;
+}
+
+.pave-compact .pave-effacer {
+  width: 44px;
+  height: 44px;
 }

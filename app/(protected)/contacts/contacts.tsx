@@ -13,6 +13,7 @@ import {
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
 import { avatarDisplaySrc } from "../../../src/lib/avatar"
+import { NomDuTitulaire } from "../../../src/components/nom-du-titulaire"
 import { RowActionsMenu } from "../../../src/components/row-actions-menu"
 import { useTranslation } from "../../../src/i18n"
 import {
@@ -167,22 +168,35 @@ export default function ContactsPage() {
               display: "flex",
               flexWrap: "wrap",
               gap: 10,
-              alignItems: "center",
+              // Les controles s'alignent par le HAUT depuis que le champ du
+              // numero porte le nom du titulaire sous lui : centres, l'alias et
+              // le bouton descendaient d'une demi-ligne des qu'un nom
+              // apparaissait, et remontaient des qu'il disparaissait.
+              alignItems: "flex-start",
               background: "var(--bg-surface)",
               border: "1px solid var(--border-subtle)",
               borderRadius: 12,
               padding: 14,
             }}
           >
-            <input
-              className="input-base"
-              placeholder={t("alanya_id_placeholder")}
-              value={formatAlanyaNumber(newNumber)}
-              onChange={(e) => setNewNumber(formatAlanyaNumber(e.target.value))}
-              inputMode="numeric"
-              maxLength={ALANYA_NUMBER_FORMATTED_MAX_LENGTH}
-              style={{ padding: "10px 12px", width: 200, fontSize: 13 }}
-            />
+            {/* Le numero et son titulaire forment une colonne : le nom doit se
+                lire DIRECTEMENT sous les chiffres, et la rangee, elle, est
+                horizontale. Sans cette colonne le nom serait parti a cote du
+                champ de l'alias, ou il ne se rapporterait plus a rien. */}
+            <div style={{ display: "grid", gap: 4, width: 200 }}>
+              <input
+                className="input-base"
+                placeholder={t("alanya_id_placeholder")}
+                value={formatAlanyaNumber(newNumber)}
+                onChange={(e) => setNewNumber(formatAlanyaNumber(e.target.value))}
+                inputMode="numeric"
+                maxLength={ALANYA_NUMBER_FORMATTED_MAX_LENGTH}
+                style={{ padding: "10px 12px", width: "100%", fontSize: 13 }}
+              />
+              {/* On enregistre un contact sous un alias : savoir QUI porte ce
+                  numero avant de le nommer evite de baptiser un inconnu. */}
+              <NomDuTitulaire numero={newNumber} />
+            </div>
             <input
               className="input-base"
               placeholder={t("alias_placeholder")}
@@ -194,7 +208,13 @@ export default function ContactsPage() {
             <button className="new-call-btn" type="submit" disabled={!canSave || saving}>
               {saving ? t("device_name_saving") : t("save")}
             </button>
-            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{t("alanya_id_hint")}</span>
+            {/* L'indication generale reste a sa place, et centree : elle ne dit
+                rien de CE numero-la, elle explique ou trouver un Alanya ID. La
+                remonter en tete de rangee, avec les champs, la ferait lire
+                comme leur etiquette. */}
+            <span style={{ fontSize: 11, color: "var(--text-muted)", alignSelf: "center" }}>
+              {t("alanya_id_hint")}
+            </span>
           </form>
         )}
 

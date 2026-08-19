@@ -35,11 +35,11 @@ import {
 import { useTranslation } from "../../../../src/i18n"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
+import { PaveNumerique } from "../../../../src/components/pave-numerique"
 import {
   formatAlanyaNumber,
   isValidAlanyaNumber,
   normalizeAlanyaNumber,
-  ALANYA_NUMBER_MAX_LENGTH,
 } from "../../../../src/lib/alanya-number"
 import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
@@ -447,6 +447,15 @@ export default function MeetingRoomPage() {
     }
   }
 
+  /*
+   * Recherche du compte vise par l'invitation DIRECTE de l'organisateur.
+   *
+   * Elle survit a la migration vers le pave partage alors que sa jumelle du
+   * panneau d'ajout a disparu, et la difference n'est pas un oubli : ici, le
+   * resultat ne sert pas a ecrire un nom — le pave s'en charge — mais a ALLUMER
+   * le bouton « Ajouter ». C'est une regle metier, pas un affichage, et la
+   * mission etait de changer le clavier sans toucher a ce qui decide.
+   */
   useEffect(() => {
     const numero = numeroDirect.replace(/\D/g, "")
     setProprietaireNumero(null)
@@ -459,19 +468,14 @@ export default function MeetingRoomPage() {
     return () => window.clearTimeout(timer)
   }, [numeroDirect])
 
-  /** Propriétaire du numéro composé dans le PANNEAU d'ajout. */
-  const [proprietaireAjout, setProprietaireAjout] = useState<ProprietaireAlanya | null>(null)
-  useEffect(() => {
-    const numero = chiffresAjout.replace(/\D/g, "")
-    setProprietaireAjout(null)
-    if (!/^(\d{3,10})$/.test(numero)) return
-    const timer = window.setTimeout(() => {
-      void trouverProprietaireAlanya(numero)
-        .then(setProprietaireAjout)
-        .catch(() => undefined)
-    }, 250)
-    return () => window.clearTimeout(timer)
-  }, [chiffresAjout])
+  /*
+   * LA RECHERCHE DU TITULAIRE DU NUMERO COMPOSE DANS LE PANNEAU D'AJOUT A
+   * DISPARU D'ICI, et c'est le pave partage qui la mene desormais
+   * (`afficherTitulaire`). Elle ne servait qu'a ecrire un nom sous les chiffres,
+   * jamais a autoriser ou refuser l'invitation : la refaire ici doublerait la
+   * requete et laisserait deux reponses se contredire. Celle de l'invitation
+   * directe, plus bas, reste — elle, elle COMMANDE un bouton.
+   */
 
   /** Contacts filtrés par la recherche dans le panneau d'ajout. */
   const contactsFiltres = useMemo(() => {
@@ -542,7 +546,9 @@ export default function MeetingRoomPage() {
   const inviterDirectement = async () => {
     if (!meetingId) return
     const numero = numeroDirect.replace(/\D/g, "")
-    if (!proprietaireNumero) return showError(t("error"), "Ce numéro ne correspond à aucun compte.")
+    // Garde de derniere ligne : le bouton est deja eteint sans compte trouve, et
+    // la validation au clavier applique la meme condition.
+    if (!proprietaireNumero) return showError(t("error"), t("dial_unknown_number"))
     try {
       await inviterAReunion(Number(meetingId), [numero])
       setNumeroDirect("")
@@ -815,54 +821,47 @@ export default function MeetingRoomPage() {
                 </small>
               </span>
             </label>
-            <div className="meeting-id-keypad" aria-label="Pavé Alanya ID">
-              <div className="meeting-id-number">
-                {numeroDirect ? (
-                  numeroDirect.replace(/(\d{2})(?=\d)/g, "$1 ")
-                ) : (
-                  <span>Alanya ID</span>
-                )}
-              </div>
-              <div className="meeting-id-help">
+            {/* LE PAVE DE LA PAGE DES APPELS, et non plus un clavier maison.
+                Celui d'ici formatait le numero par groupes de deux quand le
+                reste de l'application le groupe autrement, s'arretait a huit
+                chiffres quand le backend en emet jusqu'a dix, ignorait le
+                clavier physique, et annoncait un PSEUDO la ou l'on attend le nom
+                complet du titulaire. Un seul clavier partout, c'est un seul
+                endroit ou corriger tout cela.
+
+                Pas d'`autoFocus` : ce bloc est pose dans la page, pas dans une
+                fenetre qui vient de s'ouvrir. Lui donner le focus a l'arrivee
+                sauterait au clavier au lieu de laisser lire la reunion. */}
+            <div className="meeting-id-keypad">
+              <PaveNumerique
+                valeur={numeroDirect}
+                onChange={setNumeroDirect}
+                onValider={() => {
+                  // Entree fait ce que ferait le bouton, et rien de plus : sans
+                  // cette condition, valider au clavier sur un numero sans compte
+                  // afficherait une erreur la ou le bouton, eteint, ne propose
+                  // rien.
+                  if (proprietaireNumero) void inviterDirectement()
+                }}
+                compact
+                afficherTitulaire
+              />
+              {/* L'etat de la SAISIE. Le nom du titulaire, lui, se lit sous les
+                  chiffres, dans le pave. */}
+              <div className="meeting-id-help" aria-live="polite">
                 {numeroDirect.length === 0
-                  ? "Composez un Alanya ID"
-                  : proprietaireNumero
-                    ? `Compte trouvé : ${proprietaireNumero.pseudo ?? proprietaireNumero.publicNumber}`
-                    : `${numeroDirect.length} chiffre${numeroDirect.length > 1 ? "s" : ""}`}
-              </div>
-              <div className="meeting-id-keys">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""].map((key, index) =>
-                  key ? (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() =>
-                        setNumeroDirect((current) =>
-                          current.length < 8 ? `${current}${key}` : current
-                        )
-                      }
-                    >
-                      {key}
-                    </button>
-                  ) : (
-                    <span key={`empty-${index}`} />
-                  )
-                )}
+                  ? t("dial_hint_number")
+                  : isValidAlanyaNumber(numeroDirect)
+                    ? t("number_complete")
+                    : t("digits_too_short", { n: numeroDirect.length })}
               </div>
               <div className="meeting-id-actions">
-                <button
-                  type="button"
-                  onClick={() => setNumeroDirect((current) => current.slice(0, -1))}
-                  disabled={!numeroDirect}
-                >
-                  ⌫ Effacer
-                </button>
                 <button
                   type="button"
                   onClick={() => void inviterDirectement()}
                   disabled={!proprietaireNumero}
                 >
-                  Ajouter
+                  {t("l2_add")}
                 </button>
               </div>
             </div>
@@ -1232,52 +1231,34 @@ export default function MeetingRoomPage() {
             </>
           ) : (
             <div className="meeting-panneau-pave">
-              <div className="meeting-panneau-numero">
-                {chiffresAjout ? (
-                  formatAlanyaNumber(chiffresAjout)
-                ) : (
-                  <span className="meeting-panneau-numero-vide">Alanya ID</span>
-                )}
-              </div>
-              <div className="meeting-panneau-aide">
+              {/* Le meme pave que la page des appels, en variante resserree : ce
+                  panneau flotte au-dessus de la salle et ne doit pas defiler.
+
+                  `autoFocus` : le pave ecoute le clavier physique sur SA racine
+                  et non sur le document — il ne recoit donc rien tant que
+                  personne ne la lui donne. Sans ce prop, presser 5 en arrivant
+                  sur l'onglet ne ferait rien, et il faudrait d'abord cliquer une
+                  touche a la souris. */}
+              <PaveNumerique
+                valeur={chiffresAjout}
+                onChange={setChiffresAjout}
+                onValider={validerNumeroAjout}
+                autoFocus
+                compact
+                afficherTitulaire
+              />
+              {/* L'etat de la SAISIE. Le nom du titulaire, lui, se lit sous les
+                  chiffres, dans le pave — et c'est un NOM COMPLET, la ou cette
+                  ligne n'affichait qu'un pseudo. */}
+              <div className="meeting-panneau-aide" aria-live="polite">
                 {chiffresAjout.length === 0
                   ? t("dial_hint_number")
-                  : proprietaireAjout
-                    ? proprietaireAjout.pseudo ?? proprietaireAjout.publicNumber
-                    : isValidAlanyaNumber(chiffresAjout)
-                      ? t("number_complete")
-                      : t("digits_too_short", { n: chiffresAjout.length })}
-              </div>
-              <div className="meeting-panneau-touches">
-                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""].map(
-                  (key, index) =>
-                    key ? (
-                      <button
-                        key={key}
-                        onClick={() =>
-                          setChiffresAjout((a) =>
-                            normalizeAlanyaNumber(a + key).slice(0, ALANYA_NUMBER_MAX_LENGTH)
-                          )
-                        }
-                      >
-                        {key}
-                      </button>
-                    ) : (
-                      <span key={`v-${index}`} aria-hidden />
-                    )
-                )}
+                  : isValidAlanyaNumber(chiffresAjout)
+                    ? t("number_complete")
+                    : t("digits_too_short", { n: chiffresAjout.length })}
               </div>
               <div className="meeting-panneau-pave-actions">
-                <button
-                  onClick={() => setChiffresAjout((a) => a.slice(0, -1))}
-                  disabled={chiffresAjout.length === 0}
-                >
-                  ⌫ {t("erase")}
-                </button>
-                <button
-                  onClick={validerNumeroAjout}
-                  disabled={!isValidAlanyaNumber(chiffresAjout)}
-                >
+                <button onClick={validerNumeroAjout} disabled={!isValidAlanyaNumber(chiffresAjout)}>
                   {meeting?.jeSuisOrganisateur
                     ? t("invite_this_number")
                     : t("meet_invite_requested")}

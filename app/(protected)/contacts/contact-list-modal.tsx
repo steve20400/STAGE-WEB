@@ -15,6 +15,7 @@ import {
   rechercherCompte,
   ErreurListeContacts,
   type ChoixMembres,
+  type CompteTrouve,
   type ListeContacts,
   type ResultatEcriture,
 } from "../../../src/services/contact-lists-service"
@@ -55,7 +56,18 @@ interface MembreChoisi {
   /** Chiffres seuls. Vide seulement si le serveur n'a pas rendu de numero. */
   numero: string
   nom: string | null
-  estContact: boolean
+  /**
+   * Appartenance au repertoire, telle que LE SERVEUR l'a calculee — et `null`
+   * quand on ne la connait pas encore.
+   *
+   * Le troisieme etat n'est pas un ornement. Un numero compose puis ajoute
+   * avant que la recherche ait repondu ne nous apprend rien sur son titulaire :
+   * ecrire `false` reviendrait a le declarer hors repertoire sur la foi d'une
+   * reponse qui n'est pas arrivee, c'est-a-dire a reproduire par une autre
+   * porte le message que l'utilisateur a rejete. On se tait a la place, et le
+   * serveur tranchera a l'enregistrement.
+   */
+  estContact: boolean | null
 }
 
 function membresInitiaux(liste: ListeContacts | null, contacts: Contact[]): MembreChoisi[] {
@@ -93,12 +105,25 @@ function membresInitiaux(liste: ListeContacts | null, contacts: Contact[]): Memb
 interface EtatIdentite {
   /** Chiffres auxquels cet etat se rapporte. */
   numero: string
-  etat: "muet" | "attente" | "nom" | "inconnu"
-  /** Renseigne seulement quand `etat` vaut `nom`. */
-  nom: string | null
+  etat: "muet" | "attente" | "trouve" | "inconnu"
+  /**
+   * Le compte rendu par le serveur, ENTIER. Renseigne seulement quand `etat`
+   * vaut `trouve`.
+   *
+   * On garde l'objet et non le seul nom parce que cette fenetre ne fait pas
+   * qu'afficher : elle AJOUTE le membre, et son appartenance au repertoire
+   * (`estContact`) comme son identifiant de compte viennent de la meme reponse
+   * que le nom. Les jeter ici obligerait a les recalculer ailleurs, et le seul
+   * recalcul possible cote client — chercher le numero dans le repertoire deja
+   * charge — se trompe des que le repertoire a bouge sans la page.
+   *
+   * `trouve` avec un compte sans nom n'est pas une contradiction : le compte
+   * existe, on ne peut simplement rien lire sous les chiffres.
+   */
+  compte: CompteTrouve | null
 }
 
-const IDENTITE_VIDE: EtatIdentite = { numero: "", etat: "muet", nom: null }
+const IDENTITE_VIDE: EtatIdentite = { numero: "", etat: "muet", compte: null }
 
 /**
  * Anti-rebond de la recherche du titulaire. Une requete par touche pressee
@@ -107,28 +132,14 @@ const IDENTITE_VIDE: EtatIdentite = { numero: "", etat: "muet", nom: null }
  */
 const DELAI_RECHERCHE_MS = 350
 
-/**
- * Habillage de la ligne du titulaire, pose ici parce que `contact-lists.css` ne
- * fait pas partie de ce chantier — et parce que deux de ces trois regles
- * corrigent l'emprunt d'une classe faite pour ailleurs :
- *
- *  - `textAlign` : le pave centre ses chiffres. Un nom cale a gauche ne se
- *    lirait pas comme appartenant au numero qui le surplombe.
- *  - `minHeight` : la ligne garde sa place meme vide, sinon le bouton d'ajout
- *    sauterait a chaque reponse — meme raison que le `min-height` de
- *    `.pave-numero`.
- *  - `whiteSpace` / `overflow` / `overflowWrap` : `.clist-membre-nom` tronque a
- *    l'ellipse, ce qu'il faut dans une rangee de repertoire mais pas ici. Ce
- *    nom EST la reponse a la question posee : il se lit EN ENTIER, quitte a
- *    passer sur deux lignes.
+/*
+ * Il y avait ici un `STYLE_TITULAIRE` — centrage, hauteur minimale, retour a la
+ * ligne — declare et jamais applique a quoi que ce soit. Il est retire plutot
+ * que branche : `.pave-sous-numero`, la classe que le pave pose lui-meme autour
+ * de `sousLeNumero`, porte deja exactement ces trois regles. Le poser en plus
+ * aurait fait vivre deux sources pour un meme habillage, dont l'une invisible a
+ * qui lit la feuille de style.
  */
-const STYLE_TITULAIRE: React.CSSProperties = {
-  textAlign: "center",
-  minHeight: "1.4em",
-  whiteSpace: "normal",
-  overflow: "visible",
-  overflowWrap: "anywhere",
-}
 
 export function ContactListModal({
   liste,
@@ -159,6 +170,12 @@ export function ContactListModal({
 
   const champNom = useRef<HTMLInputElement>(null)
   const champRecherche = useRef<HTMLInputElement>(null)
+  /**
+   * Enveloppe du pave, seul moyen d'atteindre sa racine sans qu'il expose de
+   * ref. Elle est en `display: contents` : elle ne cree aucune boite, le pave
+   * reste l'enfant direct de la colonne `.clist-champ` et en garde l'ecart.
+   */
+  const zonePave = useRef<HTMLDivElement>(null)
   const idTitre = useId()
   const idErreurNom = useId()
   const idLabelMembres = useId()
@@ -235,13 +252,6 @@ export function ContactListModal({
   }
 
   const numeroCompose = normalizeAlanyaNumber(compose)
-  const contactCompose = useMemo(
-    () =>
-      numeroCompose
-        ? (contacts.find((c) => normalizeAlanyaNumber(c.phone) === numeroCompose) ?? null)
-        : null,
-    [contacts, numeroCompose]
-  )
   const composeUtilisable = isValidAlanyaNumber(compose) && !estRetenu(numeroCompose)
 
   /**
@@ -258,6 +268,17 @@ export function ContactListModal({
    *    et l'affichage le compare a celui de l'ecran (voir `identiteVisible`).
    * 3. Le nom faux pendant l'attente. Tant que la reponse n'est pas la, l'etat
    *    est `attente` : la ligne dit qu'elle cherche, elle n'avance aucun nom.
+   *
+   * LE REPERTOIRE LOCAL N'EST PLUS CONSULTE EN RACCOURCI, et c'est une
+   * correction, pas une simplification. Il repondait sans le reseau quand le
+   * numero compose etait deja un contact — mais il ne repondait pas la MEME
+   * chose que le serveur. Le nom venait alors de `contacts-service.ts`, qui
+   * retombe sur le NUMERO quand le compte n'a ni nom ni pseudo, la ou la route
+   * de recherche rend `null` pour laisser le client se taire. On lisait
+   * « 788853 » sous « 788 853 » : le numero repete sous lui-meme, exactement ce
+   * que cette ligne existe pour eviter. Le raccourci faisait par ailleurs
+   * diverger le nom montre ici de celui que le serveur enregistrera, le jour ou
+   * un alias change ailleurs sans que la page soit rechargee.
    */
   useEffect(() => {
     // Le pave est le seul endroit ou l'on compose : chercher pour un pave qui
@@ -267,39 +288,29 @@ export function ContactListModal({
     // Trop court pour etre un identifiant Alanya. Annoncer « aucun compte » des
     // le premier chiffre serait faux : l'utilisateur n'a pas fini de taper.
     if (!isValidAlanyaNumber(numeroCompose)) {
-      setIdentite({ numero: numeroCompose, etat: "muet", nom: null })
+      setIdentite({ numero: numeroCompose, etat: "muet", compte: null })
       return
     }
 
-    // Le repertoire deja charge repond sans le reseau : le nom d'un contact
-    // connu parait des la frappe, et aucune requete ne part pour quelqu'un dont
-    // on tient deja le nom.
-    if (contactCompose) {
-      setIdentite({ numero: numeroCompose, etat: "nom", nom: contactCompose.name })
-      return
-    }
-
-    setIdentite({ numero: numeroCompose, etat: "attente", nom: null })
+    setIdentite({ numero: numeroCompose, etat: "attente", compte: null })
 
     let vivant = true
     const minuterie = window.setTimeout(() => {
       void rechercherCompte(numeroCompose)
         .then((compte) => {
           if (!vivant) return
-          if (!compte) {
-            setIdentite({ numero: numeroCompose, etat: "inconnu", nom: null })
-          } else if (compte.nom) {
-            setIdentite({ numero: numeroCompose, etat: "nom", nom: compte.nom })
-          } else {
-            // Le compte existe mais ne porte aucun nom : il n'y a rien a lire,
-            // et « aucun compte » serait un mensonge. On se tait.
-            setIdentite({ numero: numeroCompose, etat: "muet", nom: null })
-          }
+          // Le compte entre ENTIER dans l'etat, meme sans nom : `ajouterCompose`
+          // y prendra son appartenance au repertoire, que le serveur seul sait.
+          setIdentite(
+            compte
+              ? { numero: numeroCompose, etat: "trouve", compte }
+              : { numero: numeroCompose, etat: "inconnu", compte: null }
+          )
         })
         .catch(() => {
           // Recherche en panne : on ne sait rien. Se taire est la seule reponse
           // vraie — annoncer un compte introuvable ferait accuser le numero.
-          if (vivant) setIdentite({ numero: numeroCompose, etat: "muet", nom: null })
+          if (vivant) setIdentite({ numero: numeroCompose, etat: "muet", compte: null })
         })
     }, DELAI_RECHERCHE_MS)
 
@@ -307,25 +318,37 @@ export function ContactListModal({
       vivant = false
       window.clearTimeout(minuterie)
     }
-  }, [contactCompose, mode, numeroCompose])
+  }, [mode, numeroCompose])
 
   /** L'etat courant, mais seulement s'il parle bien des chiffres affiches. */
   const identiteVisible = identite.numero === numeroCompose ? identite : null
 
   const ajouterCompose = () => {
     if (!composeUtilisable) return
-    // Le nom trouve par la recherche entre avec le membre : la pastille porte
-    // alors le nom complet du titulaire au lieu des seuls chiffres. Il n'est
-    // retenu que s'il concerne CES chiffres, meme regle qu'a l'affichage.
-    const titulaire = identiteVisible?.etat === "nom" ? identiteVisible.nom : null
+    /**
+     * LE COMPTE RENDU PAR LE SERVEUR, ET LUI SEUL. Il n'est retenu que s'il
+     * concerne CES chiffres, meme regle qu'a l'affichage.
+     *
+     * L'appartenance au repertoire se lisait auparavant dans le tableau local
+     * des contacts. C'etait la recalculer alors que la reponse l'apportait
+     * deja, et la recalculer FAUX : le tableau est celui du chargement de la
+     * page, ou celui du cache au demarrage hors ligne. Un contact ajoute depuis
+     * le telephone entre-temps n'y figure pas, et la pastille annoncait « hors
+     * repertoire » sur quelqu'un qui y est — le texte meme que l'utilisateur a
+     * rejete, revenu par une autre porte. Le serveur, lui, repond sur l'etat du
+     * repertoire a l'instant de la recherche.
+     */
+    const compte = identiteVisible?.etat === "trouve" ? identiteVisible.compte : null
     setMembres((precedents) => [
       ...precedents,
       {
         cle: numeroCompose,
-        idCompte: null,
+        idCompte: compte?.id ?? null,
         numero: numeroCompose,
-        nom: contactCompose?.name ?? titulaire,
-        estContact: contactCompose !== null,
+        nom: compte?.nom ?? null,
+        // `null` et non `false` quand la recherche n'a pas encore repondu :
+        // voir `MembreChoisi.estContact`.
+        estContact: compte ? compte.estContact : null,
       },
     ])
     setCompose("")
@@ -404,8 +427,29 @@ export function ContactListModal({
       return
     }
 
-    // Le pave, lui, prend le focus tout seul a son affichage (`autoFocus`) :
-    // en mode « Composer », il n'y a rien de plus a faire ici.
+    /**
+     * L'etape suivante, c'est le choix des membres — et elle ne se trouve pas
+     * au meme endroit selon le mode.
+     *
+     * En mode « Composer », la ligne se terminait par un focus sur la ref du
+     * champ de RECHERCHE. Or cette ref n'est rattachee qu'au champ du mode
+     * « Contacts », qui n'est alors pas monte : elle valait `null`, l'appel
+     * optionnel ne faisait rien, et Entree ne produisait RIEN — ni erreur, ni
+     * deplacement, ni message. Le commentaire s'appuyait sur l'`autoFocus` du
+     * pave, qui ne joue qu'a son affichage : arrive ici, le focus est dans le
+     * champ du nom depuis longtemps, et le pave ne le reprend pas tout seul.
+     *
+     * Le pave n'expose pas de ref, d'ou le passage par son enveloppe. On vise
+     * `role="group"` et non une classe : c'est le role que le pave porte sur sa
+     * racine, celle qui tient le `tabIndex` et l'ecoute du clavier physique —
+     * une classe d'habillage pourrait etre renommee, ce role decrit ce que la
+     * racine EST.
+     */
+    if (mode === "numero") {
+      zonePave.current?.querySelector<HTMLElement>('[role="group"]')?.focus()
+      return
+    }
+
     champRecherche.current?.focus()
   }
 
@@ -591,7 +635,11 @@ export function ContactListModal({
                     onClick={() => retirer(membre.cle)}
                   >
                     {membre.nom ?? formatAlanyaNumber(membre.numero)}
-                    {!membre.estContact && (
+                    {/* La comparaison est stricte : `!membre.estContact` aurait
+                        aussi attrape le `null` de « on ne sait pas encore », et
+                        la mention n'est affirmee que lorsque le serveur a dit
+                        que ce membre est hors repertoire. */}
+                    {membre.estContact === false && (
                       <span className="clist-membre-num">{t("clist_not_contact")}</span>
                     )}
                     <span className="clist-hors-ecran">{t("set_remove")}</span>
@@ -697,32 +745,47 @@ export function ContactListModal({
                     que personne ne la lui donne. Sans ce prop, presser 5 au
                     clavier en arrivant sur « Composer » ne faisait rien, et il
                     fallait d'abord cliquer une touche a la souris. */}
-                <PaveNumerique
-                  valeur={compose}
-                  onChange={setCompose}
-                  onValider={ajouterCompose}
-                  autoFocus
-                  sousLeNumero={
-                    /* LE NOM DU TITULAIRE, sous les chiffres — a l'INTERIEUR du
-                       pave, et c'est tout l'interet du prop. Rendu a cote, il
-                       tombait apres les douze touches et la rangee
-                       d'effacement, plus de quatre cents pixels sous le numero
-                       auquel il se rapporte : sur telephone il fallait faire
-                       defiler par-dessus le clavier pour le lire.
+                <div ref={zonePave} style={{ display: "contents" }}>
+                  <PaveNumerique
+                    valeur={compose}
+                    onChange={setCompose}
+                    onValider={ajouterCompose}
+                    autoFocus
+                    emphaseSousLeNumero={identiteVisible?.etat === "trouve"}
+                    sousLeNumero={
+                      /* LE NOM DU TITULAIRE, sous les chiffres — a l'INTERIEUR
+                         du pave, et c'est tout l'interet du prop. Rendu a cote,
+                         il tombait apres les douze touches et la rangee
+                         d'effacement, plus de quatre cents pixels sous le
+                         numero auquel il se rapporte : sur telephone il fallait
+                         faire defiler par-dessus le clavier pour le lire.
 
-                       Le nom complet, et rien d'autre : ni le numero repete, ni
-                       un etat technique, ni « hors repertoire » a sa place.
+                         Le nom complet, et rien d'autre : ni le numero repete,
+                         ni un etat technique, ni « hors repertoire » a sa place.
 
-                       Ligne TOUJOURS rendue : `aria-live` ne s'annonce de facon
-                       fiable que depuis un element deja present a l'ecran. */
-                    <span aria-live="polite">
-                      {identiteVisible?.etat === "nom" && identiteVisible.nom}
-                      {identiteVisible?.etat === "attente" && t("loading")}
-                      {identiteVisible?.etat === "inconnu" &&
-                        t("clist_dial_unknown", { numero: formatAlanyaNumber(numeroCompose) })}
-                    </span>
-                  }
-                />
+                         POURQUOI `sousLeNumero` ET NON `afficherTitulaire`,
+                         alors que le pave sait chercher tout seul. Parce que
+                         cette fenetre ne fait pas qu'AFFICHER : elle ajoute le
+                         membre, et il lui faut du compte trouve ce que le pave
+                         ne rend a personne — son appartenance au repertoire et
+                         son identifiant. Elle doit donc chercher de toute
+                         facon, et lui passer le resultat est justement ce qui
+                         evite le double : `sousLeNumero` fourni, le pave ne
+                         part PAS sur le reseau de son cote. Le jour ou le pave
+                         rendra le compte a son parent, cette recherche-ci
+                         disparaitra et le prop d'un mot suffira.
+
+                         Ligne TOUJOURS rendue : `aria-live` ne s'annonce de
+                         facon fiable que depuis un element deja present. */
+                      <span aria-live="polite">
+                        {identiteVisible?.etat === "trouve" && identiteVisible.compte?.nom}
+                        {identiteVisible?.etat === "attente" && t("loading")}
+                        {identiteVisible?.etat === "inconnu" &&
+                          t("clist_dial_unknown", { numero: formatAlanyaNumber(numeroCompose) })}
+                      </span>
+                    }
+                  />
+                </div>
                 <button
                   type="button"
                   className="clist-valider"

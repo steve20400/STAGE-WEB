@@ -804,48 +804,16 @@
   margin-top: 3px;
   line-height: 1.35;
 }
-.meeting-direct-invite {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-}
-.meeting-direct-invite input {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 8px;
-  background: var(--bg-input);
-  color: var(--text-primary);
-}
-.meeting-direct-invite button {
-  border: 0;
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: var(--accent);
-  color: var(--accent-text);
-  font-weight: 700;
-}
-.meeting-id-dialer {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-top: 8px;
-  max-width: 220px;
-}
-.meeting-id-dialer button {
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  padding: 8px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.meeting-id-dialer button:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent-border);
-}
+/* Invitation directe de l'organisateur : le pave partage (`pave-numerique.css`)
+   dans son cadre, la ligne d'etat de la saisie, puis le bouton.
+
+   L'ECRAN DU NUMERO ET LES TOUCHES NE SONT PLUS ICI. Ce clavier maison — des
+   touches carrees de 38 px, un numero groupe par deux — dessinait un troisieme
+   pave dans une application qui en avait deja deux identiques ailleurs. Sont
+   parties avec lui deux series de regles qui ne servaient plus personne depuis
+   plus longtemps encore : `.meeting-direct-invite`, le champ texte que ce
+   clavier avait remplace, et `.meeting-id-dialer`, une premiere version de la
+   grille de touches. */
 .meeting-id-keypad {
   margin-top: 12px;
   max-width: 260px;
@@ -854,39 +822,14 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
 }
-.meeting-id-number {
-  text-align: center;
-  min-height: 28px;
-  font-size: 19px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--text-primary);
-}
-.meeting-id-number span {
-  font-size: 13px;
-  letter-spacing: 0;
-  color: var(--text-muted);
-}
+/* Passee SOUS le pave : elle precedait les touches, elle suit desormais le
+   numero et la ligne du titulaire. */
 .meeting-id-help {
   text-align: center;
   min-height: 18px;
   font-size: 11px;
   color: var(--text-muted);
-  margin-bottom: 8px;
-}
-.meeting-id-keys {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 7px;
-}
-.meeting-id-keys button {
-  height: 38px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-size: 16px;
-  font-weight: 700;
+  margin-top: 8px;
 }
 .meeting-id-actions {
   display: flex;
@@ -1165,52 +1108,20 @@
   color: var(--text-faint);
 }
 
-/* Pavé numérique */
+/* Pavé numérique du panneau d'ajout : le pave partage (`pave-numerique.css`),
+   la ligne d'etat de la saisie, puis le bouton. L'ecran du numero et les douze
+   touches ne sont plus decrits ici — ils sont ceux de la page des appels, et
+   c'etait la demande. */
 .meeting-panneau-pave {
   padding: 12px 16px;
 }
-.meeting-panneau-numero {
-  text-align: center;
-  min-height: 28px;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--text-primary);
-}
-.meeting-panneau-numero-vide {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--text-faint);
-}
+/* Passee SOUS le pave, comme celle de l'invitation directe. */
 .meeting-panneau-aide {
   text-align: center;
   min-height: 18px;
   font-size: 11px;
   color: var(--text-muted);
-  margin-bottom: 8px;
-}
-.meeting-panneau-touches {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  max-width: 220px;
-  margin: 0 auto;
-}
-.meeting-panneau-touches button {
-  height: 38px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-}
-.meeting-panneau-touches button:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent-border);
+  margin-top: 8px;
 }
 .meeting-panneau-pave-actions {
   display: flex;

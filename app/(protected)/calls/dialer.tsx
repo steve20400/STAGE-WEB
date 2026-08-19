@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   ALANYA_NUMBER_MAX_LENGTH,
-  formatAlanyaNumber,
   isValidAlanyaNumber,
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
-import { useContacts } from "../../../src/hooks/use-contacts"
+import { PaveNumerique } from "../../../src/components/pave-numerique"
 import { useTranslation } from "../../../src/i18n"
 import "./dialer.css"
-
-/** Disposition d'un clavier de telephone, celle du composeur mobile. */
-const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""] as const
 
 /**
  * Composeur plein ecran : le numero en cours de composition, un clavier, et le
@@ -19,6 +15,15 @@ const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""] as const
  * Le numero saisi est un Alanya ID, pas un numero de telephone, et sa longueur
  * n'est pas imposee : le front verifie seulement que la saisie peut etre un
  * identifiant, le serveur tranche sur l'existence du compte.
+ *
+ * CE QUI VIENT DU PAVE PARTAGE, et pourquoi. L'ecran du numero, les douze
+ * touches et l'effacement sont ceux de `PaveNumerique` : ils etaient ecrits ici
+ * une premiere fois, et une seconde dans la fenetre des listes de contacts, ou
+ * ils ont depuis appris a montrer le NOM DU TITULAIRE sous les chiffres. Deux
+ * claviers qui divergent, c'est un utilisateur qui apprend deux fois la meme
+ * chose ; c'est aussi une amelioration livree a un seul des deux endroits. Ce
+ * qui reste ici, c'est ce qui fait de ce composeur un ECRAN et non un bloc :
+ * la fermeture, la ligne d'etat de la saisie et les deux boutons d'appel.
  */
 export function Dialer({
   onClose,
@@ -29,44 +34,75 @@ export function Dialer({
   onCall: (number: string, type: "audio" | "video") => void
 }) {
   const { t } = useTranslation()
-  const { contacts } = useContacts()
   const [digits, setDigits] = useState("")
   const valide = isValidAlanyaNumber(digits)
 
-  const foundContact = useMemo(() => {
-    if (digits.length < 6) return null
-    return contacts.find((c) => c.phone === normalizeAlanyaNumber(digits))
-  }, [digits, contacts])
+  /**
+   * Enveloppe du pave, tenue pour une seule raison : savoir si une frappe a
+   * DEJA ete traitee par lui (voir l'ecoute du clavier physique plus bas).
+   */
+  const zonePave = useRef<HTMLDivElement>(null)
 
-  const press = useCallback((key: string) => {
-    setDigits((current) => normalizeAlanyaNumber(current + key).slice(0, ALANYA_NUMBER_MAX_LENGTH))
+  const taper = useCallback((touche: string) => {
+    setDigits((courant) =>
+      normalizeAlanyaNumber(courant + touche).slice(0, ALANYA_NUMBER_MAX_LENGTH)
+    )
   }, [])
 
-  const erase = useCallback(() => setDigits((current) => current.slice(0, -1)), [])
+  const effacer = useCallback(() => setDigits((courant) => courant.slice(0, -1)), [])
 
-  const call = useCallback(
+  const appeler = useCallback(
     (type: "audio" | "video") => {
       if (isValidAlanyaNumber(digits)) onCall(normalizeAlanyaNumber(digits), type)
     },
     [digits, onCall]
   )
 
-  // Le clavier physique doit marcher aussi : on est sur un navigateur, pas
-  // seulement sur un telephone.
+  /**
+   * Le clavier physique doit marcher aussi : on est sur un navigateur, pas
+   * seulement sur un telephone. Deux ecoutes se partagent desormais le travail,
+   * et le partage est la seule subtilite de ce fichier.
+   *
+   * Le pave, lui, ecoute sur SA racine — il est fait pour vivre dans une fenetre
+   * qui contient d'autres champs de saisie, et un ecouteur global y volerait les
+   * chiffres tapes ailleurs. Il prend le focus a l'affichage (`autoFocus`), donc
+   * chiffres, retour arriere et Entree lui arrivent tant que le focus y reste.
+   *
+   * Cette ecoute-ci reste sur `document` parce que ce composeur occupe l'ecran
+   * entier : le focus peut le quitter — un clic sur le fond, sur la croix de
+   * fermeture, sur un bouton d'appel — et le clavier physique doit continuer de
+   * composer, comme avant la migration. D'ou la GARDE : une frappe partie de
+   * l'interieur du pave a deja ete traitee par lui, et la retraiter ici
+   * doublerait chaque chiffre.
+   */
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") return onClose()
-      // Entree lance un appel audio, le cas courant.
-      if (event.key === "Enter") return call("audio")
-      if (event.key === "Backspace") {
-        event.preventDefault()
-        return erase()
+    const surFrappe = (evenement: KeyboardEvent) => {
+      // Echap ferme, d'ou que vienne la frappe : le pave laisse expressement
+      // passer cette touche a la fenetre qui le porte.
+      if (evenement.key === "Escape") return onClose()
+
+      const cible = evenement.target
+      if (cible instanceof Node && zonePave.current?.contains(cible)) return
+
+      if (evenement.key === "Enter") {
+        // Entree sur un bouton, c'est presser CE bouton : le navigateur en fait
+        // deja un clic. Appeler en plus lancerait un appel au moment ou l'on
+        // ferme le composeur, ou doublerait l'appel video d'un appel audio.
+        if (cible instanceof HTMLElement && cible.closest("button")) return
+        // Entree lance un appel audio, le cas courant.
+        return appeler("audio")
       }
-      if (/^[0-9]$/.test(event.key)) press(event.key)
+      if (evenement.key === "Backspace") {
+        // Sans cela, certains navigateurs remontent d'une page a la frappe d'un
+        // retour arriere hors champ de saisie.
+        evenement.preventDefault()
+        return effacer()
+      }
+      if (/^[0-9]$/.test(evenement.key)) taper(evenement.key)
     }
-    document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
-  }, [call, erase, onClose, press])
+    document.addEventListener("keydown", surFrappe)
+    return () => document.removeEventListener("keydown", surFrappe)
+  }, [appeler, effacer, onClose, taper])
 
   return (
     <div className="dialer-root" role="dialog" aria-label={t("a2_dial_dialog")}>
@@ -85,14 +121,30 @@ export function Dialer({
         </svg>
       </button>
 
-      <div className="dialer-number-zone">
-        <div className="dialer-number" aria-live="polite">
-          {digits ? (
-            formatAlanyaNumber(digits)
-          ) : (
-            <span className="dialer-placeholder">Alanya ID</span>
-          )}
-        </div>
+      <div className="dialer-pave" ref={zonePave}>
+        {/* `afficherTitulaire` : le NOM COMPLET du titulaire se lit sous les
+            chiffres, dans l'ecran du pave. Il remplace la reconnaissance de
+            contact que ce fichier faisait lui-meme sur le repertoire local, et
+            ne s'y ajoute pas — une seule ligne de nom, sinon deux reponses a la
+            meme question se contrediraient des que le repertoire est en retard
+            sur le serveur. Ce qu'on y gagne : le repertoire local ne connait que
+            les contacts enregistres, la recherche connait tous les comptes, donc
+            un numero compose au hasard cesse d'etre annonce « introuvable »
+            alors qu'il est parfaitement joignable.
+
+            Pas de `sousLeNumero` ici : ce prop l'emporterait sur la recherche. */}
+        <PaveNumerique
+          valeur={digits}
+          onChange={setDigits}
+          onValider={() => appeler("audio")}
+          autoFocus
+          afficherTitulaire
+        />
+      </div>
+
+      <div className="dialer-pied">
+        {/* L'etat de la SAISIE, qui n'est pas celui du numero : il dit si l'on
+            peut appeler, la ou la ligne du titulaire dit qui l'on appelle. */}
         <div className="dialer-hint">
           {digits.length === 0
             ? t("dial_hint_number")
@@ -100,43 +152,13 @@ export function Dialer({
               ? t("dial_ready")
               : t("digits_too_short", { n: digits.length })}
         </div>
-        {digits.length >= 6 && (
-          <div
-            className={`dialer-contact-info ${foundContact ? "found" : "not-found"}`}
-            aria-live="polite"
-          >
-            {foundContact ? (
-              <span className="contact-name">{foundContact.name}</span>
-            ) : (
-              <span className="contact-error">{t("dial_unknown_number")}</span>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="dialer-keys">
-        {KEYS.map((key, index) =>
-          key === "" ? (
-            // Les deux cases vides de la derniere rangee tiennent la grille en
-            // place : le 0 reste centre sous le 8, comme sur un telephone.
-            <span key={`vide-${index}`} aria-hidden />
-          ) : (
-            <button key={key} className="dialer-key" onClick={() => press(key)} aria-label={key}>
-              {key}
-            </button>
-          )
-        )}
-      </div>
-
-      <div className="dialer-actions">
-        <span aria-hidden />
 
         {/* Deux appels possibles depuis un numero compose, comme depuis une fiche
             de contact : la voix, ou la video. */}
-        <div className="dialer-call-pair">
+        <div className="dialer-actions">
           <button
             className="dialer-call audio"
-            onClick={() => call("audio")}
+            onClick={() => appeler("audio")}
             disabled={!valide}
             aria-label={t("audio_call")}
             title={valide ? t("audio_call") : t("dial_a_number")}
@@ -155,7 +177,7 @@ export function Dialer({
           </button>
           <button
             className="dialer-call video"
-            onClick={() => call("video")}
+            onClick={() => appeler("video")}
             disabled={!valide}
             aria-label={t("video_call")}
             title={valide ? t("video_call") : t("dial_a_number")}
@@ -174,28 +196,6 @@ export function Dialer({
             </svg>
           </button>
         </div>
-
-        <button
-          className="dialer-erase"
-          onClick={erase}
-          disabled={digits.length === 0}
-          aria-label={t("erase_last_digit")}
-          title={t("erase")}
-        >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-          >
-            <path d="M21 5H9L3 12l6 7h12a1 1 0 001-1V6a1 1 0 00-1-1z" />
-            <line x1="18" y1="9" x2="12" y2="15" />
-            <line x1="12" y1="9" x2="18" y2="15" />
-          </svg>
-        </button>
       </div>
     </div>
   )

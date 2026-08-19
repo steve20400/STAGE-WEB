@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react"
 import { useToast } from "../../../src/components/toast"
+import { NomDuTitulaire } from "../../../src/components/nom-du-titulaire"
 import { loadContacts } from "../../../src/data/contacts"
 import { fetchContacts } from "../../../src/services/contacts-service"
-import { isValidAlanyaNumber, formatAlanyaNumber, normalizeAlanyaNumber } from "../../../src/lib/alanya-number"
+import {
+  isValidAlanyaNumber,
+  formatAlanyaNumber,
+  normalizeAlanyaNumber,
+} from "../../../src/lib/alanya-number"
 import { normalizePhoneNumber } from "../../../src/data/session-user"
 import { createMeeting } from "../../../src/services/meetings-service"
 import { useTranslation } from "../../../src/i18n"
@@ -47,7 +52,11 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
   const [contacts, setContacts] = useState(() => loadContacts())
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => { void fetchContacts().then(setContacts).catch(() => undefined) }, [])
+  useEffect(() => {
+    void fetchContacts()
+      .then(setContacts)
+      .catch(() => undefined)
+  }, [])
   const filteredContacts = searchQuery.trim()
     ? contacts.filter((c) => {
         const query = searchQuery.toLowerCase()
@@ -180,9 +189,36 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
               autoFocus
             />
 
-            <div className="meeting-direct-id">
-              <input value={formatAlanyaNumber(manualNumber)} onChange={(e) => setManualNumber(normalizeAlanyaNumber(e.target.value))} placeholder="Alanya ID" inputMode="numeric" />
-              <button type="button" disabled={!isValidAlanyaNumber(manualNumber)} onClick={() => { setSelectedParticipants((prev) => new Set(prev).add(normalizeAlanyaNumber(manualNumber))); setManualNumber("") }}>Ajouter</button>
+            {/* La marge passe du bloc de saisie a cette colonne : le nom du
+                titulaire doit rester COLLE aux chiffres, et la rangee, elle,
+                garde son ecart avec ce qui l'entoure. */}
+            <div style={{ margin: "10px 0" }}>
+              <div className="meeting-direct-id" style={{ margin: 0 }}>
+                <input
+                  value={formatAlanyaNumber(manualNumber)}
+                  onChange={(e) => setManualNumber(normalizeAlanyaNumber(e.target.value))}
+                  placeholder={t("alanya_id_placeholder")}
+                  inputMode="numeric"
+                />
+                {/* Le libelle etait en francais dans le code : les onze autres
+                    langues lisaient « Ajouter » sur ce bouton. */}
+                <button
+                  type="button"
+                  disabled={!isValidAlanyaNumber(manualNumber)}
+                  onClick={() => {
+                    setSelectedParticipants((prev) =>
+                      new Set(prev).add(normalizeAlanyaNumber(manualNumber))
+                    )
+                    setManualNumber("")
+                  }}
+                >
+                  {t("l2_add")}
+                </button>
+              </div>
+              {/* Un participant ajoute par son numero n'apparait ensuite que
+                  sous forme de compte : c'est ICI, avant l'ajout, que l'on peut
+                  encore verifier qui l'on invite. */}
+              <NomDuTitulaire numero={manualNumber} style={{ marginTop: 4 }} />
             </div>
 
             <div className="participants-list">

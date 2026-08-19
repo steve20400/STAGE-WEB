@@ -172,91 +172,45 @@
   box-shadow: 0 1px 3px #0004;
 }
 
-/* Pave de saisie : le numero, le clavier, puis la validation. */
+/* Enveloppe du pave de saisie : le pave partage (`pave-numerique.css`) et la
+   ligne d'etat de la saisie, rien d'autre — le bouton de validation lui est
+   volontairement exterieur (voir le composant, cette enveloppe sert de repere a
+   l'ecoute du clavier physique).
+
+   L'ECRAN DU NUMERO, LES TOUCHES ET L'EFFACEMENT NE SONT PLUS ICI. Ils etaient
+   ecrits une premiere fois dans le composeur d'appel, une deuxieme dans la
+   fenetre des listes de contacts, une troisieme ici : trois claviers a tenir
+   pour un seul geste, et une amelioration — le nom du titulaire sous les
+   chiffres — livree a un seul des trois. Ce fichier ne garde donc que ce qui
+   fait de ce bloc un DIALOGUE et non un clavier : la ligne d'etat et le bouton
+   d'action.
+
+   `align-items: stretch` et non `center` : les largeurs du pave partage
+   (`min(240px, 100%)` en variante resserree) se mesurent sur la sienne. Centre,
+   il se serait ajuste a son contenu, et le pourcentage n'aurait plus eu de quoi
+   se calculer. Le centrage des touches, lui, est deja l'affaire du pave. */
 .call-opt-overlay .call-opt-pave {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  margin-bottom: 14px;
+  align-items: stretch;
 }
 
-.call-opt-overlay .call-opt-numero {
-  font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--text-primary);
-  min-height: 34px;
-  line-height: 34px;
-}
-.call-opt-overlay .call-opt-numero-vide {
-  color: var(--text-faint);
-  font-weight: 400;
-  letter-spacing: 0.5px;
-}
-
+/* Passee SOUS le pave : elle etait au-dessus des touches, elle suit desormais
+   le numero et la ligne du titulaire, comme le pied du composeur d'appel. */
 .call-opt-overlay .call-opt-numero-aide {
   min-height: 18px;
-  margin-bottom: 12px;
+  margin-top: 10px;
   font-size: 11.5px;
   color: var(--text-muted);
   text-align: center;
 }
 
-.call-opt-overlay .call-opt-touches {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 9px;
-  width: min(240px, 100%);
-}
-
-.call-opt-overlay .call-opt-touche {
-  aspect-ratio: 1;
-  max-height: 62px;
-  border-radius: 50%;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 21px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-.call-opt-overlay .call-opt-touche:hover {
-  background: var(--bg-surface);
-}
-.call-opt-overlay .call-opt-touche:active {
-  background: var(--accent-dim);
-}
-.call-opt-overlay .call-opt-touche:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.call-opt-overlay .call-opt-effacer {
-  margin-top: 10px;
-  padding: 6px 12px;
-  border: none;
-  border-radius: 8px;
-  background: none;
-  color: var(--text-muted);
-  font-family: "DM Sans", sans-serif;
-  font-size: 12px;
-  cursor: pointer;
-}
-.call-opt-overlay .call-opt-effacer:hover:not(:disabled) {
-  color: var(--text-primary);
-  background: var(--bg-muted);
-}
-.call-opt-overlay .call-opt-effacer:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
+/* L'ecart qui precede « Annuler » etait porte par l'enveloppe du pave, tant que
+   ce bouton s'y trouvait. Il l'accompagne. */
 .call-opt-overlay .call-opt-valider {
   width: 100%;
   margin-top: 10px;
+  margin-bottom: 14px;
   padding: 12px;
   border: none;
   border-radius: 9px;

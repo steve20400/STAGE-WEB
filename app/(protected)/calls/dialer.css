@@ -1,17 +1,35 @@
 /* Composeur plein ecran. Aucune couleur en dur : tout vient des tokens de theme,
-   pour que le clavier suive les quatre themes de l'application. */
+   pour que le clavier suive les quatre themes de l'application.
+
+   CE QUI N'EST PLUS ICI. L'ecran du numero, les douze touches et l'effacement
+   sont passes au pave partage, `src/components/pave-numerique.css` : leurs
+   regles ont ete retirees d'ici plutot que gardees « au cas ou », parce qu'une
+   feuille qui habille des elements qui n'existent plus finit par etre recopiee
+   dans le composant suivant. Ne restent que les trois choses qui font de ce
+   composeur un ECRAN : sa fermeture, sa ligne d'etat et ses boutons d'appel. */
 
 .dialer-root {
   position: fixed;
   inset: 0;
   z-index: 9400;
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
+  /* Trois rangees seulement : la croix, le pave qui occupe le milieu, le pied
+     qui porte l'etat de la saisie et les appels. Le clavier et l'effacement,
+     jadis deux rangees a part, sont maintenant dans le pave. */
+  grid-template-rows: auto 1fr auto;
   justify-items: center;
   gap: 8px;
   padding: 18px 18px 28px;
   background: var(--bg-base);
   color: var(--text-primary);
+  /* FILET DE SECURITE, mesure a 360x560 : le pave partage est plus haut que le
+     clavier qu'il remplace — il porte en propre sa rangee « Effacer », que ce
+     composeur logeait jadis sur la ligne des appels. Sous ~590 px de hauteur,
+     les boutons d'appel debordent donc du bas. Sans cette regle ils sont
+     purement et simplement coupes, et l'ecran devient un composeur d'ou l'on ne
+     peut pas appeler ; avec elle, ils restent atteignables en faisant defiler.
+     Aucun effet des que la place suffit : rien ne deborde, rien ne defile. */
+  overflow-y: auto;
 }
 
 .dialer-close {
@@ -31,82 +49,43 @@
   background: var(--bg-surface);
 }
 
-.dialer-number-zone {
-  align-self: center;
-  text-align: center;
-  min-width: 0;
-  padding: 0 8px;
-}
+/* Le pave garde la largeur du clavier qu'il dessine — `min(320px, 100%)`, la
+   meme valeur des deux cotes.
 
-.dialer-number {
-  font-family: "Bricolage Grotesque", sans-serif;
-  /* Suit la largeur disponible : un Alanya ID a 8 chiffres tient sur une ligne
-     meme sur un petit telephone. */
-  font-size: clamp(30px, 11vw, 46px);
-  font-weight: 700;
-  letter-spacing: 2px;
-  line-height: 1.2;
-  word-break: break-all;
-}
-
-.dialer-placeholder {
-  color: var(--text-ghost);
-  letter-spacing: 1px;
-}
-
-.dialer-hint {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--text-faint);
-}
-
-.dialer-keys {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+   COLLE EN BAS de la rangee souple, et non centre : c'est la position qu'avait
+   deja le clavier de ce composeur, et celle de tous les composeurs d'appel.
+   Elle ne tient pas de l'esthetique mais du pouce, qui atteint le bas de
+   l'ecran d'un telephone tenu d'une main et pas son milieu. Le vide qui en
+   resulte au-dessus est celui que l'ancienne mise en page avait deja. */
+.dialer-pave {
+  align-self: end;
   width: min(320px, 100%);
 }
 
-.dialer-key {
-  aspect-ratio: 1;
-  max-height: 74px;
-  border-radius: 50%;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 24px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-.dialer-key:hover {
-  background: var(--bg-surface);
-}
-.dialer-key:active {
-  background: var(--accent-dim);
-}
-.dialer-key:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.dialer-actions {
+/* `margin-top` en plus de l'ecart de la grille : il rend au pied la respiration
+   que l'ancienne rangee d'appel avait, et surtout il eloigne les boutons
+   d'appel de l'effacement — deux gestes qu'un pouce ne doit pas confondre. */
+.dialer-pied {
   display: grid;
-  /* Les deux boutons d'appel restent centres sous le clavier, l'effacement a
-     droite : les colonnes laterales de meme largeur tiennent l'equilibre. */
-  grid-template-columns: 48px 1fr 48px;
-  align-items: center;
   justify-items: center;
-  gap: 8px;
+  gap: 10px;
   width: min(320px, 100%);
   margin-top: 6px;
 }
 
-.dialer-call-pair {
+/* Etat de la SAISIE, sous le clavier et au-dessus des appels : il repond a
+   « puis-je appeler », quand la ligne du titulaire, elle, reste collee aux
+   chiffres a l'interieur du pave et repond a « qui vais-je appeler ». */
+.dialer-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.dialer-actions {
   display: flex;
-  gap: 16px;
   justify-content: center;
+  gap: 16px;
 }
 
 .dialer-call {
@@ -141,64 +120,18 @@
   outline-offset: 3px;
 }
 
-.dialer-erase {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.dialer-erase:disabled {
-  color: var(--text-ghost);
-  cursor: not-allowed;
-}
-
-.dialer-contact-info {
-  margin-top: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  min-height: 20px;
-}
-
-.dialer-contact-info.found {
-  color: var(--success);
-}
-
-.contact-name {
-  display: block;
-}
-
-.dialer-contact-info.not-found {
-  color: var(--danger);
-}
-
-.contact-error {
-  display: block;
-}
-
-/* Ecran bas (telephone en paysage, petite fenetre) : on resserre pour que le
-   clavier et le bouton d'appel restent visibles sans defilement. */
+/* Ecran bas (telephone en paysage, petite fenetre) : on resserre pour reculer
+   le moment ou il faut faire defiler pour atteindre les appels. Le pave
+   applique deja la meme regle a la meme hauteur pour ce qui le regarde. */
 @media (max-height: 620px) {
-  .dialer-number {
-    font-size: clamp(24px, 8vw, 32px);
-  }
-  .dialer-keys {
-    gap: 8px;
-  }
-  .dialer-key {
-    max-height: 56px;
-    font-size: 20px;
-  }
   .dialer-call {
     width: 52px;
     height: 52px;
   }
-  .dialer-call-pair {
+  .dialer-actions {
     gap: 12px;
+  }
+  .dialer-pied {
+    gap: 6px;
   }
 }

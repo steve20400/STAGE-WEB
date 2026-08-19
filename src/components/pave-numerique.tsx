@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import {
   ALANYA_NUMBER_MAX_LENGTH,
   formatAlanyaNumber,
+  isValidAlanyaNumber,
   normalizeAlanyaNumber,
 } from "../lib/alanya-number"
+import { rechercherCompte, type CompteTrouve } from "../services/contact-lists-service"
 import { useTranslation } from "../i18n"
 import "./pave-numerique.css"
 
@@ -11,8 +13,157 @@ import "./pave-numerique.css"
 const TOUCHES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""] as const
 
 /**
+ * Anti-rebond de la recherche du titulaire. Une requete par touche pressee
+ * ferait partir six requetes pour un numero a six chiffres, dont cinq pour des
+ * numeros que l'utilisateur n'a jamais voulu chercher. La valeur est celle deja
+ * retenue par la fenetre des listes de contacts, qui a fait ce chemin la
+ * premiere : le meme geste doit repondre au meme rythme partout.
+ */
+const DELAI_RECHERCHE_MS = 350
+
+/**
+ * Ce que l'on sait du TITULAIRE du numero en cours de composition.
+ *
+ * L'etat porte le numero auquel il se rapporte, et ce n'est pas une precaution
+ * de trop : l'effet de recherche ne s'execute qu'APRES la peinture du rendu
+ * declenche par la frappe. Sans cette comparaison, le rendu qui suit un chiffre
+ * de plus afficherait encore, l'espace d'une image, le nom du numero precedent
+ * sous des chiffres qui ne sont plus les siens.
+ *
+ *  - `muet`    : rien a dire — numero trop court, compte sans nom, ou recherche
+ *                en panne. On se tait plutot que d'affirmer quelque chose de faux.
+ *  - `attente` : la recherche court. Surtout pas de nom a cet instant.
+ *  - `nom`     : le nom complet du titulaire, et rien d'autre.
+ *  - `inconnu` : aucun compte ne porte ce numero, et le serveur l'a dit.
+ */
+interface EtatTitulaire {
+  /** Chiffres auxquels cet etat se rapporte. */
+  numero: string
+  etat: "muet" | "attente" | "nom" | "inconnu"
+  /** Renseigne seulement quand `etat` vaut `nom`. */
+  nom: string | null
+}
+
+const TITULAIRE_VIDE: EtatTitulaire = { numero: "", etat: "muet", nom: null }
+
+/**
+ * Retrouve le titulaire du numero compose, et ne rend un etat que lorsqu'il
+ * parle bien des chiffres AFFICHES.
+ *
+ * TROIS PIEGES, traites ici et nulle part ailleurs — c'est tout l'interet de
+ * les tenir dans le pave plutot que dans chacun des quatre claviers :
+ *
+ * 1. LA REPONSE EN RETARD. Le numero change plus vite que le reseau ne repond :
+ *    « 788 » puis « 7888 » lancent deux recherches, et rien ne garantit que la
+ *    premiere revienne la premiere. Deux verrous, et il en faut bien deux :
+ *      - le nettoyage de l'effet eteint `vivant` des que le numero bouge, si
+ *        bien qu'une reponse arrivee ensuite n'ecrit RIEN ;
+ *      - l'etat porte son numero et le rendu le compare a celui de l'ecran, ce
+ *        qui couvre l'intervalle ou la frappe est deja peinte alors que l'effet
+ *        du nouveau numero n'a pas encore tourne.
+ *    Le premier verrou seul laisserait passer une image avec le mauvais nom, le
+ *    second seul laisserait deux reponses se recouvrir dans le desordre.
+ * 2. LE NOM FAUX PENDANT L'ATTENTE. Tant que la reponse n'est pas la, l'etat
+ *    est `attente` : la ligne dit qu'elle cherche, elle n'avance aucun nom.
+ * 3. LA PANNE QUI REMONTE. Aucune exception ne sort d'ici : un pave qui casse
+ *    empecherait de composer, c'est-a-dire d'appeler. Le `catch` de la promesse
+ *    couvre l'echec reseau, le `try` qui l'entoure couvre un jet SYNCHRONE — un
+ *    jet depuis un `setTimeout` ne se rattrape pas au-dessus, il file droit en
+ *    erreur globale, hors de portee de toute frontiere d'erreur React.
+ *
+ * Le repertoire local n'est volontairement pas consulte en raccourci : la route
+ * de recherche rend deja l'alias du repertoire quand il en existe un, et la
+ * chercher deux fois ferait diverger le nom montre par ce pave de celui montre
+ * par le serveur le jour ou l'alias change ailleurs.
+ */
+function useTitulaire(
+  chiffres: string,
+  actif: boolean,
+  onTitulaire?: (compte: CompteTrouve | null) => void
+): EtatTitulaire | null {
+  const [etat, setEtat] = useState<EtatTitulaire>(TITULAIRE_VIDE)
+  // La reference evite de relancer la recherche parce que le parent a redefini
+  // sa fonction au rendu — cas normal quand elle n'est pas memorisee.
+  const prevenir = useRef(onTitulaire)
+  prevenir.current = onTitulaire
+
+  useEffect(() => {
+    // Rendre l'etat PRECEDENT quand rien ne change fait renoncer React au
+    // rendu : sans cela, chaque chiffre frappe sous le seuil de recherche
+    // provoquerait un rendu de plus pour aboutir au meme ecran.
+    const taireSur = (numero: string) =>
+      setEtat((precedent) =>
+        precedent.numero === numero && precedent.etat === "muet"
+          ? precedent
+          : { numero, etat: "muet", nom: null }
+      )
+
+    // Pave qui n'affiche pas le titulaire : pas de requete, et l'etat retombe a
+    // vide pour qu'un nom trouve avant l'extinction ne reparaisse pas tel quel
+    // si le parent rallume l'affichage sur le meme numero.
+    if (!actif) {
+      setEtat((precedent) => (precedent === TITULAIRE_VIDE ? precedent : TITULAIRE_VIDE))
+      return
+    }
+
+    // Trop court pour etre un identifiant Alanya : rien ne s'affiche et RIEN ne
+    // part sur le reseau. Annoncer « aucun compte » des le premier chiffre
+    // serait faux — l'utilisateur n'a pas fini de taper.
+    if (!isValidAlanyaNumber(chiffres)) {
+      prevenir.current?.(null)
+      taireSur(chiffres)
+      return
+    }
+
+    setEtat({ numero: chiffres, etat: "attente", nom: null })
+
+    let vivant = true
+    const minuterie = window.setTimeout(() => {
+      try {
+        void rechercherCompte(chiffres)
+          .then((compte) => {
+            if (!vivant) return
+            // Le parent recoit le compte AVANT l'affichage : c'est ce qui lui
+            // evite de lancer sa propre recherche pour la meme question, et donc
+            // d'afficher un nom pendant que son bouton reste eteint.
+            prevenir.current?.(compte ?? null)
+            if (!compte) {
+              setEtat({ numero: chiffres, etat: "inconnu", nom: null })
+            } else if (compte.nom) {
+              setEtat({ numero: chiffres, etat: "nom", nom: compte.nom })
+            } else {
+              // Le compte existe mais ne porte aucun nom : il n'y a rien a
+              // lire, et « aucun compte » serait un mensonge. On se tait.
+              taireSur(chiffres)
+            }
+          })
+          .catch(() => {
+            // Recherche en panne : on ne sait rien. Se taire est la seule
+            // reponse vraie — annoncer un compte introuvable ferait accuser le
+            // numero d'un defaut qui est le notre.
+            if (vivant) {
+              prevenir.current?.(null)
+              taireSur(chiffres)
+            }
+          })
+      } catch {
+        if (vivant) taireSur(chiffres)
+      }
+    }, DELAI_RECHERCHE_MS)
+
+    return () => {
+      vivant = false
+      window.clearTimeout(minuterie)
+    }
+  }, [actif, chiffres])
+
+  return actif && etat.numero === chiffres ? etat : null
+}
+
+/**
  * Pave numerique reutilisable : un numero Alanya en cours de composition, les
- * dix chiffres, un effacement d'un chiffre et un effacement total. Rien d'autre.
+ * dix chiffres, un effacement d'un chiffre et un effacement total — et, s'il le
+ * faut, le NOM DU TITULAIRE lu sous les chiffres.
  *
  * POURQUOI CE COMPOSANT alors que `app/(protected)/calls/dialer.tsx` fait deja
  * ce clavier. Le composeur d'appel est un ECRAN : il occupe la fenetre, il
@@ -22,6 +173,14 @@ const TOUCHES = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""] as co
  * son numero. D'ou un composant qui ne sait que composer : le numero est tenu
  * par le parent (`valeur` / `onChange`), et ce qu'on en fait lui appartient.
  * Pas de bouton d'appel ici, pas de bouton de fermeture.
+ *
+ * POURQUOI LA RECHERCHE DU TITULAIRE EST ICI ET NON CHEZ LES PARENTS. Le nom se
+ * lit sous les chiffres partout ou l'on compose un numero Alanya : le composeur
+ * d'appel, l'invitation et le transfert en cours d'appel, l'invitation en
+ * reunion. Quatre claviers, une seule regle — et une regle qui tient de la
+ * course reseau, de l'anti-rebond et du silence prudent, c'est-a-dire tout ce
+ * qu'on ne recopie pas quatre fois sans qu'une des copies derive. Le parent
+ * demande le service d'un mot (`afficherTitulaire`) et n'a plus rien a savoir.
  *
  * POURQUOI LE CLAVIER PHYSIQUE EST ECOUTE SUR LA RACINE ET NON SUR `document`.
  * C'est le seul vrai piege du composant. Le composeur plein ecran, lui, ecoute
@@ -40,6 +199,10 @@ export function PaveNumerique({
   onValider,
   autoFocus,
   sousLeNumero,
+  afficherTitulaire,
+  onTitulaire,
+  emphaseSousLeNumero,
+  compact,
 }: {
   /** Chiffres seuls, sans les espaces d'affichage. Le parent tient l'etat. */
   valeur: string
@@ -57,8 +220,56 @@ export function PaveNumerique({
    * soit plus de quatre cents pixels plus bas. Sur telephone il fallait faire
    * defiler par-dessus tout le clavier pour lire le nom du numero qu'on venait
    * de composer, et les deux n'etaient jamais visibles ensemble.
+   *
+   * PRIORITAIRE sur `afficherTitulaire` : un parent qui fournit son propre
+   * contenu garde la main, et le pave ne cherche alors rien — il ne se contente
+   * pas de cacher sa ligne, il ne PART PAS sur le reseau, pour ne pas facturer
+   * une requete par frappe a un ecran qui n'en lira jamais la reponse.
    */
   sousLeNumero?: ReactNode
+  /**
+   * Le pave retrouve LUI-MEME le titulaire du numero et l'affiche sous les
+   * chiffres. Sans effet si `sousLeNumero` est fourni.
+   *
+   * A n'allumer que derriere une session authentifiee. La route de recherche
+   * l'exige, et ce n'est pas un hasard : un ecran PUBLIC qui donnerait le nom du
+   * titulaire laisserait n'importe qui balayer les numeros pour en recolter les
+   * noms. C'est la raison pour laquelle l'ecran de connexion, qui compose
+   * pourtant un numero Alanya, n'allume pas ce prop.
+   */
+  afficherTitulaire?: boolean
+  /**
+   * Prevenu du compte trouve, ou de `null` quand il n'y en a pas — numero trop
+   * court, aucun titulaire, ou recherche en panne.
+   *
+   * Existe parce qu'un parent a souvent besoin du compte LUI-MEME et pas
+   * seulement de son nom : pour activer un bouton « ajouter », pour retenir
+   * l'identifiant, pour savoir si la personne est deja au repertoire. Sans ce
+   * rappel, ces parents lancaient leur PROPRE recherche a cote de celle du
+   * pave — deux requetes pour la meme question, a deux rythmes differents, et
+   * un ecran qui se contredit : le nom du titulaire affiche sous les chiffres
+   * pendant que le bouton reste eteint parce que l'autre requete n'a pas encore
+   * repondu.
+   */
+  onTitulaire?: (compte: CompteTrouve | null) => void
+  /**
+   * Met `sousLeNumero` en valeur comme le fait le pave quand il cherche
+   * lui-meme : encre pleine et graisse, au lieu du gris d'accompagnement.
+   *
+   * Sans ce prop, la fenetre qui fournit son propre contenu affichait le nom du
+   * titulaire MOINS en evidence que les paves censes l'imiter, et ne le
+   * distinguait plus de la mention passagere « Chargement ». C'est le parent qui
+   * decide, parce que lui seul sait si ce qu'il pose est une reponse ou une
+   * attente.
+   */
+  emphaseSousLeNumero?: boolean
+  /**
+   * Variante resserree, pour un pave pose dans un menu deroulant ou dans le
+   * panneau lateral d'une salle de reunion : la ou la place manque, ce sont les
+   * ecarts et le plafond des touches qui cedent, jamais la cible tactile de
+   * 44 px ni la lisibilite du numero.
+   */
+  compact?: boolean
 }) {
   const { t } = useTranslation()
   const racine = useRef<HTMLDivElement>(null)
@@ -69,6 +280,38 @@ export function PaveNumerique({
     () => normalizeAlanyaNumber(valeur).slice(0, ALANYA_NUMBER_MAX_LENGTH),
     [valeur]
   )
+
+  // `sousLeNumero` fourni, meme vide, veut dire « c'est moi qui remplis cette
+  // ligne » : le pave se tait et, surtout, ne cherche pas.
+  const chercheSeul = afficherTitulaire === true && sousLeNumero === undefined
+  const titulaire = useTitulaire(chiffres, chercheSeul, onTitulaire)
+
+  /**
+   * Ce qui se lit sous les chiffres. Le nom seul quand on le tient — pas le
+   * numero repete, pas un etat technique, pas « hors repertoire » a sa place.
+   */
+  const ligneTitulaire = useMemo(() => {
+    if (!titulaire) return null
+    if (titulaire.etat === "nom") return titulaire.nom
+    if (titulaire.etat === "attente") return t("loading")
+    if (titulaire.etat === "inconnu") {
+      return t("clist_dial_unknown", { numero: formatAlanyaNumber(titulaire.numero) })
+    }
+    return null
+  }, [t, titulaire])
+
+  /**
+   * Le NOM se detache, l'ATTENTE s'efface. Les trois etats se lisent au meme
+   * endroit et il faut les distinguer sans les lire : le nom est la reponse a
+   * la question posee, il saute aux yeux ; la mention passagere de chargement
+   * ne doit pas se faire prendre pour lui le temps d'un coup d'oeil.
+   */
+  const classeSousNumero =
+    titulaire?.etat === "nom"
+      ? "pave-sous-numero pave-titulaire"
+      : titulaire?.etat === "attente"
+        ? "pave-sous-numero pave-titulaire-attente"
+        : "pave-sous-numero"
 
   const taper = useCallback(
     (touche: string) => {
@@ -130,7 +373,7 @@ export function PaveNumerique({
   return (
     <div
       ref={racine}
-      className="pave-root"
+      className={compact ? "pave-root pave-compact" : "pave-root"}
       role="group"
       aria-label={t("dial_an_id")}
       tabIndex={0}
@@ -143,7 +386,23 @@ export function PaveNumerique({
         <div className="pave-numero" aria-live="polite">
           {chiffres ? formatAlanyaNumber(chiffres) : <span className="pave-vide">Alanya ID</span>}
         </div>
-        {sousLeNumero ? <div className="pave-sous-numero">{sousLeNumero}</div> : null}
+
+        {chercheSeul ? (
+          /* Ligne TOUJOURS rendue quand le pave cherche lui-meme : `aria-live`
+             ne s'annonce de facon fiable que depuis un element deja present a
+             l'ecran — pose en meme temps que son texte, l'annonce se perd. */
+          <div className={classeSousNumero} aria-live="polite">
+            {ligneTitulaire}
+          </div>
+        ) : sousLeNumero ? (
+          <div
+            className={
+              emphaseSousLeNumero ? "pave-sous-numero pave-titulaire" : "pave-sous-numero"
+            }
+          >
+            {sousLeNumero}
+          </div>
+        ) : null}
       </div>
 
       <div className="pave-touches">

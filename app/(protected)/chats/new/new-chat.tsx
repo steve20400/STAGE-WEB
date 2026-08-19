@@ -2,6 +2,7 @@
 import { useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
+import { NomDuTitulaire } from "../../../../src/components/nom-du-titulaire"
 import { CONTACT_COLORS, normalizePhone } from "../../../../src/data/contacts"
 import { useContacts } from "../../../../src/hooks/use-contacts"
 import { addContactByPhone } from "../../../../src/services/contacts-service"
@@ -204,9 +205,13 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
                   inputMode="numeric"
                   maxLength={ALANYA_NUMBER_FORMATTED_MAX_LENGTH}
                 />
-                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                  {t("search_alanya_accounts")}
-                </div>
+                {/* LE NOM DU TITULAIRE, sous les chiffres. Il prend la place de
+                    l'indication generale « recherche dans les comptes Alanya »
+                    au lieu de s'ajouter sous elle : les deux occupent la meme
+                    ligne, et celle qui repond pour CE numero doit l'emporter.
+                    L'indication revient des qu'il n'y a rien a dire — champ
+                    vide, numero encore trop court, recherche en panne. */}
+                <NomDuTitulaire numero={newPhone} repli={t("search_alanya_accounts")} />
                 <div className="ncm-add-row">
                   <button className="cancel" onClick={() => setShowAdd(false)}>
                     {t("cancel")}
