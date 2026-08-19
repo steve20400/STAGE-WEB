@@ -1,0 +1,308 @@
+/*
+ * Fenetre reduite de la reunion.
+ *
+ * CES REGLES SERVENT DEUX DOCUMENTS. Le meme habillage vaut pour la carte
+ * flottante posee dans la page et pour la vraie fenetre du systeme, dont le
+ * document recoit une copie de toutes les feuilles de la page (voir
+ * `recopierLesFeuilles`). D'ou deux precautions :
+ *
+ *  - aucune regle ne suppose un ancetre de la salle. Tout part de
+ *    `.fr-fenetre`, qui est la racine dans la fenetre du systeme ;
+ *  - aucune couleur en dur. Les variables sont recopiees avec `data-theme` et
+ *    `data-palette` sur la racine de l'autre document : les quatre themes
+ *    suivent la fenetre, a condition que rien ici ne soit fige.
+ *
+ * Meme echelle d'espacement que le reste de l'application : 4, 8, 12, 16, 20,
+ * 24, et rien entre les deux.
+ */
+
+/* ---------- Le corps de la fenetre du systeme ---------- */
+
+/*
+ * Pose sur le <body> de l'autre document, qui n'a par definition aucune mise en
+ * page a lui. `100vh` s'y entend de la fenetre reduite, pas de la page.
+ */
+.fr-corps-pip {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+}
+
+/* ---------- La fenetre elle-meme ---------- */
+
+.fr-fenetre {
+  --fr-rayon: 14px; /* meme arrondi que les cartes de l'application */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+}
+
+/*
+ * Dans la fenetre du systeme : elle occupe tout le document, qui ne contient
+ * rien d'autre. Ni ombre ni arrondi — le systeme dessine deja le cadre, en
+ * ajouter un second se verrait.
+ */
+.fr-fenetre.dans-pip {
+  position: absolute;
+  inset: 0;
+  border: none;
+  border-radius: 0;
+}
+
+/*
+ * Le repli, dans la page : une carte flottante posee au-dessus de la salle.
+ * `left` et `top` viennent du composant — c'est la position, deplacable.
+ *
+ * z-index : au-dessus du menu d'appel (9500) et de la mise en page (9000), sous
+ * la fiche de confidentialite (9700) et la demande de pseudo (9800), qui sont
+ * des passages obliges. Une fenetre reduite ne doit pas les couvrir.
+ */
+.fr-fenetre.dans-page {
+  position: fixed;
+  z-index: 9600;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  border: 1px solid var(--border-default);
+  border-radius: var(--fr-rayon);
+  box-shadow: 0 20px 48px var(--overlay);
+}
+
+/* ---------- Barre de titre ---------- */
+
+.fr-tete {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  /* Un glissement doit deplacer la fenetre, pas selectionner son titre. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* La prise n'existe que dans la page : dans la fenetre du systeme, c'est le
+   systeme qui deplace. */
+.fr-fenetre.dans-page .fr-tete {
+  cursor: grab;
+}
+.fr-fenetre.dans-page .fr-tete:active {
+  cursor: grabbing;
+}
+
+.fr-poignee {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: inherit;
+}
+.fr-poignee:hover {
+  background: var(--bg-hover);
+}
+.fr-poignee svg {
+  flex: none;
+  opacity: 0.6;
+}
+
+.fr-titre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+/* Sans poignee, le titre porte lui-meme le retrait de la barre. */
+.fr-fenetre.dans-pip .fr-titre {
+  padding-left: 4px;
+}
+
+.fr-fermer {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.fr-fermer:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* ---------- Le contenu ---------- */
+
+/*
+ * Ce que la salle depose. Il defile verticalement — la demande le dit : on veut
+ * le rendu video en plus petit, « avec la possibilite de scroller ». Jamais
+ * horizontalement : une fenetre etroite qui defile de biais est illisible.
+ */
+.fr-corps {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+
+/* ---------- Habillage propose au contenu ---------- */
+
+/*
+ * Les classes qui suivent ne sont posees par personne ici : elles sont offertes
+ * a la salle, qui remplit la fenetre. Elles vivent dans CE fichier parce que
+ * c'est lui qui est recopie dans l'autre document — une regle ecrite dans la
+ * feuille de la salle s'y appliquerait tout aussi bien, mais rien ne garantit
+ * que la salle en ait une le jour ou l'on ouvrira la fenetre depuis ailleurs.
+ */
+
+/* Le cadre du rendu video, dans la fenetre. Il garde sa hauteur au lieu de se
+   comprimer : c'est le corps qui defile, sinon la video finirait en timbre. */
+.fr-scene {
+  flex: 1 0 auto;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+
+/*
+ * La barre des commandes. Collee au bas du corps : on coupe son micro sans
+ * avoir a remonter le defilement, ce qui est exactement ce qu'on demande a une
+ * fenetre reduite.
+ */
+.fr-barre {
+  position: sticky;
+  bottom: 0;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+/* Le meme bouton que la barre de la salle (`.meeting-controle`), en plus petit :
+   la fenetre est etroite, mais la cible reste franche au doigt. */
+.fr-bouton {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.fr-bouton:hover {
+  border-color: var(--border-default);
+}
+/* Coupe : l'etat se voit sans lire, comme dans la salle. */
+.fr-bouton.coupe {
+  background: var(--danger-dim);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+.fr-bouton.actif {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.fr-bouton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Ancre du menu des trois points : c'est elle qui donne au panneau son point
+   d'accrochage, sans quoi il se positionnerait par rapport a la fenetre. */
+.fr-menu-ancre {
+  position: relative;
+  display: flex;
+}
+
+/* Le panneau s'ouvre VERS LE HAUT : la barre est deja en bas de la fenetre, un
+   menu deroulant vers le bas sortirait du cadre. */
+.fr-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 1;
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  box-shadow: 0 12px 32px var(--overlay);
+}
+
+.fr-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.fr-menu-item:hover {
+  background: var(--bg-hover);
+}
+.fr-menu-item.danger {
+  color: var(--danger);
+}
+.fr-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

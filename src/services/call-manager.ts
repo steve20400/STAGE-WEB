@@ -27,6 +27,7 @@ import {
   sendMeetingSignal,
   sendMeetingJoin,
   sendMeetingLeave,
+  sendMeetingScreen,
   type CallServerEvent,
 } from "./websocket-service"
 import { isValidAlanyaNumber, normalizeAlanyaNumber } from "../lib/alanya-number"
@@ -44,10 +45,7 @@ const tr = (cle: Cle, variables?: Record<string, string | number>) =>
  * Gestion des appels WebRTC — miroir du CallController de l'app mobile Flutter
  * pour rester interoperable :
  * - mesh : une RTCPeerConnection par participant distant ;
- * - offreur = celui qui est DEJA dans l'appel, envers celui qui arrive.
- *   Regle positionnelle, et non plus comparaison d'UUID : le mobile a change,
- *   et une divergence entre les deux clients laissait les appels Web -> Android
- *   sans offreur du tout ;
+ * - offreur = le plus petit identifiant des deux, voir `doisJeOffrir` ;
  * - signaux { kind: "offer" | "answer" | "ice" } relayes via le WebSocket ;
  * - etats via call_state ("joined", "left", "rejected", "ended", "declined").
  */
@@ -175,6 +173,13 @@ export interface CallManagerState {
   peerName: string
   /** Photo du correspondant : affichee a la place des initiales quand elle existe. */
   peerAvatarUrl: string | null
+  /**
+   * Ce qui manque au media local dans une reunion : rien, la camera seule, ou
+   * tout. On entre desormais dans une salle meme sans micro ni camera ; ce champ
+   * permet a l'ecran de le DIRE, ce qui est la contrepartie de ne plus refuser
+   * l'entree. Vaut toujours « aucun » hors reunion.
+   */
+  mediaManquant: "aucun" | "camera" | "tout"
   callType: CallType
   role: CallRole
   /** Etat affichable sans modifier l'interface : Sonnerie, En train de sonner, Appel en cours. */
@@ -221,6 +226,31 @@ export interface CallManagerState {
    * `error`. Consomme une seule fois via `consumePendingRating`.
    */
   pendingRatingIdHist: string | null
+  /**
+   * MA piste video sortante est-elle un ecran, et non ma camera ?
+   *
+   * Verite LOCALE, posee par `demarrerPartageEcran` / `arreterPartageEcran` et
+   * jamais deduite de `partageParPeerId` : a deux presentateurs simultanes, ce
+   * dernier ne designe qu'une seule personne, alors que mon propre ecran, lui,
+   * continue de partir chez les pairs. Deduire l'un de l'autre afficherait « vous
+   * ne presentez plus » a quelqu'un qui presente encore.
+   */
+  partageParMoi: boolean
+  /**
+   * QUI presente, moi ou un autre, ou personne — l'ecran que la salle met en
+   * grand.
+   *
+   * Vient du serveur (`meeting_screen`), y compris pour mon propre partage : une
+   * piste d'ecran emprunte le meme tuyau qu'une camera, et rien dans WebRTC ne
+   * dit ce qu'elle montre. Sans ce verbe, un ecran partage arriverait chez les
+   * autres comme une vignette de visage.
+   *
+   * Un seul nom alors que le serveur accepte DEUX presentateurs : c'est au client
+   * de trancher ce qu'il met en grand, et la regle retenue est « le dernier
+   * annonce ». Le serveur diffusant une seule sequence d'evenements, tous les
+   * participants designent la meme personne.
+   */
+  partageParPeerId: string | null
 }
 
 interface WebrtcSignal {
@@ -299,12 +329,30 @@ class PeerSession {
     }
 
     if (this.isOfferer) {
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: this.isVideo,
-      })
-      await pc.setLocalDescription(offer)
-      this.onSendSignal({ kind: "offer", sdp: offer.sdp, type: offer.type })
+      // L'emission de l'offre ne doit JAMAIS remonter jusqu'a l'appelant.
+      //
+      // Depuis que l'offreur se decide par comparaison d'identifiants — pour
+      // s'accorder au mobile — cette branche est atteinte par `acceptIncomingCall`
+      // un decrochage sur deux, ce qui n'etait pas le cas quand on y passait
+      // toujours `asOfferer: false`. Or l'unique site d'appel, dans le composant
+      // de mise en page, lance `acceptIncomingCall()` sans `.catch` : une pile
+      // WebRTC en etat invalide laissait l'utilisateur sur sa liste, sans ecran
+      // d'appel ni bouton pour raccrocher, pendant que son correspondant l'entend
+      // « connecte » — l'accuse de reception etant deja parti. Seul un
+      // rechargement de page en sortait.
+      //
+      // On note l'echec et on continue : les pairs suivants doivent etre
+      // connectes, et les signaux deja recus doivent etre appliques.
+      try {
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: this.isVideo,
+        })
+        await pc.setLocalDescription(offer)
+        this.onSendSignal({ kind: "offer", sdp: offer.sdp, type: offer.type })
+      } catch (err) {
+        console.warn("[CallManager] offre impossible pour ce pair", err)
+      }
     }
 
     const pending = this.pendingSignals.splice(0)
@@ -367,7 +415,15 @@ class PeerSession {
     }
   }
 
-  async replaceVideoTrack(track: MediaStreamTrack) {
+  /**
+   * Substitue la piste video sortante chez ce pair, SANS renegocier.
+   *
+   * `null` est une valeur legitime et non un oubli : c'est ainsi qu'on cesse
+   * d'emettre de la video sans fermer la connexion — le cas d'un partage d'ecran
+   * arrete dans une reunion AUDIO, ou il n'y avait aucune camera a rendre.
+   * Sans elle, le dernier cadre de l'ecran resterait fige chez les autres.
+   */
+  async replaceVideoTrack(track: MediaStreamTrack | null) {
     const pc = this.pc
     if (!pc) return
     // `sender.track` peut etre nul — piste retiree, ou emetteur pas encore
@@ -440,6 +496,7 @@ function initialState(): CallManagerState {
     activeIvrFromId: null,
     peerName: "",
     peerAvatarUrl: null,
+    mediaManquant: "aucun",
     callType: "audio",
     role: null,
     progress: null,
@@ -456,6 +513,8 @@ function initialState(): CallManagerState {
     displayMode: "full",
     transferPending: false,
     pendingRatingIdHist: null,
+    partageParMoi: false,
+    partageParPeerId: null,
   }
 }
 
@@ -836,6 +895,16 @@ let solitudeTimer: ReturnType<typeof setTimeout> | null = null
  * sans jamais se voir.
  */
 let salleReunion: number | null = null
+
+/**
+ * Qui partage son ecran dans la salle, dans l'ordre ou les annonces sont
+ * arrivees. La vedette revient au DERNIER encore actif ; retirer quelqu'un rend
+ * donc automatiquement la vedette au precedent, au lieu de la laisser vide.
+ *
+ * Videe en meme temps que `salleReunion` : un reste d'une reunion precedente
+ * mettrait un absent en grand des l'entree dans la suivante.
+ */
+let presentateurs: string[] = []
 let desabonnementSalle: (() => void) | null = null
 // callId -> (userId -> signaux recus avant que la session soit prete)
 const signalBuffer = new Map<string, Map<string, WebrtcSignal[]>>()
@@ -860,8 +929,45 @@ function myDisplayName(): string {
   return loadSessionUser()?.name ?? tr("v2_alanya_user")
 }
 
-// La regle d'offreur n'est plus une comparaison d'UUID : elle est POSITIONNELLE
-// et vit desormais dans le parametre `asOfferer` de `connectToPeer`.
+/**
+ * Qui, de ce pair et de moi, emet l'offre WebRTC ? Le plus petit identifiant.
+ *
+ * ⚠️ C'EST LA REGLE DU MOBILE, ET C'EST LUI QUI FAIT FOI. Verifiee dans le depot
+ * Flutter, `webrtc_group_mesh.dart` :
+ *
+ *     static bool shouldOffer(String myId, String peerId) => myId.compareTo(peerId) < 0;
+ *
+ * appliquee sans condition a CHAQUE `connectToPeer`, sans variante selon qui
+ * arrive et qui etait deja la.
+ *
+ * Le web, lui, suivait une regle POSITIONNELLE : offre celui qui est DEJA dans
+ * la salle, envers celui qui arrive. Deux regles differentes ne s'accordent
+ * qu'une fois sur deux. Avec W l'identifiant du web et M celui du mobile :
+ *
+ *  - M < W : quand le mobile arrive en second, le web offre (l'autre arrive) et
+ *    le mobile offre aussi (il est le plus petit) — DEUX offres croisees ;
+ *  - M > W : quand le web arrive en second, le web n'offre pas (il vient
+ *    d'arriver) et le mobile non plus (il n'est pas le plus petit) — AUCUNE
+ *    offre, chacun attendant celle de l'autre.
+ *
+ * Dans les deux cas l'autre sens fonctionnait. Pour chaque couple
+ * d'utilisateurs, un sens d'appel sur deux etait donc casse — toujours le meme,
+ * ce qui le faisait passer pour un probleme de reseau chez l'un des deux.
+ *
+ * On aligne le web sur le mobile et non l'inverse : le web se deploie en une
+ * poussee, le parc mobile installe ne se met pas a jour sur commande.
+ *
+ * La comparaison est identique des deux cotes : `String.compareTo` de Dart et
+ * `<` de JavaScript ordonnent tous deux par unites de code UTF-16, et un UUID
+ * n'est fait que d'ASCII.
+ *
+ * Les REUNIONS suivaient deja cette regle : elles ne changent pas de convention,
+ * elles cessent seulement d'en avoir une a part.
+ */
+function doisJeOffrir(peerId: string): boolean {
+  const me = myUserId()
+  return Boolean(me && me < peerId)
+}
 
 function ensureEventSubscription() {
   if (eventsUnsubscribe) return
@@ -920,16 +1026,13 @@ async function loadIceServers(): Promise<RTCIceServer[]> {
 /**
  * Ouvre la connexion WebRTC avec un pair.
  *
- * `asOfferer` : celui qui est DEJA dans l appel emet l offre a celui qui
- * arrive. Regle POSITIONNELLE, qui a remplace cote mobile la comparaison
- * d UUID vivant ici aussi.
- *
- * La desynchronisation entre les deux clients cassait les appels Web ->
- * Android : le web ne s estimait pas offreur, le mobile non plus puisqu il
- * venait d arriver. Personne n emettait d offre. Le web voyait l acceptation
- * et lancait son compteur, le mobile restait sur « connexion en cours ».
+ * Qui offre n'est PAS un parametre : la reponse est calculee ici, par
+ * `doisJeOffrir`, et nulle part ailleurs. C'est volontaire — l'ancienne version
+ * laissait chaque appelant decider, et les chemins d'appel avaient fini par
+ * repondre autrement que ceux de reunion. Un seul point de decision rend cette
+ * divergence structurellement impossible.
  */
-async function connectToPeer(peerId: string, asOfferer: boolean) {
+async function connectToPeer(peerId: string) {
   const me = myUserId()
   const callId = state.activeCallId
   if (!me || !callId || peerId === me || peers.has(peerId)) return
@@ -956,7 +1059,7 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
   const session = new PeerSession(
     peerId,
     isVideo,
-    asOfferer,
+    doisJeOffrir(peerId),
     stream,
     iceServers,
     (signal) =>
@@ -1029,6 +1132,11 @@ function nePlusAttendre(userId: string) {
 function removePeer(peerId: string) {
   peers.get(peerId)?.close()
   peers.delete(peerId)
+  // Le presentateur s'en va : le serveur annonce lui-meme la fin de son partage
+  // avant son depart, mais on referme aussi ici. Un serveur anterieur a ce
+  // verbe, ou une trame perdue, laisserait sinon la salle en plein ecran sur un
+  // flux qui n'appartient plus a personne.
+  if (state.partageParPeerId === peerId) setState({ partageParPeerId: null })
   publishRemoteStreams()
 }
 
@@ -1037,6 +1145,13 @@ function stopMesh() {
   peers.clear()
   localStream?.getTracks().forEach((track) => track.stop())
   localStream = null
+  // La piste d'ecran vit dans `localStream` et vient donc d'etre arretee ; ce
+  // qu'on oublie ici, c'est la memoire du partage. Sans cette remise, la camera
+  // notee avant la presentation serait rouverte au beau milieu de l'appel
+  // SUIVANT, et `partageParMoi` — remis a faux par `initialState` — ne
+  // correspondrait plus a ces variables restees pleines.
+  pisteEcran = null
+  cameraAvantPartage = null
 }
 
 function clearCall(markEnded: boolean) {
@@ -1053,6 +1168,7 @@ function clearCall(markEnded: boolean) {
     desabonnementSalle = null
   }
   salleReunion = null
+  presentateurs = []
   annulerSolitude()
   attendus.clear()
   invitationsEnVol = 0
@@ -1113,8 +1229,7 @@ async function onPeerJoined(userId: string, displayName: string | null) {
     clearTimeout(ringTimeoutId)
     ringTimeoutId = null
   }
-  // Nous sommes deja dans l appel, ce pair vient d arriver : nous offrons.
-  await connectToPeer(userId, true)
+  await connectToPeer(userId)
   if (state.activeCallId) await flushBufferedSignals(state.activeCallId)
 }
 
@@ -1659,9 +1774,9 @@ export async function startCallbackCall(
  * Le mobile, lui, a toujours parle au salon ; les deux clients pouvaient donc
  * rejoindre la meme reunion sans jamais se croiser.
  *
- * Qui offre a qui suit la meme regle que pour un appel : celui qui arrive
- * n'offre pas, ceux qui sont deja la offrent. Sans cette convention, deux
- * arrivees simultanees s'enverraient deux offres croisees.
+ * Qui offre a qui suit la meme regle que pour un appel — le plus petit
+ * identifiant, voir `doisJeOffrir`. C'est la regle que la reunion a toujours
+ * suivie ; ce sont les APPELS qui l'ont rejointe.
  */
 export async function joinMeetingRoom(
   meetingId: number,
@@ -1689,6 +1804,7 @@ export async function joinMeetingRoom(
     activeIvrFromId: null,
     peerName: title,
     peerAvatarUrl: null,
+    mediaManquant: "aucun",
     callType: type,
     role: "ongoing",
     progress: "ongoing",
@@ -1713,19 +1829,35 @@ export async function joinMeetingRoom(
   // reception de `meeting_user_joined`, et une offre negociee sans piste
   // etablit une connexion parfaitement muette.
   //
-  // L'echec INTERROMPT l'entree, au lieu de la poursuivre avec un message
-  // d'erreur pose dans l'etat. Entrer sans micro donnait une salle ou l'on
-  // entend tout le monde sans que personne ne vous entende — et rien a l'ecran
-  // ne le disait, l'ecran de reunion n'affichant l'erreur que faute de charger
-  // la reunion. Mieux vaut ne pas entrer et le dire.
+  // ON ENTRE TOUJOURS, meme sans micro ni camera — mais on le DIT.
+  //
+  // Cette entree refusait l'acces quand le media manquait. Le raisonnement de
+  // l'epoque etait juste et sa conclusion fausse : entrer muet sans que rien a
+  // l'ecran ne le signale est mauvais, mais on ne repare pas une interface
+  // muette en interdisant la porte. Un poste fixe sans webcam ne pouvait pas
+  // rejoindre une reunion video, alors qu'il aurait parfaitement pu y parler.
+  //
+  // CASCADE, comme le font les autres services de reunion : la camera et le
+  // micro d'abord ; a defaut le micro seul ; a defaut on entre en simple
+  // auditeur. `mediaManquant` porte le resultat jusqu'a l'ecran, qui affiche un
+  // bandeau permanent et propose de reessayer l'autorisation — c'est lui qui
+  // remplace le refus, et c'est ce qui manquait.
+  let mediaManquant: "aucun" | "camera" | "tout" = "aucun"
   try {
     await ensureLocalStream(type === "video")
   } catch {
-    salleReunion = null
-    clearCall(false)
-    throw new Error(type === "video" ? tr("call_need_mic_cam") : tr("call_need_mic"))
+    if (type === "video") {
+      try {
+        await ensureLocalStream(false)
+        mediaManquant = "camera"
+      } catch {
+        mediaManquant = "tout"
+      }
+    } else {
+      mediaManquant = "tout"
+    }
   }
-
+  setState({ mediaManquant })
   desabonnementSalle?.()
   desabonnementSalle = subscribeToMeetingEvents((event) => {
     if (Number(event.meetingId) !== meetingId) return
@@ -1735,21 +1867,15 @@ export async function joinMeetingRoom(
   sendMeetingJoin(meetingId)
 }
 
-/** Même convention que le mobile : l'UUID le plus petit crée l'offre WebRTC. */
-function offreReunionPour(peerId: string): boolean {
-  const me = myUserId()
-  return Boolean(me && me < peerId)
-}
-
 /** Suite des evenements du salon, une fois qu'on y est entre. */
 async function traiterEvenementSalle(event: Record<string, unknown>) {
   if (salleReunion === null) return
 
   if (event.type === "meeting_joined") {
-    // Ceux qui etaient deja la : c'est a eux d'offrir, on se contente de tenir
-    // la session prete a recevoir leur offre.
+    // La liste de ceux qui etaient deja la. `connectToPeer` tranche pour chacun
+    // qui offre — la reunion n'a jamais eu d'autre regle que celle-la.
     const presents = Array.isArray(event.participants) ? (event.participants as string[]) : []
-    for (const id of presents) await connectToPeer(id, offreReunionPour(id))
+    for (const id of presents) await connectToPeer(id)
     return
   }
 
@@ -1760,8 +1886,7 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     if (nom) {
       setState({ participantNames: { ...state.participantNames, [id]: nom } })
     }
-    // Nouveau venu : nous sommes deja la, donc c'est nous qui offrons.
-    await connectToPeer(id, offreReunionPour(id))
+    await connectToPeer(id)
     return
   }
 
@@ -1775,15 +1900,54 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     return
   }
 
+  if (event.type === "meeting_screen") {
+    /*
+     * QUI presente. Le serveur l'envoie a TOUT LE MONDE, l'auteur compris, et
+     * le rejoue a celui qui entre au milieu d'une presentation — ce dernier
+     * recoit bien la piste video, mais rien d'autre ne lui dirait que c'est un
+     * ecran et non un visage.
+     *
+     * Mon propre partage passe par ici comme les autres, mais ne touche que
+     * `partageParPeerId` : `partageParMoi` reste pose localement, sans quoi une
+     * trame perdue au retour eteindrait mon bouton alors que mon ecran continue
+     * de partir chez les pairs.
+     *
+     * Le serveur accepte DEUX presentateurs a la fois ; ce champ n'en nomme
+     * qu'un, et la regle est « le dernier annonce ». Comme tout le monde recoit
+     * la meme sequence d'evenements, tout le monde met le meme en grand.
+     */
+    const auteur = String(event.fromUserId ?? "")
+    if (!auteur) return
+    // On tient l'ENSEMBLE des presentateurs, pas seulement le dernier annonce.
+    //
+    // Le serveur accepte deliberement deux partages simultanes et relaie les
+    // deux. Ne garder qu'un nom faisait disparaitre la vedette des que le SECOND
+    // s'arretait : le premier presentait toujours, mais plus personne ne le
+    // savait, et son ecran retombait en vignette de participant — recadre au
+    // format visage et retourne en miroir. Aucun evenement ne serait venu
+    // reconstruire l'information.
+    //
+    // La vedette revient au dernier ENCORE actif, ce que tous les participants
+    // calculent a l'identique puisqu'ils recoivent la meme sequence.
+    if (event.partage === true) {
+      if (!presentateurs.includes(auteur)) presentateurs.push(auteur)
+    } else {
+      const rang = presentateurs.indexOf(auteur)
+      if (rang !== -1) presentateurs.splice(rang, 1)
+    }
+    setState({ partageParPeerId: presentateurs[presentateurs.length - 1] ?? null })
+    return
+  }
+
   if (event.type === "meeting_signal") {
     const from = String(event.fromUserId ?? "")
     if (!from) return
     const session = peers.get(from)
     if (session) await session.handleSignal(event.signal as WebrtcSignal)
     else {
-      // Signal arrive avant que la session existe : on l'ouvre en receveur,
-      // puis on lui remet la trame.
-      await connectToPeer(from, offreReunionPour(from))
+      // Signal arrive avant que la session existe : on l'ouvre, puis on lui
+      // remet la trame.
+      await connectToPeer(from)
       await peers.get(from)?.handleSignal(event.signal as WebrtcSignal)
     }
   }
@@ -1836,8 +2000,10 @@ export async function acceptIncomingCall(): Promise<string | null> {
 
   for (const participant of result.activeParticipants ?? []) {
     if (participant.userId !== me) {
-      // Nous venons d accepter : les autres sont deja la, ils offriront.
-      await connectToPeer(participant.userId, false)
+      // Une offre du pair a pu arriver AVANT cette ligne — c'est meme le cas
+      // ordinaire quand la regle nous designe receveur. Elle est bufferisee par
+      // `call_signal` et rejouee par le `flushBufferedSignals` d'apres la boucle.
+      await connectToPeer(participant.userId)
     }
   }
   await flushBufferedSignals(incoming.callId)
@@ -1922,12 +2088,16 @@ export function toggleMicrophone(): boolean {
  *
  * Sans le `replaceTrack` sur chaque connexion, les correspondants gardent
  * l'ancienne camera — figee, puisqu'elle vient d'etre arretee.
+ *
+ * `activee` dit si la piste doit EMETTRE, et vaut par defaut l'etat du bouton
+ * camera : une piste neuve arrive toujours activee, et sans cela la camera se
+ * rallumerait toute seule en changeant d'objectif. Le partage d'ecran, lui,
+ * passe `true` explicitement — un ecran se partage le plus souvent camera
+ * coupee, et le defaut l'aurait rendu noir chez tout le monde.
  */
-async function appliquerPisteVideo(piste: MediaStreamTrack): Promise<void> {
+async function appliquerPisteVideo(piste: MediaStreamTrack, activee = state.camOn): Promise<void> {
   if (!localStream) return
-  // Une piste neuve arrive toujours activee : si la camera etait coupee, elle
-  // se rallumerait toute seule en changeant d'objectif.
-  piste.enabled = state.camOn
+  piste.enabled = activee
 
   for (const ancienne of localStream.getVideoTracks()) {
     ancienne.stop()
@@ -1937,6 +2107,18 @@ async function appliquerPisteVideo(piste: MediaStreamTrack): Promise<void> {
 
   await Promise.all([...peers.values()].map((peer) => peer.replaceVideoTrack(piste)))
   setState({ localStream })
+}
+
+/** Cesse d'emettre de la video chez tous les pairs, sans fermer les connexions. */
+async function retirerLaPisteVideo(): Promise<void> {
+  if (localStream) {
+    for (const ancienne of localStream.getVideoTracks()) {
+      ancienne.stop()
+      localStream.removeTrack(ancienne)
+    }
+    setState({ localStream })
+  }
+  await Promise.all([...peers.values()].map((peer) => peer.replaceVideoTrack(null)))
 }
 
 /**
@@ -1954,6 +2136,11 @@ async function appliquerPisteVideo(piste: MediaStreamTrack): Promise<void> {
  */
 export async function switchCamera(): Promise<boolean> {
   if (!localStream) return false
+  // Pendant un partage, la seule piste video du flux local est l'ECRAN. Sans
+  // cette garde, changer d'objectif l'arreterait pour ouvrir une camera a sa
+  // place : la presentation s'eteindrait chez tout le monde sur un bouton qui
+  // ne la concerne pas.
+  if (state.partageParMoi) return false
   const courante = localStream.getVideoTracks()[0]
   if (!courante) return false
 
@@ -2018,11 +2205,232 @@ export async function switchCamera(): Promise<boolean> {
 /** Coupe/retablit la camera (pistes video locales). */
 export function toggleCamera(): boolean {
   const next = !state.camOn
+  // Pendant un partage d'ecran, la piste video locale n'est PAS la camera :
+  // c'est l'ecran. La couper eteindrait la presentation chez tout le monde. On
+  // n'enregistre donc que l'intention — elle sera honoree telle quelle quand la
+  // camera reviendra, a la fin du partage.
+  if (state.partageParMoi) {
+    if (cameraAvantPartage) cameraAvantPartage.camOn = next
+    setState({ camOn: next })
+    return next
+  }
   localStream?.getVideoTracks().forEach((track) => {
     track.enabled = next
   })
   setState({ camOn: next })
   return next
+}
+
+/* ----------------- Partage d'ecran ----------------- */
+
+/**
+ * De quoi rendre EXACTEMENT l'etat d'avant le partage.
+ *
+ * `contraintes` nulle veut dire « il n'y avait aucune camera » — une reunion
+ * audio, ou un appel audio. C'est une valeur legitime et non un oubli : a la
+ * fin du partage il faut alors cesser d'emettre de la video, et surtout pas
+ * ouvrir une camera que personne n'avait demandee.
+ *
+ * `camOn` est le bouton camera tel qu'il etait, pas l'etat de la piste : qui
+ * presentait camera eteinte ne doit pas se retrouver a l'image en arretant.
+ */
+interface EtatCameraAvantPartage {
+  contraintes: MediaStreamConstraints | null
+  camOn: boolean
+}
+
+let pisteEcran: MediaStreamTrack | null = null
+let cameraAvantPartage: EtatCameraAvantPartage | null = null
+
+/**
+ * Ce navigateur sait-il capturer un ecran ?
+ *
+ * Capacite du NAVIGATEUR seulement, et sans jamais jeter : les navigateurs
+ * mobiles, et tout contexte non securise, n'ont pas `getDisplayMedia`, et une
+ * simple lecture de propriete est la seule facon de le savoir sans ouvrir de
+ * fenetre.
+ *
+ * ⚠️ Repondre vrai ne suffit PAS a decider d'afficher le bouton : encore
+ * faut-il que la session sache porter de la video. Voir `demarrerPartageEcran`.
+ */
+export function partageEcranSupporte(): boolean {
+  if (typeof navigator === "undefined") return false
+  return typeof navigator.mediaDevices?.getDisplayMedia === "function"
+}
+
+/** Est-ce MOI qui presente en ce moment ? */
+export function partageEcranActif(): boolean {
+  return state.partageParMoi
+}
+
+/**
+ * Commence a partager son ecran.
+ *
+ * MECANISME : aucun. C'est celui du changement de camera, mot pour mot —
+ * `appliquerPisteVideo` substitue la piste chez tous les pairs par
+ * `replaceTrack`, donc SANS renegocier une seule connexion. Un ecran n'est
+ * qu'une autre source de video ; seule l'annonce `meeting_screen` dit aux
+ * autres ce que cette piste montre.
+ *
+ * NE JETTE PAS QUAND L'UTILISATEUR REFUSE. Fermer la fenetre de choix du
+ * navigateur est une decision, pas une panne : une exception remonterait en
+ * toast d'erreur pour quelqu'un qui a simplement change d'avis. La verite est
+ * dans `partageParMoi` — c'est lui, et non la resolution de cette promesse, qui
+ * doit piloter le bouton de la salle.
+ *
+ * ⚠️ IL FAUT UNE SESSION VIDEO. Dans une reunion AUDIO, aucun m-line video n'a
+ * ete negocie : il n'existe pas d'emetteur video a substituer, la piste d'ecran
+ * n'irait nulle part et la salle se croirait en presentation devant des pairs
+ * qui ne voient rien. Y remedier demanderait une renegociation complete, qui
+ * n'est pas de ce lot. On refuse donc AVANT d'ouvrir la fenetre de choix, pour
+ * ne pas faire choisir un ecran qui ne partirait pas.
+ */
+export async function demarrerPartageEcran(): Promise<void> {
+  if (state.partageParMoi) return
+  if (!partageEcranSupporte()) {
+    console.warn("[CallManager] partage d'ecran indisponible dans ce navigateur")
+    return
+  }
+  if (!state.activeCallId || !localStream) return
+  if (state.callType !== "video") {
+    console.warn("[CallManager] partage d'ecran refuse : la session ne porte pas de video")
+    return
+  }
+
+  let flux: MediaStream
+  try {
+    // `audio: false` : le son d'un onglet partirait dans une piste separee que
+    // personne ne negocie ici, et couperait la voix en la remplacant.
+    flux = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+  } catch (err) {
+    // Refus, fenetre fermee, ou capture interdite par la politique du poste.
+    // Rien n'est pose dans `error` : le cas de loin le plus frequent est le
+    // refus, et faire surgir un toast alarmant a qui vient de changer d'avis
+    // serait pire que le silence. La trace reste en console pour les autres cas.
+    console.warn("[CallManager] capture d'ecran non obtenue :", err)
+    return
+  }
+
+  const piste = flux.getVideoTracks()[0]
+  if (!piste) {
+    flux.getTracks().forEach((t) => t.stop())
+    return
+  }
+  // Le choix a pu prendre plusieurs secondes : l'appel peut s'etre termine
+  // entre-temps. Sans ce controle on installerait une piste dans un flux mort.
+  if (!state.activeCallId || !localStream) {
+    flux.getTracks().forEach((t) => t.stop())
+    return
+  }
+
+  cameraAvantPartage = memoriserCamera()
+  pisteEcran = piste
+
+  /*
+   * FIN DU PARTAGE DEPUIS LA BARRE DU NAVIGATEUR. Chrome et Firefox affichent
+   * leur propre bandeau « Arreter le partage », qui ne passe evidemment pas par
+   * notre bouton : la piste s'eteint toute seule et `ended` est le seul signal
+   * qu'on en recoive. Sans cette ecoute, l'application resterait persuadee de
+   * presenter, la camera ne reviendrait jamais, et les autres garderaient le
+   * dernier cadre de l'ecran fige en plein ecran.
+   *
+   * `stop()` appele par nous ne declenche PAS `ended` — cette ecoute ne se
+   * confond donc pas avec notre propre arret. La garde reste, pour un
+   * navigateur qui en deciderait autrement.
+   */
+  piste.addEventListener("ended", () => {
+    if (pisteEcran !== piste) return
+    void arreterPartageEcran()
+  })
+
+  // `true` et non `state.camOn` : c'est l'ecran qui doit emettre, meme — et
+  // surtout — quand la camera etait coupee.
+  await appliquerPisteVideo(piste, true)
+  setState({ partageParMoi: true })
+
+  /*
+   * L'annonce APRES la piste : elle allume le plein ecran chez les autres, et
+   * l'y allumer avant montrerait un grand cadre encore vide.
+   *
+   * Seule une REUNION est annoncee : le serveur n'a de verbe de partage que
+   * pour le salon des reunions. Dans un appel ordinaire, l'image passe quand
+   * meme — c'est le meme tuyau — mais les autres l'affichent comme une camera.
+   * Le jour ou un `call_screen` existera, il se branchera ici.
+   */
+  if (salleReunion !== null) sendMeetingScreen(salleReunion, true)
+}
+
+/**
+ * Arrete le partage et remet l'etat d'AVANT — camera coupee comprise.
+ *
+ * Idempotent : l'arret peut venir du bouton, du bandeau du navigateur, ou du
+ * raccrochage, parfois de deux a la fois.
+ */
+export async function arreterPartageEcran(): Promise<void> {
+  if (!state.partageParMoi) return
+
+  const avant = cameraAvantPartage
+  const piste = pisteEcran
+  cameraAvantPartage = null
+  pisteEcran = null
+  setState({ partageParMoi: false })
+
+  // Prevenir la salle AVANT de rendre la camera : les autres referment le plein
+  // ecran pendant que la piste change, au lieu d'afficher un visage en grand a
+  // la place de l'ecran le temps de recevoir l'annonce.
+  if (salleReunion !== null) sendMeetingScreen(salleReunion, false)
+
+  // La capture est arretee des maintenant : le bandeau du navigateur doit
+  // disparaitre au clic, pas a la fin de la reouverture de la camera.
+  piste?.stop()
+
+  if (!localStream) return
+  if (!avant?.contraintes) {
+    // Rien a rendre : on cesse d'emettre. Laisser la piste morte en place
+    // figerait le dernier cadre de l'ecran chez les autres.
+    await retirerLaPisteVideo()
+    return
+  }
+
+  try {
+    const flux = await navigator.mediaDevices.getUserMedia(avant.contraintes)
+    const camera = flux.getVideoTracks()[0]
+    if (camera) {
+      // `avant.camOn` et non l'etat courant : c'est le bouton tel qu'il etait,
+      // ou tel que l'utilisateur l'a repose pendant la presentation.
+      setState({ camOn: avant.camOn })
+      await appliquerPisteVideo(camera, avant.camOn)
+      return
+    }
+    flux.getTracks().forEach((t) => t.stop())
+  } catch {
+    // L'objectif a pu etre pris par une autre application pendant le partage.
+  }
+  // Camera irrecuperable : mieux vaut ne plus rien emettre qu'un ecran fige.
+  await retirerLaPisteVideo()
+}
+
+/**
+ * Note la camera en cours pour pouvoir la rouvrir a l'identique.
+ *
+ * On retient les CONTRAINTES et non la piste : `appliquerPisteVideo` arrete
+ * l'ancienne en installant l'ecran, et c'est voulu — garder la camera ouverte
+ * pendant toute une presentation laisserait son temoin allume, et sur mobile
+ * empecherait la capture, un seul objectif pouvant etre ouvert a la fois.
+ */
+function memoriserCamera(): EtatCameraAvantPartage {
+  const courante = localStream?.getVideoTracks()[0]
+  if (!courante) return { contraintes: null, camOn: state.camOn }
+  const deviceId = courante.getSettings().deviceId
+  return {
+    contraintes: {
+      // Par identifiant quand on l'a : sur un poste a plusieurs cameras,
+      // `video: true` en rendrait une autre que celle qu'on montrait.
+      video: deviceId ? { deviceId: { exact: deviceId } } : true,
+      audio: false,
+    },
+    camOn: state.camOn,
+  }
 }
 
 /** Efface le marqueur "appel termine" (apres l'ecran de fin). */

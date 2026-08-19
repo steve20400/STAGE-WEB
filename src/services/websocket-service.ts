@@ -596,6 +596,12 @@ const MEETING_EVENT_TYPES = new Set([
   "meeting_extended",
   "meeting_message",
   "meeting_hand",
+  // ⚠️ Cette liste FILTRE, comme celle des appels : un type absent n'atteint
+  // jamais le gestionnaire de salle, et sans la moindre erreur. Oublier
+  // `meeting_screen` ici donnerait un partage d'ecran qui part bien chez les
+  // autres mais qu'aucun d'eux ne reconnait comme un ecran — il s'afficherait
+  // en vignette de visage, sans que rien dans le code du partage ne cloche.
+  "meeting_screen",
 ])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
@@ -683,6 +689,28 @@ export function sendMeetingHand(meetingId: number, levee: boolean) {
  */
 export function sendMeetingMessage(meetingId: number, texte: string) {
   sendRaw({ type: "meeting_message", meetingId, text: texte })
+}
+
+/**
+ * Annonce le debut ou la fin de MON partage d'ecran a la salle.
+ *
+ * POURQUOI UN VERBE ALORS QUE L'IMAGE PASSE DEJA. La piste d'un ecran emprunte
+ * exactement le meme tuyau que celle d'une camera : elle est substituee chez
+ * tous les pairs sans renegocier, et rien dans WebRTC ne dit ce qu'elle montre.
+ * Sans cette annonce, l'ecran partage arriverait chez les autres comme une
+ * vignette de visage — rognee au cadre du visage et retournee en miroir.
+ *
+ * On n'envoie pas d'expediteur : le serveur pose `fromUserId` lui-meme, sinon
+ * n'importe qui declarerait un partage au nom d'un autre. Il rediffuse ensuite
+ * a TOUTE la salle, l'auteur compris — c'est sa reponse, et non notre propre
+ * foi, qui allume la presentation chez tout le monde au meme instant.
+ *
+ * Le serveur retient qui presente et rejoue l'annonce a celui qui entre en
+ * cours de route ; il l'eteint aussi de lui-meme quand le presentateur quitte
+ * la salle ou perd sa socket. Rien de tout cela n'est a refaire ici.
+ */
+export function sendMeetingScreen(meetingId: number, partage: boolean) {
+  sendRaw({ type: "meeting_screen", meetingId, partage })
 }
 
 /** Diffuse un changement d'etat d'appel (joined / left / rejected / ended...). */

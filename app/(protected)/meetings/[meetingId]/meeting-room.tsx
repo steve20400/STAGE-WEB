@@ -16,8 +16,11 @@ import {
   type DemandeInvitation,
 } from "../../../../src/services/meetings-service"
 import {
+  arreterPartageEcran,
+  demarrerPartageEcran,
   hangUp,
   joinMeetingRoom,
+  partageEcranSupporte,
   setCallAudioOutput,
   toggleCamera,
   toggleMicrophone,
@@ -25,16 +28,22 @@ import {
 import { OUTPUT_VOLUME } from "../../../../src/services/audio-output"
 import { useCallState } from "../../../../src/hooks/use-call"
 import { useContacts } from "../../../../src/hooks/use-contacts"
+import { usePleinEcran } from "../../../../src/hooks/use-plein-ecran"
 import { getMyUserId, loadSessionUser, toInitials } from "../../../../src/data/session-user"
 import {
+  getRealtimeState,
   sendMeetingHand,
   subscribeToMeetingEvents,
 } from "../../../../src/services/websocket-service"
-import { useTranslation } from "../../../../src/i18n"
+import { useTranslation, type Cle } from "../../../../src/i18n"
+import { ApiError } from "../../../../src/lib/api-client"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
 import { PaveNumerique } from "../../../../src/components/pave-numerique"
-import type { CompteTrouve } from "../../../../src/services/contact-lists-service"
+import {
+  FenetreReduite,
+  fenetreReduiteSupportee,
+} from "../../../../src/components/fenetre-reduite"
 import {
   formatAlanyaNumber,
   isValidAlanyaNumber,
@@ -43,14 +52,47 @@ import {
 import type { Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
+/**
+ * INTITULES QUE LE CATALOGUE NE PORTE PAS ENCORE. Voir le compte-rendu du lot :
+ * `meet_share_screen` (« Partager l'ecran ») et `meet_screen_shared`
+ * (« Ecran partage », le bandeau du grand cadre) n'existent dans aucune des
+ * neuf langues.
+ *
+ * Rien n'est ecrit en francais dans le JSX pour autant : la cle est passee
+ * telle quelle a `t`, dont le repli DOCUMENTE est « la cle elle-meme ». L'ecran
+ * degrade donc en un intitule technique, visible et signalable, au lieu de
+ * figer le francais pour les huit autres langues. Le jour ou les cles entrent
+ * au catalogue, ce type disparait et les appels redeviennent des `t` ordinaires
+ * sans autre changement.
+ */
+type CleAVenir = "meet_share_screen" | "meet_screen_shared"
+
 function MeetingControlIcon({
   kind,
+  taille = 18,
 }: {
-  kind: "mic" | "micOff" | "camera" | "cameraOff" | "hand" | "speaker" | "earpiece"
+  kind:
+    | "mic"
+    | "micOff"
+    | "camera"
+    | "cameraOff"
+    | "hand"
+    | "speaker"
+    | "earpiece"
+    | "ecran"
+    | "chat"
+    | "agrandir"
+    | "reduire"
+    | "fenetre"
+    | "points"
+    | "sortir"
+  /** La fenetre reduite est etroite : ses boutons portent des icones plus
+      petites, sans qu'il faille un second jeu de dessins. */
+  taille?: number
 }) {
   const common = {
-    width: 18,
-    height: 18,
+    width: taille,
+    height: taille,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -58,6 +100,59 @@ function MeetingControlIcon({
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
   }
+  /* Un moniteur sur pied : la forme dit « ecran » et non « camera », ce que la
+     seule presence d'une image ne dirait pas. La fleche montante distingue
+     l'emission du simple affichage. */
+  if (kind === "ecran")
+    return (
+      <svg {...common}>
+        <rect x="2" y="4" width="20" height="13" rx="2" />
+        <path d="M8 21h8M12 17v4" />
+        <path d="m12 13-3-3 3-3 3 3-3 3" />
+      </svg>
+    )
+  if (kind === "chat")
+    return (
+      <svg {...common}>
+        <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z" />
+      </svg>
+    )
+  if (kind === "agrandir")
+    return (
+      <svg {...common}>
+        <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+      </svg>
+    )
+  if (kind === "reduire")
+    return (
+      <svg {...common}>
+        <path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5" />
+      </svg>
+    )
+  /* Une grande fenetre et, dans son coin, la petite qui s'en detache : le dessin
+     dit le geste, la ou deux fleches diraient seulement « plus petit ». */
+  if (kind === "fenetre")
+    return (
+      <svg {...common}>
+        <rect x="2" y="4" width="20" height="16" rx="2" />
+        <rect x="12" y="12" width="8" height="6" rx="1" />
+      </svg>
+    )
+  if (kind === "points")
+    return (
+      <svg {...common} fill="currentColor" stroke="none">
+        <circle cx="12" cy="5" r="2" />
+        <circle cx="12" cy="12" r="2" />
+        <circle cx="12" cy="19" r="2" />
+      </svg>
+    )
+  if (kind === "sortir")
+    return (
+      <svg {...common}>
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <path d="m16 17 5-5-5-5M21 12H9" />
+      </svg>
+    )
   if (kind === "camera" || kind === "cameraOff")
     return (
       <svg {...common}>
@@ -118,6 +213,65 @@ function MeetingRemoteVideo({ stream, name }: { stream?: MediaStream; name: stri
 }
 
 /**
+ * LE GRAND CADRE : ce que la salle met en avant, ecran partage ou visage.
+ *
+ * `object-fit: contain` et non `cover` — c'est la difference de fond avec une
+ * tuile de participant. Un visage recadre reste un visage ; un ECRAN recadre
+ * perd la barre d'outils, la ligne de code ou la colonne du tableau qu'on
+ * partageait justement. La vignette de sa propre camera, elle, se retourne en
+ * miroir ; un ecran JAMAIS, on y lit du texte.
+ *
+ * Le `srcObject` est repose au montage : la fenetre reduite recree ce noeud
+ * dans un AUTRE document, ou l'element arrive vierge.
+ */
+function VideoGrande({
+  stream,
+  miroir = false,
+  classe = "salle-grand-video",
+}: {
+  stream: MediaStream | null
+  miroir?: boolean
+  classe?: string
+}) {
+  const ref = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    const element = ref.current
+    if (!element || !stream) return
+    if (element.srcObject !== stream) {
+      element.srcObject = stream
+      void element.play().catch(() => undefined)
+    }
+  }, [stream])
+  if (!stream) return null
+  return (
+    <video
+      ref={ref}
+      className={`${classe}${miroir ? " miroir" : ""}`}
+      autoPlay
+      playsInline
+      /* Muet, comme toutes les images de la salle : le son sort des `<audio>`
+         dedies, restes dans la page. Le rejouer ici doublerait chaque voix. */
+      muted
+    />
+  )
+}
+
+/**
+ * L'echec de la sortie dit-il seulement que le depart avait DEJA eu lieu ?
+ *
+ * `ALREADY_LEFT` — la participation est close — et 404 — il n'y a plus rien a
+ * fermer, la reunion ou la ligne a disparu — ne sont pas des pannes : ils
+ * decrivent l'etat VOULU. Les annoncer ferait surgir une erreur au moment
+ * precis ou tout s'est bien passe.
+ */
+function departDejaEffectue(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false
+  if (err.status === 404) return true
+  const code = (err.payload as { error?: { code?: unknown } } | null | undefined)?.error?.code
+  return code === "ALREADY_LEFT"
+}
+
+/**
  * Sortie programmee par le demontage de la salle, en attente d'echeance — et LA
  * SALLE qu'elle concerne.
  *
@@ -166,25 +320,22 @@ export default function MeetingRoomPage() {
    */
   const etroit = useEcranEtroit()
   const [filOuvert, setFilOuvert] = useState(false)
+  /**
+   * Le fil est-il deplie sur GRAND ecran ?
+   *
+   * Deux etats et non un seul : le panneau du telephone se referme d'un appui
+   * hors de lui, la colonne du grand ecran non. Les melanger faisait qu'un
+   * appui sur le voile du telephone repliait aussi la colonne, et qu'on
+   * retrouvait le fil ferme en revenant sur un grand ecran.
+   *
+   * Deplie par defaut : c'est l'etat qu'a toujours eu la salle sur grand ecran.
+   * Le bouton sert a le RENDRE a la video, pas a decouvrir le fil.
+   */
+  const [filLargeOuvert, setFilLargeOuvert] = useState(true)
   /** Identifiants dont la main est levee, tels que le serveur les diffuse. */
   const [mainsLevees, setMainsLevees] = useState<Set<string>>(new Set())
   const [nonLus, setNonLus] = useState(0)
   const [demandes, setDemandes] = useState<DemandeInvitation[]>([])
-  const [numeroDirect, setNumeroDirect] = useState("")
-  /**
-   * Ce que le pave a trouve sous les chiffres composes, ET les chiffres auxquels
-   * sa reponse se rapporte.
-   *
-   * Le numero accompagne le compte parce que le pave ne previent qu'a
-   * l'aboutissement de SA recherche : entre la frappe d'un chiffre de plus et la
-   * reponse suivante, le compte du numero PRECEDENT serait encore en main, et le
-   * bouton « Ajouter » resterait allume au-dessus d'un numero qui n'est plus le
-   * sien. Compare aux chiffres affiches, il s'eteint des la frappe.
-   */
-  const [titulaireDirect, setTitulaireDirect] = useState<{
-    numero: string
-    compte: CompteTrouve | null
-  }>({ numero: "", compte: null })
   /**
    * Lecture du son refusee par le navigateur. Sans cet etat, la salle est muette
    * et rien ne le dit : on n'a alors ni explication, ni moyen de reessayer.
@@ -204,6 +355,14 @@ export default function MeetingRoomPage() {
   const [ongletAjout, setOngletAjout] = useState<"contacts" | "numero">("contacts")
   /** Chiffres composés dans le pavé Alanya ID du panneau d'ajout. */
   const [chiffresAjout, setChiffresAjout] = useState("")
+
+  /** La salle est-elle repliee dans la petite fenetre plutot que dans la page ? */
+  const [fenetreReduite, setFenetreReduite] = useState(false)
+  /** Menu des trois points DANS la fenetre reduite, qui n'a pas de barre. */
+  const [menuFenetre, setMenuFenetre] = useState(false)
+
+  /** Racine de la page : elle sert a mesurer le panneau du fil, plus bas. */
+  const racineRef = useRef<HTMLDivElement | null>(null)
 
   const { contacts } = useContacts()
 
@@ -248,6 +407,28 @@ export default function MeetingRoomPage() {
     [fluxDistants, callState.participantNames, nomsConnus, t]
   )
 
+  /**
+   * QUI PRESENTE, et donc ce que la salle met en grand.
+   *
+   * `partageParPeerId` vient du serveur : c'est le seul verbe qui distingue une
+   * piste d'ecran d'une piste de camera, les deux empruntant le meme tuyau
+   * WebRTC. Sans lui, un ecran partage arriverait ici comme une vignette de
+   * visage parmi les autres.
+   *
+   * La vedette peut etre nulle alors que quelqu'un presente : c'est le cas de
+   * MON propre partage, mon identifiant n'etant evidemment pas dans les flux
+   * DISTANTS. `partageParMoi` prend alors le relais et le grand cadre montre le
+   * flux local.
+   */
+  const vedette = useMemo(
+    () =>
+      callState.partageParPeerId
+        ? (participantsDistants.find((p) => p.id === callState.partageParPeerId) ?? null)
+        : null,
+    [callState.partageParPeerId, participantsDistants]
+  )
+  const jePresente = callState.partageParMoi && vedette === null
+
   const sortiesAudio = useRef<Map<string, HTMLAudioElement>>(new Map())
 
   // Niveau de sortie : on regle le VOLUME et non la coupure, pour que la bascule
@@ -278,6 +459,41 @@ export default function MeetingRoomPage() {
    */
   const idPisteLocale = callState.localStream?.getVideoTracks()[0]?.id ?? null
   const apercuLocalRef = useRef<HTMLVideoElement | null>(null)
+  // Miroir du flux, lisible depuis la ref de rappel sans la faire dependre de
+  // l'etat : une ref de rappel qui change d'identite a chaque rendu serait
+  // rappelee avec null puis avec l'element a CHAQUE rendu, ce qui rebrancherait
+  // l'image en boucle.
+  const fluxLocalRef = useRef<MediaStream | null>(null)
+  fluxLocalRef.current = callState.localStream ?? null
+
+  /**
+   * Branche le flux depuis L'ELEMENT et non depuis un effet.
+   *
+   * L'apercu vit dans la branche « pas en fenetre reduite » : passer en petite
+   * fenetre le demonte, en revenir le remonte en noeud DOM NEUF. Un effet dont
+   * les dependances sont des DONNEES ne rejoue pas — aucune ne bouge pendant
+   * l'aller-retour — et l'element neuf restait donc sans image. La vignette
+   * « Moi » se vidait, et le rester jusqu'a ce qu'on coupe puis rallume la
+   * camera, ou que quelqu'un entre ou sorte.
+   *
+   * Une ref de rappel s'execute A CHAQUE montage, par construction : c'est
+   * l'element qui declenche le branchement, donc il ne peut plus etre manque.
+   */
+  const brancherApercuLocal = useCallback(
+    (element: HTMLVideoElement | null) => {
+      apercuLocalRef.current = element
+      if (!element) return
+      const flux = fluxLocalRef.current
+      if (!flux || element.srcObject === flux) return
+      element.srcObject = flux
+      void element.play().catch(() => undefined)
+    },
+    []
+  )
+
+  // Le flux peut aussi changer SANS que l'element bouge : changement de camera,
+  // retour d'un partage d'ecran. La ref de rappel ne verrait rien, d'ou cet
+  // effet qui reste, mais qui n'est plus le seul chemin.
   useEffect(() => {
     const element = apercuLocalRef.current
     if (!element || !callState.localStream) return
@@ -287,10 +503,79 @@ export default function MeetingRoomPage() {
     }
   }, [callState.localStream, idPisteLocale, callState.camOn, participantsDistants.length])
 
+  /** Le fil est-il reellement sous les yeux, sur l'un ou l'autre format ? */
+  const filVisible = etroit ? filOuvert : filLargeOuvert
+
   // Ouvrir le fil solde ce qui a ete rate pendant qu'il etait ferme.
   useEffect(() => {
-    if (filOuvert) setNonLus(0)
-  }, [filOuvert])
+    if (filVisible) setNonLus(0)
+  }, [filVisible])
+
+  /**
+   * PLEIN ECRAN du grand cadre. Le hook porte les trois orthographes de l'API
+   * et, surtout, l'ecoute des sorties que l'application ne declenche pas —
+   * Echap, bouton du systeme. `supporte` vaut faux la ou l'API manque ou est
+   * interdite : le bouton disparait alors au lieu de promettre un refus.
+   */
+  const pleinEcran = usePleinEcran()
+
+  /**
+   * Ce navigateur sait-il capturer un ecran ? Lu UNE FOIS : c'est une capacite
+   * du navigateur, elle ne change pas en cours de reunion.
+   */
+  const captureEcranPossible = useMemo(() => partageEcranSupporte(), [])
+  /**
+   * La VRAIE fenetre du systeme — celle qui survit a la reduction du navigateur.
+   * Ailleurs, le composant retombe sur une carte flottante dans la page : utile
+   * sur un bureau ou l'on veut degager la salle, sans objet sur un telephone ou
+   * elle recouvrirait le peu d'ecran qui reste.
+   */
+  const vraieFenetreReduite = useMemo(() => fenetreReduiteSupportee(), [])
+
+  /**
+   * DIMENSIONS DE LA FENETRE REDUITE, MESUREES SUR LE PANNEAU DU FIL.
+   *
+   * L'utilisateur les a donnees en s'y referant — « la largeur du panneau de
+   * chat, les trois quarts de sa hauteur ». Deux nombres ecrits en dur les
+   * auraient trahies des la premiere retouche de `meeting-chat.css`, ou sur un
+   * ecran ou le panneau ne fait pas la meme taille : on mesure donc le panneau
+   * REEL, et on continue de le mesurer, la fenetre du navigateur pouvant
+   * changer de taille pendant que la reunion dure.
+   *
+   * Une mesure nulle est IGNOREE : replier la colonne pose `display: none` sur
+   * le panneau, dont la boite tombe alors a zero. Garder la derniere mesure
+   * connue vaut mieux qu'ouvrir une fenetre plate.
+   */
+  const [tailleFil, setTailleFil] = useState<{ largeur: number; hauteur: number } | null>(null)
+  useEffect(() => {
+    const racine = racineRef.current
+    if (!racine || typeof ResizeObserver === "undefined") return
+    const panneau = racine.querySelector<HTMLElement>(".salle-fil")
+    if (!panneau) return
+    const mesurer = () => {
+      const boite = panneau.getBoundingClientRect()
+      if (boite.width < 1 || boite.height < 1) return
+      setTailleFil({
+        largeur: Math.round(boite.width),
+        hauteur: Math.round(boite.height * 0.75),
+      })
+    }
+    mesurer()
+    const observateur = new ResizeObserver(mesurer)
+    observateur.observe(panneau)
+    return () => observateur.disconnect()
+    // `meeting` : le panneau n'existe dans l'arbre qu'une fois la reunion lue.
+  }, [meeting])
+
+  /**
+   * Sortir de la salle referme la fenetre reduite.
+   *
+   * Sans cela, elle resterait ouverte sur un cadre vide — le media a ete coupe,
+   * mais la fenetre du systeme, elle, ne se ferme pas toute seule.
+   */
+  useEffect(() => {
+    if (!enSalle) setFenetreReduite(false)
+  }, [enSalle])
 
   /**
    * Etat du gestionnaire d'appels, lisible depuis un nettoyage.
@@ -355,13 +640,24 @@ export default function MeetingRoomPage() {
    * LA sortie de la salle. Tous les chemins passent par ici — le bouton, le
    * demontage de la page, la fermeture de l'onglet.
    *
-   * Deux choses a faire, et il en manquait toujours une : couper le media, et
-   * fermer la participation EN BASE. `hangUp()` arrete les pistes — camera et
-   * micro s'eteignent pour de bon —, ferme les connexions et emet
-   * `meeting_leave` sur la socket deja ouverte. Mais lui seul ne dit RIEN a la
-   * base : sans l'appel a `/leave`, le participant y reste « connecte » et sa
-   * duree de presence n'est jamais close. C'est exactement ce qui arrivait par
-   * tout chemin autre que le bouton.
+   * DEUX CHOSES A FAIRE, ET UNE SEULE VOIE POUR CHACUNE : couper le media, et
+   * fermer la participation EN BASE.
+   *
+   * `hangUp()` fait LES DEUX quand on est dans la salle. Il arrete les pistes —
+   * camera et micro s'eteignent pour de bon —, ferme les connexions, ET emet
+   * `meeting_leave` sur la socket deja ouverte ; le serveur temps reel repond a
+   * cette trame en posant `connecte = 0` et en closant la duree de presence.
+   *
+   * LE COMMENTAIRE QUI TENAIT ICI AFFIRMAIT LE CONTRAIRE — que `hangUp()` « ne
+   * dit RIEN a la base » — et c'est cette phrase qui a produit le defaut : on
+   * ajoutait donc `/leave` derriere, la route trouvait la ligne deja close et
+   * repondait 400 `ALREADY_LEFT`, dont le message brut du serveur s'affichait en
+   * toast. Quitter proprement se soldait par une erreur a l'ecran.
+   *
+   * La route REST n'est donc appelee QUE lorsque la socket n'a rien dit : le cas
+   * ou l'on est inscrit en base sans le moindre media — entree faite depuis la
+   * liste des reunions, qui appelle `join` avant meme d'ouvrir cet ecran, ou
+   * micro et camera refuses au moment d'entrer.
    *
    * `auDechargement` distingue le cas ou la page est en train de disparaitre :
    * plus rien d'asynchrone n'y survit, tout doit partir dans le gestionnaire
@@ -383,14 +679,34 @@ export default function MeetingRoomPage() {
         // gestionnaire, le document peut avoir cesse d'exister. Les deux appels
         // sont synchrones — la trame part sur la socket deja ouverte, la requete
         // est remise au navigateur, qui la termine sans nous.
+        //
+        // SEUL CHEMIN OU LES DEUX PARTENT ENSEMBLE, et c'est delibere : rien ne
+        // garantit qu'une trame confiee a la socket soit reellement emise par un
+        // document qu'on est en train de detruire, la ou `keepalive` l'est par
+        // contrat. Un 400 « deja deconnecte » que personne ne verra vaut mieux
+        // qu'un participant reste « connecte » pour toujours.
         if (aPrevenir) leaveMeetingAuDechargement(id)
         if (enAppelIci) void hangUp()
         return
       }
 
+      /*
+       * « LA SOCKET L'A-T-ELLE FAIT ? » se lit AVANT de raccrocher.
+       *
+       * `sendMeetingLeave` passe par `sendRaw`, qui MET EN FILE au lieu
+       * d'emettre quand la socket est fermee, et rouvre la connexion. La trame
+       * partira donc... un jour, et peut-etre jamais si l'on ferme l'onglet
+       * entre-temps. Socket fermee, c'est exactement le cas ou « la socket n'a
+       * pas fait le travail » : la route REST reprend la main.
+       */
+      const socketOuverte = getRealtimeState().connected
+
       // Le media D'ABORD, la base ensuite : sans ce passage, on sortait de la
       // reunion cote serveur en continuant a filmer et a etre vu.
-      if (enAppelIci) await hangUp()
+      if (enAppelIci) {
+        await hangUp()
+        if (socketOuverte) return
+      }
       if (aPrevenir) await leaveMeeting(id)
     },
     [meetingId]
@@ -468,25 +784,21 @@ export default function MeetingRoomPage() {
   }
 
   /*
-   * PLUS AUCUNE RECHERCHE DE TITULAIRE N'EST MENEE DEPUIS CET ECRAN, ni pour le
-   * panneau d'ajout ni pour l'invitation directe de l'organisateur : le pave
+   * PLUS AUCUNE RECHERCHE DE TITULAIRE N'EST MENEE DEPUIS CET ECRAN : le pave
    * partage la mene une fois (`afficherTitulaire`) et rend le compte trouve
    * (`onTitulaire`).
    *
-   * Il y en avait deux, pour la MEME question et a deux rythmes differents : le
-   * pave peignait le nom du titulaire a 350 ms pendant qu'une seconde requete,
-   * ici, decidait a 250 ms si le bouton « Ajouter » s'allumait. L'ecran se
-   * contredisait a chaque frappe — le nom complet lisible sous les chiffres, le
-   * bouton eteint dessous, et rien pour expliquer pourquoi on ne pouvait pas
-   * inviter quelqu'un de manifestement identifie. Une seule source de verite
-   * supprime la contradiction en meme temps que la requete.
+   * IL N'Y A PLUS NON PLUS QU'UN SEUL PAVE. La colonne d'informations en portait
+   * un second, « invitation directe de l'organisateur », qui posait exactement
+   * la meme question au meme serveur pour appeler exactement la meme route que
+   * l'onglet « Alanya ID » du panneau « Ajouter ». Ce doublon coutait 577 px de
+   * hauteur a une colonne plafonnee a 26 vh : c'est la video, dessous, qui les
+   * payait. Le reglage « invitation automatique » qui l'accompagnait etait lui
+   * aussi ecrit deux fois, mot pour mot, dans le panneau « Menu ». Les deux
+   * copies de la colonne sont parties ; les panneaux qu'on ouvre restent, et
+   * s'ouvrent desormais aussi AVANT d'entrer dans la salle, ou la colonne etait
+   * jusqu'ici le seul acces.
    */
-
-  /** Chiffres composes, sans les espaces d'affichage. */
-  const chiffresDirects = normalizeAlanyaNumber(numeroDirect)
-
-  /** Le compte trouve, mais seulement s'il parle bien des chiffres AFFICHES. */
-  const compteDirect = titulaireDirect.numero === chiffresDirects ? titulaireDirect.compte : null
 
   /** Contacts filtrés par la recherche dans le panneau d'ajout. */
   const contactsFiltres = useMemo(() => {
@@ -554,23 +866,29 @@ export default function MeetingRoomPage() {
     )
   }
 
-  const inviterDirectement = async () => {
-    if (!meetingId) return
-    // Garde de derniere ligne : le bouton est deja eteint sans compte trouve, et
-    // la validation au clavier applique la meme condition.
-    if (!compteDirect) return showError(t("error"), t("dial_unknown_number"))
-    try {
-      await inviterAReunion(Number(meetingId), [chiffresDirects])
-      setNumeroDirect("")
-      setMeeting(await fetchMeeting(Number(meetingId)))
-    } catch (err) {
-      showError(t("error"), err instanceof Error ? err.message : t("a2_invite_failed"))
-    }
-  }
-
   const maMain = mainsLevees.has(getMyUserId() ?? "")
   /** Notre propre nom, pour l'initiale affichee quand on est seul dans la salle. */
   const monNom = loadSessionUser()?.name ?? t("l2_me")
+
+  /**
+   * Traduction d'une cle QUI N'EST PAS ENCORE AU CATALOGUE (voir `CleAVenir`).
+   * Le detour par `unknown` est volontairement voyant : c'est lui qui signale
+   * qu'il reste ici une dette, et il disparaitra avec elle.
+   */
+  const tAVenir = useCallback((cle: CleAVenir) => t(cle as unknown as Cle), [t])
+
+  /**
+   * Commencer ou arreter de partager son ecran.
+   *
+   * AUCUN TOAST D'ERREUR, meme en cas d'echec : le cas de loin le plus frequent
+   * est le refus de la fenetre de choix du navigateur, c'est-a-dire quelqu'un
+   * qui a change d'avis. `demarrerPartageEcran` ne jette d'ailleurs pas — la
+   * verite est dans `partageParMoi`, que le bouton lit directement.
+   */
+  const basculerPartageEcran = useCallback(() => {
+    if (callState.partageParMoi) void arreterPartageEcran()
+    else void demarrerPartageEcran()
+  }, [callState.partageParMoi])
 
   const handleExclure = async (participantId: string, nom: string) => {
     if (!meetingId || !confirm(t("meet_exclude_confirm", { name: nom }))) return
@@ -611,7 +929,13 @@ export default function MeetingRoomPage() {
       // Le media est deja coupe : on ne reste pas dans une salle vide parce que
       // la requete a echoue.
       navigate("/meetings")
-      showError(t("error"), err instanceof Error ? err.message : t("meet_leave_failed"))
+      // Le depart avait DEJA eu lieu : il n'y a rien a annoncer. Annoncer quoi
+      // que ce soit ici transformait une sortie reussie en erreur a l'ecran.
+      if (departDejaEffectue(err)) return
+      // JAMAIS `err.message` : c'est le texte BRUT du serveur, ecrit dans une
+      // seule langue et jamais passe par le catalogue. Un utilisateur en chinois
+      // lisait une phrase francaise. Le libelle de l'echec est ici, traduit.
+      showError(t("error"), t("meet_leave_failed"))
     }
   }
 
@@ -694,15 +1018,139 @@ export default function MeetingRoomPage() {
     )
   }
 
+  const bandeauVisible = meeting.jeSuisOrganisateur && demandes.length > 0 && enSalle
+
+  /**
+   * CE QUE MONTRE LE RENDU — et qui DEMENAGE.
+   *
+   * Le meme rendu est pose soit dans la page, soit dans la fenetre reduite, mais
+   * JAMAIS dans les deux : un flux ne se branche pas sur deux `<video>` sans que
+   * l'un des deux se fige. Une fonction plutot qu'une valeur, parce que les deux
+   * emplacements ne veulent pas exactement la meme chose (voir `dansLaFenetre`),
+   * et un seul est monte a la fois.
+   *
+   * Trois dispositions, dans cet ordre de priorite :
+   *
+   *  1. QUELQU'UN PRESENTE — c'est ce qu'on attend d'une reunion : son ecran
+   *     passe en grand TOUT SEUL, sans que personne ait a le demander, et les
+   *     autres se rangent dans une bande dessous. Le presentateur est designe
+   *     par le serveur (`partageParPeerId`) et non devine d'une piste video :
+   *     rien dans WebRTC ne distingue un ecran d'un visage.
+   *  2. PERSONNE NE PRESENTE — la grille egale des appels de groupe, comme
+   *     avant. Sauf dans la FENETRE REDUITE, trop etroite pour une grille : la
+   *     demande y veut « le gros rendu video, les autres en plus petit avec
+   *     defilement », donc un grand cadre coute que coute — a defaut de
+   *     presentateur, le premier arrive.
+   *  3. PERSONNE D'AUTRE N'EST LA — sa propre image occupe le cadre. Arriver en
+   *     avance est ordinaire, cela ne doit pas ressembler a une panne.
+   */
+  const rendreScene = (dansLaFenetre: boolean) => {
+    const grand = vedette ?? (dansLaFenetre && !jePresente ? (participantsDistants[0] ?? null) : null)
+    const flux = grand ? grand.stream : jePresente ? callState.localStream : null
+    /** Un ECRAN, et pas un visage : c'est ce que l'etiquette doit annoncer. */
+    const estUnEcran = vedette !== null || jePresente
+
+    if (!flux) {
+      return participantsDistants.length > 0 ? (
+        <ParticipantGrid participants={participantsDistants} isVideo={estVideo} size="room" />
+      ) : (
+        <div className="meeting-seul">
+          {estVideo && callState.localStream && callState.camOn ? (
+            /* `VideoGrande` et non un `<video>` branche par un effet de la page :
+               ce bloc peut renaitre dans le document de la fenetre reduite, ou
+               l'element arrive vierge et doit rebrancher son flux lui-meme. */
+            <VideoGrande stream={callState.localStream} miroir classe="meeting-seul-video" />
+          ) : (
+            <div className="meeting-seul-avatar">{toInitials(monNom)}</div>
+          )}
+          <span className="meeting-seul-mention">{t("meet_pending")}</span>
+        </div>
+      )
+    }
+
+    const autres = grand
+      ? participantsDistants.filter((p) => p.id !== grand.id)
+      : participantsDistants
+
+    return (
+      <div className="salle-scene">
+        <div className="salle-grand">
+          {/* Jamais de miroir ici : le grand cadre montre soit l'image d'un
+              autre, soit un ecran — et l'on y lit du texte. */}
+          <VideoGrande stream={flux} />
+          {/* CE QUI DIT « ECRAN » ET NON « CAMERA ». Sans cette etiquette, un
+              ecran partage n'est qu'une image de plus, en plus grand : rien ne
+              distinguerait une presentation d'un gros plan sur un visage. */}
+          <span className={`salle-grand-etiquette${estUnEcran ? "" : " neutre"}`}>
+            {estUnEcran && <MeetingControlIcon kind="ecran" taille={13} />}
+            <b>{grand ? grand.name : t("l2_me")}</b>
+            {estUnEcran && <span>{tAVenir("meet_screen_shared")}</span>}
+          </span>
+        </div>
+        {autres.length > 0 && (
+          <div className="salle-bande">
+            <ParticipantGrid participants={autres} isVideo={estVideo} size="room" />
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div
-      className={`meeting-room-root${filOuvert ? " fil-ouvert" : ""}${enSalle ? " en-salle" : ""}`}
+      ref={racineRef}
+      className={[
+        "meeting-room-root",
+        filOuvert ? "fil-ouvert" : "",
+        enSalle ? "en-salle" : "",
+        // La rangee du bandeau n'existe que lorsqu'il y a un bandeau : declaree
+        // en permanence, elle restait vide et coutait quand meme un interligne.
+        bandeauVisible ? "avec-bandeau" : "",
+        filLargeOuvert ? "" : "sans-fil",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <div className="meeting-header">
         <h1>{meeting.objet}</h1>
-        <button className="btn-back" onClick={() => navigate("/meetings")} aria-label={t("close")}>
-          ✕
-        </button>
+        <div className="meeting-entete-actions">
+          {/*
+            LE FIL S'OUVRE ET SE FERME SUR GRAND ECRAN AUSSI.
+
+            LE MOTIF EST CELUI DE LA FENETRE DE DISCUSSION, et c'est deja une
+            regle de la maison : la discussion ouvre ses informations par un
+            bouton de sa RANGEE D'ACTIONS — pas depuis la barre du bas, qui porte
+            les gestes de la conversation en cours — et le panneau se GLISSE A
+            COTE au lieu de recouvrir. Le fil de la salle est le meme genre de
+            compagnon : il accompagne la reunion sans jamais la cacher. Il prend
+            donc le meme bouton au meme endroit, et la meme colonne qui pousse la
+            video au lieu de se poser dessus.
+
+            Sur ecran etroit, le fil est un panneau glissant avec sa propre
+            bascule flottante : ce bouton-ci n'y aurait rien a commander.
+          */}
+          {!etroit && (
+            <button
+              className={`meeting-entete-bouton${filLargeOuvert ? " actif" : ""}`}
+              onClick={() => setFilLargeOuvert((ouvert) => !ouvert)}
+              aria-expanded={filLargeOuvert}
+              aria-label={t("meet_chat_title")}
+              title={t("meet_chat_title")}
+            >
+              <MeetingControlIcon kind="chat" taille={16} />
+              {!filLargeOuvert && nonLus > 0 && (
+                <span className="meeting-entete-compte">{nonLus > 99 ? "99+" : nonLus}</span>
+              )}
+            </button>
+          )}
+          <button
+            className="btn-back"
+            onClick={() => navigate("/meetings")}
+            aria-label={t("close")}
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* NOTIFICATIONS D'INVITATION — positionnées AU-DESSUS du media, pas dans la barre du bas
@@ -710,7 +1158,7 @@ export default function MeetingRoomPage() {
           EN DUR FAUTE DE CLE : « Demandes d'invitation » et « X souhaite inviter
           Y » n'existent nulle part au catalogue, ici comme dans le repli de la
           barre du bas. A reprendre des que les cles existent. */}
-      {meeting.jeSuisOrganisateur && demandes.length > 0 && enSalle && (
+      {bandeauVisible && (
         <section className="meeting-invite-banner" aria-label="Demandes d'invitation">
           {demandes.map((d) => (
             <div key={d.id} className="meeting-invite-banner-item">
@@ -740,7 +1188,15 @@ export default function MeetingRoomPage() {
         et evite qu'un meme flux soit joue deux fois.
       */}
       {enSalle && (
-        <div className="meeting-media">
+        /* `pleinEcran.cible` sur le CADRE et non sur un `<video>` : agrandir le
+           seul element video perdrait la bande des autres participants et
+           l'etiquette du presentateur. C'est le rendu entier qu'on veut plein
+           ecran, pas une image. */
+        <div className="meeting-media" ref={pleinEcran.cible}>
+          {/* LES `<audio>` NE DEMENAGENT JAMAIS. Ils restent dans la page meme
+              quand l'image part dans la fenetre reduite : les recreer ailleurs
+              couperait le son le temps que les flux se rebranchent, et une
+              reunion qu'on replie est justement une reunion qu'on ECOUTE. */}
           {fluxDistants.map(([id, stream]) => (
             <audio
               key={id}
@@ -770,132 +1226,125 @@ export default function MeetingRoomPage() {
             </button>
           )}
 
-          {participantsDistants.length > 0 ? (
+          {fenetreReduite ? (
+            /* L'image est ailleurs. On le DIT, et on offre le retour : un cadre
+               vide laisserait croire que la salle a lache. */
+            <div className="meeting-media-deporte">
+              <MeetingControlIcon kind="fenetre" taille={22} />
+              <span>{t("size_small_screen")}</span>
+              <button type="button" onClick={() => setFenetreReduite(false)}>
+                {t("size_large_screen")}
+              </button>
+            </div>
+          ) : (
             <>
-              <ParticipantGrid participants={participantsDistants} isVideo={estVideo} size="room" />
+              {rendreScene(false)}
+
               {/* Sa propre image, en petit : on verifie d'un coup d'oeil ce que
                   les autres recoivent, sans prendre la place de leurs cadres.
-                  Retournee comme un miroir — c'est ainsi qu'on se voit. */}
-              {estVideo && callState.localStream && (
-                <div className="meeting-apercu">
-                  {callState.camOn ? (
-                    <video ref={apercuLocalRef} autoPlay playsInline muted />
-                  ) : (
-                    <div className="meeting-apercu-coupee">{t("camera_off")}</div>
-                  )}
-                  <span className="meeting-apercu-nom">{t("l2_me")}</span>
-                </div>
-              )}
+                  Retournee comme un miroir — c'est ainsi qu'on se voit.
+
+                  Pas pendant qu'on presente : le grand cadre montre deja notre
+                  emission, et ce n'est plus un visage a se voir mais un ecran a
+                  lire. */}
+              {estVideo &&
+                callState.localStream &&
+                !jePresente &&
+                participantsDistants.length > 0 && (
+                  <div className="meeting-apercu">
+                    {callState.camOn ? (
+                      <video ref={brancherApercuLocal} autoPlay playsInline muted />
+                    ) : (
+                      <div className="meeting-apercu-coupee">{t("camera_off")}</div>
+                    )}
+                    <span className="meeting-apercu-nom">{t("l2_me")}</span>
+                  </div>
+                )}
+
+              {/* LES DEUX TAILLES DU RENDU, posees SUR le rendu lui-meme et non
+                  dans la barre du bas : elles ne commandent pas la reunion, elles
+                  commandent ce cadre-ci. C'est la ou l'oeil les cherche, et la ou
+                  elles suivent le cadre en plein ecran — dans la barre du bas,
+                  elles auraient disparu au moment precis ou l'on veut en sortir. */}
+              <div className="meeting-media-outils">
+                {/* Le bouton n'apparait PAS la ou l'API manque ou est interdite :
+                    `supporte` lit `fullscreenEnabled`, qui vaut faux dans un
+                    cadre sans permission comme dans la fenetre reduite. */}
+                {pleinEcran.supporte && (
+                  <button
+                    type="button"
+                    className={`meeting-media-bouton${pleinEcran.actif ? " actif" : ""}`}
+                    onClick={pleinEcran.basculer}
+                    aria-pressed={pleinEcran.actif}
+                    title={t("f2_fullscreen")}
+                    aria-label={t("f2_fullscreen")}
+                  >
+                    <MeetingControlIcon
+                      kind={pleinEcran.actif ? "reduire" : "agrandir"}
+                      taille={16}
+                    />
+                  </button>
+                )}
+                {/* Sur telephone, la carte de repli recouvrirait le peu d'ecran
+                    qui reste : on ne propose la fenetre reduite que la ou elle
+                    tient sa promesse — une VRAIE fenetre du systeme, ou un
+                    bureau assez large pour qu'une carte flottante ait un sens. */}
+                {(vraieFenetreReduite || !etroit) && !pleinEcran.actif && (
+                  <button
+                    type="button"
+                    className="meeting-media-bouton"
+                    onClick={() => setFenetreReduite(true)}
+                    title={t("size_small_screen")}
+                    aria-label={t("size_small_screen")}
+                  >
+                    <MeetingControlIcon kind="fenetre" taille={16} />
+                  </button>
+                )}
+              </div>
             </>
-          ) : (
-            /* Seul dans la salle : sa propre image occupe le cadre, faute
-               d'autre chose a montrer. Une reunion ou l'on arrive en avance ne
-               doit pas ressembler a une reunion en panne. */
-            <div className="meeting-seul">
-              {estVideo && callState.localStream && callState.camOn ? (
-                <video
-                  ref={apercuLocalRef}
-                  className="meeting-seul-video"
-                  autoPlay
-                  playsInline
-                  muted
-                />
-              ) : (
-                <div className="meeting-seul-avatar">{toInitials(monNom)}</div>
-              )}
-              <span className="meeting-seul-mention">{t("meet_pending")}</span>
-            </div>
           )}
         </div>
       )}
 
+      {/*
+        LA COLONNE D'INFORMATIONS, DESORMAIS UNE BANDE.
+
+        Elle a longtemps ete le vrai voleur de l'ecran : plafonnee a 26 vh, elle
+        prenait 281 px pour un contenu qui en mesurait 918, dont 577 px d'un
+        panneau de reglages ecrit une seconde fois dans les panneaux flottants.
+        Ces 577 px sont partis (voir le commentaire des paves) ; ce qui reste —
+        le type, la duree, les invites, l'etat de l'appel — tient dans une bande
+        d'environ 90 px et laisse le reste a la video.
+
+        Les mentions passent a gauche, les invites defilent a l'horizontale a
+        droite : la bande garde une hauteur de ligne quel que soit le nombre
+        d'invites, au lieu de grandir jusqu'a son plafond.
+      */}
       <div className="meeting-info">
-        {/* Le deux-points est DANS la traduction : l'espace qui le precede est
-            une regle francaise, l'anglais colle le signe au mot et le chinois
-            emploie le sien. Le coder ici les imposait a tout le monde. */}
-        <p>
-          {t("r2_meet_type_value", {
-            value: meeting.type === "video" ? t("video_label") : t("cinfo_audio"),
-          })}
-        </p>
-        <p>{t("meet_duration_minutes", { n: Math.floor(meeting.dureeSecondes / 60) })}</p>
-        {meeting.jeSuisOrganisateur && !meeting.terminee && (
-          <section className="meeting-settings-panel">
-            {/* Le meme intitule et le meme libelle que le panneau « Menu » de la
-                barre du bas, qui porte deja la meme case : deux ecritures du
-                meme reglage ne doivent pas se dire autrement. */}
-            <div className="meeting-settings-title">{t("meet_settings")}</div>
-            <label className="meeting-auto-invite">
-              <input
-                type="checkbox"
-                checked={meeting.invitationAuto}
-                onChange={(e) => void changerModeInvitation(e.target.checked)}
-              />
-              <span>
-                <strong>{t("meet_auto_invite")}</strong>
-                <small>{t("meet_auto_invite_hint")}</small>
-              </span>
-            </label>
-            {/* LE PAVE DE LA PAGE DES APPELS, et non plus un clavier maison.
-                Celui d'ici formatait le numero par groupes de deux quand le
-                reste de l'application le groupe autrement, s'arretait a huit
-                chiffres quand le backend en emet jusqu'a dix, ignorait le
-                clavier physique, et annoncait un PSEUDO la ou l'on attend le nom
-                complet du titulaire. Un seul clavier partout, c'est un seul
-                endroit ou corriger tout cela.
-
-                Pas d'`autoFocus` : ce bloc est pose dans la page, pas dans une
-                fenetre qui vient de s'ouvrir. Lui donner le focus a l'arrivee
-                sauterait au clavier au lieu de laisser lire la reunion. */}
-            <div className="meeting-id-keypad">
-              <PaveNumerique
-                valeur={numeroDirect}
-                onChange={setNumeroDirect}
-                onValider={() => {
-                  // Entree fait ce que ferait le bouton, et rien de plus : sans
-                  // cette condition, valider au clavier sur un numero sans compte
-                  // afficherait une erreur la ou le bouton, eteint, ne propose
-                  // rien.
-                  if (compteDirect) void inviterDirectement()
-                }}
-                compact
-                afficherTitulaire
-                /* Le compte que le pave vient de trouver, celui-la meme dont il
-                   ecrit le nom sous les chiffres. C'est ce rappel qui remplace
-                   la seconde requete : le nom affiche et le bouton allume
-                   repondent desormais a la meme reponse, au meme instant.
-
-                   Les chiffres sont pris dans la fermeture et non dans une
-                   reference : le rappel qui parle est celui du rendu qui a
-                   lance la recherche, donc `chiffresDirects` designe le numero
-                   CHERCHE et non le dernier tape. */
-                onTitulaire={(compte, numero) => setTitulaireDirect({ numero, compte })}
-              />
-              {/* L'etat de la SAISIE. Le nom du titulaire, lui, se lit sous les
-                  chiffres, dans le pave. */}
-              <div className="meeting-id-help" aria-live="polite">
-                {numeroDirect.length === 0
-                  ? t("dial_hint_number")
-                  : isValidAlanyaNumber(numeroDirect)
-                    ? t("number_complete")
-                    : t("digits_too_short", { n: numeroDirect.length })}
-              </div>
-              <div className="meeting-id-actions">
-                <button
-                  type="button"
-                  onClick={() => void inviterDirectement()}
-                  disabled={!compteDirect}
-                >
-                  {t("l2_add")}
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
-        {meeting.participants.length > 0 && (
-          <>
+        <div className="meeting-info-meta">
+          {/* Le deux-points est DANS la traduction : l'espace qui le precede est
+              une regle francaise, l'anglais colle le signe au mot et le chinois
+              emploie le sien. Le coder ici les imposait a tout le monde. */}
+          <p>
+            {t("r2_meet_type_value", {
+              value: meeting.type === "video" ? t("video_label") : t("cinfo_audio"),
+            })}
+          </p>
+          <p>{t("meet_duration_minutes", { n: Math.floor(meeting.dureeSecondes / 60) })}</p>
+          {meeting.participants.length > 0 && (
             <p>{t("meet_participants", { count: meeting.participants.length })}</p>
-            <div className="participants-grid">
+          )}
+          {/* « Appel en cours » ne vaut que pour CETTE salle : un appel mene
+              ailleurs n'a rien a annoncer ici. */}
+          {enSalle && (
+            <div className="call-status">
+              <div className="status-indicator active" />
+              <span>{t("call_in_progress")}</span>
+            </div>
+          )}
+        </div>
+        {meeting.participants.length > 0 && (
+          <div className="participants-grid">
               {meeting.participants.map((p) => (
                 <div key={p.id} className="participant-box">
                   {/* Un rond a la place du nom en clair : c'est la convention
@@ -954,15 +1403,6 @@ export default function MeetingRoomPage() {
                   </div>
                 </div>
               ))}
-            </div>
-          </>
-        )}
-        {/* « Appel en cours » ne vaut que pour CETTE salle : un appel mene
-            ailleurs n'a rien a annoncer ici. */}
-        {enSalle && (
-          <div className="call-status">
-            <div className="status-indicator active" />
-            <span>{t("call_in_progress")}</span>
           </div>
         )}
       </div>
@@ -984,9 +1424,13 @@ export default function MeetingRoomPage() {
           aria-hidden="true"
         />
       )}
+      {/* TOUJOURS MONTE, meme replie : le fil est ephemere et n'existe nulle
+          part ailleurs — le demonter perdrait tout ce qui s'y est dit. Replier
+          la colonne se fait donc en CSS, et `visible` sert seulement a compter
+          ce qui arrive pendant qu'on ne le regarde pas. */}
       <MeetingChat
         meetingId={Number(meetingId)}
-        visible={!etroit || filOuvert}
+        visible={filVisible}
         onMessageMasque={() => setNonLus((n) => n + 1)}
       />
 
@@ -1067,12 +1511,21 @@ export default function MeetingRoomPage() {
             qui compte, et il n'y en a pas d'autre pour cet etat. */}
         {meeting.terminee && <div className="meeting-ended">{t("meet_ended_toast")}</div>}
 
-        {/* Commandes de la salle. Elles n'existent qu'une fois dedans : proposer
-            de couper un micro qui n'est pas ouvert n'aurait aucun sens. La camera
-            n'apparait qu'en video, et la sortie audio qu'en audio — au haut-parleur
-            de toute facon des qu'il y a de l'image. */}
-        {enSalle && (
+        {/* Commandes de la salle. Le micro, la camera, la main, la sortie audio
+            et le partage n'existent qu'une fois DEDANS : proposer de couper un
+            micro qui n'est pas ouvert n'aurait aucun sens. La camera n'apparait
+            qu'en video, et la sortie audio qu'en audio — au haut-parleur de
+            toute facon des qu'il y a de l'image.
+
+            « Ajouter » et « Menu », eux, valent AUSSI AVANT d'entrer : c'est la
+            colonne d'informations qui portait jusqu'ici les reglages de
+            l'organisateur, et elle ne les porte plus. Les enfermer dans la salle
+            aurait rendu l'invitation automatique inaccessible a qui n'a pas
+            encore rejoint. */}
+        {(enSalle || !meeting.terminee) && (
           <div className="meeting-controles">
+            {enSalle && (
+              <>
             <button
               className={`meeting-controle${callState.micOn ? "" : " coupe"}`}
               onClick={() => toggleMicrophone()}
@@ -1146,6 +1599,34 @@ export default function MeetingRoomPage() {
               </button>
             )}
 
+            {/*
+              LE PARTAGE D'ECRAN.
+
+              Deux conditions, et pas une de trop. `partageEcranSupporte()` :
+              `getDisplayMedia` n'existe ni sur les navigateurs mobiles ni hors
+              contexte securise, et un bouton qui ne peut rien faire ne doit pas
+              etre la. `estVideo` : dans une reunion AUDIO, aucune piste video
+              n'a ete negociee — l'ecran n'irait nulle part et l'on se croirait
+              en presentation devant des gens qui ne voient rien.
+
+              Un seul intitule pour les deux etats, et `aria-pressed` pour dire
+              lequel : c'est la convention des bascules, et elle evite d'inventer
+              une seconde cle de catalogue pour l'arret.
+            */}
+            {captureEcranPossible && estVideo && (
+              <button
+                className={`meeting-controle${callState.partageParMoi ? " actif" : ""}`}
+                onClick={basculerPartageEcran}
+                aria-pressed={callState.partageParMoi}
+                title={tAVenir("meet_share_screen")}
+                aria-label={tAVenir("meet_share_screen")}
+              >
+                <MeetingControlIcon kind="ecran" />
+              </button>
+            )}
+              </>
+            )}
+
             {/* Bouton « Ajouter une personne » — visible pour tout le monde */}
             <button
               className={`meeting-controle${panneauOuvert === "ajouter" ? " actif" : ""}`}
@@ -1175,11 +1656,7 @@ export default function MeetingRoomPage() {
                 aria-label={t("meet_settings")}
                 aria-expanded={panneauOuvert === "menu"}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <circle cx="12" cy="5" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="12" cy="19" r="2" />
-                </svg>
+                <MeetingControlIcon kind="points" />
               </button>
             )}
           </div>
@@ -1211,8 +1688,9 @@ export default function MeetingRoomPage() {
         </div>
       </div>
 
-      {/* PANNEAU D'AJOUT DE PERSONNE — sous la barre, au-dessus du chat */}
-      {panneauOuvert === "ajouter" && enSalle && (
+      {/* PANNEAU D'AJOUT DE PERSONNE — sous la barre, au-dessus du chat.
+          Plus conditionne a `enSalle` : son bouton ne l'est plus non plus. */}
+      {panneauOuvert === "ajouter" && (
         <div className="meeting-panneau meeting-panneau-ajout" ref={panneauRef}>
           <div className="meeting-panneau-titre">{t("meet_add_person")}</div>
 
@@ -1305,8 +1783,10 @@ export default function MeetingRoomPage() {
         </div>
       )}
 
-      {/* PANNEAU DE PARAMÈTRES — organisateur seulement */}
-      {panneauOuvert === "menu" && enSalle && meeting.jeSuisOrganisateur && (
+      {/* PANNEAU DE PARAMÈTRES — organisateur seulement.
+          C'EST DESORMAIS LE SEUL ENDROIT ou vit l'invitation automatique : la
+          colonne d'informations en portait une copie mot pour mot. */}
+      {panneauOuvert === "menu" && meeting.jeSuisOrganisateur && (
         <div className="meeting-panneau meeting-panneau-menu" ref={panneauRef}>
           <div className="meeting-panneau-titre">{t("meet_settings")}</div>
           <label className="meeting-panneau-toggle">
@@ -1321,6 +1801,205 @@ export default function MeetingRoomPage() {
             </span>
           </label>
         </div>
+      )}
+
+      {/*
+        LA FENETRE REDUITE.
+
+        Ses dimensions viennent de l'utilisateur — « la largeur du panneau de
+        chat, les trois quarts de sa hauteur » — et sont MESUREES sur le panneau
+        reel : deux nombres ecrits ici auraient menti des la premiere retouche du
+        fil. Tant qu'aucune mesure n'est disponible, la fenetre ne s'ouvre pas :
+        mieux vaut ne rien ouvrir qu'ouvrir de travers.
+
+        Le composant ne rend rien tant que `ouverte` est faux ; il est donc monte
+        en permanence sans consequence.
+      */}
+      {tailleFil && (
+        <FenetreReduite
+          ouverte={fenetreReduite && enSalle}
+          onFermer={() => {
+            setMenuFenetre(false)
+            setFenetreReduite(false)
+          }}
+          largeur={tailleFil.largeur}
+          hauteur={tailleFil.hauteur}
+        >
+          {/* Le rendu, en plus petit : le grand cadre puis les autres, qui
+              defilent. `.fr-scene` et `.fr-barre` sont l'habillage que la
+              fenetre offre a la salle — ecrits dans SA feuille, la seule qui
+              soit sure d'etre recopiee dans l'autre document. */}
+          <div className="fr-scene">{rendreScene(true)}</div>
+
+          <div className="fr-barre">
+            <button
+              type="button"
+              className={`fr-bouton${callState.micOn ? "" : " coupe"}`}
+              onClick={() => toggleMicrophone()}
+              aria-pressed={!callState.micOn}
+              title={callState.micOn ? t("mute_mic") : t("unmute_mic")}
+              aria-label={callState.micOn ? t("mute_mic") : t("unmute_mic")}
+            >
+              <MeetingControlIcon kind={callState.micOn ? "mic" : "micOff"} taille={16} />
+            </button>
+
+            {meeting.type === "video" && (
+              <button
+                type="button"
+                className={`fr-bouton${callState.camOn ? "" : " coupe"}`}
+                onClick={() => toggleCamera()}
+                aria-pressed={!callState.camOn}
+                title={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
+                aria-label={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
+              >
+                <MeetingControlIcon kind={callState.camOn ? "camera" : "cameraOff"} taille={16} />
+              </button>
+            )}
+
+            {/*
+              TOUT LE RESTE derriere les trois points. Une fenetre large comme la
+              colonne du fil ne tient pas huit boutons de front, et couper son
+              micro doit rester atteignable sans reflechir : les deux gestes
+              qu'on fait vingt fois restent dehors, les autres se deplient.
+
+              Le menu s'ouvre EN PLACE, sans ecouteur pose sur `document` : ce
+              contenu vit dans un AUTRE document quand la fenetre du systeme
+              existe, et un ecouteur pose sur celui de la page n'y verrait aucun
+              clic.
+            */}
+            <div className="fr-menu-ancre">
+              <button
+                type="button"
+                className={`fr-bouton${menuFenetre ? " actif" : ""}`}
+                onClick={() => setMenuFenetre((ouvert) => !ouvert)}
+                aria-expanded={menuFenetre}
+                title={t("more_actions")}
+                aria-label={t("more_actions")}
+              >
+                <MeetingControlIcon kind="points" taille={16} />
+              </button>
+
+              {menuFenetre && (
+                <div className="fr-menu" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="fr-menu-item"
+                    onClick={() => {
+                      setMenuFenetre(false)
+                      sendMeetingHand(Number(meetingId), !maMain)
+                    }}
+                  >
+                    <MeetingControlIcon kind="hand" taille={15} />
+                    {maMain ? t("r2_lower_hand") : t("meet_raise_hand")}
+                  </button>
+
+                  {meeting.type !== "video" && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="fr-menu-item"
+                      onClick={() => {
+                        setMenuFenetre(false)
+                        setCallAudioOutput(
+                          callState.audioOutput === "speaker" ? "earpiece" : "speaker"
+                        )
+                      }}
+                    >
+                      <MeetingControlIcon
+                        kind={callState.audioOutput === "speaker" ? "speaker" : "earpiece"}
+                        taille={15}
+                      />
+                      {callState.audioOutput === "speaker"
+                        ? t("r2_switch_to_earpiece")
+                        : t("r2_switch_to_speaker")}
+                    </button>
+                  )}
+
+                  {captureEcranPossible && estVideo && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="fr-menu-item"
+                      aria-pressed={callState.partageParMoi}
+                      onClick={() => {
+                        setMenuFenetre(false)
+                        basculerPartageEcran()
+                      }}
+                    >
+                      <MeetingControlIcon kind="ecran" taille={15} />
+                      {tAVenir("meet_share_screen")}
+                    </button>
+                  )}
+
+                  {/*
+                    CES TROIS-LA RAMENENT D'ABORD AU GRAND ECRAN. Le fil et les
+                    panneaux vivent dans la page : les ouvrir depuis la fenetre
+                    reduite les ferait apparaitre derriere elle, sur un ecran que
+                    l'utilisateur ne regarde plus. Reduire la fenetre d'abord,
+                    c'est montrer ce qu'on vient de demander.
+                  */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="fr-menu-item"
+                    onClick={() => {
+                      setMenuFenetre(false)
+                      setFenetreReduite(false)
+                      if (etroit) setFilOuvert(true)
+                      else setFilLargeOuvert(true)
+                    }}
+                  >
+                    <MeetingControlIcon kind="chat" taille={15} />
+                    {t("meet_chat_title")}
+                  </button>
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="fr-menu-item"
+                    onClick={() => {
+                      setMenuFenetre(false)
+                      setFenetreReduite(false)
+                      setPanneauOuvert("ajouter")
+                    }}
+                  >
+                    {t("meet_add_person")}
+                  </button>
+
+                  {meeting.jeSuisOrganisateur && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="fr-menu-item"
+                      onClick={() => {
+                        setMenuFenetre(false)
+                        setFenetreReduite(false)
+                        setPanneauOuvert("menu")
+                      }}
+                    >
+                      {t("meet_settings")}
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="fr-menu-item danger"
+                    onClick={() => {
+                      setMenuFenetre(false)
+                      setFenetreReduite(false)
+                      void handleLeaveMeeting()
+                    }}
+                  >
+                    <MeetingControlIcon kind="sortir" taille={15} />
+                    {t("meet_leave_room")}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </FenetreReduite>
       )}
     </div>
   )

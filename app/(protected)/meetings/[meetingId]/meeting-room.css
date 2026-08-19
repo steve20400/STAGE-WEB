@@ -30,9 +30,32 @@
 /*
  * Une fois DANS la salle, le media prend la place principale : c'est lui qu'on
  * regarde, la liste des invites n'est plus qu'un rappel. Elle passe donc sous
- * les cadres, bornee en hauteur, avec son propre defilement.
+ * les cadres, reduite a une bande, avec son propre defilement.
+ *
+ * QUATRE RANGEES ET NON CINQ. La cinquieme etait celle du bandeau des demandes
+ * d'invitation, declaree en permanence depuis 43cc8ec : `auto` sur une rangee
+ * vide ne prend certes aucune hauteur, mais l'interligne de 16 px qui la
+ * separait de ses voisines, lui, etait bien preleve — 16 px de video en moins
+ * sur chaque ecran, y compris ceux qui n'ont jamais vu une demande. La rangee
+ * n'existe donc plus que lorsqu'il y a quelque chose a y poser.
  */
 .meeting-room-root.en-salle {
+  /* Dans la salle, chaque interligne est de la video en moins : on resserre.
+     Ce n'est pas le vrai voleur — c'etait `.meeting-info` —, mais l'utilisateur
+     a raison de trouver le haut trop aere une fois la reunion commencee. */
+  padding: 16px 20px;
+  gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "entete entete"
+    "media  fil"
+    "infos  fil"
+    "actions fil";
+}
+.meeting-room-root.en-salle .meeting-header {
+  padding-bottom: 12px;
+}
+.meeting-room-root.en-salle.avec-bandeau {
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   grid-template-areas:
     "entete entete"
@@ -44,9 +67,23 @@
 .meeting-room-root.en-salle .meeting-invite-banner {
   grid-area: banner;
 }
-.meeting-room-root.en-salle .meeting-info {
-  /* Bornee, sinon l'annuaire repousse les visages hors de l'ecran. */
-  max-height: 26vh;
+
+/*
+ * LE FIL REPLIE, sur grand ecran.
+ *
+ * `display: none` et non un demontage : le fil est ephemere et n'existe nulle
+ * part ailleurs. La colonne tombe a zero et l'interligne qui la separait de la
+ * video avec elle — sans quoi replier le fil aurait laisse une bande de 16 px
+ * de vide a sa place.
+ */
+@media (min-width: 901px) {
+  .meeting-room-root.sans-fil {
+    grid-template-columns: minmax(0, 1fr) 0;
+    column-gap: 0;
+  }
+  .meeting-room-root.sans-fil .salle-fil {
+    display: none;
+  }
 }
 
 /* ---------- Media de la salle ---------- */
@@ -67,6 +104,118 @@
 .meeting-room-root .meeting-media > .pgrid {
   flex: 1 1 auto;
   height: 100%;
+}
+
+/* ---------- La scene : un grand cadre, les autres dessous ---------- */
+
+/*
+ * ATTENTION, CES REGLES SERVENT DEUX DOCUMENTS. Le meme rendu est pose soit dans
+ * la page, soit dans la fenetre reduite — qui est un AUTRE document, sans
+ * `.meeting-room-root` au-dessus de lui. Aucun selecteur de cette section ne
+ * doit donc partir de la racine de la salle : il ne s'appliquerait pas la ou
+ * l'on en a le plus besoin. Meme precaution que dans `fenetre-reduite.css`.
+ */
+.salle-scene {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.salle-grand {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+.salle-grand-video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* `contain` ET NON `cover`, seule difference de fond avec une tuile de
+     participant : on recadre un visage sans rien perdre, un ECRAN jamais — la
+     barre d'outils, la derniere colonne du tableau ou la ligne de code qu'on
+     partageait justement passeraient hors champ. */
+  object-fit: contain;
+  background: var(--bg-base);
+}
+/* Miroir : c'est ainsi qu'on se voit, et seulement pour soi. Jamais sur un
+   ecran partage, ou l'on lit du texte. */
+.salle-grand-video.miroir,
+.meeting-seul-video.miroir {
+  transform: scaleX(-1);
+}
+/* L'etiquette du grand cadre. Teintee de l'accent quand c'est un ECRAN : la
+   couleur se voit avant le texte, et c'est elle qui separe d'un coup d'oeil une
+   presentation d'un simple gros plan. */
+.salle-grand-etiquette {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.salle-grand-etiquette b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.salle-grand-etiquette > span {
+  flex: none;
+  opacity: 0.85;
+}
+/* Pas de partage : un simple nom, qui ne doit pas se faire passer pour une
+   annonce de presentation. Voile sombre et texte clair — `--text-primary`
+   serait ILLISIBLE ici : en theme clair, c'est une encre foncee, et elle se
+   poserait sur un voile noir. `--brand-text` est le blanc des fonds soutenus,
+   dans les quatre themes. */
+.salle-grand-etiquette.neutre {
+  background: var(--overlay);
+  color: var(--brand-text);
+}
+
+/* La bande des autres : une seule rangee, qui defile a l'horizontale. Elle ne
+   se comprime pas — la video du grand cadre prend ce qui reste. */
+.salle-bande {
+  flex: none;
+  height: 116px;
+  min-height: 0;
+}
+.salle-bande .pgrid-room {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 168px;
+  grid-auto-rows: 100%;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Le geste du doigt suit la bande, qui defile en largeur et non en hauteur. */
+  touch-action: pan-x;
+}
+
+/* Dans la fenetre reduite, tout retrecit : la bande n'y montre plus que deux
+   vignettes a la fois, et l'on defile pour les autres — c'est la demande. */
+.fr-scene .salle-bande {
+  height: 74px;
+}
+.fr-scene .salle-bande .pgrid-room {
+  grid-auto-columns: 96px;
+  gap: 6px;
+}
+.fr-scene .salle-scene {
+  padding: 6px;
 }
 
 /* Apercu de sa propre camera : petit, dans un coin, par-dessus la grille. Il
@@ -117,8 +266,12 @@
 }
 
 /* Seul dans la salle : sa propre image occupe le cadre. Arriver en avance est
-   ordinaire, cela ne doit pas ressembler a une reunion en panne. */
-.meeting-room-root .meeting-seul {
+   ordinaire, cela ne doit pas ressembler a une reunion en panne.
+
+   SANS PREFIXE DE RACINE, comme la scene juste au-dessus : ce bloc part lui
+   aussi dans le document de la fenetre reduite, ou `.meeting-room-root`
+   n'existe pas — prefixe, il s'y affichait sans aucun style. */
+.meeting-seul {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
@@ -131,15 +284,14 @@
   overflow: hidden;
   background: var(--bg-elevated);
 }
-.meeting-room-root .meeting-seul-video {
+.meeting-seul-video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1);
 }
-.meeting-room-root .meeting-seul-avatar {
+.meeting-seul-avatar {
   width: 88px;
   height: 88px;
   display: flex;
@@ -152,14 +304,88 @@
   font-size: 28px;
   font-weight: 700;
 }
-.meeting-room-root .meeting-seul-mention {
+.meeting-seul-mention {
   position: relative;
   padding: 4px 12px;
   border-radius: 20px;
-  background: rgba(0, 0, 0, 0.45);
-  color: #fff;
+  /* Posee sur une image : voile sombre, texte clair, dans les quatre themes. */
+  background: var(--overlay);
+  color: var(--brand-text);
   font-size: 12px;
   font-weight: 600;
+}
+
+/* ---------- Les deux tailles du rendu, posees sur le rendu ---------- */
+
+/*
+ * En haut a droite du cadre, et non dans la barre du bas : ces deux boutons ne
+ * commandent pas la reunion, ils commandent CE cadre. Ils le suivent donc en
+ * plein ecran — dans la barre du bas, ils auraient disparu au moment precis ou
+ * l'on veut en sortir. Le bandeau « son bloque » occupe le haut au CENTRE : les
+ * deux ne se croisent pas.
+ */
+.meeting-room-root .meeting-media-outils {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+}
+.meeting-room-root .meeting-media-bouton {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  /* Le cadre peut etre une image : un fond franc, sinon l'icone se perd dessus. */
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.85;
+  transition:
+    opacity 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+.meeting-room-root .meeting-media-bouton:hover {
+  opacity: 1;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.meeting-room-root .meeting-media-bouton.actif {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* L'image est partie dans la fenetre reduite. On le dit : un cadre vide
+   laisserait croire que la salle a lache. */
+.meeting-room-root .meeting-media-deporte {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.meeting-room-root .meeting-media-deporte button {
+  padding: 7px 16px;
+  border: 1px solid var(--accent-border);
+  border-radius: 20px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 /* Le navigateur a refuse la lecture : sans ce bouton, la salle reste muette et
@@ -204,6 +430,61 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* La rangee d'actions de l'entete — le meme emplacement que celle de la fenetre
+   de discussion, d'ou part son panneau d'informations. */
+.meeting-room-root .meeting-entete-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.meeting-room-root .meeting-entete-bouton {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.meeting-room-root .meeting-entete-bouton:hover {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+/* Deplie : le bouton reste allume, sinon rien ne dit que c'est LUI qui a ouvert
+   la colonne, ni comment la refermer. */
+.meeting-room-root .meeting-entete-bouton.actif {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+/* Le compteur dit ce qui s'est ecrit pendant que la colonne etait repliee :
+   sans lui, on ne la rouvrirait que par hasard. Meme pastille que la bascule
+   flottante du telephone. */
+.meeting-room-root .meeting-entete-compte {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  padding: 1px 4px;
+  border-radius: 20px;
+  background: var(--danger);
+  color: var(--bg-base);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  border: 2px solid var(--bg-base);
+}
+
 .meeting-room-root .btn-back {
   flex: none;
   width: 34px;
@@ -245,6 +526,105 @@
 }
 .meeting-room-root .meeting-info p:last-of-type {
   margin-bottom: 12px;
+}
+
+/* ---------- La bande d'informations, une fois DANS la salle ---------- */
+
+/*
+ * ICI SE JOUAIT LA PLACE DE LA VIDEO.
+ *
+ * Ce bloc etait plafonne a 26 vh — 281 px sur un ecran de 1080 — pour un contenu
+ * qui en mesurait 918 : on lisait un quart de ses informations en defilant, et
+ * la video, dessous, se contentait de 604 px. Le plafond n'etait pas le fautif,
+ * le CONTENU l'etait : 577 px de reglages d'organisateur, dont un pave numerique
+ * deja present a l'identique dans le panneau « Ajouter ». Ces reglages sont
+ * partis dans les panneaux qu'on ouvre.
+ *
+ * Ce qui reste tient sur une ligne : les mentions a gauche, les invites en bande
+ * defilante a droite. La hauteur ne depend plus du nombre d'invites — c'est ce
+ * qui permet d'annoncer un chiffre : ~90 px, contre 281. Le plafond reste, mais
+ * comme garde-fou et non comme mesure de travail.
+ */
+.meeting-room-root.en-salle .meeting-info {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 6px 12px;
+  overflow: hidden;
+  /*
+   * UNE HAUTEUR, ET NON UN PLAFOND. La bande occupe une rangee de grille en
+   * `auto` : une `max-height` posee ici ne borne pas la RANGEE, qui se dimensionne
+   * sur le contenu — le plafond de 26 vh d'avant ne servait qu'a couper ce qui
+   * depassait, il ne rendait rien a la video. Une hauteur, elle, fixe la rangee,
+   * et ce qui reste va au cadre du dessus.
+   *
+   * Les bornes ne sont pas arbitraires. 88 px, c'est la hauteur exacte du contenu
+   * le plus haut de la bande, mesuree : en dessous, on couperait. 108 px, c'est
+   * ce qu'on s'autorise sur un grand ecran, ou l'on peut respirer. Entre les
+   * deux, 9 vh suit l'ecran. Sur 768 px de haut, cela donne 88 px et laisse au
+   * cadre 524 px : DEUX rangees de tuiles de 240 px et leur interligne en
+   * tiennent (492 px).
+   */
+  height: clamp(88px, 9vh, 108px);
+}
+.meeting-room-root.en-salle .meeting-info-meta {
+  flex: none;
+  max-width: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+.meeting-room-root.en-salle .meeting-info p,
+.meeting-room-root.en-salle .meeting-info p:last-of-type {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meeting-room-root.en-salle .call-status {
+  margin-top: 3px;
+  padding: 2px 8px;
+  font-size: 10px;
+  align-self: flex-start;
+}
+
+/* Les invites : une seule rangee de pastilles qui defile a l'horizontale. En
+   salle, leur image est deja dans le grand rendu — ces vignettes ne servent plus
+   qu'a dire QUI EST ATTENDU, ce qu'un rond et un nom suffisent a dire. */
+.meeting-room-root.en-salle .participants-grid {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  touch-action: pan-x;
+}
+.meeting-room-root.en-salle .participant-box {
+  flex: none;
+  width: 96px;
+  min-height: 0;
+  gap: 4px;
+  padding: 6px;
+  justify-content: center;
+}
+.meeting-room-root.en-salle .participant-vignette,
+.meeting-room-root.en-salle .participant-vignette:has(.meeting-remote-video) {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 14px;
+}
+.meeting-room-root.en-salle .participant-name {
+  font-size: 11px;
+}
+/* La pastille verte du rond dit deja la presence : la ligne de texte qui la
+   repetait couterait ici le tiers de la hauteur de la bande. */
+.meeting-room-root.en-salle .participant-status {
+  display: none;
 }
 
 .meeting-room-root .participants-grid {
@@ -536,6 +916,16 @@
      restent grandes — une ou deux par ligne — et l'on defile pour voir les
      autres, exactement comme en appel video a plusieurs. */
   .meeting-room-root.en-salle {
+    padding: 16px;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "entete"
+      "media"
+      "infos"
+      "actions";
+  }
+  /* La rangee du bandeau, la aussi, seulement quand il y a un bandeau. */
+  .meeting-room-root.en-salle.avec-bandeau {
     grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
       "entete"
@@ -544,9 +934,14 @@
       "infos"
       "actions";
   }
+  /* Plus serree encore qu'au bureau : la barre du bas passe a deux rangees sur
+     un telephone etroit, et c'est autant de pris sur les visages. */
   .meeting-room-root.en-salle .meeting-info {
-    max-height: 22vh;
-    padding: 12px;
+    max-height: min(14vh, 120px);
+    padding: 8px 10px;
+  }
+  .meeting-room-root.en-salle .meeting-info-meta {
+    max-width: 132px;
   }
   .meeting-room-root .meeting-media {
     padding: 6px;
@@ -775,83 +1170,18 @@
   gap: 6px;
   align-items: center;
 }
-.meeting-settings-panel {
-  margin: 12px 0;
-  padding: 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  background: var(--bg-elevated);
-}
-.meeting-settings-title {
-  font-size: 12px;
-  font-weight: 800;
-  margin-bottom: 10px;
-}
-.meeting-auto-invite {
-  display: flex;
-  gap: 9px;
-  align-items: flex-start;
-  font-size: 12px;
-  cursor: pointer;
-}
-.meeting-auto-invite input {
-  margin-top: 2px;
-  accent-color: var(--accent);
-}
-.meeting-auto-invite small {
-  display: block;
-  color: var(--text-muted);
-  margin-top: 3px;
-  line-height: 1.35;
-}
-/* Invitation directe de l'organisateur : le pave partage (`pave-numerique.css`)
-   dans son cadre, la ligne d'etat de la saisie, puis le bouton.
+/*
+ * LE PANNEAU DE REGLAGES DE LA COLONNE N'EXISTE PLUS, ni son pave numerique.
+ *
+ * Sont parties avec eux `.meeting-settings-panel`, `.meeting-settings-title`,
+ * `.meeting-auto-invite`, `.meeting-id-keypad`, `.meeting-id-help` et
+ * `.meeting-id-actions` : 577 px de hauteur dans une colonne plafonnee a 26 vh,
+ * pour un reglage ecrit mot pour mot dans le panneau « Menu » et un clavier
+ * identique a celui de l'onglet « Alanya ID » du panneau « Ajouter ». Un ecran
+ * qui pose deux fois la meme question n'a pas besoin de deux feuilles de style :
+ * il a besoin qu'on en supprime une, et c'est la video qui recupere la place.
+ */
 
-   L'ECRAN DU NUMERO ET LES TOUCHES NE SONT PLUS ICI. Ce clavier maison — des
-   touches carrees de 38 px, un numero groupe par deux — dessinait un troisieme
-   pave dans une application qui en avait deja deux identiques ailleurs. Sont
-   parties avec lui deux series de regles qui ne servaient plus personne depuis
-   plus longtemps encore : `.meeting-direct-invite`, le champ texte que ce
-   clavier avait remplace, et `.meeting-id-dialer`, une premiere version de la
-   grille de touches. */
-.meeting-id-keypad {
-  margin-top: 12px;
-  max-width: 260px;
-  padding: 12px;
-  border-radius: 12px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-}
-/* Passee SOUS le pave : elle precedait les touches, elle suit desormais le
-   numero et la ligne du titulaire. */
-.meeting-id-help {
-  text-align: center;
-  min-height: 18px;
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 8px;
-}
-.meeting-id-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 9px;
-}
-.meeting-id-actions button {
-  flex: 1;
-  border: 0;
-  border-radius: 8px;
-  padding: 8px;
-  background: var(--border-subtle);
-  color: var(--text-secondary);
-  font-weight: 700;
-}
-.meeting-id-actions button:last-child {
-  background: var(--accent);
-  color: var(--accent-text);
-}
-.meeting-id-actions button:disabled {
-  opacity: 0.45;
-}
 /* Grille média réunion : grandes tuiles, rendu uniforme vidéo/avatar et lisibilité tactile. */
 .meeting-room-root .participants-grid {
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
