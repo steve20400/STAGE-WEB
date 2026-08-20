@@ -3497,11 +3497,11 @@ export default function SettingsPage() {
               <div className="s-card">
                 {[
                   { label: t("set_about_app"), value: "Alanya", interne: false },
-                  { label: t("set_about_version"), value: "1.0.0-beta", interne: true },
+                  { label: t("set_about_version"), value: "1.0.0-beta", interne: false },
                   {
                     label: t("set_about_env"),
                     value: t("set_about_env_value"),
-                    interne: true,
+                    interne: false,
                   },
                   {
                     label: t("set_about_turn"),
@@ -3516,8 +3516,12 @@ export default function SettingsPage() {
                     value: t("set_about_project_value"),
                     interne: true,
                   },
-                  { label: t("set_about_supervisor"), value: "Dr. NANA BINKEU", interne: true },
-                  { label: t("set_about_group"), value: "Alanya II", interne: true },
+                  { label: t("set_about_supervisor"), value: "Dr. NANA BINKEU", interne: false },
+                  {
+                    label: t("set_about_developer"),
+                    value: "STEVE AUREL MANFO",
+                    interne: false,
+                  },
                 ]
                   .filter(({ interne }) => !interne || compteInterne)
                   .map(({ label, value }) => (
