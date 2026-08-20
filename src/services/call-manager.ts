@@ -5,6 +5,12 @@ import { isCustomRingtone, RINGTONES, ringtoneSource, ringtoneUrl } from "./ring
 import { sonneriePourAppelant } from "./contact-lists-service"
 import { defaultAudioOutput, type AudioOutputMode } from "./audio-output"
 import {
+  demarrerEnregistrement,
+  attacherVoixDistante,
+  arreterEtDeposer,
+  enregistrementEnCours,
+} from "./enregistrement-appel"
+import {
   acceptCallRest,
   callbackCallRest,
   endCallRest,
@@ -1158,6 +1164,24 @@ function publishRemoteStreams() {
     if (session.remoteStream) streams[peerId] = session.remoteStream
   }
   setState({ remoteStreams: streams })
+  // Le flux distant apparait ICI, apres le decrochage : seul moment fiable pour
+  // brancher la voix du correspondant sur un enregistrement deja demarre.
+  brancherVoixDistanteSiPossible()
+}
+
+/**
+ * Branche la voix du correspondant sur l'enregistrement en cours, si sa piste
+ * distante est deja la. Idempotent (la facade garde l'etat) : sans effet s'il
+ * n'y a rien a enregistrer ou si c'est deja fait.
+ */
+function brancherVoixDistanteSiPossible() {
+  if (!enregistrementEnCours()) return
+  for (const session of peers.values()) {
+    if (session.remoteStream && session.remoteStream.getAudioTracks().length > 0) {
+      attacherVoixDistante(session.remoteStream)
+      return
+    }
+  }
 }
 
 async function ensureLocalStream(isVideo: boolean): Promise<MediaStream> {
@@ -1390,6 +1414,12 @@ function clearCall(markEnded: boolean) {
   attendus.clear()
   invitationsEnVol = 0
   salleAEteHabitee = false
+  // ⚠️ AVANT `stopMesh()` : l'arret des `MediaRecorder` doit etre declenche
+  // pendant que les pistes sont encore vivantes, sinon le dernier morceau se
+  // perd. `arreterEtDeposer` appelle `.stop()` de facon synchrone avant son
+  // premier `await`, donc avant que `stopMesh` ne coupe les pistes juste apres.
+  // Volontairement NON attendu : le depot se poursuit seul, l'appel est fini.
+  void arreterEtDeposer()
   stopMesh()
   stopOutgoingRingtone()
   stopIncomingRingtone()
@@ -2270,6 +2300,16 @@ export async function acceptIncomingCall(): Promise<string | null> {
     setState({
       error: incoming.callType === "video" ? tr("call_need_mic_cam") : tr("call_need_mic"),
     })
+  }
+
+  // Enregistrement de l'appel si, et seulement si, le SERVEUR l'a autorise.
+  // Sans entreprise de destination, le depot ne pourrait aboutir : on ne
+  // demarre pas. La voix distante n'existe pas encore (negociation en cours) ;
+  // `publishRemoteStreams` la branchera des qu'elle apparait.
+  if (result.enregistrer && result.enregistrementCompanyId != null && localStream) {
+    if (demarrerEnregistrement(incoming.callId, result.enregistrementCompanyId, localStream)) {
+      brancherVoixDistanteSiPossible()
+    }
   }
 
   for (const participant of result.activeParticipants ?? []) {

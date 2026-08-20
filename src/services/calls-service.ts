@@ -213,11 +213,38 @@ export interface AcceptCallResult {
   isGroup: boolean
   groupName: string | null
   activeParticipants: Array<{ userId: string; displayName: string }>
+  /**
+   * L'agent est-il autorise a enregistrer cet appel ? Calcule par le serveur
+   * depuis `center.enregistrement` — le client ne fait qu'obeir. Absent chez un
+   * serveur anterieur : traite comme faux.
+   */
+  enregistrer?: boolean
+  /** Entreprise destinataire de l'enregistrement, ou null. */
+  enregistrementCompanyId?: number | null
 }
 
 /** POST /api/calls/:id/accept — accepte / rejoint l'appel. */
 export async function acceptCallRest(callId: string): Promise<AcceptCallResult> {
   return apiRequest<AcceptCallResult>(`/api/calls/${callId}/accept`, { method: "POST" })
+}
+
+/**
+ * POST /api/call-recordings — depose l'enregistrement d'une conversation.
+ *
+ * ⚠️ Le contrat vit cote serveur (`src/app/api/call-recordings/route.ts`) :
+ * DEUX medias (voix agent + voix client), le serveur les mixe. `cleEnvoi`, posee
+ * par le client, rend le depot idempotent — un reessai apres coupure rend 200
+ * avec l'enregistrement existant. Miroir exact du mobile.
+ */
+export async function deposerEnregistrementAppel(body: {
+  callId?: string
+  companyId: number
+  mediaAgentId: string
+  mediaClientId: string
+  dureeMs: number
+  cleEnvoi: string
+}): Promise<void> {
+  await apiRequest("/api/call-recordings", { method: "POST", body })
 }
 
 /** POST /api/calls/:id/reject — refuse (direct) ou decline (groupe). */
