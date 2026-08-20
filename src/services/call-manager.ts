@@ -45,7 +45,8 @@ const tr = (cle: Cle, variables?: Record<string, string | number>) =>
  * Gestion des appels WebRTC — miroir du CallController de l'app mobile Flutter
  * pour rester interoperable :
  * - mesh : une RTCPeerConnection par participant distant ;
- * - offreur = le plus petit identifiant des deux, voir `doisJeOffrir` ;
+ * - offreur = celui qui est DEJA dans l'appel, envers celui qui arrive. Regle
+ *   POSITIONNELLE, et non une comparaison d'UUID : voir `connectToPeer` ;
  * - signaux { kind: "offer" | "answer" | "ice" } relayes via le WebSocket ;
  * - etats via call_state ("joined", "left", "rejected", "ended", "declined").
  */
@@ -930,44 +931,49 @@ function myDisplayName(): string {
 }
 
 /**
- * Qui, de ce pair et de moi, emet l'offre WebRTC ? Le plus petit identifiant.
+ * 🔴 CETTE FONCTION A ETE RETIREE — ET IL NE FAUT PAS LA REECRIRE.
  *
- * ⚠️ C'EST LA REGLE DU MOBILE, ET C'EST LUI QUI FAIT FOI. Verifiee dans le depot
- * Flutter, `webrtc_group_mesh.dart` :
+ * Elle comparait les identifiants (`me < peerId`) au motif que le mobile ferait
+ * de meme, en citant `webrtc_group_mesh.dart` :
  *
  *     static bool shouldOffer(String myId, String peerId) => myId.compareTo(peerId) < 0;
  *
- * appliquee sans condition a CHAQUE `connectToPeer`, sans variante selon qui
- * arrive et qui etait deja la.
+ * ⚠️ CETTE FONCTION N'EXISTE PAS dans le depot Flutter, et n'y a jamais existe
+ * sous cette forme. `webrtc_group_mesh.dart` ne DECIDE rien : il RECOIT le role
+ * en parametre — `connectToPeer(String peerId, {required bool asOfferer})` — et
+ * ce sont ses appelants qui tranchent, POSITIONNELLEMENT :
  *
- * Le web, lui, suivait une regle POSITIONNELLE : offre celui qui est DEJA dans
- * la salle, envers celui qui arrive. Deux regles differentes ne s'accordent
- * qu'une fois sur deux. Avec W l'identifiant du web et M celui du mobile :
+ *  - `call_controller.dart:662` et `:760` (j'accepte, j'arrive) → asOfferer: false
+ *  - `call_controller.dart:1342`  (quelqu'un arrive, j'etais la) → asOfferer: true
+ *  - `meeting_controller.dart:646` (les presents, j'arrive)      → asOfferer: false
+ *  - `meeting_controller.dart:671` (il entre apres moi)          → asOfferer: true
  *
- *  - M < W : quand le mobile arrive en second, le web offre (l'autre arrive) et
- *    le mobile offre aussi (il est le plus petit) — DEUX offres croisees ;
- *  - M > W : quand le web arrive en second, le web n'offre pas (il vient
- *    d'arriver) et le mobile non plus (il n'est pas le plus petit) — AUCUNE
- *    offre, chacun attendant celle de l'autre.
+ * Le raisonnement etait juste, la premisse fausse : aligner le web sur une regle
+ * que le mobile n'applique pas a produit exactement la panne que ce commentaire
+ * decrivait. Avec W l'identifiant du web et M celui du mobile, sur un appel
+ * web → mobile (le web est deja la, le mobile arrive en decrochant) :
  *
- * Dans les deux cas l'autre sens fonctionnait. Pour chaque couple
- * d'utilisateurs, un sens d'appel sur deux etait donc casse — toujours le meme,
- * ce qui le faisait passer pour un probleme de reseau chez l'un des deux.
+ *  - W < M : le web offre, le mobile recoit — l'appel passe ;
+ *  - W > M : le web n'offre pas (il n'est pas le plus petit) et le mobile non
+ *    plus (il arrive) — AUCUNE offre, « connexion en cours » indefiniment.
+ *
+ * ⚠️ Le resultat est DETERMINISTE PAR PAIRE DE COMPTES : pour deux comptes
+ * donnes, l'appel echoue toujours, ou reussit toujours. C'est ce qui le fait
+ * passer pour un probleme de reseau. Le defaut avait deja frappe a l'identique
+ * le 06/08/2026, dans l'autre sens.
+ *
+ * REGLE, DEFINITIVE : celui qui est DEJA dans l'appel offre a celui qui arrive.
+ * Elle ne se decide pas ici mais chez l'appelant, qui SEUL sait lequel des deux
+ * il est — c'est une information d'evenement, pas une propriete des identifiants.
+ *
+ * ⚠️ Les REUNIONS suivaient la comparaison d'UUID depuis toujours
+ * (`offreReunionPour`), alors que `meeting_controller.dart` est POSITIONNEL lui
+ * aussi. Elles avaient donc le meme defaut, jamais remarque faute d'avoir teste
+ * la bonne paire de comptes. Elles passent a la regle positionnelle ici meme.
  *
  * On aligne le web sur le mobile et non l'inverse : le web se deploie en une
  * poussee, le parc mobile installe ne se met pas a jour sur commande.
- *
- * La comparaison est identique des deux cotes : `String.compareTo` de Dart et
- * `<` de JavaScript ordonnent tous deux par unites de code UTF-16, et un UUID
- * n'est fait que d'ASCII.
- *
- * Les REUNIONS suivaient deja cette regle : elles ne changent pas de convention,
- * elles cessent seulement d'en avoir une a part.
  */
-function doisJeOffrir(peerId: string): boolean {
-  const me = myUserId()
-  return Boolean(me && me < peerId)
-}
 
 function ensureEventSubscription() {
   if (eventsUnsubscribe) return
@@ -1026,13 +1032,17 @@ async function loadIceServers(): Promise<RTCIceServer[]> {
 /**
  * Ouvre la connexion WebRTC avec un pair.
  *
- * Qui offre n'est PAS un parametre : la reponse est calculee ici, par
- * `doisJeOffrir`, et nulle part ailleurs. C'est volontaire — l'ancienne version
- * laissait chaque appelant decider, et les chemins d'appel avaient fini par
- * repondre autrement que ceux de reunion. Un seul point de decision rend cette
- * divergence structurellement impossible.
+ * `asOfferer` : celui qui est DEJA dans l'appel emet l'offre a celui qui arrive.
+ * Regle POSITIONNELLE, identique a `webrtc_group_mesh.dart` du mobile, qui la
+ * recoit lui aussi en parametre.
+ *
+ * ⚠️ CE PARAMETRE NE PEUT PAS ETRE REMPLACE PAR UN CALCUL LOCAL. « Suis-je
+ * arrive avant lui ? » ne se lit ni dans mon identifiant ni dans le sien : c'est
+ * l'EVENEMENT qui le dit, et lui seul. Le supprimer au nom d'un point de
+ * decision unique a casse les appels web → mobile — voir le pave au-dessus de
+ * `connectToPeer`.
  */
-async function connectToPeer(peerId: string) {
+async function connectToPeer(peerId: string, asOfferer: boolean) {
   const me = myUserId()
   const callId = state.activeCallId
   if (!me || !callId || peerId === me || peers.has(peerId)) return
@@ -1059,7 +1069,7 @@ async function connectToPeer(peerId: string) {
   const session = new PeerSession(
     peerId,
     isVideo,
-    doisJeOffrir(peerId),
+    asOfferer,
     stream,
     iceServers,
     (signal) =>
@@ -1229,7 +1239,10 @@ async function onPeerJoined(userId: string, displayName: string | null) {
     clearTimeout(ringTimeoutId)
     ringTimeoutId = null
   }
-  await connectToPeer(userId)
+  // Nous sommes DEJA dans l'appel, ce pair vient d'arriver : nous offrons.
+  // En 1-a-1 cet evenement est le decrochage de l'appele, et c'est donc
+  // l'appelant qui offre — le chemin direct, celui qui a toujours marche.
+  await connectToPeer(userId, true)
   if (state.activeCallId) await flushBufferedSignals(state.activeCallId)
 }
 
@@ -1774,9 +1787,9 @@ export async function startCallbackCall(
  * Le mobile, lui, a toujours parle au salon ; les deux clients pouvaient donc
  * rejoindre la meme reunion sans jamais se croiser.
  *
- * Qui offre a qui suit la meme regle que pour un appel — le plus petit
- * identifiant, voir `doisJeOffrir`. C'est la regle que la reunion a toujours
- * suivie ; ce sont les APPELS qui l'ont rejointe.
+ * Qui offre a qui suit la meme regle que pour un appel : celui qui arrive
+ * n'offre pas, ceux qui sont deja la offrent. Sans cette convention, deux
+ * arrivees simultanees s'enverraient deux offres croisees.
  */
 export async function joinMeetingRoom(
   meetingId: number,
@@ -1872,10 +1885,11 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
   if (salleReunion === null) return
 
   if (event.type === "meeting_joined") {
-    // La liste de ceux qui etaient deja la. `connectToPeer` tranche pour chacun
-    // qui offre — la reunion n'a jamais eu d'autre regle que celle-la.
+    // Ceux qui etaient deja la : c'est a eux d'offrir, on se contente de tenir
+    // la session prete a recevoir leur offre. Meme role que
+    // `meeting_controller.dart:646` cote mobile.
     const presents = Array.isArray(event.participants) ? (event.participants as string[]) : []
-    for (const id of presents) await connectToPeer(id)
+    for (const id of presents) await connectToPeer(id, false)
     return
   }
 
@@ -1886,7 +1900,9 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     if (nom) {
       setState({ participantNames: { ...state.participantNames, [id]: nom } })
     }
-    await connectToPeer(id)
+    // Il entre APRES moi : j'offre. Deux evenements distincts portent les deux
+    // roles, donc deux pairs ne peuvent jamais s'offrir mutuellement.
+    await connectToPeer(id, true)
     return
   }
 
@@ -1946,8 +1962,9 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     if (session) await session.handleSignal(event.signal as WebrtcSignal)
     else {
       // Signal arrive avant que la session existe : on l'ouvre, puis on lui
-      // remet la trame.
-      await connectToPeer(from)
+      // remet la trame. Il nous PARLE, donc c'est lui l'offreur — ouvrir en
+      // offreur ici produirait une seconde offre croisee.
+      await connectToPeer(from, false)
       await peers.get(from)?.handleSignal(event.signal as WebrtcSignal)
     }
   }
@@ -2003,7 +2020,10 @@ export async function acceptIncomingCall(): Promise<string | null> {
       // Une offre du pair a pu arriver AVANT cette ligne — c'est meme le cas
       // ordinaire quand la regle nous designe receveur. Elle est bufferisee par
       // `call_signal` et rejouee par le `flushBufferedSignals` d'apres la boucle.
-      await connectToPeer(participant.userId)
+      //
+      // J'ARRIVE dans l'appel : ceux qui y sont deja m'enverront leur offre.
+      // Meme role que `call_controller.dart:662` cote mobile.
+      await connectToPeer(participant.userId, false)
     }
   }
   await flushBufferedSignals(incoming.callId)
