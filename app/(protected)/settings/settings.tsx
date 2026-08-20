@@ -1914,6 +1914,27 @@ export default function SettingsPage() {
    * ne peut donc pas promettre que le mail est parti, seulement que la demande
    * a ete prise. Le message le dit dans ces termes.
    */
+  /**
+   * Les comptes de l'equipe, seuls a voir les informations internes de
+   * « A propos » : version du build, environnement, presence des relais TURN,
+   * nom du projet, encadrant, groupe.
+   *
+   * Rien de tout cela n'interesse un client, et l'ensemble raconte comment le
+   * service est fabrique et deploye. Le reste du monde ne voit donc que la
+   * premiere ligne, celle du nom de l'application.
+   *
+   * A SAVOIR, et c'est une limite reelle : ce filtre agit a l'AFFICHAGE. Les
+   * valeurs restent presentes dans le paquet JavaScript telecharge par tout le
+   * monde, et restent lisibles pour qui sait l'ouvrir. Le jour ou l'une d'elles
+   * devient un secret, elle devra sortir du client et venir du serveur, derriere
+   * une verification de compte — un filtre d'affichage n'y suffira pas.
+   *
+   * La comparaison passe en minuscules et sans espaces : une adresse saisie
+   * « Steve@... » a l'inscription designe le meme compte.
+   */
+  const COMPTES_INTERNES = ["stevelove2040@gmail.com", "steveaurelmanfo@gmail.com"]
+  const compteInterne = COMPTES_INTERNES.includes(user?.email?.trim().toLowerCase() ?? "")
+
   const [reinitEnvoi, setReinitEnvoi] = useState(false)
   const envoyerReinitialisation = async () => {
     const email = user?.email?.trim()
@@ -3275,7 +3296,11 @@ export default function SettingsPage() {
                   label={t("notif_preview")}
                   description={t("notif_preview_sub")}
                 />
-                <PushDiagnostic />
+                {/* Diagnostic des notifications poussees : jeton FCM, autorisation du
+                    navigateur, etat de l'enregistrement. Ce sont des donnees de mise au
+                    point — un client n'a rien a en faire, et n'a pas de quoi les lire.
+                    Reserve a l'equipe, comme la pile technique de « A propos ». */}
+                {compteInterne && <PushDiagnostic />}
               </div>
 
               <RingtonePicker />
@@ -3471,20 +3496,31 @@ export default function SettingsPage() {
               <p className="s-page-sub">{t("about_sub")}</p>
               <div className="s-card">
                 {[
-                  { label: t("set_about_app"), value: "Alanya" },
-                  { label: t("set_about_version"), value: "1.0.0-beta" },
-                  { label: t("set_about_env"), value: t("set_about_env_value") },
+                  { label: t("set_about_app"), value: "Alanya", interne: false },
+                  { label: t("set_about_version"), value: "1.0.0-beta", interne: true },
+                  {
+                    label: t("set_about_env"),
+                    value: t("set_about_env_value"),
+                    interne: true,
+                  },
                   {
                     label: t("set_about_turn"),
                     // Diagnostic visible depuis un telephone : dit si ce build
                     // embarque les variables VITE_TURN_* (necessaires pour les
                     // appels entre reseaux differents).
                     value: isTurnConfigured() ? t("set_turn_configured") : t("set_turn_missing"),
+                    interne: true,
                   },
-                  { label: t("set_about_project"), value: t("set_about_project_value") },
-                  { label: t("set_about_supervisor"), value: "Dr. NANA BINKEU" },
-                  { label: t("set_about_group"), value: "Alanya II" },
-                ].map(({ label, value }) => (
+                  {
+                    label: t("set_about_project"),
+                    value: t("set_about_project_value"),
+                    interne: true,
+                  },
+                  { label: t("set_about_supervisor"), value: "Dr. NANA BINKEU", interne: true },
+                  { label: t("set_about_group"), value: "Alanya II", interne: true },
+                ]
+                  .filter(({ interne }) => !interne || compteInterne)
+                  .map(({ label, value }) => (
                   <div
                     className="about-row"
                     key={label}
@@ -3512,55 +3548,63 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-              <div className="s-card">
-                <div className="s-card-title">{t("set_tech_stack")}</div>
-                {[
-                  { label: t("set_stack_frontend"), value: t("set_stack_frontend_value") },
-                  { label: t("set_stack_backend"), value: "Next.js (App Router, API Routes)" },
-                  { label: t("database"), value: "PostgreSQL  -  Prisma" },
-                  { label: t("set_stack_realtime"), value: t("set_stack_realtime_value") },
-                  { label: t("set_stack_calls"), value: t("set_stack_calls_value") },
-                  { label: t("set_stack_auth"), value: t("set_stack_auth_value") },
-                  { label: t("set_stack_deploy"), value: t("set_stack_deploy_value") },
-                ].map(({ label, value }) => (
-                  <div
-                    className="stack-row"
-                    key={label}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "11px 0",
-                      borderBottom: "1px solid var(--border-subtle)",
-                      gap: 16,
-                    }}
-                  >
-                    <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
-                      {label}
-                    </span>
-                    <span
-                      className="stack-value"
+              {/* La pile technique et le diagnostic temps reel racontent comment le
+                  service est fabrique et deploye : versions, hebergeur, transport,
+                  etat des relais. C'est utile a l'equipe et sans objet pour un
+                  client, a qui la page ne montre donc que le nom de l'application. */}
+              {compteInterne && (
+                <>
+                <div className="s-card">
+                  <div className="s-card-title">{t("set_tech_stack")}</div>
+                  {[
+                    { label: t("set_stack_frontend"), value: t("set_stack_frontend_value") },
+                    { label: t("set_stack_backend"), value: "Next.js (App Router, API Routes)" },
+                    { label: t("database"), value: "PostgreSQL  -  Prisma" },
+                    { label: t("set_stack_realtime"), value: t("set_stack_realtime_value") },
+                    { label: t("set_stack_calls"), value: t("set_stack_calls_value") },
+                    { label: t("set_stack_auth"), value: t("set_stack_auth_value") },
+                    { label: t("set_stack_deploy"), value: t("set_stack_deploy_value") },
+                  ].map(({ label, value }) => (
+                    <div
+                      className="stack-row"
+                      key={label}
                       style={{
-                        fontSize: 12,
-                        color: "var(--text-secondary)",
-                        fontWeight: 500,
-                        textAlign: "right",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "11px 0",
+                        borderBottom: "1px solid var(--border-subtle)",
+                        gap: 16,
                       }}
                     >
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                      <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+                        {label}
+                      </span>
+                      <span
+                        className="stack-value"
+                        style={{
+                          fontSize: 12,
+                          color: "var(--text-secondary)",
+                          fontWeight: 500,
+                          textAlign: "right",
+                        }}
+                      >
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
 
-              {/* Diagnostic en direct de la connexion temps reel (messages) */}
-              <div className="s-card">
-                <div className="s-card-title">{t("set_realtime_diagnostic")}</div>
-                <RealtimeStatus />
-              </div>
+                {/* Diagnostic en direct de la connexion temps reel (messages) */}
+                <div className="s-card">
+                  <div className="s-card-title">{t("set_realtime_diagnostic")}</div>
+                  <RealtimeStatus />
+                </div>
 
-              {/* Comparateur de fournisseurs TURN (Metered, Cloudflare, coturn...) */}
-              <TurnTester />
+                {/* Comparateur de fournisseurs TURN (Metered, Cloudflare, coturn...) */}
+                  <TurnTester />
+                </>
+              )}
             </>
           )}
         </main>
