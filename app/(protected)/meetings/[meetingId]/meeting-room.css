@@ -407,6 +407,215 @@
   cursor: pointer;
 }
 
+/* ---------- Ce qui manque au media local ---------- */
+
+/*
+ * PAR-DESSUS LE CADRE, ET NON AU-DESSUS DE LUI.
+ *
+ * On entre desormais dans une salle sans micro ni camera ; il faut donc le DIRE,
+ * et le dire en permanence. Mais la salle vient d'etre redessinee pour rendre
+ * des pixels aux participants, et un message n'a pas a les reprendre : la zone
+ * est posee EN ABSOLU dans le cadre video et ne coute pas un pixel de
+ * disposition.
+ *
+ * LE CALCUL, pour qu'il soit verifiable — hauteurs MESUREES sur le rendu, pas
+ * estimees. En rangee de grille de `.meeting-room-root.en-salle`, l'avis aurait
+ * pris sa hauteur — 62 px deplie, 32 px replie — PLUS l'interligne de 12 px qui
+ * l'aurait separe de ses voisines, soit 74 px de video en moins sur toute la
+ * largeur a chaque fois qu'il s'affiche. C'est le meme piege que la rangee du
+ * bandeau d'invitations, retiree pour 16 px. Ici : 0 px preleve, 62 px
+ * recouverts au haut du cadre pendant qu'on lit, 32 px ensuite — et cette bande
+ * du haut est celle ou une image 16/9 ne montre le plus souvent que sa marge.
+ *
+ * ATTENTION, CES REGLES SERVENT DEUX DOCUMENTS — comme celles de `.salle-scene`
+ * plus haut. La pastille suit le media dans la fenetre reduite, qui est un autre
+ * document, sans `.meeting-room-root` au-dessus d'elle : aucun selecteur de
+ * cette section ne part de la racine de la salle.
+ */
+.salle-avis-zone {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  /*
+   * 90 px A DROITE, ET NON 14 : les deux outils du cadre — plein ecran, fenetre
+   * reduite — occupent ce coin (32 px chacun, 6 px entre eux, 14 px de marge).
+   * La zone s'arrete donc AVANT eux, et le bandeau se centre dans ce qui reste.
+   *
+   * Une largeur maximale calculee sur la leur ne suffisait pas : `calc(100% -
+   * 160px)` devient negatif des que le cadre est etroit, et une longueur
+   * negative fait jeter la declaration ENTIERE par le navigateur — le bandeau
+   * repassait alors sous les boutons, exactement la ou on ne voulait pas de lui.
+   */
+  right: 90px;
+  /* Au-dessus des outils du cadre (3) : sur un ecran etroit, ce qui manque au
+     micro prime sur le bouton « plein ecran ». */
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  /* Vide neuf fois sur dix, elle ne doit alors rien intercepter du cadre. */
+  pointer-events: none;
+}
+
+/*
+ * SUR TELEPHONE, LES 90 PX RESERVES SONT DE TROP. Sous 900 px — la coupure de
+ * toute la salle — la salle ne laisse plus qu'un seul outil dans le coin, celui
+ * du plein ecran : on rend les 34 px de l'autre au texte, qui gagne une ligne.
+ */
+@media (max-width: 900px) {
+  .meeting-room-root .salle-avis-zone {
+    right: 56px;
+  }
+}
+
+.salle-avis {
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  /* Une ligne de lecture, pas une banniere : au-dela, l'oeil ne revient plus au
+     debut de la phrase. La zone, elle, a deja mis les outils du cadre hors de
+     portee. */
+  max-width: min(560px, 100%);
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  /* Fond franc et non teinte : dessous, le cadre est une image en mouvement, et
+     un fond translucide rendrait la phrase illisible une seconde sur deux. */
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  box-shadow: 0 2px 10px var(--overlay);
+  font-size: 12px;
+  line-height: 18px;
+}
+.salle-avis > svg {
+  flex: none;
+  color: var(--accent);
+}
+.salle-avis-titre {
+  flex: none;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+/*
+ * DEUX LIGNES, ET PAS TROIS.
+ *
+ * Laisse a lui-meme, le bandeau enchainait titre, phrase, bouton et chevron sur
+ * une seule suite : 560 px de large, il retombait sur TROIS lignes — 84 px
+ * recouvrant le haut du cadre. L'explication est renvoyee sur sa propre ligne
+ * (`order` plus tard que les boutons, base de 100 %), ce qui remonte le bouton a
+ * cote du titre : 48 px au lieu de 84, pour exactement le meme texte.
+ *
+ * L'ordre du DOM, lui, ne bouge pas — titre, phrase, bouton : c'est celui de la
+ * lecture a voix haute, et celui du clavier. Seule la mise en page differe.
+ */
+.salle-avis-texte {
+  order: 3;
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+/*
+ * L'ECOUTE SEULE PORTE LA COULEUR D'ALERTE, la camera manquante non.
+ *
+ * Ce n'est pas un ornement : la camera absente n'est pas une panne, la reunion
+ * fonctionne et l'on est entendu — l'accent suffit. Personne qui ne nous entend
+ * est un autre ordre de probleme, et l'oeil doit faire la difference avant meme
+ * d'avoir lu.
+ */
+.salle-avis.grave {
+  border-color: var(--warning);
+  color: var(--text-primary);
+}
+.salle-avis.grave > svg {
+  color: var(--warning);
+}
+
+/* Replie : le titre reste, l'explication et le bouton partent. Ce qui disparait
+   n'est jamais l'information — seulement son detail. */
+.salle-avis.replie {
+  padding: 4px 4px 4px 10px;
+  gap: 6px;
+}
+
+.salle-avis-action {
+  flex: none;
+  order: 2;
+  /* Le titre a gauche, l'action a droite : deux roles, deux bords. */
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 20px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.salle-avis-action:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.salle-avis-action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.salle-avis.grave .salle-avis-action {
+  border-color: var(--warning);
+  background: var(--warning-dim);
+  color: var(--warning);
+}
+.salle-avis.grave .salle-avis-action:hover:not(:disabled) {
+  background: var(--warning);
+  color: var(--accent-text);
+}
+
+.salle-avis-bascule {
+  flex: none;
+  order: 2;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.salle-avis-bascule:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* Le cadre de la fenetre reduite n'est pas positionne dans sa propre feuille :
+   sans ce reperage, la pastille se poserait sur le premier ancetre positionne,
+   c'est-a-dire n'importe ou dans la fenetre. */
+.fr-scene {
+  position: relative;
+}
+/* La fenetre est large comme la colonne du fil : la pastille s'y colle aux
+   bords, et n'a AUCUN outil de cadre a eviter — les 90 px reserves dans la page
+   lui prendraient le tiers de sa largeur. */
+.fr-scene .salle-avis-zone {
+  top: 8px;
+  left: 8px;
+  right: 8px;
+}
+.fr-scene .salle-avis {
+  max-width: 100%;
+}
+
+/* Les deux occupent le haut du cadre au centre : on les empile plutot que de
+   les superposer. 88 px = 14 px de marge + 62 px d'avis deploye + 12 px. Replie,
+   l'avis n'en fait plus que 32 et le bouton reste simplement plus bas — mieux
+   vaut un blanc qu'un chevauchement une fois sur deux. */
+.meeting-room-root .meeting-media.avec-avis .meeting-son-bloque {
+  top: 88px;
+}
+
 /* ---------- Entete ---------- */
 
 .meeting-room-root .meeting-header {

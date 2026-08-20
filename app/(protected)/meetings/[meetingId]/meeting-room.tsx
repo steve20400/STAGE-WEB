@@ -18,8 +18,10 @@ import {
 import {
   arreterPartageEcran,
   demarrerPartageEcran,
+  getCallState,
   hangUp,
   joinMeetingRoom,
+  reprendreLeMediaLocal,
   partageEcranSupporte,
   setCallAudioOutput,
   toggleCamera,
@@ -343,6 +345,17 @@ export default function MeetingRoomPage() {
   const [sonBloque, setSonBloque] = useState(false)
 
   /**
+   * L'avis « il vous manque quelque chose » est-il replie en pastille ?
+   *
+   * Il ne disparait jamais : replie, il garde son titre — camera indisponible,
+   * ecoute seule. Ce qui part, c'est la phrase d'explication et le bouton, pas
+   * l'information elle-meme.
+   */
+  const [avisReplie, setAvisReplie] = useState(false)
+  /** Une reprise du media est-elle en cours ? Le bouton s'en verrouille. */
+  const [repriseEnCours, setRepriseEnCours] = useState(false)
+
+  /**
    * Panneau ouvert sous la barre : soit « ajouter », soit « menu ». Un seul a
    * la fois — basculer ouvre l'un et ferme l'autre.
    */
@@ -577,6 +590,31 @@ export default function MeetingRoomPage() {
     if (!enSalle) setFenetreReduite(false)
   }, [enSalle])
 
+  /*
+   * LE BANDEAU NE SE REPLIE PAS DE LA MEME FACON SELON CE QUI MANQUE.
+   *
+   * CAMERA SEULE : la reunion fonctionne, on parle et on est entendu. Il n'y a
+   * rien a faire d'urgent, seulement quelque chose a savoir — l'avis se replie
+   * donc tout seul en pastille au bout de huit secondes, le temps de lire deux
+   * lignes sans avoir a les relire.
+   *
+   * ECOUTE SEULE : personne ne nous entend. Aucun minuteur ne le replie, parce
+   * qu'un repli automatique serait exactement la disparition silencieuse qu'on
+   * cherche a eviter : celui qui a regarde ailleurs pendant huit secondes
+   * parlerait ensuite dans le vide. Seul un geste de l'utilisateur le replie, et
+   * ce geste-la PROUVE qu'il a lu.
+   *
+   * Dans les deux cas, un changement d'etat redeploie l'avis : passer de
+   * « camera » a « tout » est une nouvelle information, pas la suite de
+   * l'ancienne.
+   */
+  useEffect(() => {
+    setAvisReplie(false)
+    if (callState.mediaManquant !== "camera") return
+    const minuteur = window.setTimeout(() => setAvisReplie(true), 8000)
+    return () => window.clearTimeout(minuteur)
+  }, [callState.mediaManquant])
+
   /**
    * Etat du gestionnaire d'appels, lisible depuis un nettoyage.
    *
@@ -727,6 +765,125 @@ export default function MeetingRoomPage() {
       await joinMeetingRoom(parseInt(meetingId, 10), meeting.type, meeting.objet)
     } catch (err) {
       showError(t("error"), err instanceof Error ? err.message : t("meet_join_failed"))
+    }
+  }
+
+  /**
+   * REPRENDRE SON MICRO ET SA CAMERA SANS QUITTER LA REUNION.
+   *
+   * C'est la contrepartie du bandeau, et la vraie reponse au probleme : dans la
+   * grande majorite des cas, ce qui manque n'est pas un appareil mais une
+   * AUTORISATION, refusee d'un geste au moment d'entrer. Celui qui l'accorde
+   * ensuite — depuis le cadenas de la barre d'adresse — doit pouvoir se
+   * remettre a parler sans sortir de la reunion et y revenir.
+   *
+   * DEUX TEMPS, ET L'ORDRE EST TOUT.
+   *
+   *  1. ON DEMANDE AU NAVIGATEUR, sans rien toucher au salon. C'est lui qui
+   *     porte le refus, et lui seul sait s'il est leve. Tant qu'il ne l'est pas,
+   *     la tentative doit couter ZERO : ni coupure du son, ni sortie et rentree
+   *     sous les yeux des autres participants. L'appareil obtenu est rendu
+   *     aussitot — plus d'un systeme n'en accorde qu'une ouverture a la fois, et
+   *     le garder ici ferait echouer la cascade juste apres.
+   *  2. SEULEMENT SI L'AUTORISATION EST ACQUISE, on rejoue l'entree.
+   *
+   * ⚠️ FAUTE DE MIEUX, ET C'EST UNE DETTE. `call-manager.ts` n'expose rien pour
+   * reprendre le flux local d'une salle DEJA rejointe : `ensureLocalStream` est
+   * privee, et rend la main sans rien faire quand un flux existe deja — le cas
+   * « camera manquante », justement, ou le micro tourne. Rejouer l'entree est
+   * donc le seul chemin public qui rejoue la cascade, et il se paie d'un
+   * `meeting_leave` suivi d'un `meeting_join` : la page ne bouge pas, mais les
+   * autres nous voient sortir et rentrer. Voir le compte-rendu du lot pour la
+   * signature qui supprimerait ce detour.
+   */
+  const reessayerLeMedia = async () => {
+    if (repriseEnCours || !meeting || !meetingId) return
+    setRepriseEnCours(true)
+
+    /*
+     * LA SONDE DESCEND LES MEMES MARCHES QUE LA CASCADE D'ENTREE.
+     *
+     * `getUserMedia` EST ATOMIQUE : un seul appareil refuse fait rejeter tout
+     * l'appel, meme quand l'autre etait accorde. Cette sonde demandait micro ET
+     * camera en UN SEUL appel, et echouait donc exactement dans le cas le plus
+     * frequent — celui que le cadenas de la barre d'adresse produit d'un clic :
+     * micro autorise, camera bloquee. On lisait « Toujours aucun acces », rien
+     * ne bougeait, et c'etait faux : la cascade d'entree, elle, aurait pris le
+     * micro et rendu la voix AUDIBLE. Le bouton annoncait qu'aucun appareil
+     * n'etait disponible alors que celui qui compte le plus l'etait.
+     *
+     * On ne conclut donc a l'echec qu'apres avoir redemande le MICRO SEUL, qui
+     * est la derniere marche de `joinMeetingRoom`. Ce que la sonde accepte est
+     * exactement ce que la cascade saura reprendre — ni plus, ni moins.
+     *
+     * Les pistes obtenues sont rendues aussitot : plus d'un systeme n'accorde
+     * qu'une ouverture a la fois, et les garder ici ferait echouer la cascade
+     * juste apres.
+     */
+    const sonder = async (avecCamera: boolean): Promise<boolean> => {
+      try {
+        const essai = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: avecCamera,
+        })
+        essai.getTracks().forEach((piste) => piste.stop())
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    const enVideo = meeting.type === "video"
+    // Le repli n'a de sens que si la premiere demande portait la camera : en
+    // reunion audio, les deux appels seraient le meme et le second ne dirait
+    // rien de neuf.
+    const accorde = (await sonder(enVideo)) || (enVideo && (await sonder(false)))
+
+    if (!accorde) {
+      // Toujours refuse, micro compris : on le dit, et on ne touche a rien. Le
+      // bandeau reste ou il est, la reunion continue exactement comme avant.
+      showError(t("error"), t("meet_media_retry_failed"))
+      setRepriseEnCours(false)
+      return
+    }
+
+    // Ce qui manquait AVANT la reprise : c'est lui qui dira si l'on a progresse.
+    const avant = getCallState().mediaManquant
+
+    try {
+      // ON NE SORT PLUS DE LA SALLE POUR Y RENTRER.
+      //
+      // Le bouton rappelait `joinMeetingRoom`, qui raccroche tout et refait les
+      // connexions une a une : la salle voyait le revenant sortir puis rentrer,
+      // sa ligne de presence se refermait puis se rouvrait, et la duree
+      // enregistree repartait de zero — un clic a la cinquantieme minute ne
+      // gardait que les minutes restantes.
+      //
+      // `reprendreLeMediaLocal` ajoute la piste retrouvee aux connexions DEJA
+      // ouvertes et renegocie, sans quitter quoi que ce soit. Elle rend ce qui
+      // manque ENCORE, lu sur les pistes et non sur le drapeau d'entree.
+      const apres = await reprendreLeMediaLocal()
+      if (apres === "aucun") {
+        success(t("meet_media_retry_done"))
+      } else if (apres !== avant) {
+        /*
+         * REPRISE PARTIELLE — micro retrouve, camera toujours refusee. C'est
+         * une VICTOIRE, pas un echec : on etait inaudible, on est desormais
+         * entendu de tous. L'annoncer par « Toujours aucun acces » aurait
+         * repete a l'ecran le mensonge qu'on vient de corriger dans la sonde.
+         *
+         * Les intitules sont ceux du bandeau qui vient de changer sous les
+         * yeux — memes mots, meme situation : le toast et le bandeau ne
+         * peuvent pas se contredire.
+         */
+        success(t("meet_media_camera_title"), t("meet_media_camera_body"))
+      } else {
+        showError(t("error"), t("meet_media_retry_failed"))
+      }
+    } catch (err) {
+      showError(t("error"), err instanceof Error ? err.message : t("meet_join_failed"))
+    } finally {
+      setRepriseEnCours(false)
     }
   }
 
@@ -1020,6 +1177,139 @@ export default function MeetingRoomPage() {
 
   const bandeauVisible = meeting.jeSuisOrganisateur && demandes.length > 0 && enSalle
 
+  /** Ecoute seule : on entend et on voit tout le monde, personne ne nous entend. */
+  const ecouteSeule = callState.mediaManquant === "tout"
+
+  /*
+   * UNE BASCULE SANS PISTE NE COMMANDE RIEN — ET NE DOIT PAS S'AFFICHER ALLUMEE.
+   *
+   * A deux centimetres du bandeau « Ecoute seule », le micro se montrait allume
+   * et proposait « Couper le micro ». Rien derriere : `toggleMicrophone` n'a
+   * aucune piste a basculer quand la cascade d'entree n'en a obtenu aucune. Deux
+   * affirmations contraires sur le meme ecran, et c'est la plus rassurante qui
+   * gagne — on se croit ouvert alors qu'on est muet.
+   *
+   * ON LIT `mediaManquant` ET NON `micOn` / `camOn`. Les drapeaux sont redresses
+   * en parallele dans `call-manager.ts` ; s'y fier ici ferait dependre la verite
+   * de l'ecran d'un correctif qui vit dans un autre fichier. `mediaManquant` est
+   * le VERDICT de la cascade — il dit ce qui a ete obtenu, pas la position d'un
+   * bouton — et il est deja juste aujourd'hui.
+   *
+   * DESACTIVER PLUTOT QUE REMPLACER PAR « REESSAYER », et ce n'est pas un
+   * detail de gout :
+   *  - la barre est une rangee de reperes fixes. Echanger le micro contre un
+   *    bouton d'une autre nature deplace tous les suivants sous le doigt, au
+   *    moment precis ou l'utilisateur est deja desoriente ;
+   *  - l'invitation a reessayer EXISTE DEJA, dans le bandeau juste au-dessus,
+   *    accompagnee de la phrase qui dit pourquoi. Une seconde copie dans la
+   *    barre dirait quoi faire sans dire de quoi il retourne, et les deux
+   *    boutons se disputeraient le meme geste ;
+   *  - le micro barre est LUI-MEME une information vraie — « vous n'avez pas de
+   *    micro » —, que le remplacer effacerait.
+   *
+   * `aria-disabled` et non l'attribut `disabled` : celui-ci sort le bouton du
+   * parcours au clavier, et l'etat le plus grave de la salle deviendrait le seul
+   * que le clavier ne rencontre jamais. Le clic ne tombe pas dans le vide pour
+   * autant — il REDEPLOIE le bandeau, c'est-a-dire l'explication et le seul
+   * geste qui puisse y remedier.
+   */
+  const microInerte = enSalle && callState.mediaManquant === "tout"
+  const cameraInerte = enSalle && callState.mediaManquant !== "aucun"
+
+  /**
+   * CE QUI MANQUE AU MEDIA LOCAL, DIT A L'ECRAN.
+   *
+   * On entre desormais dans une salle meme sans micro ni camera — un poste fixe
+   * sans webcam peut rejoindre une reunion video et y parler. Le prix de cette
+   * porte ouverte, c'est CE bandeau : sans lui, on aurait supprime le refus sans
+   * rien donner en echange, et l'utilisateur en ecoute seule parlerait dans le
+   * vide en croyant que les autres l'ignorent.
+   *
+   * OU IL EST POSE, ET CE QU'IL COUTE. En absolu DANS le cadre video, donc ZERO
+   * pixel de disposition. Une rangee de grille dans `.meeting-room-root` aurait
+   * pris sa hauteur — 62 px deplie, 32 px replie — plus l'interligne de 12 px,
+   * soit 74 px de video en moins sur toute la largeur. La salle vient
+   * precisement de rendre ces pixels aux participants ; on ne les reprend pas
+   * pour un message. Le detail du calcul est dans la feuille, avec les regles.
+   *
+   * `compact` est le rendu de la FENETRE REDUITE : trop etroite pour une phrase
+   * et un bouton, elle ne recoit que la pastille. Le bouton n'y perd rien — la
+   * fenetre reduite est faite pour ecouter en travaillant ailleurs, et reprendre
+   * la main se fait dans la page, ou l'avis est entier. Les deux rendus ne sont
+   * JAMAIS montes ensemble : quand le media part dans la fenetre, la page montre
+   * `meeting-media-deporte` a la place de la scene.
+   */
+  const rendreAvisMedia = (compact: boolean) => {
+    const replie = compact || avisReplie
+    return (
+      /*
+        LA ZONE EST TOUJOURS POSEE, MEME VIDE.
+
+        Une region vivante ne s'annonce que si elle existait DEJA au moment ou
+        son contenu change. Inseree en meme temps que son texte, plus d'un
+        lecteur d'ecran la passerait sous silence — et c'est justement l'ecoute
+        seule qu'il ne faut pas manquer. Elle est montee des l'entree dans la
+        salle, alors que la cascade du media n'a pas encore rendu son verdict.
+
+        Vide, elle ne doit rien intercepter : `pointer-events` la traverse, et
+        seul le bandeau lui-meme les reprend.
+      */
+      <div className="salle-avis-zone" role="status" aria-live="polite">
+        {callState.mediaManquant !== "aucun" && (
+          <div
+            className={["salle-avis", ecouteSeule ? "grave" : "", replie ? "replie" : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <MeetingControlIcon kind={ecouteSeule ? "micOff" : "cameraOff"} taille={15} />
+            <b className="salle-avis-titre">
+              {t(ecouteSeule ? "meet_media_none_title" : "meet_media_camera_title")}
+            </b>
+            {!replie && (
+              <>
+                <span className="salle-avis-texte">
+                  {t(ecouteSeule ? "meet_media_none_body" : "meet_media_camera_body")}
+                </span>
+                <button
+                  type="button"
+                  className="salle-avis-action"
+                  onClick={() => void reessayerLeMedia()}
+                  disabled={repriseEnCours}
+                >
+                  {repriseEnCours ? t("meet_media_retrying") : t("meet_media_retry")}
+                </button>
+              </>
+            )}
+            {!compact && (
+              <button
+                type="button"
+                className="salle-avis-bascule"
+                onClick={() => setAvisReplie((etait) => !etait)}
+                aria-expanded={!replie}
+                title={replie ? t("meet_media_expand") : t("meet_media_collapse")}
+                aria-label={replie ? t("meet_media_expand") : t("meet_media_collapse")}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d={replie ? "m6 9 6 6 6-6" : "m6 15 6-6 6 6"} />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   /**
    * CE QUE MONTRE LE RENDU — et qui DEMENAGE.
    *
@@ -1192,7 +1482,14 @@ export default function MeetingRoomPage() {
            seul element video perdrait la bande des autres participants et
            l'etiquette du presentateur. C'est le rendu entier qu'on veut plein
            ecran, pas une image. */
-        <div className="meeting-media" ref={pleinEcran.cible}>
+        <div
+          /* `avec-avis` decale le bandeau « son bloque », qui occupe le meme
+             haut de cadre au centre. Les deux peuvent tomber ensemble : un
+             navigateur qui refuse le micro est souvent celui qui refuse aussi de
+             jouer le son tout seul. */
+          className={`meeting-media${callState.mediaManquant !== "aucun" ? " avec-avis" : ""}`}
+          ref={pleinEcran.cible}
+        >
           {/* LES `<audio>` NE DEMENAGENT JAMAIS. Ils restent dans la page meme
               quand l'image part dans la fenetre reduite : les recreer ailleurs
               couperait le son le temps que les flux se rebranchent, et une
@@ -1238,6 +1535,7 @@ export default function MeetingRoomPage() {
             </div>
           ) : (
             <>
+              {rendreAvisMedia(false)}
               {rendreScene(false)}
 
               {/* Sa propre image, en petit : on verifie d'un coup d'oeil ce que
@@ -1526,14 +1824,34 @@ export default function MeetingRoomPage() {
           <div className="meeting-controles">
             {enSalle && (
               <>
+            {/* Inerte, le bouton ne porte plus `aria-pressed` : il a cesse
+              d'etre une bascule, et annoncer une position « enfoncee » ou
+              « relachee » sur une commande qui ne commande rien serait le meme
+              mensonge, dit cette fois au lecteur d'ecran. Son intitule est
+              celui du bandeau — memes mots, meme situation. */}
             <button
-              className={`meeting-controle${callState.micOn ? "" : " coupe"}`}
-              onClick={() => toggleMicrophone()}
-              aria-pressed={!callState.micOn}
-              title={callState.micOn ? t("mute_mic") : t("unmute_mic")}
-              aria-label={callState.micOn ? t("mute_mic") : t("unmute_mic")}
+              className={`meeting-controle${
+                microInerte ? " inerte" : callState.micOn ? "" : " coupe"
+              }`}
+              onClick={() => (microInerte ? setAvisReplie(false) : toggleMicrophone())}
+              aria-disabled={microInerte || undefined}
+              aria-pressed={microInerte ? undefined : !callState.micOn}
+              title={
+                microInerte
+                  ? t("meet_media_none_title")
+                  : callState.micOn
+                    ? t("mute_mic")
+                    : t("unmute_mic")
+              }
+              aria-label={
+                microInerte
+                  ? t("meet_media_none_title")
+                  : callState.micOn
+                    ? t("mute_mic")
+                    : t("unmute_mic")
+              }
             >
-              {callState.micOn ? (
+              {!microInerte && callState.micOn ? (
                 <MeetingControlIcon kind="mic" />
               ) : (
                 <MeetingControlIcon kind="micOff" />
@@ -1545,13 +1863,28 @@ export default function MeetingRoomPage() {
               coupee l'infobulle se resumait a « Video ». */}
             {meeting.type === "video" && (
               <button
-                className={`meeting-controle${callState.camOn ? "" : " coupe"}`}
-                onClick={() => toggleCamera()}
-                aria-pressed={!callState.camOn}
-                title={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
-                aria-label={callState.camOn ? t("turn_off_camera") : t("turn_on_camera")}
+                className={`meeting-controle${
+                  cameraInerte ? " inerte" : callState.camOn ? "" : " coupe"
+                }`}
+                onClick={() => (cameraInerte ? setAvisReplie(false) : toggleCamera())}
+                aria-disabled={cameraInerte || undefined}
+                aria-pressed={cameraInerte ? undefined : !callState.camOn}
+                title={
+                  cameraInerte
+                    ? t("meet_media_camera_title")
+                    : callState.camOn
+                      ? t("turn_off_camera")
+                      : t("turn_on_camera")
+                }
+                aria-label={
+                  cameraInerte
+                    ? t("meet_media_camera_title")
+                    : callState.camOn
+                      ? t("turn_off_camera")
+                      : t("turn_on_camera")
+                }
               >
-                {callState.camOn ? (
+                {!cameraInerte && callState.camOn ? (
                   <MeetingControlIcon kind="camera" />
                 ) : (
                   <MeetingControlIcon kind="cameraOff" />
@@ -1829,7 +2162,14 @@ export default function MeetingRoomPage() {
               defilent. `.fr-scene` et `.fr-barre` sont l'habillage que la
               fenetre offre a la salle — ecrits dans SA feuille, la seule qui
               soit sure d'etre recopiee dans l'autre document. */}
-          <div className="fr-scene">{rendreScene(true)}</div>
+          {/* La pastille SUIT LE MEDIA jusque dans la fenetre reduite. Sans
+              elle, replier la salle ferait disparaitre l'ecoute seule en
+              silence : on continuerait a entendre tout le monde, on croirait
+              etre entendu, et plus rien a l'ecran ne dirait le contraire. */}
+          <div className="fr-scene">
+            {rendreAvisMedia(true)}
+            {rendreScene(true)}
+          </div>
 
           <div className="fr-barre">
             <button

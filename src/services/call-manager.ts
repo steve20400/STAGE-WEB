@@ -275,7 +275,18 @@ class PeerSession {
     private readonly peerId: string,
     private readonly isVideo: boolean,
     private readonly isOfferer: boolean,
-    private readonly localStream: MediaStream,
+    /**
+     * Le flux local, ou NUL — l'ecoute seule.
+     *
+     * Nul est une valeur legitime et non un oubli : on entre dans une reunion
+     * sans micro ni camera, et une connexion sans rien a emettre RECOIT
+     * parfaitement. Voir `declarerLesMedias`.
+     *
+     * Non `readonly` : le media peut revenir en cours de session — l'utilisateur
+     * finit par accorder son micro — et la connexion existe alors deja. Voir
+     * `ajouterPisteLocale`.
+     */
+    private localStream: MediaStream | null,
     private readonly iceServers: RTCIceServer[],
     private readonly onSendSignal: (signal: WebrtcSignal) => void,
     private readonly onUpdated: () => void
@@ -325,9 +336,7 @@ class PeerSession {
       }
     }
 
-    for (const track of this.localStream.getTracks()) {
-      pc.addTrack(track, this.localStream)
-    }
+    this.declarerLesMedias(pc)
 
     if (this.isOfferer) {
       // L'emission de l'offre ne doit JAMAIS remonter jusqu'a l'appelant.
@@ -359,6 +368,94 @@ class PeerSession {
     const pending = this.pendingSignals.splice(0)
     for (const signal of pending) {
       await this.applySignal(signal)
+    }
+  }
+
+  /**
+   * Declare a cette connexion ce qu'elle EMET, et ce qu'elle ATTEND.
+   *
+   * L'ECOUTE SEULE TIENT TOUTE ENTIERE ICI. Cette methode ne se contente pas
+   * d'ajouter les pistes locales : la ou il n'y en a pas, elle declare une ligne
+   * media en RECEPTION SEULE. Une connexion sans rien a emettre reste
+   * parfaitement capable de recevoir — encore faut-il que la negociation porte
+   * la ligne correspondante.
+   *
+   * Sans cela, une session ouverte sans flux local negociait une connexion
+   * VIDE : ni son ni image dans aucun sens. C'est ce qui rendait l'ecoute seule
+   * impossible, et c'est pourquoi `connectToPeer` renoncait plutot que d'ouvrir
+   * une session muette et aveugle.
+   *
+   * Une seule piste de chaque sorte, et l'audio d'abord : l'ordre des lignes
+   * media est celui de leur declaration, et le mobile construit le meme. Le
+   * `getTracks()` d'avant laissait cet ordre a la main du navigateur.
+   *
+   * La video n'est declaree que dans une session VIDEO : ouvrir une ligne video
+   * dans une reunion audio la ferait negocier pour rien.
+   */
+  private declarerLesMedias(pc: RTCPeerConnection) {
+    const flux = this.localStream
+    const audio = flux?.getAudioTracks()[0]
+    if (flux && audio) pc.addTrack(audio, flux)
+    else pc.addTransceiver("audio", { direction: "recvonly" })
+
+    if (!this.isVideo) return
+    const video = flux?.getVideoTracks()[0]
+    if (flux && video) pc.addTrack(video, flux)
+    else pc.addTransceiver("video", { direction: "recvonly" })
+  }
+
+  /**
+   * Ajoute une piste locale a une connexion DEJA OUVERTE — le retour du media.
+   *
+   * On est entre en ecoute seule, et le micro finit par etre accorde. La
+   * mecanique de `replaceVideoTrack` ne convient pas ici : elle substitue une
+   * piste a une autre sur un emetteur qui EMET deja, alors que la ligne a ete
+   * negociee en reception seule. Il faut en changer le SENS, ce dont `addTrack`
+   * se charge — il reprend le transceiver en reception seule et le passe en
+   * emission-reception — et ce changement de sens doit etre renegocie ; voir
+   * `renegocier`, que l'appelant enchaine.
+   */
+  ajouterPisteLocale(piste: MediaStreamTrack, flux: MediaStream): boolean {
+    const pc = this.pc
+    if (!pc) return false
+    this.localStream = flux
+    try {
+      pc.addTrack(piste, flux)
+      return true
+    } catch (err) {
+      console.warn(`[webrtc] piste ${piste.kind} refusee par la connexion (${this.peerId}) :`, err)
+      return false
+    }
+  }
+
+  /**
+   * Renvoie une offre sur une connexion etablie.
+   *
+   * Obligatoire des qu'une ligne change de sens : une piste ajoutee a une
+   * connexion negociee en reception seule ne part nulle part tant que le pair
+   * n'a pas accepte la nouvelle description. C'est la difference avec le
+   * changement de camera et le partage d'ecran, qui substituent une piste a une
+   * autre sans toucher a la negociation.
+   *
+   * ⚠️ Cette offre part meme quand c'est le PAIR qui avait offert le premier :
+   * une renegociation n'a pas de role fixe, contrairement a l'etablissement. Si
+   * les deux bouts retrouvent leur micro dans la meme fraction de seconde, les
+   * deux offres se croisent et l'une des deux est refusee par le pair — il n'y a
+   * pas de rattrapage ici. Le cas est rare, sans consequence sur l'existant, et
+   * se repare en refaisant le geste.
+   *
+   * On n'offre que depuis un etat « stable » : une negociation deja en vol se
+   * conclura d'elle-meme avec la piste, qui est deja attachee a la connexion.
+   */
+  async renegocier() {
+    const pc = this.pc
+    if (!pc || pc.signalingState !== "stable") return
+    try {
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      this.onSendSignal({ kind: "offer", sdp: offer.sdp, type: offer.type })
+    } catch (err) {
+      console.warn(`[webrtc] renegociation impossible avec ${this.peerId}`, err)
     }
   }
 
@@ -1020,7 +1117,24 @@ function publishRemoteStreams() {
 async function ensureLocalStream(isVideo: boolean): Promise<MediaStream> {
   if (localStream) return localStream
   localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo })
-  setState({ localStream, micOn: true, camOn: isVideo })
+  // `mediaManquant` est remis a jour ICI, et pas seulement a l'entree en salle.
+  //
+  // Cette fonction est rappelee a CHAQUE pair : entre en ecoute seule, puis
+  // autorise le micro depuis le cadenas du navigateur sans toucher au bouton
+  // « Reessayer », l'appel suivant reussissait — les pistes partaient, la
+  // moitie de la salle nous entendait — mais le drapeau restait fige sur
+  // « tout ». Le bandeau continuait d'affirmer « personne ne vous entend » a
+  // quelqu'un qui parlait, et le bouton du micro restait inerte puisque l'ecran
+  // se regle sur ce drapeau : impossible de se couper.
+  //
+  // Ce qui manque se lit sur les PISTES obtenues, jamais sur ce qu'on esperait.
+  const aVideo = localStream.getVideoTracks().length > 0
+  setState({
+    localStream,
+    micOn: localStream.getAudioTracks().length > 0,
+    camOn: aVideo,
+    mediaManquant: isVideo && !aVideo ? "camera" : "aucun",
+  })
   return localStream
 }
 
@@ -1055,14 +1169,43 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
   annulerSolitude()
 
   const isVideo = state.callType === "video"
-  let stream: MediaStream
+  const enReunion = salleReunion !== null
+
+  /*
+   * SANS FLUX LOCAL, ON POURSUIT — DANS UNE REUNION.
+   *
+   * L'ECOUTE SEULE SE JOUE ICI, ET NULLE PART AILLEURS. Cette fonction posait
+   * `error` et RETOURNAIT des que `getUserMedia` echouait : aucune session
+   * n'etait construite, donc aucune offre, aucune reponse, et rien de recu. Le
+   * participant sans micro etait pourtant inscrit dans le salon — les autres le
+   * voyaient entrer — et restait dans le noir et le silence pendant que le
+   * bandeau lui affirmait qu'il voyait et entendait tout le monde. Avoir leve le
+   * refus d'entree sans lever ce renoncement-ci n'avait donc rien repare : ca
+   * avait remplace une porte fermee par un mensonge a l'ecran.
+   *
+   * Une connexion sans piste a emettre RECOIT parfaitement — voir
+   * `declarerLesMedias`. On construit donc la session quand meme.
+   *
+   * LES APPELS ORDINAIRES GARDENT L'ANCIEN COMPORTEMENT, deliberement. Leur
+   * ecran ne lit pas `mediaManquant` — le champ vaut toujours « aucun » hors
+   * reunion — et n'a aucun bandeau pour dire qu'on n'est pas entendu. Y ouvrir
+   * l'ecoute seule installerait, dans un appel a deux ou l'autre parlerait seul
+   * dans le vide, exactement le mensonge qu'on retire de la reunion. Le jour ou
+   * l'ecran d'appel saura le dire, il n'y aura que cette garde a retirer.
+   *
+   * `error` n'est pas le signal de l'ecoute seule : c'est `mediaManquant`, pose
+   * par `joinMeetingRoom`, qui le porte jusqu'a l'ecran.
+   */
+  let stream: MediaStream | null = null
   try {
     stream = await ensureLocalStream(isVideo)
   } catch {
-    setState({
-      error: isVideo ? tr("call_need_mic_cam") : tr("call_need_mic"),
-    })
-    return
+    if (!enReunion) {
+      setState({
+        error: isVideo ? tr("call_need_mic_cam") : tr("call_need_mic"),
+      })
+      return
+    }
   }
   const iceServers = await loadIceServers()
 
@@ -1142,11 +1285,26 @@ function nePlusAttendre(userId: string) {
 function removePeer(peerId: string) {
   peers.get(peerId)?.close()
   peers.delete(peerId)
-  // Le presentateur s'en va : le serveur annonce lui-meme la fin de son partage
-  // avant son depart, mais on referme aussi ici. Un serveur anterieur a ce
-  // verbe, ou une trame perdue, laisserait sinon la salle en plein ecran sur un
-  // flux qui n'appartient plus a personne.
-  if (state.partageParPeerId === peerId) setState({ partageParPeerId: null })
+  /*
+   * Le presentateur s'en va : le serveur annonce lui-meme la fin de son partage
+   * avant son depart, mais on referme aussi ici. Un serveur anterieur a ce
+   * verbe, ou une trame perdue, laisserait sinon la salle en plein ecran sur un
+   * flux qui n'appartient plus a personne.
+   *
+   * On le retire de la LISTE des presentateurs et pas seulement de la vedette.
+   * L'y laisser le faisait revenir en grand cadre — absent, et sur son dernier
+   * cadre fige — des que le presentateur SUIVANT s'arretait : la vedette est
+   * « le dernier encore actif » de cette liste, et son depart ne l'en effacait
+   * pas. Recalculer la vedette rend du meme coup le grand cadre a celui qui
+   * presente encore, au lieu de le refermer sur tout le monde.
+   */
+  const rang = presentateurs.indexOf(peerId)
+  if (rang !== -1) {
+    presentateurs.splice(rang, 1)
+    setState({ partageParPeerId: presentateurs[presentateurs.length - 1] ?? null })
+  } else if (state.partageParPeerId === peerId) {
+    setState({ partageParPeerId: null })
+  }
   publishRemoteStreams()
 }
 
@@ -1162,6 +1320,9 @@ function stopMesh() {
   // correspondrait plus a ces variables restees pleines.
   pisteEcran = null
   cameraAvantPartage = null
+  // Une demande d'arret mise en attente n'a plus d'objet : la laisser vraie
+  // ferait avorter le PROCHAIN partage des la fin de son installation.
+  arretEcranDemandePendantInstallation = false
 }
 
 function clearCall(markEnded: boolean) {
@@ -1870,7 +2031,22 @@ export async function joinMeetingRoom(
       mediaManquant = "tout"
     }
   }
-  setState({ mediaManquant })
+  /*
+   * LES BOUTONS DISENT LA VERITE DES PISTES.
+   *
+   * `micOn` et `camOn` sont poses plus haut, AVANT la cascade, alors que
+   * personne ne sait encore ce que le navigateur accordera. La branche « tout »
+   * ne les corrigeait jamais : la barre montrait un micro OUVERT a quelqu'un qui
+   * n'a aucune piste audio — un bouton qui promet qu'on est entendu, et qui
+   * invite meme a « se couper » d'un micro inexistant. Sans piste, ces drapeaux
+   * sont faux, et `toggleMicrophone` / `toggleCamera` refusent desormais de les
+   * relever.
+   */
+  setState({
+    mediaManquant,
+    micOn: mediaManquant !== "tout",
+    camOn: mediaManquant === "aucun" && type === "video",
+  })
   desabonnementSalle?.()
   desabonnementSalle = subscribeToMeetingEvents((event) => {
     if (Number(event.meetingId) !== meetingId) return
@@ -2064,6 +2240,7 @@ export async function hangUp(): Promise<void> {
   const wasGroup = state.isGroup
   const wasInitiator = state.isInitiator
   const wasRole = state.role
+  const jePresentais = state.partageParMoi
 
   // Neutralise tout de suite pour ignorer les echos pendant le nettoyage.
   setState({ activeCallId: null })
@@ -2073,6 +2250,23 @@ export async function hangUp(): Promise<void> {
       // Dans un groupe, même l'initiateur quitte individuellement après décrochage.
       // Le backend ne termine globalement que lorsqu'il reste moins de deux personnes.
       if (salleReunion !== null) {
+        /*
+         * JE PRESENTAIS : LA SALLE DOIT L'APPRENDRE AVANT MON DEPART.
+         *
+         * La capture, elle, s'arrete toute seule — la piste d'ecran vit dans
+         * `localStream`, que `stopMesh` coupe. Ce qui manquait, c'est le VERBE :
+         * sans lui, les autres gardent en grand cadre l'ecran de quelqu'un qui
+         * n'est plus la, sur son dernier cadre fige.
+         *
+         * On ne s'en remet pas au serveur, qui eteint pourtant le partage de
+         * lui-meme quand un presentateur quitte le salon : ce verbe-la lui est
+         * posterieur, et l'annonce explicite ne coute qu'une trame, deja
+         * idempotente chez ceux qui la recoivent deux fois.
+         *
+         * Rien n'est restaure ici — ni camera, ni bouton : l'appel s'acheve, et
+         * `clearCall` remet tout l'etat a neuf juste apres.
+         */
+        if (jePresentais) sendMeetingScreen(salleReunion, false)
         // Une reunion se quitte : elle continue sans nous. La terminer
         // reviendrait a la fermer pour tout le monde, ce que seul
         // l'organisateur peut faire, et depuis la liste des reunions.
@@ -2095,8 +2289,18 @@ export async function hangUp(): Promise<void> {
 
 /** Coupe/retablit le micro (pistes audio locales). */
 export function toggleMicrophone(): boolean {
+  const pistes = localStream?.getAudioTracks() ?? []
+  /*
+   * SANS PISTE, LE BOUTON NE COMMANDE RIEN — il ne doit donc pas bouger.
+   *
+   * En ecoute seule, la bascule affichait un micro coupe puis rouvert sur un
+   * micro qui n'existe pas : le second clic laissait croire qu'on venait de se
+   * rendre audible. On renvoie l'etat courant — faux — et le bandeau de la salle
+   * reste la seule chose qui parle du micro, avec son bouton de reprise.
+   */
+  if (pistes.length === 0) return state.micOn
   const next = !state.micOn
-  localStream?.getAudioTracks().forEach((track) => {
+  pistes.forEach((track) => {
     track.enabled = next
   })
   setState({ micOn: next })
@@ -2139,6 +2343,101 @@ async function retirerLaPisteVideo(): Promise<void> {
     setState({ localStream })
   }
   await Promise.all([...peers.values()].map((peer) => peer.replaceVideoTrack(null)))
+}
+
+/**
+ * Reprend le media refuse a l'entree, SANS quitter la salle.
+ *
+ * Le pendant de l'ecoute seule : on est entre sans micro, l'autorisation est
+ * accordee en cours de reunion, et les connexions existent deja — negociees en
+ * reception seule. Il ne s'agit donc pas de remplacer une piste (le mecanisme du
+ * changement de camera et du partage d'ecran) mais d'en AJOUTER une la ou il n'y
+ * en avait pas, ce qui change le sens d'une ligne media et impose une
+ * renegociation par pair. Voir `PeerSession.ajouterPisteLocale` et
+ * `PeerSession.renegocier`.
+ *
+ * Ce que ca remplace : ressortir de la salle pour y rentrer. C'est ce que fait
+ * encore le bouton « Reessayer » de l'ecran de reunion — il rappelle
+ * `joinMeetingRoom`, qui raccroche tout et refait les connexions une a une. Ca
+ * marche, mais tout le monde voit le revenant sortir et rentrer.
+ *
+ * Ce qui manque se lit sur les PISTES, jamais sur `mediaManquant` : le drapeau
+ * dit ce qui manquait a l'entree, les pistes disent ce qu'on a maintenant.
+ *
+ * Renvoie ce qui manque ENCORE, « aucun » quand tout est revenu.
+ */
+export async function reprendreLeMediaLocal(): Promise<CallManagerState["mediaManquant"]> {
+  if (!state.activeCallId) return state.mediaManquant
+  const veutVideo = state.callType === "video"
+  const aAudio = () => (localStream?.getAudioTracks().length ?? 0) > 0
+  const aVideo = () => (localStream?.getVideoTracks().length ?? 0) > 0
+
+  if (!aAudio() || (veutVideo && !aVideo())) {
+    // Cascade identique a celle de l'entree : tout, puis le micro seul. On ne
+    // redemande jamais ce qu'on a deja — rouvrir un objectif deja ouvert echoue
+    // sur la plupart des telephones.
+    const tentatives: MediaStreamConstraints[] = []
+    if (!aAudio()) {
+      if (veutVideo && !aVideo()) tentatives.push({ audio: true, video: true })
+      tentatives.push({ audio: true, video: false })
+    } else {
+      tentatives.push({ audio: false, video: true })
+    }
+    for (const contraintes of tentatives) {
+      try {
+        await adopterLesPistes(await navigator.mediaDevices.getUserMedia(contraintes))
+        break
+      } catch {
+        // Toujours refuse, ou peripherique absent : on tente moins, puis rien.
+      }
+    }
+  }
+
+  const manquant = !aAudio() ? "tout" : veutVideo && !aVideo() ? "camera" : "aucun"
+  const patch: Partial<CallManagerState> = { micOn: aAudio() }
+  // Pendant un partage, la piste video locale est l'ECRAN : `camOn` y note
+  // l'intention de camera et ne se deduit pas des pistes. Voir `toggleCamera`.
+  if (!state.partageParMoi) patch.camOn = aVideo()
+  // `mediaManquant` ne vaut que pour une reunion — hors salle il reste « aucun ».
+  if (salleReunion !== null) patch.mediaManquant = manquant
+  setState(patch)
+  return manquant
+}
+
+/**
+ * Installe des pistes fraiches dans le flux local et les pousse aux pairs.
+ *
+ * Le flux local peut ne pas exister du tout : en ecoute seule il n'y a jamais eu
+ * de `getUserMedia` reussi, donc rien a completer — on le cree.
+ *
+ * Une piste dont la sorte est deja presente est ARRETEE et non ajoutee : deux
+ * pistes audio dans le meme flux n'en feraient pas partir deux, et une camera
+ * ouverte pour rien garderait son temoin allume.
+ */
+async function adopterLesPistes(flux: MediaStream): Promise<void> {
+  const cible = localStream ?? new MediaStream()
+  localStream = cible
+
+  const ajoutees: MediaStreamTrack[] = []
+  for (const piste of flux.getTracks()) {
+    const dejaLa = piste.kind === "audio" ? cible.getAudioTracks() : cible.getVideoTracks()
+    if (dejaLa.length > 0) {
+      piste.stop()
+      continue
+    }
+    cible.addTrack(piste)
+    ajoutees.push(piste)
+  }
+  if (ajoutees.length === 0) return
+  setState({ localStream: cible })
+
+  for (const session of peers.values()) {
+    let aChange = false
+    for (const piste of ajoutees) {
+      if (session.ajouterPisteLocale(piste, cible)) aChange = true
+    }
+    if (aChange) await session.renegocier()
+  }
 }
 
 /**
@@ -2234,7 +2533,12 @@ export function toggleCamera(): boolean {
     setState({ camOn: next })
     return next
   }
-  localStream?.getVideoTracks().forEach((track) => {
+  const pistes = localStream?.getVideoTracks() ?? []
+  // Meme raison que pour le micro : sans piste video, il n'y a aucune camera a
+  // rallumer, et un bouton qui s'allume promet une image qui ne partira jamais.
+  // Cas courant depuis qu'on entre en reunion video sans webcam.
+  if (pistes.length === 0) return state.camOn
+  pistes.forEach((track) => {
     track.enabled = next
   })
   setState({ camOn: next })
@@ -2261,6 +2565,19 @@ interface EtatCameraAvantPartage {
 
 let pisteEcran: MediaStreamTrack | null = null
 let cameraAvantPartage: EtatCameraAvantPartage | null = null
+
+/**
+ * L'installation de la piste d'ecran est-elle en cours ?
+ *
+ * Installer, c'est substituer la piste chez CHAQUE pair, donc autant d'allers-
+ * retours qu'il y a de participants. Un arret demande pendant ce temps ferait
+ * courir deux substitutions en parallele — l'ecran qui s'installe et la camera
+ * qu'on rend — dont l'ordre d'arrivee chez les pairs n'est garanti par rien :
+ * l'ecran mort peut gagner et rester fige chez tout le monde. On met donc
+ * l'arret en attente, et `demarrerPartageEcran` l'honore des qu'il a fini.
+ */
+let installationEcranEnCours = false
+let arretEcranDemandePendantInstallation = false
 
 /**
  * Ce navigateur sait-il capturer un ecran ?
@@ -2317,6 +2634,41 @@ export async function demarrerPartageEcran(): Promise<void> {
     return
   }
 
+  /*
+   * L'INTENTION SE POSE AVANT LE TRAVAIL, PAS APRES.
+   *
+   * `partageParMoi` etait pose une fois les pistes substituees chez tous les
+   * pairs. Entre le clic et cet instant — la fenetre de choix de l'ecran, puis
+   * autant de `replaceTrack` qu'il y a de participants — les DEUX gardes qui
+   * protegent le partage lisaient encore « faux », et laissaient passer :
+   *
+   *  - un second demarrage repassait la garde d'entree : deux fenetres de
+   *    choix, et la seconde memorisation de camera photographiait la piste
+   *    d'ECRAN installee par la premiere. La camera d'origine etait perdue, et
+   *    le retour rouvrait potentiellement un autre objectif ;
+   *  - un `ended` emis dans la fenetre etait AVALE : l'ecouteur appelait
+   *    `arreterPartageEcran`, qui sortait aussitot, puis `partageParMoi`
+   *    passait a vrai. Bouton enfonce sur une piste deja morte, annonce
+   *    `partage:true` envoyee quand meme, camera jamais rendue, et les autres
+   *    figes sur le dernier cadre.
+   *
+   * On pose donc l'intention en premier, et `annulerIntentionDePartage` la
+   * retire a chaque sortie qui n'aboutit pas.
+   */
+  setState({ partageParMoi: true })
+
+  /*
+   * La camera est notee AVANT d'ouvrir la fenetre de choix : c'est le dernier
+   * instant ou la piste video locale est a coup sur la camera. La noter apres
+   * ne redeviendrait exact que parce que la garde ci-dessus interdit desormais
+   * un second demarrage — mieux vaut ne pas dependre de cela.
+   *
+   * C'est aussi ce qui rend un arret demande PENDANT le choix inoffensif :
+   * sans cette memoire, `arreterPartageEcran` conclurait « rien a rendre » et
+   * couperait une camera qui n'avait jamais ete remplacee.
+   */
+  cameraAvantPartage = memoriserCamera()
+
   let flux: MediaStream
   try {
     // `audio: false` : le son d'un onglet partirait dans une piste separee que
@@ -2328,22 +2680,31 @@ export async function demarrerPartageEcran(): Promise<void> {
     // refus, et faire surgir un toast alarmant a qui vient de changer d'avis
     // serait pire que le silence. La trace reste en console pour les autres cas.
     console.warn("[CallManager] capture d'ecran non obtenue :", err)
+    annulerIntentionDePartage()
     return
   }
 
   const piste = flux.getVideoTracks()[0]
   if (!piste) {
     flux.getTracks().forEach((t) => t.stop())
+    annulerIntentionDePartage()
     return
   }
   // Le choix a pu prendre plusieurs secondes : l'appel peut s'etre termine
   // entre-temps. Sans ce controle on installerait une piste dans un flux mort.
   if (!state.activeCallId || !localStream) {
     flux.getTracks().forEach((t) => t.stop())
+    annulerIntentionDePartage()
+    return
+  }
+  // L'intention n'est plus la notre : un arret est passe pendant que la fenetre
+  // de choix etait ouverte, et il a deja tout remis en place. Installer cet
+  // ecran maintenant le ferait revenir sans que personne ne l'ait redemande.
+  if (!state.partageParMoi) {
+    flux.getTracks().forEach((t) => t.stop())
     return
   }
 
-  cameraAvantPartage = memoriserCamera()
   pisteEcran = piste
 
   /*
@@ -2365,8 +2726,36 @@ export async function demarrerPartageEcran(): Promise<void> {
 
   // `true` et non `state.camOn` : c'est l'ecran qui doit emettre, meme — et
   // surtout — quand la camera etait coupee.
-  await appliquerPisteVideo(piste, true)
-  setState({ partageParMoi: true })
+  installationEcranEnCours = true
+  arretEcranDemandePendantInstallation = false
+  try {
+    await appliquerPisteVideo(piste, true)
+  } finally {
+    installationEcranEnCours = false
+  }
+
+  /*
+   * ARRET SURVENU PENDANT L'INSTALLATION.
+   *
+   * Le cas concret : le bandeau « Arreter le partage » du navigateur est
+   * clique avant que la piste ait fini de s'installer chez tous les pairs.
+   * `arreterPartageEcran` a alors mis sa demande en attente plutot que de
+   * croiser deux substitutions de piste ; c'est ici qu'on l'honore.
+   *
+   * `readyState` est relu en plus du drapeau : une piste peut mourir sans que
+   * `ended` soit encore parvenu jusqu'a nous, et l'annoncer serait promettre un
+   * ecran deja eteint.
+   *
+   * Rien n'est annonce a la salle dans ce cas — ni `true`, qui n'a jamais ete
+   * vrai, ni un `false` qui l'annulerait : `arreterPartageEcran` s'en charge, et
+   * son annonce reste sans effet chez des participants a qui aucun partage
+   * n'avait ete declare.
+   */
+  if (arretEcranDemandePendantInstallation || piste.readyState === "ended") {
+    arretEcranDemandePendantInstallation = false
+    await arreterPartageEcran()
+    return
+  }
 
   /*
    * L'annonce APRES la piste : elle allume le plein ecran chez les autres, et
@@ -2388,12 +2777,29 @@ export async function demarrerPartageEcran(): Promise<void> {
  */
 export async function arreterPartageEcran(): Promise<void> {
   if (!state.partageParMoi) return
+  // Installation en cours : la demande attend son tour. Voir
+  // `installationEcranEnCours` — deux substitutions de piste menees de front
+  // peuvent se croiser, et l'ecran mort arriver en dernier chez les pairs.
+  if (installationEcranEnCours) {
+    arretEcranDemandePendantInstallation = true
+    return
+  }
 
   const avant = cameraAvantPartage
   const piste = pisteEcran
   cameraAvantPartage = null
   pisteEcran = null
   setState({ partageParMoi: false })
+
+  // Aucune piste d'ecran n'a jamais ete installee : l'arret est arrive pendant
+  // la fenetre de choix du navigateur, alors que l'intention etait deja posee.
+  // Rien n'a donc ete annonce a la salle, et la camera n'a pas ete remplacee —
+  // elle tourne toujours, la rouvrir la ferait clignoter pour rien. Reposer le
+  // bouton, tel que `toggleCamera` a pu le noter entre-temps, suffit.
+  if (!piste) {
+    if (avant) reposerBoutonCamera(avant.camOn)
+    return
+  }
 
   // Prevenir la salle AVANT de rendre la camera : les autres referment le plein
   // ecran pendant que la piste change, au lieu d'afficher un visage en grand a
@@ -2402,7 +2808,7 @@ export async function arreterPartageEcran(): Promise<void> {
 
   // La capture est arretee des maintenant : le bandeau du navigateur doit
   // disparaitre au clic, pas a la fin de la reouverture de la camera.
-  piste?.stop()
+  piste.stop()
 
   if (!localStream) return
   if (!avant?.contraintes) {
@@ -2428,6 +2834,38 @@ export async function arreterPartageEcran(): Promise<void> {
   }
   // Camera irrecuperable : mieux vaut ne plus rien emettre qu'un ecran fige.
   await retirerLaPisteVideo()
+}
+
+/**
+ * Repose le bouton camera sur les pistes locales.
+ *
+ * Necessaire des que l'intention de partage a ete posee sans qu'aucun ecran ne
+ * soit finalement installe : pendant cette fenetre, `toggleCamera` se contente
+ * de NOTER le bouton dans `cameraAvantPartage` — couper la piste video y
+ * reviendrait a eteindre la presentation. Si le partage n'a pas lieu, la camera
+ * tourne toujours et personne ne lui a transmis le dernier clic.
+ */
+function reposerBoutonCamera(camOn: boolean): void {
+  localStream?.getVideoTracks().forEach((track) => {
+    track.enabled = camOn
+  })
+  if (state.camOn !== camOn) setState({ camOn })
+}
+
+/**
+ * Retire l'intention de partage posee avant le travail, sans rien annoncer.
+ *
+ * Sortie sans partage : refus de la fenetre de choix, appel termine pendant le
+ * choix, ou capture rendue sans piste video. Rien n'a ete dit a la salle et
+ * aucune piste n'a bouge — il n'y a donc que ce qu'on avait pose a defaire.
+ */
+function annulerIntentionDePartage(): void {
+  const avant = cameraAvantPartage
+  cameraAvantPartage = null
+  pisteEcran = null
+  arretEcranDemandePendantInstallation = false
+  setState({ partageParMoi: false })
+  if (avant) reposerBoutonCamera(avant.camOn)
 }
 
 /**

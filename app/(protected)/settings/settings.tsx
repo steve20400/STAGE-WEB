@@ -3520,10 +3520,10 @@ export default function SettingsPage() {
                     value: t("set_about_project_value"),
                     interne: false,
                   },
-                  { label: t("set_about_supervisor"), value: "Dr. NANA BINKEU", interne: false },
+                  { label: t("set_about_supervisor"), value: "Alanya Communication", interne: false },
                   {
                     label: t("set_about_developer"),
-                    value: "STEVE AUREL MANFO",
+                    value: "TEAM XFILE",
                     interne: false,
                   },
                 ]
