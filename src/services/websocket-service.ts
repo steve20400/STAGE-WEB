@@ -585,6 +585,11 @@ const CALL_EVENT_TYPES = new Set([
   // `ivr_play` ici aurait donne un menu vocal ou aucune touche ne joue rien,
   // impossible a diagnostiquer depuis le code du standard.
   "ivr_play",
+  // ⚠️ Plainte vocale sur la touche 0 (20/08/2026). Meme piege que `ivr_play`
+  // ci-dessus : sans cette ligne, l'appelant appuierait sur 0, le serveur
+  // ouvrirait bien la session d'enregistrement de son cote, et le web ne
+  // montrerait RIEN — sans la moindre erreur, ni ici ni dans la console.
+  "ivr_record",
   "ivr_error",
   "queue_rating_available",
 ])

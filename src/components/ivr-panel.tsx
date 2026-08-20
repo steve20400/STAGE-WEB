@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { sendIvrChoice, type IvrSession } from "../services/call-manager"
 import { useTranslation } from "../i18n"
+import { PlainteRecorder } from "./plainte-recorder"
 
 /** Delai au-dela duquel un appui devient un appui MAINTENU (revelation). */
 const DELAI_APPUI_LONG_MS = 450
@@ -41,9 +42,33 @@ export function IvrPanel({ session }: { session: IvrSession }) {
     }
   }, [])
 
+  /**
+   * L'option d'une touche, y compris celle que le SERVEUR ne renvoie pas.
+   *
+   * 🔴 LA TOUCHE 0 D'UN CENTRE VOCAL N'EST PAS DANS `options`. Elle ne vient pas
+   * de `center_audio` : le serveur la RESERVE a l'enregistrement d'une plainte,
+   * quoi que porte la table. Sans cette synthese elle serait la seule touche
+   * sans anneau ni libelle — « aucun service sur cette touche » — alors qu'elle
+   * mene a la seule action qui ECRIVE quelque chose. Defaut signale sur mobile
+   * le 20/08/2026, corrige ici en meme temps pour que les deux clients montrent
+   * la meme chose.
+   *
+   * ⚠️ Fabriquee ICI et NON ajoutee a `session.options` : ces options sont ce
+   * que le serveur a envoye, et y glisser une entree maison ferait mentir tout
+   * ce qui les compte ou les parcourt.
+   */
   const optionPour = useCallback(
-    (digit: number) => session.options.find((o) => o.digit === digit) ?? null,
-    [session.options]
+    (digit: number) => {
+      const recue = session.options.find((o) => o.digit === digit)
+      if (recue) return recue
+      if (digit === 0 && session.vocal) {
+        // `disponible: true` : il n'y a aucun agent a trouver derriere, c'est
+        // le navigateur lui-meme qui enregistre.
+        return { digit: 0, label: "Service plainte", nomService: "Service plainte", disponible: true }
+      }
+      return null
+    },
+    [session.options, session.vocal]
   )
 
   const arreteMinuteur = () => {
@@ -98,7 +123,12 @@ export function IvrPanel({ session }: { session: IvrSession }) {
 
   return (
     <div style={{ width: "100%", maxWidth: 320, margin: "16px auto 0" }}>
-      {session.message && (
+      {/* Le lecteur de plainte prend la place du message, il ne s'ajoute pas :
+          les deux ne peuvent pas coexister — `ivr_record` efface le message en
+          posant l'etape — et l'empiler pousserait le pave vers le bas. */}
+      {session.step === "enregistrement" && <PlainteRecorder session={session} />}
+
+      {session.step !== "enregistrement" && session.message && (
         <div
           style={{
             padding: "10px 14px",

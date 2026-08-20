@@ -78,7 +78,7 @@ export interface IncomingCallInfo {
  * `attente` n'existe que pour un centre d'APPELS (on attend un agent),
  * `lecture` que pour un centre VOCAL (un son tourne en boucle).
  */
-export type IvrStep = "menu" | "attente" | "lecture"
+export type IvrStep = "menu" | "attente" | "lecture" | "enregistrement"
 
 /**
  * Une touche du menu. `disponible` vient du serveur : un service peut etre
@@ -134,6 +134,22 @@ export interface IvrSession {
   titreEnLecture: string | null
   /** La touche dont le son joue, pour la mettre en evidence sur le pave. */
   toucheEnLecture: number | null
+  /**
+   * Le bip a jouer AVANT de demarrer l'enregistrement d'une plainte, ou nul.
+   *
+   * ⚠️ Nul est un cas NORMAL, pas une panne : la variable d'environnement du
+   * serveur peut ne pas etre renseignee, ou designer un dossier. On demarre
+   * alors sans annonce plutot que de ne pas demarrer.
+   */
+  bipEnregistrementUrl: string | null
+  /**
+   * Plafond de duree d'une plainte, donne par le serveur avec `ivr_record`.
+   *
+   * Recu et non code en dur : la borne pourra changer sans redeployer le web,
+   * comme la regle de boucle d'`ivr_play`. Le defaut ne sert qu'au cas ou un
+   * serveur plus ancien l'omettrait.
+   */
+  plainteMaxMs: number
   /** Libelle du service choisi, pendant que l'agent sonne. */
   serviceChoisi: string | null
   /**
@@ -966,7 +982,15 @@ export function sendIvrChoice(digit: number) {
  */
 export function sendIvrBackToMenu() {
   const session = state.ivr
-  if (!session || !session.vocal || session.step !== "lecture") return
+  if (!session || !session.vocal) return
+  // ⚠️ `enregistrement` DOIT passer ici aussi. La garde ne laissait entrer que
+  // `lecture` : pendant qu'un appelant dicte une plainte, le bouton « Accueil »
+  // etait donc INERTE, et il ne lui restait que le raccrochage pour sortir.
+  //
+  // Le mobile portait le MEME defaut, corrige le 20/08/2026, et le serveur
+  // aussi avant lui. Une regle partagee entre TROIS bouts se corrige aux trois
+  // — c'est la quatrieme fois que ce projet paie cet oubli.
+  if (session.step !== "lecture" && session.step !== "enregistrement") return
   sendIvrBack(session.callId)
 }
 
@@ -1504,6 +1528,8 @@ async function handleServerEvent(event: CallServerEvent) {
       step: "menu",
       titreEnLecture: null,
       toucheEnLecture: null,
+      bipEnregistrementUrl: null,
+      plainteMaxMs: 3 * 60 * 1000,
       serviceChoisi: null,
       nomServiceChoisi: null,
       message: null,
@@ -1521,6 +1547,39 @@ async function handleServerEvent(event: CallServerEvent) {
     // centre vocal dont l'accueil s'arrete au bout d'un tour laisserait un
     // ecran muet sans rien pour l'expliquer.
     if (session.promptUrl) playIvrAudio(session.promptUrl, event.promptLoop !== false)
+    return
+  }
+
+  if (event.type === "ivr_record") {
+    /*
+     * Touche 0 d'un centre vocal : l'appelant va dicter une plainte.
+     *
+     * ⚠️ ON NE DEMARRE PAS LE MICRO ICI. Le serveur donne le depart ; c'est le
+     * composant d'enregistrement qui enchaine, bip d'abord et micro ensuite,
+     * parce que lui seul sait quand la lecture se termine. Le serveur ne
+     * connait ni la duree du fichier ni le temps de mise en cache.
+     *
+     * Meme decoupage que sur mobile, volontairement : les deux clients doivent
+     * se comporter pareil devant le meme evenement.
+     */
+    const session = state.ivr
+    if (!session || String(event.callId ?? "") !== session.callId) return
+    const borne = typeof event.maxMs === "number" ? event.maxMs : 0
+    setState({
+      ivr: {
+        ...session,
+        step: "enregistrement",
+        toucheEnLecture: null,
+        titreEnLecture: null,
+        bipEnregistrementUrl: (event.bipUrl as string | null) ?? null,
+        plainteMaxMs: borne > 0 ? borne : session.plainteMaxMs,
+        message: null,
+        envoiEnCours: false,
+      },
+    })
+    // Coupe l'invite d'accueil, qui tourne en boucle : sans cela elle
+    // couvrirait le bip puis la voix de l'appelant.
+    stopIvrAudio()
     return
   }
 
