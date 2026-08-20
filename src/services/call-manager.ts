@@ -521,21 +521,43 @@ class PeerSession {
    * arrete dans une reunion AUDIO, ou il n'y avait aucune camera a rendre.
    * Sans elle, le dernier cadre de l'ecran resterait fige chez les autres.
    */
-  async replaceVideoTrack(track: MediaStreamTrack | null) {
+  /**
+   * Rend VRAI quand la connexion doit etre renegociee pour que la piste parte.
+   *
+   * `replaceTrack` reussit meme sur un transceiver en RECEPTION SEULE, et ne
+   * transmet alors rien. C'est le cas de qui rejoint une reunion video sans
+   * camera : la ligne video a ete negociee en `recvonly`, et un partage d'ecran
+   * lance depuis ce poste s'annoncait a toute la salle sans jamais y arriver —
+   * chacun mettait le presentateur en vedette devant une vignette vide pendant
+   * que lui voyait son propre ecran et se croyait en presentation.
+   *
+   * Changer la direction ne suffit pas : elle ne prend effet qu'a la
+   * renegociation, que l'appelant declenche une fois toutes les pistes posees.
+   */
+  async replaceVideoTrack(track: MediaStreamTrack | null): Promise<boolean> {
     const pc = this.pc
-    if (!pc) return
+    if (!pc) return false
     // `sender.track` peut etre nul — piste retiree, ou emetteur pas encore
     // associe. On retombe alors sur le transceiver video, sinon le
     // correspondant reste sur l'ancienne image apres un changement de camera.
+    const transceiver = pc
+      .getTransceivers()
+      .find((item) => item.sender.track?.kind === "video" || item.receiver.track?.kind === "video")
     const sender =
-      pc.getSenders().find((item) => item.track?.kind === "video") ??
-      pc.getTransceivers().find((item) => item.receiver.track?.kind === "video")?.sender
-    if (!sender) return
+      pc.getSenders().find((item) => item.track?.kind === "video") ?? transceiver?.sender
+    if (!sender) return false
     try {
       await sender.replaceTrack(track)
     } catch (err) {
       console.warn(`[webrtc] remplacement de la piste video refuse (${this.peerId}) :`, err)
+      return false
     }
+    if (!track || !transceiver) return false
+    if (transceiver.direction === "recvonly" || transceiver.direction === "inactive") {
+      transceiver.direction = "sendrecv"
+      return true
+    }
+    return false
   }
 
   close() {
@@ -2329,7 +2351,14 @@ async function appliquerPisteVideo(piste: MediaStreamTrack, activee = state.camO
   }
   localStream.addTrack(piste)
 
-  await Promise.all([...peers.values()].map((peer) => peer.replaceVideoTrack(piste)))
+  // Les pairs dont la ligne video etait en reception seule ont vu leur direction
+  // changer : elle ne prend effet qu'a la renegociation, et sans elle la piste
+  // resterait posee sans jamais partir.
+  const sessions = [...peers.values()]
+  const aRenegocier = await Promise.all(sessions.map((peer) => peer.replaceVideoTrack(piste)))
+  await Promise.all(
+    sessions.filter((_, rang) => aRenegocier[rang]).map((peer) => peer.renegocier())
+  )
   setState({ localStream })
 }
 
