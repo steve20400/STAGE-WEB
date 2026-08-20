@@ -3494,6 +3494,10 @@ export default function SettingsPage() {
             <>
               <div className="s-page-title">{t("settings_about")}</div>
               <p className="s-page-sub">{t("about_sub")}</p>
+              {/* RIEN pour un compte ordinaire : la page « A propos » se resume alors
+                  a son titre. Une carte vide aurait garde son cadre a l'ecran, ce
+                  qui se lit comme un defaut d'affichage plutot que comme un choix. */}
+              {compteInterne && (
               <div className="s-card">
                 {[
                   { label: t("set_about_app"), value: "Alanya", interne: false },
@@ -3509,12 +3513,12 @@ export default function SettingsPage() {
                     // embarque les variables VITE_TURN_* (necessaires pour les
                     // appels entre reseaux differents).
                     value: isTurnConfigured() ? t("set_turn_configured") : t("set_turn_missing"),
-                    interne: true,
+                    interne: false,
                   },
                   {
                     label: t("set_about_project"),
                     value: t("set_about_project_value"),
-                    interne: true,
+                    interne: false,
                   },
                   { label: t("set_about_supervisor"), value: "Dr. NANA BINKEU", interne: false },
                   {
@@ -3552,6 +3556,7 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+              )}
               {/* La pile technique et le diagnostic temps reel racontent comment le
                   service est fabrique et deploye : versions, hebergeur, transport,
                   etat des relais. C'est utile a l'equipe et sans objet pour un
