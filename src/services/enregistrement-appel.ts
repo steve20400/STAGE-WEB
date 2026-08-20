@@ -58,7 +58,14 @@ class EnregistreurPiste {
       })
     }
     if (this.morceaux.length === 0) return null
-    return new Blob(this.morceaux, { type: this.type || "audio/webm" })
+    // 🔴 TYPE SANS PARAMÈTRE. Le navigateur produit « audio/webm;codecs=opus »,
+    // mais la liste blanche du serveur (`isAllowedMime`) fait un match EXACT et
+    // rejette le « ;codecs=… » par un 415 (constaté le 20/08/2026 : Firefox, 4
+    // essais tous en 415). On ne garde que le conteneur — accepté tel quel — et
+    // ffmpeg autodétecte le codec au mélange, l'extension et les paramètres ne
+    // comptent pas pour lui.
+    const type = (this.rec.mimeType || this.type || "audio/webm").split(";")[0].trim()
+    return new Blob(this.morceaux, { type })
   }
 }
 
