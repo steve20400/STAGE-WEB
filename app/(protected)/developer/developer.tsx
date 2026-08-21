@@ -876,7 +876,36 @@ curl -X POST https://alanyavox.com/api/v1/messages \\
               </div>
 
               <div>
-                <h4 className="dev-doc-title">3. Position GPS</h4>
+                <h4 className="dev-doc-title">3. Boutons de réponse rapide</h4>
+                <div className="dev-code-block">
+{`curl -X POST https://alanyavox.com/api/v1/messages \\
+  -H "X-Api-Key: ${activeRawKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "destinataire": "12345678",
+    "texte": "Veux-tu manger ?",
+    "options": ["OUI", "NON"]
+  }'
+
+// L'utilisateur voit la question, avec deux pastilles cliquables
+// dessous — sur mobile comme sur le web. Un clic renvoie le
+// libellé du bouton comme message texte ordinaire.
+
+// 1 à 10 options (2 ou 3 se lisent bien mieux), 24 caractères
+// chacune, sans crochet. Pas sur un CONTACT ni une LOCATION,
+// dont le contenu est du JSON.
+
+// ⚠️ Tout crochet dans un texte devient un bouton, même sans
+// "options" : « commande [12345] prête » affiche un bouton 12345
+// ET retire le numéro de la phrase.
+
+// 🔴 La réponse ne vous revient PAS par webhook : il n'y a pas
+// encore de notification de message entrant.`}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="dev-doc-title">4. Position GPS</h4>
                 <div className="dev-code-block">
 {`// LOCATION porte sa charge en JSON dans "texte".
 curl -X POST https://alanyavox.com/api/v1/messages \\
