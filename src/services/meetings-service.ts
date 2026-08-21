@@ -179,7 +179,12 @@ export async function createMeeting(donnees: NouvelleReunion): Promise<number> {
 export async function inviterAReunion(id: number, numeros: string[]): Promise<void> {
   await apiRequest(`/api/meetings/${id}/participants`, {
     method: "POST",
-    body: { participantNumbers: numeros },
+    // `publicNumbers` et non `participantNumbers` : c'est le nom que porte le
+    // schema de validation du serveur. L'autre nom faisait rejeter le corps
+    // AVANT toute lecture, donc echouer TOUTE invitation par numero — pas
+    // seulement celle d'un exclu qu'on voulait rappeler, cas ou le defaut a fini
+    // par se voir parce qu'on y insiste.
+    body: { publicNumbers: numeros },
   })
 }
 
