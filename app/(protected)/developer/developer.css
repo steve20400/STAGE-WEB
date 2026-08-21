@@ -192,6 +192,16 @@
   font-size: 14px;
 }
 
+/* Titre d'un exemple, au-dessus d'un .dev-code-block. Les anciens exemples
+   portaient ces valeurs en style en ligne, recopiées à chaque bloc — donc
+   déjà divergentes entre deux d'entre eux. */
+.dev-doc-title {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dev-accent);
+}
+
 .dev-code-block {
   background-color: var(--dev-bg-page);
   padding: 18px;

@@ -13,10 +13,19 @@ interface ApiKeyItem {
   createdAt: string
 }
 
+/*
+ * 🔴 PLUS DE SOLDE NI DE BAC À SABLE (21/08/2026).
+ *
+ * `balanceCredits` et `holdCredits` ont disparu : l'API Alanya n'est plus
+ * facturée. Elle sert la plateforme de l'équipe, qui porte son propre mécanisme
+ * de paiement de son côté ; nous livrons un moyen de communiquer avec les
+ * utilisateurs, pas un produit à crédits. La route
+ * `POST /api/developer/billing/sandbox` a été SUPPRIMÉE du backend — tout ce
+ * qui l'appelait ici part avec elle, plutôt que de rester à afficher un solde
+ * qui n'existe plus.
+ */
 interface DeveloperData {
   id: string
-  balanceCredits: string
-  holdCredits: string
 }
 
 interface WorkspaceItem {
@@ -172,10 +181,17 @@ export default function DeveloperPage() {
   const [keyType, setKeyType] = useState<"SANDBOX" | "LIVE">("SANDBOX")
   const [newWsName, setNewWsName] = useState("")
   const [showNewWsModal, setShowNewWsModal] = useState(false)
-  const [docLang, setDocLang] = useState<"curl" | "node" | "python" | "flutter">("curl")
-  const [docType, setDocType] = useState<"text" | "media" | "location" | "interactive" | "otp" | "webhook">("text")
+  /*
+   * ⚠️ Les onglets `location` et `interactive` ont disparu le 21/08/2026.
+   *
+   * `interactive` et `template` étaient des notions WhatsApp : l'API les
+   * aplatissait en texte (« [Titre] » concaténé), donc elle documentait des
+   * boutons qu'aucun client Alanya n'a jamais affichés. `location` n'est pas un
+   * endpoint mais un TYPE de message parmi d'autres — il est documenté avec
+   * eux, où il se trouve réellement.
+   */
+  const [docType, setDocType] = useState<"message" | "media" | "verification" | "webhook">("message")
   const [generatedRawKey, setGeneratedRawKey] = useState<string | null>(null)
-  const [rechargeMsg, setRechargeMsg] = useState<string | null>(null)
   const [webhookMsg, setWebhookMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -199,11 +215,11 @@ export default function DeveloperPage() {
         setDeveloper(devObj)
         setApiKeys(keysList)
       } else {
-        setDeveloper({ id: "default", balanceCredits: "1000", holdCredits: "0" })
+        setDeveloper({ id: "default" })
         setApiKeys([])
       }
     } catch {
-      setDeveloper({ id: "default", balanceCredits: "1000", holdCredits: "0" })
+      setDeveloper({ id: "default" })
     } finally {
       setLoading(false)
     }
@@ -332,28 +348,6 @@ export default function DeveloperPage() {
     }
   }
 
-  const handleSandboxRecharge = async (pack: "STARTER" | "PRO" | "ENTERPRISE") => {
-    try {
-      setRechargeMsg(null)
-      const data = (await apiRequest("/api/developer/billing/sandbox", {
-        method: "POST",
-        body: { pack },
-      })) as any
-
-      const message = data?.data?.message || data?.message
-      if (message) {
-        setRechargeMsg(message)
-        fetchDeveloperData()
-      } else {
-        alert(data?.error || "Erreur de recharge Sandbox")
-      }
-    } catch (err: any) {
-      alert(err?.message || "Erreur de communication")
-    }
-  }
-
-  const balance = Number(developer?.balanceCredits || 1000)
-  const hold = Number(developer?.holdCredits || 0)
   const activeKeysCount = apiKeys.filter((k) => k.isActive).length
   const activeRawKey = apiKeys.find((k) => k.isActive)?.prefix ? `${apiKeys.find((k) => k.isActive)?.prefix}_...` : "ak_test_votre_cle_ici"
 
@@ -367,7 +361,6 @@ export default function DeveloperPage() {
             {activeTab === "keys" && "Gestion des Clés d'API"}
             {activeTab === "logs" && "Journal des Requêtes (Logs API)"}
             {activeTab === "webhooks" && "Webhooks & Callbacks Alanya API"}
-            {activeTab === "sandbox" && "Recharge Sandbox Gratuit"}
             {activeTab === "docs" && "Documentation & Spécification Alanya API"}
           </h1>
           <p className="dev-main-subtitle">Spécification officielle Alanya API Graph v1</p>
@@ -448,7 +441,6 @@ export default function DeveloperPage() {
       )}
 
       {error && <div style={{ color: "#ef4444", fontSize: "14px", fontWeight: "600", marginBottom: "12px" }}>{error}</div>}
-      {rechargeMsg && <div style={{ color: "#10b981", fontSize: "14px", fontWeight: "600", marginBottom: "12px" }}>{rechargeMsg}</div>}
       {webhookMsg && <div style={{ color: "#10b981", fontSize: "14px", fontWeight: "600", marginBottom: "12px" }}>{webhookMsg}</div>}
 
       {/* BANNIÈRE CLÉ NOUVELLEMENT GÉNÉRÉE */}
@@ -485,24 +477,6 @@ export default function DeveloperPage() {
 
       {/* GRILLE DE CARTES MÉTRIQUES AVEC LATENCE ET TAUX DE SUCCÈS */}
       <div className="dev-metrics-grid">
-        <div className="dev-metric-card">
-          <div className="dev-metric-header">
-            <div className="dev-metric-icon-box" style={{ background: "rgba(14, 165, 233, 0.15)", color: "#38bdf8" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="5" width="20" height="14" rx="2" />
-                <line x1="2" y1="10" x2="22" y2="10" />
-              </svg>
-            </div>
-            <div className="dev-metric-info">
-              <span className="dev-metric-label">SOLDE DISPONIBLE</span>
-              <span className="dev-metric-value">{balance.toLocaleString()} ALC</span>
-            </div>
-          </div>
-          <button className="dev-metric-btn" onClick={() => setActiveTab("sandbox")}>
-            Recharger -&gt;
-          </button>
-        </div>
-
         <div className="dev-metric-card">
           <div className="dev-metric-header">
             <div className="dev-metric-icon-box" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981" }}>
@@ -566,8 +540,8 @@ export default function DeveloperPage() {
           <div className="dev-panel-box">
             <h3 className="dev-panel-title">Aperçu du Compte Développeur Alanya</h3>
             <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-              Bienvenue sur votre Console Développeur Alanya. Votre solde actuel de <strong>{balance} crédits</strong>{" "}
-              vous permet d'envoyer des messages texte, des médias, des messages interactifs avec boutons, et des codes d'authentification OTP via l'<strong>Alanya API</strong>.
+              Bienvenue sur votre Console Développeur Alanya. Vos clés vous permettent d'envoyer des messages texte,
+              des médias, des messages interactifs avec boutons, et des codes d'authentification OTP via l'<strong>Alanya API</strong>.
             </p>
           </div>
           <DevLatencyChart logs={logs} />
@@ -820,46 +794,13 @@ export default function DeveloperPage() {
         </div>
       )}
 
-      {/* 5. RECHARGE SANDBOX */}
-      {activeTab === "sandbox" && (
-        <div className="dev-panel-box">
-          <h3 className="dev-panel-title">Recharge Gratuit / Mode Sandbox</h3>
-          <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0" }}>
-            Testez vos fonctionnalités sans frais en créditant instantanément votre compte Sandbox :
-          </p>
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <button
-              className="dev-metric-btn"
-              style={{ background: "var(--dev-accent)", color: "#ffffff", padding: "10px 18px" }}
-              onClick={() => handleSandboxRecharge("STARTER")}
-            >
-              +1 000 Crédits (Starter)
-            </button>
-            <button
-              className="dev-metric-btn"
-              style={{ background: "#0d9488", color: "#ffffff", padding: "10px 18px" }}
-              onClick={() => handleSandboxRecharge("PRO")}
-            >
-              +5 750 Crédits (Pro)
-            </button>
-            <button
-              className="dev-metric-btn"
-              style={{ background: "#7c3aed", color: "#ffffff", padding: "10px 18px" }}
-              onClick={() => handleSandboxRecharge("ENTERPRISE")}
-            >
-              +26 000 Crédits (Enterprise)
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 6. DOCUMENTATION & SPÉCIFICATION ALANYA API */}
+      {/* 5. DOCUMENTATION & SPÉCIFICATION ALANYA API */}
       {activeTab === "docs" && (
         <div className="dev-panel-box">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <h3 className="dev-panel-title" style={{ margin: 0 }}>Documentation Officielle Alanya API</h3>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {(["text", "media", "location", "interactive", "otp", "webhook"] as const).map((type) => (
+              {(["message", "media", "verification", "webhook"] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setDocType(type)}
@@ -873,272 +814,255 @@ export default function DeveloperPage() {
                     textTransform: "uppercase",
                   }}
                 >
-                  {type === "text" && "Message Texte"}
-                  {type === "media" && "Médias & Vocaux"}
-                  {type === "location" && "Localisation GPS"}
-                  {type === "interactive" && "Boutons Interactifs"}
-                  {type === "otp" && "Service OTP 2FA"}
-                  {type === "webhook" && "Format Webhook"}
+                  {type === "message" && "Messages"}
+                  {type === "media" && "Médias"}
+                  {type === "verification" && "Vérifications (OTP / 2FA)"}
+                  {type === "webhook" && "Webhooks"}
                 </button>
               ))}
             </div>
           </div>
 
           <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0" }}>
-            Exemples de requêtes prêts à exécuter pour l'API Alanya (spécification v1) :
+            Quatre routes, gratuites et sans quota de volume. Seule la cadence est plafonnée.
+            Guide complet : <code>docs/2026-08-21-api-v1-integration.md</code>.
           </p>
 
-          {docType === "location" && (
+          {docType === "message" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              {/* Endpoint 1 : Message de Localisation simple */}
               <div>
-                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/>
-                    <circle cx="12" cy="10" r="3"/>
-                  </svg>
-                  1. Localisation GPS Simple (POST /api/v1/messages/send)
-                </h4>
-                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
-                  Transmettez des coordonnées GPS (latitude et longitude avec 2 décimales ou plus). L'application génère automatiquement la mini-carte OpenStreetMap interactive avec marqueur de position.
-                </p>
+                <h4 className="dev-doc-title">1. Message texte (POST /api/v1/messages)</h4>
                 <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
+{`curl -X POST https://alanyavox.com/api/v1/messages \\
+  -H "X-Api-Key: ${activeRawKey}" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
   -d '{
-    "messaging_product": "alanya",
-    "to": "600001",
-    "type": "location",
-    "location": {
-      "latitude": "3.8480",
-      "longitude": "11.5020",
-      "name": "Yaoundé",
-      "address": "Centre-ville, Yaoundé, Cameroun"
-    }
+    "destinataire": "12345678",
+    "type": "TEXT",
+    "texte": "Bonjour depuis Alanya"
+  }'
+
+// 201 Created
+{
+  "id": "3f9a1c2e-…",          // l'identifiant RÉEL du message
+  "statut": "ENVOYE",
+  "destinataire": "12345678",
+  "conversationId": "8c21…",
+  "type": "TEXT",
+  "medias": [],
+  "envoyeA": "2026-08-21T14:02:11.482Z"
+}`}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="dev-doc-title">2. Message avec média</h4>
+                <div className="dev-code-block">
+{`// Téléversez d'abord le fichier (onglet Médias), puis :
+curl -X POST https://alanyavox.com/api/v1/messages \\
+  -H "X-Api-Key: ${activeRawKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "destinataire": "12345678",
+    "type": "IMAGE",
+    "texte": "La légende, facultative",
+    "mediaIds": ["b7d0…-uuid"]
+  }'
+
+// Types : TEXT · IMAGE · VIDEO · AUDIO · FILE · CONTACT · LOCATION
+// Jusqu'à 10 mediaIds. Vous ne pouvez joindre que VOS propres
+// téléversements — sinon 403 MEDIA_FORBIDDEN.`}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="dev-doc-title">3. Position GPS</h4>
+                <div className="dev-code-block">
+{`// LOCATION porte sa charge en JSON dans "texte".
+curl -X POST https://alanyavox.com/api/v1/messages \\
+  -H "X-Api-Key: ${activeRawKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "destinataire": "12345678",
+    "type": "LOCATION",
+    "texte": "{\\"v\\":1,\\"lat\\":3.848,\\"lon\\":11.502,\\"nom\\":\\"Agence Yaoundé\\"}"
   }'`}
                 </div>
               </div>
 
-              {/* Endpoint 2 : Speech Publicitaire / Texte + Localisation */}
               <div>
-                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                  2. Speech Vendeur / Publicité avec Localisation (POST /api/v1/messages/send)
-                </h4>
-                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
-                  Joignez un texte descriptif ou un discours commercial (ex: promotion, annonce vendeur) directement à vos coordonnées GPS. Le texte et la mini-carte interactive s'afficheront ensemble dans la même bulle.
-                </p>
+                <h4 className="dev-doc-title">Les trois refus à traiter</h4>
                 <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
-  -d '{
-    "messaging_product": "alanya",
-    "to": "600001",
-    "type": "text",
-    "text": {
-      "body": "Venez visiter notre boutique au centre-ville ! Promotion spéciale de 20% aujourd’hui sur tous nos articles. (3.8480, 11.5020)"
-    }
-  }'`}
+{`404 RECIPIENT_NOT_FOUND  Le numéro n'a pas de compte Alanya.
+                         Pas d'envoi hors plateforme.
+403 RECIPIENT_BLOCKED    Blocage entre les deux comptes.
+                         Ce n'est pas passager : cessez de réessayer.
+403 MEDIA_FORBIDDEN      mediaId inconnu, ou téléversé par une autre clé.
+422 VALIDATION           Champ absent ou hors bornes. Le détail est
+                         dans error.details.fieldErrors.`}
                 </div>
               </div>
-            </div>
-          )}
-
-          {docType === "text" && (
-            <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
-  -d '{
-    "messaging_product": "alanya",
-    "to": "600001",
-    "type": "text",
-    "text": {
-      "body": "Bonjour depuis Alanya API !"
-    }
-  }'`}
             </div>
           )}
 
           {docType === "media" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              {/* Endpoint 1 : Upload de Média */}
               <div>
-                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                  </svg>
-                  1. Upload de Média & Obtention d'un ID (POST /api/v1/media)
-                </h4>
-                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
-                  Uploadez une image ou un fichier multimédia pour générer un <code>media_id</code> réutilisable dans vos messages.
-                </p>
+                <h4 className="dev-doc-title">Téléverser un fichier (POST /api/v1/media)</h4>
                 <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/media \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
-  -d '{
-    "url": "https://alanyavox.com/assets/sample.png",
-    "mimeType": "image/png"
-  }'`}
+{`// multipart/form-data — un VRAI fichier, pas une URL.
+curl -X POST https://alanyavox.com/api/v1/media \\
+  -H "X-Api-Key: ${activeRawKey}" \\
+  -F "file=@facture.pdf"
+
+// 201 Created
+{
+  "id": "b7d0…-uuid",
+  "url": "/api/media/b7d0…-uuid",
+  "nomFichier": "facture.pdf",
+  "typeMime": "application/pdf",
+  "octets": 48213,
+  "dureeMs": null
+}
+
+// Champ facultatif : durationMs (audio, vidéo).
+// Passez ensuite "id" dans mediaIds de POST /api/v1/messages.`}
                 </div>
               </div>
 
-              {/* Endpoint 2 : Envoi d'Image */}
               <div>
-                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <rect x="3" y="3" width="18" height="18" rx="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21 15 16 10 5 21"/>
-                  </svg>
-                  2. Envoi d'un Message avec Image (POST /api/v1/messages/send)
-                </h4>
-                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
-                  Transmettez une image via son URL HTTPS directe (avec légende optionnelle) ou via son <code>media_id</code>.
-                </p>
+                <h4 className="dev-doc-title">À savoir</h4>
                 <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
-  -d '{
-    "messaging_product": "alanya",
-    "to": "600001",
-    "type": "image",
-    "image": {
-      "link": "https://alanyavox.com/assets/sample.png",
-      "caption": "Voici le visuel d'intégration Alanya"
-    }
-  }'`}
-                </div>
-              </div>
+{`400 INVALID_REQUEST      Vous avez envoyé du JSON. Cette route attend
+                         un multipart avec un champ "file".
+415 MEDIA_TYPE_REJECTED  Type hors liste blanche.
+413 MEDIA_TOO_LARGE      Au-delà du plafond de taille.
+502 STORAGE_UNAVAILABLE  Notre stockage n'a pas répondu. Réessayez.
 
-              {/* Endpoint 3 : Envoi de Note Vocale / Audio */}
-              <div>
-                <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "700", color: "var(--dev-accent)", display: "flex", alignItems: "center", gap: "8px" }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                    <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                    <line x1="12" y1="19" x2="12" y2="23"/>
-                  </svg>
-                  3. Envoi d'une Note Vocale / Audio (POST /api/v1/messages/send)
-                </h4>
-                <p style={{ fontSize: "13px", color: "var(--dev-text-secondary)", margin: "0 0 8px 0" }}>
-                  Envoie un fichier audio (.mp3, .aac, .ogg) directement jouable dans le lecteur de la bulle de discussion.
-                </p>
-                <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
-  -d '{
-    "messaging_product": "alanya",
-    "to": "600001",
-    "type": "audio",
-    "audio": {
-      "link": "https://alanyavox.com/assets/sample_vocal.mp3"
-    }
-  }'`}
+L'url rendue est proxyfiée : c'est elle qui porte le contrôle
+d'accès. Ne construisez pas d'URL de stockage vous-même.`}
                 </div>
               </div>
             </div>
           )}
 
-          {docType === "interactive" && (
-            <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/messages/send \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
-  -d '{
-    "messaging_product": "alanya",
-    "to": "600001",
-    "type": "interactive",
-    "interactive": {
-      "type": "button",
-      "body": {
-        "text": "Confirmez-vous votre rendez-vous ?"
-      },
-      "action": {
-        "buttons": [
-          {
-            "type": "reply",
-            "reply": {
-              "id": "btn_yes",
-              "title": "Confirmer"
-            }
-          },
-          {
-            "type": "reply",
-            "reply": {
-              "id": "btn_no",
-              "title": "Annuler"
-            }
-          }
-        ]
-      }
-    }
-  }'`}
-            </div>
-          )}
-
-          {docType === "otp" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {docType === "verification" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               <div>
-                <h4 style={{ margin: "0 0 6px 0", fontSize: "13px", fontWeight: "700" }}>1. Génération & Envoi de l'OTP</h4>
+                <h4 className="dev-doc-title">1. Émettre un code (POST /api/v1/verifications)</h4>
                 <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/auth/otp/send \\
+{`curl -X POST https://alanyavox.com/api/v1/verifications \\
+  -H "X-Api-Key: ${activeRawKey}" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
   -d '{
-    "recipientNumber": "600001"
-  }'`}
+    "finalite": "AUTH_2FA",
+    "destination": "agent@exemple.com",
+    "canal": "EMAIL"
+  }'
+
+// finalite : AUTH_2FA · CREATION_AGENT · VALIDATION_CONTACT
+// canal    : EMAIL · ALANYA  (défaut EMAIL pour AUTH_2FA)
+
+{
+  "id": "…", "finalite": "AUTH_2FA", "canal": "EMAIL",
+  "destination": "agent@exemple.com",
+  "expireA": "2026-08-21T14:07:11Z",
+  "livraison": "REMIS"
+}`}
                 </div>
               </div>
+
               <div>
-                <h4 style={{ margin: "0 0 6px 0", fontSize: "13px", fontWeight: "700" }}>2. Vérification du Code OTP</h4>
+                <h4 className="dev-doc-title">2. Vérifier (POST /api/v1/verifications/check)</h4>
                 <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/auth/otp/verify \\
+{`curl -X POST https://alanyavox.com/api/v1/verifications/check \\
+  -H "X-Api-Key: ${activeRawKey}" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${activeRawKey}" \\
   -d '{
-    "recipientNumber": "600001",
-    "code": "123456"
-  }'`}
+    "finalite": "AUTH_2FA",
+    "destination": "agent@exemple.com",
+    "code": "042518"
+  }'
+
+{ "verifie": false, "essaisRestants": 2 }`}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="dev-doc-title">Deux règles qui vous concernent</h4>
+                <div className="dev-code-block">
+{`La réponse ne contient JAMAIS le code. C'est nous qui livrons.
+
+"livraison": "REMIS" est CONSTATÉ, jamais supposé. Si rien n'est
+parti, vous recevez 502 VERIFICATION_NOT_DELIVERED — pas un faux
+succès.
+
+Un refus ne dit pas POURQUOI (faux, expiré, déjà utilisé, trop
+d'essais rendent la même réponse) : distinguer apprendrait à un
+attaquant qu'il visait le bon code. Affichez essaisRestants.
+
+Un seul code vivant à la fois par (destination, finalité) :
+en émettre un nouveau invalide le précédent.`}
                 </div>
               </div>
             </div>
           )}
 
           {docType === "webhook" && (
-            <div className="dev-code-block">
-{`// Exemple de Callback de Statut reçu sur votre Webhook Alanya
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              <div>
+                <h4 className="dev-doc-title">Ce que vous recevez</h4>
+                <div className="dev-code-block">
+{`POST <votre url>
+X-Alanya-Signature: sha256=<hex>
+
 {
-  "object": "alanya_business_account",
-  "entry": [
-    {
-      "id": "dev_account_id",
-      "changes": [
-        {
-          "value": {
-            "messaging_product": "alanya",
-            "statuses": [
-              {
-                "id": "wamid.HBgL...",
-                "status": "delivered", // "sent" | "delivered" | "read" | "failed"
-                "timestamp": "1723674405",
-                "recipient_id": "600001"
-              }
-            ]
-          },
-          "field": "messages"
-        }
-      ]
-    }
-  ]
-}`}
+  "evenement": "message.statut",
+  "emisA": "2026-08-21T14:02:11.482Z",
+  "donnees": {
+    "messageId": "3f9a1c2e-…",
+    "statut": "ENVOYE",
+    "destinataire": "12345678"
+  }
+}
+
+// statut : ENVOYE · REMIS · LU · ECHEC
+// "evenement" n'a qu'une valeur aujourd'hui. Aiguillez quand
+// même dessus : c'est ce qui nous permettra d'en ajouter.`}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="dev-doc-title">Vérifier la signature</h4>
+                <div className="dev-code-block">
+{`const brut = await request.text();   // le CORPS BRUT, pas un objet
+const attendu = "sha256=" + crypto
+  .createHmac("sha256", process.env.ALANYA_WEBHOOK_SECRET)
+  .update(brut, "utf8")
+  .digest("hex");
+
+const recu = request.headers.get("X-Alanya-Signature") ?? "";
+const a = Buffer.from(recu), b = Buffer.from(attendu);
+if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+  return new Response("signature invalide", { status: 401 });
+}
+const charge = JSON.parse(brut);     // parser APRÈS, jamais avant`}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="dev-doc-title">Trois règles</h4>
+                <div className="dev-code-block">
+{`1. Signez le CORPS BRUT. Un JSON.parse suivi d'une
+   re-sérialisation change l'espacement, donc l'empreinte.
+2. Comparez à TEMPS CONSTANT (timingSafeEqual), jamais par ===.
+3. REJETEZ toute requête non signée. Sans secret configuré nous
+   n'envoyons aucun en-tête, plutôt qu'un en-tête décoratif.
+
+Le secret est rendu UNE SEULE FOIS, à l'enregistrement du
+webhook. Il n'est plus relisible ensuite.`}
+                </div>
+              </div>
             </div>
           )}
         </div>

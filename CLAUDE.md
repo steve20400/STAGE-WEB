@@ -5,6 +5,29 @@
 
 ---
 
+> 🔴 **CES NOTES SONT LARGEMENT PÉRIMÉES — refonte du 21/08/2026.**
+>
+> L'API v1 a été refaite en une fois, personne ne l'ayant encore intégrée.
+> Sont **faux** dans tout ce qui suit :
+>
+> - **la facturation** — plus de crédits `ALC`, plus de solde, plus de recharge,
+>   plus de bac à sable. L'API sert la plateforme de l'équipe, qui porte son
+>   propre paiement. La console n'a plus ni onglet *Recharge Sandbox* ni carte
+>   *Solde disponible* ;
+> - **la conformité WhatsApp Cloud API** — abandonnée. Plus de `wamid.`, de
+>   `wa_id`, de `messaging_product`, ni de charge `entry[].changes[].value` dans
+>   les webhooks. Les types `interactive` et `template` n'existent pas ;
+> - **`POST /api/v1/messages/send`** → devient `POST /api/v1/messages`, charge
+>   en français (`destinataire`, `type`, `texte`, `mediaIds`), réponse `201` ;
+> - **`/api/v1/auth/otp/send`** et **`/otp/verify`** → `POST /api/v1/verifications`
+>   et `POST /api/v1/verifications/check` ;
+> - **`/api/v1/media`** téléverse maintenant un VRAI fichier (multipart), au
+>   lieu d'enregistrer une URL ;
+> - **`/api/v1/calls/initiate`** → supprimée (elle ne faisait sonner personne) ;
+> - **`/developer/dashboard` côté backend** → supprimée ; la console vit ici.
+>
+> **La référence à jour est `backend-alanya/docs/2026-08-21-api-v1-integration.md`.**
+
 ## 📌 Présentation de l'Espace Développeur Alanya
 
 L'Espace Développeur Alanya permet à tout utilisateur d'accéder à la console API et de générer des clés d'API (Sandbox `ak_test_...` et Live `ak_live_...`) pour l'intégration de services de messagerie WhatsApp, d'appels et d'authentification 2FA.
