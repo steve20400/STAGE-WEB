@@ -2242,6 +2242,42 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     return
   }
 
+  if (event.type === "meeting_mute") {
+    /*
+     * L'ORGANISATEUR DEMANDE UNE COUPURE — et c'est ICI qu'elle a lieu.
+     *
+     * Personne ne coupe un micro a distance : le flux est sur MON appareil, et
+     * la trame n'est qu'une demande a laquelle mon application obeit. Ce qui
+     * s'eteint, ce sont mes propres pistes, exactement comme si j'avais appuye
+     * sur le bouton de la barre.
+     *
+     * ET C'EST BIEN LE BOUTON QU'ON RAPPELLE, pas un drapeau d'affichage :
+     * `toggleMicrophone` et `toggleCamera` portent chacun des cas que rien ici
+     * ne saurait refaire — le refus de bouger quand il n'y a aucune piste (on
+     * est entre en ecoute seule), et pour la camera l'intention mise de cote
+     * pendant un partage d'ecran, ou la piste video n'est PAS la camera. Poser
+     * `track.enabled = false` a la main aurait eteint la presentation chez tout
+     * le monde, et fait diverger l'etat des boutons de la verite des pistes.
+     *
+     * COUPER, JAMAIS BASCULER : on ne rappelle le bouton que si l'on est
+     * effectivement ouvert. Une trame rejouee apres une reconnexion, ou deux
+     * clics de l'organisateur, rallumeraient sinon le micro qu'ils devaient
+     * couper. Rien n'empeche en revanche de se rallumer soi-meme juste apres :
+     * c'est une coupure, pas un verrou.
+     *
+     * On ne verifie pas que l'expediteur est l'organisateur : c'est au SERVEUR
+     * de le faire, lui seul sait qui a cree la reunion et lui seul ne peut pas
+     * etre contourne. Le refaire ici ne protegerait personne.
+     */
+    if (String(event.toUserId ?? "") !== myUserId()) return
+    if (event.media === "audio") {
+      if (state.micOn) toggleMicrophone()
+    } else if (event.media === "video") {
+      if (state.camOn) toggleCamera()
+    }
+    return
+  }
+
   if (event.type === "meeting_signal") {
     const from = String(event.fromUserId ?? "")
     if (!from) return

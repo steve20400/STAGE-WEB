@@ -35,6 +35,7 @@ import { getMyUserId, loadSessionUser, toInitials } from "../../../../src/data/s
 import {
   getRealtimeState,
   sendMeetingHand,
+  sendMeetingMute,
   subscribeToMeetingEvents,
 } from "../../../../src/services/websocket-service"
 import { useTranslation, type Cle } from "../../../../src/i18n"
@@ -51,7 +52,7 @@ import {
   isValidAlanyaNumber,
   normalizeAlanyaNumber,
 } from "../../../../src/lib/alanya-number"
-import type { Reunion } from "../../../../src/services/meetings-service"
+import type { ParticipantReunion, Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
 
 /**
@@ -60,6 +61,12 @@ import "./meeting-room.css"
  * (« Ecran partage », le bandeau du grand cadre) n'existent dans aucune des
  * neuf langues.
  *
+ * S'y ajoutent les deux phrases qui disent a quelqu'un POURQUOI son micro vient
+ * de s'eteindre : `meet_muted_by` (« {name} a coupe votre micro ») et
+ * `meet_camera_off_by` (« {name} a coupe votre camera »). Les intitules des
+ * BOUTONS, eux, existent deja — `mute_mic` et `turn_off_camera` — et sont
+ * repris tels quels.
+ *
  * Rien n'est ecrit en francais dans le JSX pour autant : la cle est passee
  * telle quelle a `t`, dont le repli DOCUMENTE est « la cle elle-meme ». L'ecran
  * degrade donc en un intitule technique, visible et signalable, au lieu de
@@ -67,7 +74,17 @@ import "./meeting-room.css"
  * au catalogue, ce type disparait et les appels redeviennent des `t` ordinaires
  * sans autre changement.
  */
-type CleAVenir = "meet_share_screen" | "meet_screen_shared"
+type CleAVenir = "meet_share_screen" | "meet_screen_shared" | "meet_muted_by" | "meet_camera_off_by"
+
+/**
+ * Combien de temps la pastille « vient d'etre coupe » reste sur une vignette.
+ *
+ * Assez pour que le regard la trouve apres avoir entendu une voix se taire,
+ * assez peu pour ne pas survivre a un rallumage — que rien n'annonce. Quatre
+ * secondes, soit la duree d'un toast (`toast.tsx`) : la pastille vue par la
+ * salle et le message lu par le principal interesse s'effacent ensemble.
+ */
+const DUREE_MARQUE_COUPURE = 4000
 
 function MeetingControlIcon({
   kind,
@@ -308,7 +325,7 @@ export default function MeetingRoomPage() {
   const { meetingId } = useParams()
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { success, error: showError } = useToast()
+  const { success, error: showError, info } = useToast()
   const callState = useCallState()
   const remoteStreams = useMemo(() => callState.remoteStreams, [callState.remoteStreams])
 
@@ -336,6 +353,22 @@ export default function MeetingRoomPage() {
   const [filLargeOuvert, setFilLargeOuvert] = useState(true)
   /** Identifiants dont la main est levee, tels que le serveur les diffuse. */
   const [mainsLevees, setMainsLevees] = useState<Set<string>>(new Set())
+  /**
+   * Qui vient d'etre coupe par l'organisateur, et sur quel media.
+   *
+   * PASSAGER, ET C'EST VOULU. La coupure n'est pas un verrou : le participant
+   * peut se rallumer d'un appui sur sa barre, et RIEN sur le fil ne l'annonce —
+   * une piste qu'on reactive ne produit aucun evenement, ni WebRTC ni serveur.
+   * Une pastille permanente finirait donc par mentir, et sur la seule chose
+   * qu'elle est censee dire. Elle s'efface d'elle-meme au bout de
+   * `DUREE_MARQUE_COUPURE` : elle dit « vient d'etre coupe », un fait qui a bien
+   * eu lieu, et non « est coupe », un etat que le web ne peut pas connaitre.
+   */
+  const [coupuresRecentes, setCoupuresRecentes] = useState<
+    Record<string, "audio" | "video" | undefined>
+  >({})
+  /** Minuteurs d'effacement des pastilles, a annuler au demontage. */
+  const minuteursCoupure = useRef<Map<string, number>>(new Map())
   const [nonLus, setNonLus] = useState(0)
   const [demandes, setDemandes] = useState<DemandeInvitation[]>([])
   /**
@@ -1032,7 +1065,87 @@ export default function MeetingRoomPage() {
    * Le detour par `unknown` est volontairement voyant : c'est lui qui signale
    * qu'il reste ici une dette, et il disparaitra avec elle.
    */
-  const tAVenir = useCallback((cle: CleAVenir) => t(cle as unknown as Cle), [t])
+  const tAVenir = useCallback(
+    (cle: CleAVenir, variables?: Record<string, string | number>) =>
+      t(cle as unknown as Cle, variables),
+    [t]
+  )
+
+  /**
+   * QUELQU'UN A ETE COUPE PAR L'ORGANISATEUR.
+   *
+   * Deux choses ici, et une SEULE des deux touche au media : rien. La piste est
+   * eteinte par `call-manager`, qui recoit la meme trame et rappelle le chemin
+   * du bouton de la barre. Cet ecran ne fait que le DIRE.
+   *
+   * A CELUI QU'ON COUPE, avec des mots : un micro qui s'eteint tout seul passe
+   * pour une panne, et la personne cherche son materiel au lieu d'ecouter. Le
+   * message nomme l'organisateur quand on a son nom — « X a coupe votre
+   * micro » se comprend sans explication, « Micro coupe » non.
+   *
+   * A LA SALLE, sans mot : une pastille sur la vignette, le temps que le regard
+   * la trouve. Le toast est reserve a l'interesse ; le repeter a tout le monde
+   * ferait de chaque micro oublie un evenement.
+   *
+   * On n'agit pas sur sa propre trame en local avant la reponse du serveur : la
+   * coupure part, le serveur verifie le droit et rediffuse a TOUTE la salle,
+   * l'organisateur compris. C'est donc sa reponse — et non notre propre foi —
+   * qui pose la pastille, au meme instant chez tout le monde. Un droit refuse
+   * ne laisse ainsi aucune marque nulle part.
+   */
+  useEffect(() => {
+    return subscribeToMeetingEvents((event) => {
+      if (event.type !== "meeting_mute") return
+      if (Number(event.meetingId) !== Number(meetingId)) return
+      const cible = String(event.toUserId ?? "")
+      const media = event.media === "audio" || event.media === "video" ? event.media : null
+      if (!cible || !media) return
+
+      setCoupuresRecentes((precedentes) => ({ ...precedentes, [cible]: media }))
+      // Un minuteur par personne, et on remplace le sien : deux coupures
+      // rapprochees (le micro puis la camera) ne doivent pas laisser le premier
+      // minuteur effacer la seconde pastille avant l'heure.
+      const ancien = minuteursCoupure.current.get(cible)
+      if (ancien !== undefined) window.clearTimeout(ancien)
+      const minuteur = window.setTimeout(() => {
+        minuteursCoupure.current.delete(cible)
+        setCoupuresRecentes((precedentes) => {
+          const suivantes = { ...precedentes }
+          delete suivantes[cible]
+          return suivantes
+        })
+      }, DUREE_MARQUE_COUPURE)
+      minuteursCoupure.current.set(cible, minuteur)
+
+      if (cible !== (getMyUserId() ?? "")) return
+      const auteur = String(event.fromUserId ?? "")
+      const nomAuteur =
+        (auteur && auteur === meeting?.organisateur.id ? meeting.organisateur.nom : "") ||
+        meeting?.participants.find((p) => p.id === auteur)?.nom ||
+        ""
+      if (nomAuteur) {
+        info(
+          tAVenir(media === "audio" ? "meet_muted_by" : "meet_camera_off_by", {
+            name: nomAuteur,
+          })
+        )
+      } else {
+        // Sans nom, on dit au moins le FAIT, avec les intitules que le catalogue
+        // porte deja. On ne remplace pas le nom par « l'organisateur » : aucune
+        // cle ne le dit, et l'ecrire ici le figerait en francais.
+        info(t(media === "audio" ? "a2_mic_muted" : "camera_off"))
+      }
+    })
+  }, [meetingId, meeting, info, t, tAVenir])
+
+  /** Efface les minuteurs de pastille quand on quitte l'ecran. */
+  useEffect(() => {
+    const minuteurs = minuteursCoupure.current
+    return () => {
+      minuteurs.forEach((minuteur) => window.clearTimeout(minuteur))
+      minuteurs.clear()
+    }
+  }, [])
 
   /**
    * Commencer ou arreter de partager son ecran.
@@ -1046,6 +1159,42 @@ export default function MeetingRoomPage() {
     if (callState.partageParMoi) void arreterPartageEcran()
     else void demarrerPartageEcran()
   }, [callState.partageParMoi])
+
+  /**
+   * A-t-on le droit — et l'occasion — de couper le media de cette personne ?
+   *
+   * Meme droit que l'exclusion : l'organisateur, et jamais sur lui-meme. Deux
+   * conditions s'y ajoutent, qui tiennent a la nature de la coupure. Il faut
+   * etre soi-meme DANS la salle, parce que la demande passe par le salon
+   * WebSocket et n'atteint personne depuis la page d'attente. Et il faut que
+   * l'autre y soit aussi : un invite qui n'est pas entre n'a aucune piste a
+   * eteindre, et le bouton ne ferait que promettre un geste sans effet.
+   *
+   * Ce n'est qu'une politesse d'interface : le droit se verifie sur le SERVEUR,
+   * qui seul ne peut pas etre contourne. Voir `sendMeetingMute`.
+   */
+  const peutCouperSonMedia = (p: ParticipantReunion) =>
+    meeting?.jeSuisOrganisateur === true &&
+    p.id !== meeting.organisateur.id &&
+    enSalle &&
+    p.connecte
+
+  /**
+   * L'organisateur demande a quelqu'un de couper son micro ou sa camera.
+   *
+   * PAS DE CONFIRMATION, a la difference de l'exclusion : couper un micro se
+   * defait d'un appui, par l'interesse lui-meme. Demander « etes-vous sur ? »
+   * pour un geste reversible transforme en decision ce qui n'est qu'un
+   * reglage — on coupe justement parce qu'un micro oublie fait du bruit MAINTENANT.
+   *
+   * Rien n'est affiche dans la foulee : c'est la rediffusion du serveur qui pose
+   * la pastille, chez l'organisateur comme chez les autres. Voir l'ecoute de
+   * `meeting_mute` plus haut.
+   */
+  const demanderCoupure = (participantId: string, media: "audio" | "video") => {
+    if (!meetingId) return
+    sendMeetingMute(Number(meetingId), participantId, media)
+  }
 
   const handleExclure = async (participantId: string, nom: string) => {
     if (!meetingId || !confirm(t("meet_exclude_confirm", { name: nom }))) return
@@ -1644,7 +1793,10 @@ export default function MeetingRoomPage() {
         {meeting.participants.length > 0 && (
           <div className="participants-grid">
               {meeting.participants.map((p) => (
-                <div key={p.id} className="participant-box">
+                <div
+                  key={p.id}
+                  className={`participant-box${peutCouperSonMedia(p) ? " avec-actions" : ""}`}
+                >
                   {/* Un rond a la place du nom en clair : c'est la convention
                       partout ailleurs, et une tuile se balaie du regard bien
                       plus vite qu'une liste de noms. Sans photo, l'initiale —
@@ -1667,9 +1819,57 @@ export default function MeetingRoomPage() {
                         ✋
                       </span>
                     )}
+                    {/* « Vient d'etre coupe », vu par TOUTE la salle : sans
+                        cela, une voix se tait au milieu d'une phrase et
+                        personne ne sait si c'est un choix, une coupure ou une
+                        panne de reseau. La pastille s'efface d'elle-meme —
+                        elle date un fait, elle ne pretend pas dire un etat
+                        (voir `coupuresRecentes`). */}
+                    {coupuresRecentes[p.id] && (
+                      <span
+                        className="participant-coupe"
+                        title={t(
+                          coupuresRecentes[p.id] === "audio" ? "a2_mic_muted" : "camera_off"
+                        )}
+                      >
+                        <MeetingControlIcon
+                          kind={coupuresRecentes[p.id] === "audio" ? "micOff" : "cameraOff"}
+                          taille={11}
+                        />
+                      </span>
+                    )}
                   </div>
                   <div className="participant-ligne">
                     <div className="participant-name">{p.nom}</div>
+                    {/* Couper le micro, couper la camera : a cote de la croix,
+                        parce que c'est le meme droit et le meme geste — agir
+                        sur quelqu'un depuis sa vignette. Une coupure n'est PAS
+                        un verrou : l'interesse se rallume d'un appui sur sa
+                        barre, et ces boutons ne l'en empechent jamais. */}
+                    {peutCouperSonMedia(p) && (
+                      <>
+                        <button
+                          className="participant-couper"
+                          onClick={() => demanderCoupure(p.id, "audio")}
+                          aria-label={t("mute_mic")}
+                          title={t("mute_mic")}
+                        >
+                          <MeetingControlIcon kind="micOff" taille={13} />
+                        </button>
+                        {/* Rien a couper dans une reunion audio : la camera n'y
+                            est allumee chez personne. */}
+                        {meeting.type === "video" && (
+                          <button
+                            className="participant-couper"
+                            onClick={() => demanderCoupure(p.id, "video")}
+                            aria-label={t("turn_off_camera")}
+                            title={t("turn_off_camera")}
+                          >
+                            <MeetingControlIcon kind="cameraOff" taille={13} />
+                          </button>
+                        )}
+                      </>
+                    )}
                     {/* L'exclusion n'apparait qu'a l'organisateur, et jamais sur
                         lui-meme : le serveur refuse les deux, et un bouton qui
                         promet un refus ne vaut pas mieux que pas de bouton. */}

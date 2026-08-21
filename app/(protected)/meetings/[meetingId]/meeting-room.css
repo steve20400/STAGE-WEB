@@ -835,6 +835,43 @@
 .meeting-room-root.en-salle .participant-status {
   display: none;
 }
+/*
+ * LA TUILE S'ELARGIT, ELLE NE GRANDIT PAS.
+ *
+ * La bande a une HAUTEUR, pas un plafond : `clamp(88px, 9vh, 108px)` avec
+ * `overflow: hidden`, et 88 px est la mesure exacte du contenu le plus haut.
+ * Renvoyer les boutons a la ligne sous le nom aurait donc coupe ce qui depasse,
+ * ou vole a la video ce que le commentaire de la bande explique avoir mis des
+ * mois a lui rendre. Ils restent sur la ligne du nom, et c'est la LARGEUR qui
+ * paie : 128 px au lieu de 96.
+ *
+ * Le nom n'y perd rien. Il disposait de 56 px a cote de la seule croix
+ * (84 px de contenu, moins 22 px de croix et 6 px d'ecart) ; il en garde 53 a
+ * cote de trois boutons de 18 px. La troncature reste ce qu'elle etait.
+ *
+ * Ces tuiles-la sont les seules a s'elargir : celles ou il n'y a rien a couper
+ * gardent leurs 96 px, et la bande defile a l'horizontale de toute facon.
+ */
+.meeting-room-root.en-salle .participant-box.avec-actions {
+  width: 128px;
+}
+.meeting-room-root.en-salle .participant-ligne {
+  gap: 3px;
+}
+.meeting-room-root.en-salle .participant-exclure,
+.meeting-room-root.en-salle .participant-couper {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+/* Le rond de 38 px de la bande ne porte pas la meme pastille que celui de 52 px
+   de la grille : a taille egale, elle mangerait la vignette. */
+.meeting-room-root.en-salle .participant-coupe {
+  top: -3px;
+  right: -3px;
+  width: 16px;
+  height: 16px;
+}
 
 .meeting-room-root .participants-grid {
   display: grid;
@@ -902,6 +939,24 @@
   background: var(--success);
   border: 2px solid var(--bg-elevated);
 }
+/* « Vient d'etre coupe par l'organisateur ». En HAUT A DROITE : la main occupe
+   deja le haut a gauche et la presence le bas a droite, et les trois peuvent
+   coexister sur la meme vignette. Un rond sourd, pas une alerte rouge — couper
+   un micro oublie est un geste ordinaire, que l'interesse defait d'un appui. */
+.meeting-room-root .participant-coupe {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  border: 2px solid var(--bg-elevated);
+}
 /* Le nom et la croix partagent la ligne : la croix ne pousse pas le nom, elle
    se retire quand il n'y a rien a exclure. */
 .meeting-room-root .participant-ligne {
@@ -912,7 +967,8 @@
   width: 100%;
   min-width: 0;
 }
-.meeting-room-root .participant-exclure {
+.meeting-room-root .participant-exclure,
+.meeting-room-root .participant-couper {
   flex: none;
   width: 22px;
   height: 22px;
@@ -931,6 +987,13 @@
 .meeting-room-root .participant-exclure:hover {
   background: var(--danger-dim);
   color: var(--danger);
+}
+/* Couper n'est pas exclure : le survol prend l'accent et non le rouge. Deux
+   gestes voisins sur la meme ligne, dont un seul est sans retour — la couleur
+   est ce qui les distingue avant qu'on ait lu l'infobulle. */
+.meeting-room-root .participant-couper:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 
 .meeting-room-root .participant-name {

@@ -607,6 +607,11 @@ const MEETING_EVENT_TYPES = new Set([
   // autres mais qu'aucun d'eux ne reconnait comme un ecran — il s'afficherait
   // en vignette de visage, sans que rien dans le code du partage ne cloche.
   "meeting_screen",
+  // Meme piege : sans `meeting_mute` ici, la demande de coupure partirait bien
+  // depuis l'organisateur et serait bien relayee par le serveur, mais tomberait
+  // dans le vide chez le destinataire — son micro resterait ouvert sans que rien
+  // dans le code de la coupure ne cloche.
+  "meeting_mute",
 ])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
@@ -716,6 +721,35 @@ export function sendMeetingMessage(meetingId: number, texte: string) {
  */
 export function sendMeetingScreen(meetingId: number, partage: boolean) {
   sendRaw({ type: "meeting_screen", meetingId, partage })
+}
+
+/**
+ * DEMANDE a un participant de couper son micro ou sa camera.
+ *
+ * UNE DEMANDE, ET NON UNE COMMANDE, et ce n'est pas une nuance de vocabulaire :
+ * le flux appartient a l'APPAREIL du participant. Rien ici, ni sur le serveur,
+ * ne touche a sa piste — c'est SON application qui recoit la trame et se coupe
+ * elle-meme. Un participant dont le client ignore ce verbe continuera de parler,
+ * et c'est la limite du procede, la meme chez Zoom, Meet et Teams.
+ *
+ * QUI A LE DROIT SE VERIFIE SUR LE SERVEUR, jamais ici. Ce module se contente
+ * d'ecrire sur le fil ; l'ecran ne montre les boutons qu'a l'organisateur, mais
+ * ce n'est qu'une politesse d'interface. N'importe qui peut forger cette trame
+ * depuis une console — c'est le serveur qui doit refuser quiconque n'est pas
+ * l'organisateur, sinon un participant fait taire toute la salle.
+ *
+ * On n'envoie pas d'expediteur : le serveur pose `fromUserId` lui-meme, comme
+ * pour le partage d'ecran, sinon on couperait un micro au nom d'un autre.
+ *
+ * Le serveur relaie a TOUTE la salle et pas au seul destinataire : les autres
+ * doivent pouvoir montrer que ce participant vient d'etre coupe, sans quoi son
+ * micro s'eteint au milieu d'une phrase et personne ne comprend pourquoi.
+ *
+ * COUPER N'EST PAS VERROUILLER : le participant peut se rallumer aussitot avec
+ * le bouton de sa barre. Le verbe sert au micro oublie, pas au baillon.
+ */
+export function sendMeetingMute(meetingId: number, toUserId: string, media: "audio" | "video") {
+  sendRaw({ type: "meeting_mute", meetingId, toUserId, media })
 }
 
 /** Diffuse un changement d'etat d'appel (joined / left / rejected / ended...). */
