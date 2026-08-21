@@ -624,7 +624,20 @@ export function subscribeToCallEvents(handler: (event: CallServerEvent) => void)
 /** S'abonne aux evenements de réunion WebRTC (signalisation, participants). */
 export function subscribeToMeetingEvents(handler: (event: ServerEvent) => void): () => void {
   return addListener((event) => {
-    if (MEETING_EVENT_TYPES.has(event.type)) handler(event)
+    if (MEETING_EVENT_TYPES.has(event.type)) return handler(event)
+    // LE REFUS DE LA SALLE PASSE PAR « error », ET IL DOIT PASSER.
+    //
+    // Quand la salle est pleine, le serveur repond une trame d'erreur et non un
+    // verbe meeting_*. Le filtre ci-dessus la jetait, et la branche generique des
+    // erreurs exige un `tempId` que cette trame ne porte pas : le refus
+    // disparaissait donc sans laisser de trace. Celui qu'on refusait restait
+    // seul dans une salle fantome, camera et micro ouverts, sans un mot.
+    //
+    // On ne laisse passer que les erreurs QUI DESIGNENT UNE REUNION : les autres
+    // n'ont rien a faire dans le gestionnaire de salle.
+    if (event.type === "error" && (event as { meetingId?: unknown }).meetingId != null) {
+      handler(event)
+    }
   })
 }
 

@@ -584,6 +584,7 @@ export const WEB_TRANSLATION_KEYS = [
   "meet_left",
   "meet_leave_failed",
   "meet_connected",
+  "meet_full_room",
   "meet_muted_by",
   "meet_camera_off_by",
   "meet_pending",
@@ -1020,6 +1021,34 @@ export const WEB_TRANSLATION_KEYS = [
   "meet_auto_invite_hint",
   "meet_invite_requested",
   "meet_invite_sent",
+  // Plafond de participants d'une reunion.
+  //
+  // LES CHIFFRES NE SONT PAS ICI, et ne doivent jamais y venir : le plafond est
+  // regle sur le serveur, entreprise par entreprise, et le web ne fait que
+  // l'afficher. Toutes ces phrases portent donc des marqueurs `{plafond}`,
+  // `{audio}`, `{video}` — jamais 6 ni 9.
+  //
+  // Deux familles, et la distinction compte. Celles en `_hint` / `_seats` /
+  // `_switch` PREVIENNENT : elles se lisent pendant qu'on compose sa liste,
+  // avant tout refus. Celles en `_full` / `_create` EXPLIQUENT un refus deja
+  // tombe, avec les nombres que le serveur a mis dans sa reponse.
+  //
+  // « organisateur compris » revient partout, et ce n'est pas une lourdeur :
+  // c'est la convention de comptage du serveur. Sans elle, « 6 » se lit comme
+  // « six invites », l'utilisateur en choisit six, et se fait refuser le
+  // dernier sans comprendre.
+  "meet_cap_hint",
+  "meet_cap_seats",
+  "meet_cap_seats_none",
+  "meet_cap_switch_video",
+  "meet_cap_full_title",
+  "meet_cap_full_video",
+  "meet_cap_full_audio",
+  "meet_cap_create_video",
+  "meet_cap_create_audio",
+  "meet_cap_advice_audio",
+  "meet_cap_advice_wait",
+  "meet_cap_audio_max",
   // Listes de contacts : des cercles nommes dans le carnet d'adresses, avec
   // leur sonnerie propre et un filtre sur la liste des discussions.
   "clist_title",
@@ -1103,6 +1132,26 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.",
     meet_invite_requested: "Demande d'invitation envoyée",
     meet_invite_sent: "{name} a été invité à la réunion",
+    meet_cap_hint:
+      "Une réunion vidéo accueille {video} personnes, une réunion audio {audio} — organisateur compris. Chaque participant envoie son flux à tous les autres : au-delà, la qualité s'effondre pour tout le monde.",
+    meet_cap_seats: "Places restantes : {restantes} sur {plafond}, organisateur compris.",
+    meet_cap_seats_none:
+      "Plus aucune place : {plafond} personnes au maximum, organisateur compris.",
+    meet_cap_switch_video:
+      "Vous avez choisi {choisis} personnes ; une réunion vidéo n'en accueille que {video}, organisateur compris. Retirez-en, ou restez en audio, qui en accueille {audio}.",
+    meet_cap_full_title: "Réunion complète",
+    meet_cap_full_video:
+      "Cette réunion vidéo est limitée à {plafond} personnes, organisateur compris — {actuel} y ont déjà leur place.",
+    meet_cap_full_audio:
+      "Cette réunion audio est limitée à {plafond} personnes, organisateur compris — {actuel} y ont déjà leur place.",
+    meet_cap_create_video:
+      "Une réunion vidéo accueille au maximum {plafond} personnes, organisateur compris — vous en avez demandé {demandes}.",
+    meet_cap_create_audio:
+      "Une réunion audio accueille au maximum {plafond} personnes, organisateur compris — vous en avez demandé {demandes}.",
+    meet_cap_advice_audio:
+      "Une réunion audio accueille plus de monde : passez en audio pour inviter davantage de personnes.",
+    meet_cap_advice_wait: "Attendez qu'une place se libère, ou tenez la réunion en deux fois.",
+    meet_cap_audio_max: "Plafond audio : {audio} personnes.",
     meet_chat_title: "Fil de la réunion",
     meet_chat_ephemeral: "effacé à la fin",
     meet_chat_empty: "Aucun message. Ce fil disparaît à la fin de la réunion.",
@@ -1293,6 +1342,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "Réunion quittée",
     meet_leave_failed: "Impossible de quitter la réunion",
     meet_connected: "Connecté",
+    meet_full_room: "Cette réunion est complète : {plafond} places, {actuel} déjà prises.",
     meet_muted_by: "{nom} a coupé votre micro",
     meet_camera_off_by: "{nom} a coupé votre caméra",
     meet_pending: "En attente",
@@ -2197,6 +2247,25 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "When you are away, requests are always accepted automatically.",
     meet_invite_requested: "Invitation request sent",
     meet_invite_sent: "{name} has been invited to the meeting",
+    meet_cap_hint:
+      "A video meeting holds {video} people, an audio meeting {audio} — organiser included. Every participant sends their stream to everyone else: beyond that, quality collapses for all.",
+    meet_cap_seats: "Seats left: {restantes} of {plafond}, organiser included.",
+    meet_cap_seats_none: "No seats left: {plafond} people maximum, organiser included.",
+    meet_cap_switch_video:
+      "You picked {choisis} people; a video meeting only holds {video}, organiser included. Remove a few, or stay on audio, which holds {audio}.",
+    meet_cap_full_title: "Meeting full",
+    meet_cap_full_video:
+      "This video meeting is limited to {plafond} people, organiser included — {actuel} already have a seat.",
+    meet_cap_full_audio:
+      "This audio meeting is limited to {plafond} people, organiser included — {actuel} already have a seat.",
+    meet_cap_create_video:
+      "A video meeting holds at most {plafond} people, organiser included — you asked for {demandes}.",
+    meet_cap_create_audio:
+      "An audio meeting holds at most {plafond} people, organiser included — you asked for {demandes}.",
+    meet_cap_advice_audio:
+      "An audio meeting holds more people: switch to audio to invite more of them.",
+    meet_cap_advice_wait: "Wait for a seat to free up, or hold the meeting in two sessions.",
+    meet_cap_audio_max: "Audio limit: {audio} people.",
     meet_chat_title: "Meeting chat",
     meet_chat_ephemeral: "cleared at the end",
     meet_chat_empty: "No messages yet. This chat disappears when the meeting ends.",
@@ -2384,6 +2453,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "Left the meeting",
     meet_leave_failed: "Could not leave the meeting",
     meet_connected: "Connected",
+    meet_full_room: "This meeting is full: {plafond} seats, {actuel} already taken.",
     meet_muted_by: "{nom} muted your microphone",
     meet_camera_off_by: "{nom} turned off your camera",
     meet_pending: "Waiting",
@@ -3280,6 +3350,25 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "Cuando no esté disponible, las solicitudes siempre se aceptan automáticamente.",
     meet_invite_requested: "Solicitud de invitación enviada",
     meet_invite_sent: "{name} ha sido invitado a la reunión",
+    meet_cap_hint:
+      "Una reunión de vídeo admite {video} personas; una de audio, {audio} — organizador incluido. Cada participante envía su flujo a todos los demás: más allá, la calidad se hunde para todos.",
+    meet_cap_seats: "Plazas libres: {restantes} de {plafond}, organizador incluido.",
+    meet_cap_seats_none: "No quedan plazas: {plafond} personas como máximo, organizador incluido.",
+    meet_cap_switch_video:
+      "Has elegido {choisis} personas; una reunión de vídeo solo admite {video}, organizador incluido. Quita algunas o sigue en audio, que admite {audio}.",
+    meet_cap_full_title: "Reunión completa",
+    meet_cap_full_video:
+      "Esta reunión de vídeo está limitada a {plafond} personas, organizador incluido: {actuel} ya tienen plaza.",
+    meet_cap_full_audio:
+      "Esta reunión de audio está limitada a {plafond} personas, organizador incluido: {actuel} ya tienen plaza.",
+    meet_cap_create_video:
+      "Una reunión de vídeo admite como máximo {plafond} personas, organizador incluido; has pedido {demandes}.",
+    meet_cap_create_audio:
+      "Una reunión de audio admite como máximo {plafond} personas, organizador incluido; has pedido {demandes}.",
+    meet_cap_advice_audio:
+      "Una reunión de audio admite más gente: cambia a audio para invitar a más personas.",
+    meet_cap_advice_wait: "Espera a que se libere una plaza o divide la reunión en dos.",
+    meet_cap_audio_max: "Límite en audio: {audio} personas.",
     meet_chat_title: "Chat de la reunión",
     meet_chat_ephemeral: "se borra al terminar",
     meet_chat_empty: "Sin mensajes. Este chat desaparece al terminar la reunión.",
@@ -3470,6 +3559,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "Has salido de la reunión",
     meet_leave_failed: "No se pudo salir de la reunión",
     meet_connected: "Conectado",
+    meet_full_room: "Esta reunión está completa: {plafond} plazas, {actuel} ya ocupadas.",
     meet_muted_by: "{nom} silenció tu micrófono",
     meet_camera_off_by: "{nom} desactivó tu cámara",
     meet_pending: "En espera",
@@ -4369,6 +4459,26 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "Wenn Sie abwesend sind, werden Anfragen immer automatisch akzeptiert.",
     meet_invite_requested: "Einladungsanfrage gesendet",
     meet_invite_sent: "{name} wurde zur Besprechung eingeladen",
+    meet_cap_hint:
+      "Eine Videokonferenz fasst {video} Personen, eine Audiokonferenz {audio} — Organisator eingerechnet. Jeder Teilnehmer sendet seinen Stream an alle anderen: darüber hinaus bricht die Qualität für alle ein.",
+    meet_cap_seats: "Freie Plätze: {restantes} von {plafond}, Organisator eingerechnet.",
+    meet_cap_seats_none: "Kein Platz mehr: höchstens {plafond} Personen, Organisator eingerechnet.",
+    meet_cap_switch_video:
+      "Sie haben {choisis} Personen gewählt; eine Videokonferenz fasst nur {video}, Organisator eingerechnet. Entfernen Sie einige, oder bleiben Sie bei Audio, das {audio} fasst.",
+    meet_cap_full_title: "Konferenz voll",
+    meet_cap_full_video:
+      "Diese Videokonferenz ist auf {plafond} Personen begrenzt, Organisator eingerechnet — {actuel} haben bereits einen Platz.",
+    meet_cap_full_audio:
+      "Diese Audiokonferenz ist auf {plafond} Personen begrenzt, Organisator eingerechnet — {actuel} haben bereits einen Platz.",
+    meet_cap_create_video:
+      "Eine Videokonferenz fasst höchstens {plafond} Personen, Organisator eingerechnet — Sie haben {demandes} angefragt.",
+    meet_cap_create_audio:
+      "Eine Audiokonferenz fasst höchstens {plafond} Personen, Organisator eingerechnet — Sie haben {demandes} angefragt.",
+    meet_cap_advice_audio:
+      "Eine Audiokonferenz fasst mehr Personen: Wechseln Sie zu Audio, um mehr Leute einzuladen.",
+    meet_cap_advice_wait:
+      "Warten Sie, bis ein Platz frei wird, oder halten Sie die Konferenz in zwei Runden ab.",
+    meet_cap_audio_max: "Audio-Grenze: {audio} Personen.",
     meet_chat_title: "Besprechungs-Chat",
     meet_chat_ephemeral: "wird am Ende gelöscht",
     meet_chat_empty: "Noch keine Nachrichten. Dieser Chat verschwindet am Ende der Besprechung.",
@@ -4564,6 +4674,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "Besprechung verlassen",
     meet_leave_failed: "Besprechung konnte nicht verlassen werden",
     meet_connected: "Verbunden",
+    meet_full_room: "Diese Besprechung ist voll: {plafond} Plätze, {actuel} bereits belegt.",
     meet_muted_by: "{nom} hat Ihr Mikrofon stummgeschaltet",
     meet_camera_off_by: "{nom} hat Ihre Kamera ausgeschaltet",
     meet_pending: "Wartet",
@@ -5469,6 +5580,25 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "Quando estiver ausente, as solicitações são sempre aceitas automaticamente.",
     meet_invite_requested: "Solicitação de convite enviada",
     meet_invite_sent: "{name} foi convidado para a reunião",
+    meet_cap_hint:
+      "Uma reunião de vídeo comporta {video} pessoas; uma de áudio, {audio} — organizador incluído. Cada participante envia o seu fluxo a todos os outros: além disso, a qualidade cai para todos.",
+    meet_cap_seats: "Lugares livres: {restantes} de {plafond}, organizador incluído.",
+    meet_cap_seats_none: "Sem lugares: no máximo {plafond} pessoas, organizador incluído.",
+    meet_cap_switch_video:
+      "Escolheu {choisis} pessoas; uma reunião de vídeo só comporta {video}, organizador incluído. Retire algumas ou fique em áudio, que comporta {audio}.",
+    meet_cap_full_title: "Reunião cheia",
+    meet_cap_full_video:
+      "Esta reunião de vídeo está limitada a {plafond} pessoas, organizador incluído — {actuel} já têm lugar.",
+    meet_cap_full_audio:
+      "Esta reunião de áudio está limitada a {plafond} pessoas, organizador incluído — {actuel} já têm lugar.",
+    meet_cap_create_video:
+      "Uma reunião de vídeo comporta no máximo {plafond} pessoas, organizador incluído — pediu {demandes}.",
+    meet_cap_create_audio:
+      "Uma reunião de áudio comporta no máximo {plafond} pessoas, organizador incluído — pediu {demandes}.",
+    meet_cap_advice_audio:
+      "Uma reunião de áudio comporta mais gente: mude para áudio para convidar mais pessoas.",
+    meet_cap_advice_wait: "Aguarde que se liberte um lugar ou faça a reunião em duas vezes.",
+    meet_cap_audio_max: "Limite em áudio: {audio} pessoas.",
     meet_chat_title: "Chat da reunião",
     meet_chat_ephemeral: "apagado no final",
     meet_chat_empty: "Sem mensagens. Este chat desaparece no fim da reunião.",
@@ -5659,6 +5789,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "Saiu da reunião",
     meet_leave_failed: "Não foi possível sair da reunião",
     meet_connected: "Ligado",
+    meet_full_room: "Esta reunião está cheia: {plafond} lugares, {actuel} já ocupados.",
     meet_muted_by: "{nom} silenciou o seu microfone",
     meet_camera_off_by: "{nom} desligou a sua câmara",
     meet_pending: "A aguardar",
@@ -6558,6 +6689,25 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "Когда вас нет, запросы всегда принимаются автоматически.",
     meet_invite_requested: "Запрос на приглашение отправлен",
     meet_invite_sent: "{name} приглашён на встречу",
+    meet_cap_hint:
+      "Видеовстреча вмещает {video} человек, аудиовстреча — {audio}, включая организатора. Каждый участник отправляет свой поток всем остальным: сверх этого качество падает у всех.",
+    meet_cap_seats: "Свободных мест: {restantes} из {plafond}, включая организатора.",
+    meet_cap_seats_none: "Мест больше нет: не более {plafond} человек, включая организатора.",
+    meet_cap_switch_video:
+      "Вы выбрали {choisis} человек, а видеовстреча вмещает только {video}, включая организатора. Уберите лишних или останьтесь в аудио — там помещается {audio}.",
+    meet_cap_full_title: "Встреча заполнена",
+    meet_cap_full_video:
+      "Эта видеовстреча ограничена {plafond} участниками, включая организатора: {actuel} уже заняли места.",
+    meet_cap_full_audio:
+      "Эта аудиовстреча ограничена {plafond} участниками, включая организатора: {actuel} уже заняли места.",
+    meet_cap_create_video:
+      "Видеовстреча вмещает не более {plafond} человек, включая организатора, а вы запросили {demandes}.",
+    meet_cap_create_audio:
+      "Аудиовстреча вмещает не более {plafond} человек, включая организатора, а вы запросили {demandes}.",
+    meet_cap_advice_audio:
+      "Аудиовстреча вмещает больше людей: переключитесь на аудио, чтобы пригласить больше участников.",
+    meet_cap_advice_wait: "Дождитесь, когда освободится место, или проведите встречу в два захода.",
+    meet_cap_audio_max: "Предел для аудио: {audio} человек.",
     meet_chat_title: "Чат встречи",
     meet_chat_ephemeral: "удаляется по окончании",
     meet_chat_empty: "Сообщений нет. Этот чат исчезнет после встречи.",
@@ -6745,6 +6895,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "Вы покинули встречу",
     meet_leave_failed: "Не удалось покинуть встречу",
     meet_connected: "На связи",
+    meet_full_room: "Встреча заполнена: мест {plafond}, занято {actuel}.",
     meet_muted_by: "{nom} отключил ваш микрофон",
     meet_camera_off_by: "{nom} отключил вашу камеру",
     meet_pending: "Ожидание",
@@ -7638,6 +7789,20 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "您不在线时，请求始终自动接受。",
     meet_invite_requested: "邀请请求已发送",
     meet_invite_sent: "{name} 已被邀请加入会议",
+    meet_cap_hint:
+      "视频会议最多容纳 {video} 人，语音会议 {audio} 人，均含发起人。每位参与者都要把自己的画面发给其他所有人：超过之后，所有人的质量都会崩塌。",
+    meet_cap_seats: "剩余名额：{restantes}/{plafond}，含发起人。",
+    meet_cap_seats_none: "没有空位了：最多 {plafond} 人，含发起人。",
+    meet_cap_switch_video:
+      "您选了 {choisis} 人，而视频会议只能容纳 {video} 人（含发起人）。请减少人数，或继续使用语音会议，它可容纳 {audio} 人。",
+    meet_cap_full_title: "会议已满",
+    meet_cap_full_video: "该视频会议上限为 {plafond} 人（含发起人），目前已有 {actuel} 人占位。",
+    meet_cap_full_audio: "该语音会议上限为 {plafond} 人（含发起人），目前已有 {actuel} 人占位。",
+    meet_cap_create_video: "视频会议最多 {plafond} 人（含发起人），而您请求了 {demandes} 人。",
+    meet_cap_create_audio: "语音会议最多 {plafond} 人（含发起人），而您请求了 {demandes} 人。",
+    meet_cap_advice_audio: "语音会议可容纳更多人：改用语音即可邀请更多参与者。",
+    meet_cap_advice_wait: "请等待有人退出腾出名额，或将会议分两次举行。",
+    meet_cap_audio_max: "语音上限：{audio} 人。",
     meet_chat_title: "会议聊天",
     meet_chat_ephemeral: "结束后清除",
     meet_chat_empty: "暂无消息。会议结束后此聊天将消失。",
@@ -7821,6 +7986,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "已离开会议",
     meet_leave_failed: "无法离开该会议",
     meet_connected: "已连接",
+    meet_full_room: "会议已满：共 {plafond} 个名额，已占用 {actuel} 个。",
     meet_muted_by: "{nom} 关闭了你的麦克风",
     meet_camera_off_by: "{nom} 关闭了你的摄像头",
     meet_pending: "等待中",
@@ -8691,6 +8857,25 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "När du är borta accepteras förfrågningar alltid automatiskt.",
     meet_invite_requested: "Inbjudningsförfrågan skickad",
     meet_invite_sent: "{name} har bjudits in till mötet",
+    meet_cap_hint:
+      "Ett videomöte rymmer {video} personer, ett ljudmöte {audio} — organisatören inräknad. Varje deltagare skickar sin ström till alla andra: därutöver rasar kvaliteten för alla.",
+    meet_cap_seats: "Lediga platser: {restantes} av {plafond}, organisatören inräknad.",
+    meet_cap_seats_none: "Inga platser kvar: högst {plafond} personer, organisatören inräknad.",
+    meet_cap_switch_video:
+      "Du har valt {choisis} personer; ett videomöte rymmer bara {video}, organisatören inräknad. Ta bort några, eller stanna kvar på ljud, som rymmer {audio}.",
+    meet_cap_full_title: "Mötet är fullt",
+    meet_cap_full_video:
+      "Det här videomötet är begränsat till {plafond} personer, organisatören inräknad — {actuel} har redan en plats.",
+    meet_cap_full_audio:
+      "Det här ljudmötet är begränsat till {plafond} personer, organisatören inräknad — {actuel} har redan en plats.",
+    meet_cap_create_video:
+      "Ett videomöte rymmer högst {plafond} personer, organisatören inräknad — du bad om {demandes}.",
+    meet_cap_create_audio:
+      "Ett ljudmöte rymmer högst {plafond} personer, organisatören inräknad — du bad om {demandes}.",
+    meet_cap_advice_audio:
+      "Ett ljudmöte rymmer fler: byt till ljud för att bjuda in fler personer.",
+    meet_cap_advice_wait: "Vänta tills en plats blir ledig, eller håll mötet i två omgångar.",
+    meet_cap_audio_max: "Gräns för ljud: {audio} personer.",
     meet_chat_title: "Mötets chatt",
     meet_chat_ephemeral: "raderas vid slutet",
     meet_chat_empty: "Inga meddelanden. Chatten försvinner när mötet slutar.",
@@ -8879,6 +9064,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "Du lämnade mötet",
     meet_leave_failed: "Kunde inte lämna mötet",
     meet_connected: "Ansluten",
+    meet_full_room: "Mötet är fullt: {plafond} platser, {actuel} redan upptagna.",
     meet_muted_by: "{nom} stängde av din mikrofon",
     meet_camera_off_by: "{nom} stängde av din kamera",
     meet_pending: "Väntar",
@@ -9776,6 +9962,24 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint: "Når du er borte, godtas forespørsler alltid automatisk.",
     meet_invite_requested: "Invitasjonsforespørsel sendt",
     meet_invite_sent: "{name} er invitert til møtet",
+    meet_cap_hint:
+      "Et videomøte rommer {video} personer, et lydmøte {audio} — arrangøren medregnet. Hver deltaker sender strømmen sin til alle de andre: utover dette faller kvaliteten for alle.",
+    meet_cap_seats: "Ledige plasser: {restantes} av {plafond}, arrangøren medregnet.",
+    meet_cap_seats_none: "Ingen plasser igjen: høyst {plafond} personer, arrangøren medregnet.",
+    meet_cap_switch_video:
+      "Du har valgt {choisis} personer; et videomøte rommer bare {video}, arrangøren medregnet. Fjern noen, eller bli på lyd, som rommer {audio}.",
+    meet_cap_full_title: "Møtet er fullt",
+    meet_cap_full_video:
+      "Dette videomøtet er begrenset til {plafond} personer, arrangøren medregnet — {actuel} har allerede plass.",
+    meet_cap_full_audio:
+      "Dette lydmøtet er begrenset til {plafond} personer, arrangøren medregnet — {actuel} har allerede plass.",
+    meet_cap_create_video:
+      "Et videomøte rommer høyst {plafond} personer, arrangøren medregnet — du ba om {demandes}.",
+    meet_cap_create_audio:
+      "Et lydmøte rommer høyst {plafond} personer, arrangøren medregnet — du ba om {demandes}.",
+    meet_cap_advice_audio: "Et lydmøte rommer flere: bytt til lyd for å invitere flere personer.",
+    meet_cap_advice_wait: "Vent til en plass blir ledig, eller hold møtet i to omganger.",
+    meet_cap_audio_max: "Grense for lyd: {audio} personer.",
     meet_chat_title: "Møtechat",
     meet_chat_ephemeral: "slettes til slutt",
     meet_chat_empty: "Ingen meldinger. Denne chatten forsvinner når møtet er slutt.",
@@ -9965,6 +10169,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_left: "Du forlot møtet",
     meet_leave_failed: "Kunne ikke forlate møtet",
     meet_connected: "Tilkoblet",
+    meet_full_room: "Møtet er fullt: {plafond} plasser, {actuel} allerede opptatt.",
     meet_muted_by: "{nom} slo av mikrofonen din",
     meet_camera_off_by: "{nom} slo av kameraet ditt",
     meet_pending: "Venter",

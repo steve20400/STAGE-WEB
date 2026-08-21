@@ -510,3 +510,57 @@
   }
 }
 .meeting-direct-id{display:flex;gap:8px;margin:10px 0}.meeting-direct-id input{flex:1;min-width:0}.meeting-direct-id button{border:0;border-radius:8px;background:var(--accent);color:var(--accent-text);font-weight:700;padding:0 12px}.meeting-direct-id button:disabled{opacity:.45}
+
+/* ── PLAFOND DE PARTICIPANTS ───────────────────────────────────────────────
+   Le compteur de places et l'avis de bascule audio → video.
+
+   Trois etats, trois poids visuels, et l'ecart entre eux est le message :
+   une note grise qui renseigne, un compteur qui se teinte quand la derniere
+   place approche, un avis qui alerte. Rien ne clignote et rien ne rougit tant
+   qu'il reste de la place — un ecran qui crie tout le temps ne se lit plus.
+
+   Aucune couleur ecrite ici : ce sont les variables du theme, pour que la
+   meme phrase reste lisible en clair comme en nuit. */
+.meeting-capacite-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.meeting-capacite {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+/* Plus une place : le compteur cesse d'etre une simple mention. */
+.meeting-capacite.pleine {
+  border-color: var(--warning);
+  background: var(--warning-dim);
+  color: var(--text-primary);
+}
+.meeting-capacite-avis {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+  background: var(--warning-dim);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+/* Un contact hors plafond reste VISIBLE et lisible : il n'est pas retire de la
+   liste, seulement rendu inerte. Le faire disparaitre laisserait croire a un
+   defaut de recherche. */
+.participant-item.hors-plafond {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.participant-item.hors-plafond:hover {
+  background: transparent;
+}

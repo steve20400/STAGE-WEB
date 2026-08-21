@@ -13,7 +13,11 @@ import {
   reglerInvitationAuto,
   inviterAReunion,
   demanderInvitation,
+  chargerPlafondsReunion,
+  lireRefusPlafond,
+  refusPlafondEnMots,
   type DemandeInvitation,
+  type PlafondsReunion,
 } from "../../../../src/services/meetings-service"
 import {
   arreterPartageEcran,
@@ -397,6 +401,17 @@ export default function MeetingRoomPage() {
 
   /** Recherche dans la liste des contacts (panneau ajout). */
   const [rechercheContact, setRechercheContact] = useState("")
+  /**
+   * MES plafonds, et rien d'autre — donc utiles seulement quand la reunion est
+   * la mienne.
+   *
+   * Le serveur resout le plafond d'apres l'ORGANISATEUR, jamais d'apres celui
+   * qui frappe a la porte : deux entreprises peuvent avoir deux reglages, et
+   * annoncer les miens dans la reunion d'un autre donnerait un chiffre faux. On
+   * ne les demande donc que si j'organise ; sinon ils restent nuls, et le refus
+   * se dit sans chiffre plutot qu'avec un mauvais.
+   */
+  const [mesPlafonds, setMesPlafonds] = useState<PlafondsReunion | null>(null)
   /** Onglet actif dans le panneau d'ajout : contacts ou pavé numérique. */
   const [ongletAjout, setOngletAjout] = useState<"contacts" | "numero">("contacts")
   /** Chiffres composés dans le pavé Alanya ID du panneau d'ajout. */
@@ -797,6 +812,19 @@ export default function MeetingRoomPage() {
       // liste des invites, qui ne dit pas qui est present.
       await joinMeetingRoom(parseInt(meetingId, 10), meeting.type, meeting.objet)
     } catch (err) {
+      /*
+       * LA SALLE PEUT ETRE PLEINE A L'INSTANT OU L'ON ENTRE, meme apres une
+       * invitation acceptee : le contingent d'invites et le nombre de personnes
+       * PRESENTES ne sont pas la meme chose. C'est le refus le plus deroutant
+       * des trois — on avait le droit d'etre la — donc celui qui a le plus
+       * besoin d'une phrase claire plutot que d'un message d'erreur brut.
+       */
+      const refus = lireRefusPlafond(err)
+      if (refus) {
+        const { titre, texte } = refusPlafondEnMots({ refus, plafonds: mesPlafonds, t })
+        showError(titre, texte)
+        return
+      }
       showError(t("error"), err instanceof Error ? err.message : t("meet_join_failed"))
     }
   }
@@ -954,6 +982,18 @@ export default function MeetingRoomPage() {
       await trancherDemandeInvitation(Number(meetingId), demandeId, accepter)
       setDemandes((liste) => liste.filter((d) => d.id !== demandeId))
     } catch (err) {
+      /*
+       * ACCEPTER UNE DEMANDE FAIT ENTRER QUELQU'UN : le plafond s'y applique
+       * comme a un ajout direct. La demande reste alors dans la file — elle
+       * redeviendra acceptable des qu'une place se libere, et l'effacer
+       * obligerait le demandeur a tout recommencer.
+       */
+      const refus = lireRefusPlafond(err)
+      if (refus) {
+        const { titre, texte } = refusPlafondEnMots({ refus, plafonds: mesPlafonds, t })
+        showError(titre, texte)
+        return
+      }
       // EN DUR FAUTE DE CLE : le catalogue n'a rien pour l'echec d'un arbitrage
       // de demande d'invitation. A reprendre des que la cle existe.
       showError(t("error"), err instanceof Error ? err.message : "Demande impossible")
@@ -999,6 +1039,22 @@ export default function MeetingRoomPage() {
     )
   }, [contacts, rechercheContact])
 
+  /**
+   * LES PLACES DE CETTE REUNION, telles que le serveur les compte.
+   *
+   * Elles ne sont PAS recalculees ici, et la tentation etait pourtant a portee :
+   * la liste des participants est dans `meeting`, il suffirait d'y ajouter
+   * l'organisateur et d'en retirer ceux qui ont decline. C'est justement la
+   * regle du serveur — qui occupe une place, et sous quel plafond — et deux
+   * ecritures d'une meme regle finissent toujours par se contredire.
+   *
+   * Nul tant que la route de detail ne porte pas ces nombres : le panneau
+   * n'affiche alors aucun compteur, et le refus reste la seule barriere. Voir le
+   * compte-rendu du lot pour le champ attendu.
+   */
+  const placesReunion = meeting?.capacite ?? null
+  const salleComplete = placesReunion !== null && placesReunion.restantes === 0
+
   /** Fermeture par clic extérieur : si on clique hors du panneau, on le ferme. */
   useEffect(() => {
     if (!panneauOuvert) return
@@ -1021,6 +1077,26 @@ export default function MeetingRoomPage() {
     }
   }, [panneauOuvert])
 
+  /**
+   * Les plafonds ne servent qu'a NOMMER une alternative dans le refus — « une
+   * reunion audio en accueille neuf ». Ils ne bornent rien ici : le compteur du
+   * panneau lit `meeting.capacite`, que le serveur calcule pour la reunion
+   * elle-meme.
+   */
+  useEffect(() => {
+    if (!meeting?.jeSuisOrganisateur) {
+      setMesPlafonds(null)
+      return
+    }
+    let vivant = true
+    void chargerPlafondsReunion().then((p) => {
+      if (vivant) setMesPlafonds(p)
+    })
+    return () => {
+      vivant = false
+    }
+  }, [meeting?.jeSuisOrganisateur])
+
   /** Ajouter une personne depuis le panneau — contacts ou pavé. */
   const ajouterPersonneParNumero = async (numero: string, nom: string) => {
     if (!meetingId) return
@@ -1040,6 +1116,27 @@ export default function MeetingRoomPage() {
       // Recharger la réunion pour mettre à jour la liste
       setMeeting(await fetchMeeting(Number(meetingId)))
     } catch (err) {
+      /*
+       * SALLE PLEINE : on garde le panneau OUVERT, contrairement au succes.
+       *
+       * La personne n'a pas fini ce qu'elle faisait — elle vient d'apprendre
+       * qu'il n'y a plus de place, et le geste suivant est souvent de retirer
+       * quelqu'un ou de refermer elle-meme. Fermer sous ses yeux lui ferait
+       * perdre sa recherche pour rien.
+       *
+       * ⚠️ Le refus vient du SERVEUR, y compris pour l'organisateur : le
+       * plafond ne connait pas de privilege, il tient a ce que les machines des
+       * participants peuvent porter.
+       */
+      const refus = lireRefusPlafond(err)
+      if (refus) {
+        const { titre, texte } = refusPlafondEnMots({ refus, plafonds: mesPlafonds, t })
+        showError(titre, texte)
+        // La reunion a peut-etre bouge depuis le dernier chargement : on relit,
+        // pour que le compteur du panneau dise la verite d'apres le refus.
+        setMeeting(await fetchMeeting(Number(meetingId)).catch(() => meeting))
+        return
+      }
       showError(t("error"), err instanceof Error ? err.message : t("a2_invite_failed"))
     }
   }
@@ -2227,6 +2324,22 @@ export default function MeetingRoomPage() {
         <div className="meeting-panneau meeting-panneau-ajout" ref={panneauRef}>
           <div className="meeting-panneau-titre">{t("meet_add_person")}</div>
 
+          {/* COMBIEN DE PLACES RESTENT, avant de chercher qui inviter. Le
+              chiffre vient du serveur ; sans lui, pas de ligne du tout. */}
+          {placesReunion && (
+            <div
+              className={`meeting-panneau-places${salleComplete ? " pleine" : ""}`}
+              aria-live="polite"
+            >
+              {placesReunion.restantes > 0
+                ? t("meet_cap_seats", {
+                    restantes: placesReunion.restantes,
+                    plafond: placesReunion.plafond,
+                  })
+                : t("meet_cap_seats_none", { plafond: placesReunion.plafond })}
+            </div>
+          )}
+
           <div className="meeting-panneau-onglets">
             <button
               className={ongletAjout === "contacts" ? "on" : ""}
@@ -2258,6 +2371,10 @@ export default function MeetingRoomPage() {
                     <button
                       key={c.id}
                       className="meeting-panneau-contact"
+                      // Salle pleine : le bouton ne promet plus un ajout que le
+                      // serveur refuserait. Rien n'est cache pour autant — la
+                      // liste reste entiere, et la ligne au-dessus dit pourquoi.
+                      disabled={salleComplete}
                       onClick={() => void ajouterPersonneParNumero(c.phone, c.name)}
                     >
                       <b>{c.name}</b>
@@ -2298,7 +2415,10 @@ export default function MeetingRoomPage() {
                     : t("digits_too_short", { n: chiffresAjout.length })}
               </div>
               <div className="meeting-panneau-pave-actions">
-                <button onClick={validerNumeroAjout} disabled={!isValidAlanyaNumber(chiffresAjout)}>
+                <button
+                  onClick={validerNumeroAjout}
+                  disabled={!isValidAlanyaNumber(chiffresAjout) || salleComplete}
+                >
                   {meeting?.jeSuisOrganisateur
                     ? t("invite_this_number")
                     : t("meet_invite_requested")}

@@ -1,6 +1,6 @@
-import { apiRequest } from "../lib/api-client"
+import { ApiError, apiRequest } from "../lib/api-client"
 import { resolveMediaUrl } from "./media-service"
-import { langueInitiale, traduire } from "../i18n"
+import { langueInitiale, traduire, type Cle } from "../i18n"
 
 /**
  * Reunions audio/video.
@@ -37,6 +37,27 @@ export interface ParticipantReunion extends Personne {
   dureeSecondes: number | null
 }
 
+/**
+ * Combien de personnes tiennent encore dans CETTE reunion.
+ *
+ * Trois nombres qui viennent tous du serveur, et qu'on ne recalcule pas : le
+ * plafond depend de l'entreprise de l'ORGANISATEUR (pas de celui qui regarde),
+ * et « qui occupe une place » est une regle serveur — l'organisateur compte
+ * meme s'il n'est pas entre, celui qui a decline ne compte plus. Deux facons de
+ * compter finiraient par donner deux chiffres, et l'un des deux serait faux.
+ *
+ * ⚠️ Nul tant que la route de detail ne porte pas ces champs : l'ecran n'affiche
+ * alors AUCUN compteur plutot qu'un compteur invente. Voir `capaciteBrute`.
+ */
+export interface CapaciteReunion {
+  /** Nombre maximum de personnes, organisateur compris. */
+  plafond: number
+  /** Places deja tenues, organisateur compris. */
+  occupants: number
+  /** Places encore libres. Jamais negatif. */
+  restantes: number
+}
+
 export interface Reunion {
   id: number
   objet: string
@@ -53,6 +74,8 @@ export interface Reunion {
   participants: ParticipantReunion[]
   /** Vrai si le compte courant a cree la reunion : lui seul peut la terminer. */
   jeSuisOrganisateur: boolean
+  /** Places, telles que le serveur les compte. Nul s'il ne les envoie pas. */
+  capacite: CapaciteReunion | null
 }
 
 /* ----------------- Traduction du vocabulaire serveur ----------------- */
@@ -81,6 +104,32 @@ interface ReunionBrute {
   organiser?: PersonneBrute
   participants?: PersonneBrute[]
   isOrganiser?: boolean
+  /* Places — voir `capaciteBrute`. Facultatifs : le serveur ne les envoie pas
+     encore, et l'ecran doit survivre a leur absence. */
+  plafond?: number
+  occupants?: number
+  restantes?: number
+}
+
+/**
+ * Lit les trois nombres de capacite, ou rend nul.
+ *
+ * TOUT OU RIEN, et volontairement : un plafond sans le nombre d'occupants ne
+ * permet d'afficher aucun compteur honnete, et completer le manquant reviendrait
+ * a recompter cote client la regle que le serveur porte. Mieux vaut ne rien
+ * montrer que montrer un chiffre a soi.
+ */
+function capaciteBrute(brut: ReunionBrute): CapaciteReunion | null {
+  const { plafond, occupants } = brut
+  if (typeof plafond !== "number" || typeof occupants !== "number") return null
+  return {
+    plafond,
+    occupants,
+    // `restantes` est calcule par le serveur ; le repli n'est qu'une soustraction
+    // sur SES deux nombres, pas une regle reinventee.
+    restantes:
+      typeof brut.restantes === "number" ? brut.restantes : Math.max(0, plafond - occupants),
+  }
 }
 
 const STATUTS: Record<number, StatutParticipant> = { 0: "invite", 1: "accepte", 2: "decline" }
@@ -120,6 +169,7 @@ function versReunion(brut: ReunionBrute, monId?: string): Reunion {
     participants: (brut.participants ?? []).map(versParticipant),
     // La liste ne porte pas isOrganiser : on le deduit alors de l'organisateur.
     jeSuisOrganisateur: brut.isOrganiser ?? (monId ? organisateur.id === monId : false),
+    capacite: capaciteBrute(brut),
   }
 }
 
@@ -135,6 +185,186 @@ export async function fetchMeetings(monId?: string): Promise<Reunion[]> {
 export async function fetchMeeting(id: number): Promise<Reunion> {
   const res = await apiRequest<ReunionBrute>(`/api/meetings/${id}`)
   return versReunion(res)
+}
+
+/* ----------------- Plafond de participants ----------------- */
+
+/**
+ * LE PLAFOND N'EST PAS ECRIT ICI, ET NE DOIT JAMAIS L'ETRE.
+ *
+ * Six en video, neuf en audio : ces chiffres appartiennent au serveur, qui les
+ * resout entreprise par entreprise et que le superuser peut deplacer. Les
+ * recopier dans le web donnerait deux sources de verite, et la seconde
+ * mentirait des la premiere modification — en affichant « 3 places restantes »
+ * dans une salle deja pleine, ou l'inverse.
+ *
+ * Le web ne fait donc que deux choses :
+ *   - il DEMANDE les plafonds pour les montrer AVANT le refus ;
+ *   - il RELIT les nombres que le serveur met dans son refus pour l'expliquer.
+ *
+ * Ni l'un ni l'autre ne suppose de valeur. Quand le serveur ne repond pas, il
+ * n'y a pas de compteur : une absence se remarque, un chiffre faux non.
+ */
+
+/**
+ * Le code que le serveur pose sur TOUS ses refus de plafond — creation, ajout,
+ * demande d'invitation, entree dans la salle. C'est un mot de PROTOCOLE, pas
+ * une regle : le recopier ici ne duplique aucune decision.
+ */
+export const CODE_SALLE_PLEINE = "MEETING_FULL"
+
+/** Les deux plafonds applicables au compte courant, organisateur compris. */
+export interface PlafondsReunion {
+  audio: number
+  video: number
+}
+
+/**
+ * GET /api/meetings/limits — les plafonds qui s'appliqueront a une reunion que
+ * JE cree (mon entreprise, sinon le reglage global, sinon les defauts).
+ *
+ * ⚠️ Sert la PREVENTION, jamais la decision : le serveur reste seul juge au
+ * moment de la creation. Deux raisons, et la seconde suffit — le reglage peut
+ * changer entre l'ouverture du formulaire et l'envoi, et un client n'est jamais
+ * une barriere.
+ *
+ * REND NUL PLUTOT QUE DE DEVINER. Route absente (le serveur ne l'expose pas
+ * encore), reseau coupe, reponse illisible : l'ecran se prive de son compteur
+ * et laisse le serveur refuser s'il doit refuser. Poser 6 et 9 en repli serait
+ * exactement la duplication qu'on evite : les defauts du code ne sont PAS les
+ * plafonds d'une entreprise qui les a releves.
+ */
+export async function chargerPlafondsReunion(): Promise<PlafondsReunion | null> {
+  try {
+    const res = await apiRequest<{
+      audio?: number
+      video?: number
+      // `effectif` est le mot qu'emploie deja l'administration des plafonds
+      // pour « le plafond reellement applique » : on l'accepte tel quel plutot
+      // que d'imposer une forme de plus.
+      effectif?: { audio?: number; video?: number }
+    }>("/api/meetings/limits")
+    const audio = res.audio ?? res.effectif?.audio
+    const video = res.video ?? res.effectif?.video
+    if (typeof audio !== "number" || typeof video !== "number") return null
+    return { audio, video }
+  } catch {
+    return null
+  }
+}
+
+/** Places encore libres, `occupants` comptant l'organisateur (convention serveur). */
+export function placesRestantes(plafond: number, occupants: number): number {
+  return Math.max(0, plafond - occupants)
+}
+
+/** Ce que le serveur dit quand il refuse : les nombres, pas sa phrase. */
+export interface RefusPlafond {
+  /** Type de la reunion visee, deduit du `typeMedia` du serveur. */
+  type: "audio" | "video"
+  plafond: number
+  /** Places deja tenues au moment du refus. */
+  actuel: number
+  /** Places demandees par le geste refuse. */
+  demandes: number
+  restantes: number
+}
+
+/**
+ * Reconnait un refus de plafond parmi les autres erreurs, et en tire les
+ * nombres.
+ *
+ * POURQUOI NE PAS AFFICHER LA PHRASE DU SERVEUR. Elle existe — `error.message`,
+ * en francais, avec les bons chiffres — et l'`ApiError` la porte deja. Mais
+ * cette application parle neuf langues : un utilisateur norvegien verrait
+ * surgir une phrase francaise au milieu de son ecran. Les nombres, eux, ne se
+ * traduisent pas ; on refait donc la phrase par-dessus.
+ *
+ * Rend nul pour toute autre erreur — y compris un 409 d'une autre nature — pour
+ * que l'appelant retombe sur son traitement d'erreur habituel.
+ */
+export function lireRefusPlafond(erreur: unknown): RefusPlafond | null {
+  if (!(erreur instanceof ApiError)) return null
+  const enveloppe = erreur.payload as { error?: Record<string, unknown> } | undefined
+  const corps = enveloppe?.error
+  if (!corps || corps.code !== CODE_SALLE_PLEINE) return null
+
+  const nombre = (valeur: unknown, defaut: number) =>
+    typeof valeur === "number" && Number.isFinite(valeur) ? valeur : defaut
+
+  const plafond = nombre(corps.plafond, 0)
+  const actuel = nombre(corps.actuel, 0)
+  return {
+    // 2 = video cote serveur. Tout le reste est traite comme de l'audio, comme
+    // le fait le serveur lui-meme.
+    type: corps.typeMedia === 2 ? "video" : "audio",
+    plafond,
+    actuel,
+    demandes: nombre(corps.demandes, 1),
+    restantes: nombre(corps.restantes, placesRestantes(plafond, actuel)),
+  }
+}
+
+/**
+ * Le refus, EN MOTS, dans la langue de celui qui le lit.
+ *
+ * Deux phrases et pas une seule, parce qu'un refus qui n'ouvre aucune porte
+ * n'aide personne : la premiere dit CE QUI est refuse et avec quels chiffres, la
+ * seconde dit QUOI FAIRE.
+ *
+ * LE CONSEIL EST CHOISI SUR DES NOMBRES DU SERVEUR, jamais sur une intuition.
+ * On ne propose l'audio que si l'on sait qu'il accueille davantage : un
+ * exploitant peut avoir releve le plafond video au-dessus du plafond audio, et
+ * « passez en audio » serait alors un mauvais conseil. Sans plafonds connus, on
+ * garde le conseil general — vrai par construction, l'audio coutant environ dix
+ * fois moins qu'une image — mais sans avancer de chiffre.
+ */
+export function refusPlafondEnMots(args: {
+  refus: RefusPlafond
+  /** Plafonds connus, s'ils ont pu etre demandes. */
+  plafonds: PlafondsReunion | null
+  /** Vrai si le refus est tombe A LA CREATION, ou aucune reunion n'existe encore. */
+  creation?: boolean
+  t: (cle: Cle, variables?: Record<string, string | number>) => string
+}): { titre: string; texte: string } {
+  const { refus, plafonds, creation, t } = args
+  const video = refus.type === "video"
+
+  const fait = creation
+    ? t(video ? "meet_cap_create_video" : "meet_cap_create_audio", {
+        plafond: refus.plafond,
+        demandes: refus.demandes,
+      })
+    : t(video ? "meet_cap_full_video" : "meet_cap_full_audio", {
+        plafond: refus.plafond,
+        actuel: refus.actuel,
+      })
+
+  // L'audio est-il vraiment la sortie ? Inconnu = on le suppose sans chiffrer.
+  const audioPlusGrand = plafonds ? plafonds.audio > refus.plafond : true
+  const conseil: string[] =
+    video && audioPlusGrand
+      ? plafonds
+        ? [t("meet_cap_advice_audio"), t("meet_cap_audio_max", { audio: plafonds.audio })]
+        : [t("meet_cap_advice_audio")]
+      : [t("meet_cap_advice_wait")]
+
+  return { titre: t("meet_cap_full_title"), texte: enchainer([fait, ...conseil]) }
+}
+
+/**
+ * Enchaine des phrases deja traduites.
+ *
+ * Le chinois ponctue avec des signes PLEINE CHASSE — « 。 », « ！ » — qui
+ * portent deja leur propre blanc : y ajouter une espace ouvre un trou visible au
+ * milieu du texte. Les alphabets latin et cyrillique, eux, l'exigent. Une simple
+ * jointure par `" "` etait donc juste dans huit langues sur neuf.
+ */
+function enchainer(phrases: string[]): string {
+  return phrases.reduce((accumule, phrase) => {
+    if (!accumule) return phrase
+    return `${accumule}${/[。！？]$/.test(accumule) ? "" : " "}${phrase}`
+  }, "")
 }
 
 /* ----------------- Ecriture ----------------- */

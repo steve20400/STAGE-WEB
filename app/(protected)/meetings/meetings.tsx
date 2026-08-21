@@ -8,6 +8,8 @@ import {
   declineMeeting,
   endMeeting,
   deleteMeeting,
+  lireRefusPlafond,
+  refusPlafondEnMots,
   type Reunion,
 } from "../../../src/services/meetings-service"
 import { getMyUserId } from "../../../src/data/session-user"
@@ -77,6 +79,26 @@ export default function MeetingsPage() {
       await joinMeeting(id)
       navigate(`/meetings/${id}`)
     } catch (err) {
+      /*
+       * LA PORTE PEUT ETRE FERMEE MEME QUAND ON EST INVITE.
+       *
+       * Le contingent d'invites et la presence reelle sont deux choses : une
+       * reunion peut avoir invite six personnes et n'en accueillir que six a la
+       * fois, organisateur compris. Le dernier a pousser la porte se la voit
+       * refuser, et c'est ici qu'il faut le lui dire avec des mots — pas avec
+       * la phrase francaise du serveur, que huit utilisateurs sur neuf ne
+       * lisent pas.
+       *
+       * Les plafonds de la reunion sont ceux de SON organisateur, que le compte
+       * courant n'a aucun moyen de connaitre : on passe donc `null`, et le
+       * conseil se donne sans chiffre.
+       */
+      const refus = lireRefusPlafond(err)
+      if (refus) {
+        const { titre, texte } = refusPlafondEnMots({ refus, plafonds: null, t })
+        showError(titre, texte)
+        return
+      }
       showError(err instanceof Error ? err.message : t("meet_join_failed"))
     }
   }

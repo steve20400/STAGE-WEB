@@ -2326,6 +2326,27 @@ export async function joinMeetingRoom(
 async function traiterEvenementSalle(event: Record<string, unknown>) {
   if (salleReunion === null) return
 
+  // SALLE PLEINE : on sort, et on le DIT.
+  //
+  // C'est la seule barriere qui protege reellement le maillage — la route HTTP,
+  // elle, compte des lignes de base qu'une coupure brutale laisse perimees. Sans
+  // ce traitement, le refuse restait indefiniment seul dans une salle fantome,
+  // camera et micro ouverts, sans le moindre message : rien ne ferme l'ecran
+  // d'une reunion, `verifierSolitude` ne s'y applique pas.
+  //
+  // Le message vient du serveur, mais l'ecran le traduit a partir du CODE et des
+  // deux nombres : le texte du serveur n'est jamais traduit, et l'application
+  // parle neuf langues.
+  if (event.type === "error" && String(event.code ?? "") === "MEETING_FULL") {
+    const plafond = Number(event.plafond ?? 0)
+    const actuel = Number(event.actuel ?? 0)
+    setState({
+      error: tr("meet_full_room", { plafond: String(plafond), actuel: String(actuel) }),
+    })
+    await hangUp()
+    return
+  }
+
   if (event.type === "meeting_joined") {
     // Ceux qui etaient deja la : c'est a eux d'offrir, on se contente de tenir
     // la session prete a recevoir leur offre. Meme role que

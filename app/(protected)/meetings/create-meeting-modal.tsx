@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useToast } from "../../../src/components/toast"
 import { NomDuTitulaire } from "../../../src/components/nom-du-titulaire"
 import { loadContacts } from "../../../src/data/contacts"
@@ -9,7 +9,14 @@ import {
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
 import { normalizePhoneNumber } from "../../../src/data/session-user"
-import { createMeeting } from "../../../src/services/meetings-service"
+import {
+  chargerPlafondsReunion,
+  createMeeting,
+  lireRefusPlafond,
+  placesRestantes,
+  refusPlafondEnMots,
+  type PlafondsReunion,
+} from "../../../src/services/meetings-service"
 import { useTranslation } from "../../../src/i18n"
 
 interface CreateMeetingModalProps {
@@ -51,12 +58,105 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
   const [manualNumber, setManualNumber] = useState("")
   const [contacts, setContacts] = useState(() => loadContacts())
   const [loading, setLoading] = useState(false)
+  /**
+   * Les plafonds tels que LE SERVEUR les applique a mes reunions. Nuls tant
+   * qu'ils n'ont pas ete obtenus — et durablement nuls si la route n'existe pas
+   * encore. Aucun repli en dur : voir `chargerPlafondsReunion`.
+   */
+  const [plafonds, setPlafonds] = useState<PlafondsReunion | null>(null)
 
   useEffect(() => {
     void fetchContacts()
       .then(setContacts)
       .catch(() => undefined)
   }, [])
+
+  /**
+   * Relus a CHAQUE ouverture, et non une fois pour la vie de l'onglet : un
+   * exploitant peut avoir change le plafond depuis, et une session de web reste
+   * ouverte des journees entieres.
+   */
+  useEffect(() => {
+    if (!isOpen) return
+    let vivant = true
+    void chargerPlafondsReunion().then((p) => {
+      if (vivant) setPlafonds(p)
+    })
+    return () => {
+      vivant = false
+    }
+  }, [isOpen])
+
+  /**
+   * LE COMPTE DES PLACES, tel que le serveur le tient.
+   *
+   * `occupants` compte l'organisateur — c'est-a-dire MOI, qui cree la reunion —
+   * en plus des invites choisis. C'est la convention du serveur, et ne pas la
+   * suivre rendrait le compteur faux d'une unite : il annoncerait une derniere
+   * place que la creation refuserait.
+   *
+   * Tout est nul quand les plafonds sont inconnus : pas de compteur invente.
+   */
+  const capacite = useMemo(() => {
+    if (!plafonds) return null
+    const plafond = typeMedia === 2 ? plafonds.video : plafonds.audio
+    const occupants = selectedParticipants.size + 1
+    return {
+      plafond,
+      occupants,
+      restantes: placesRestantes(plafond, occupants),
+      depasse: occupants > plafond,
+    }
+  }, [plafonds, typeMedia, selectedParticipants])
+
+  /**
+   * LE CHANGEMENT DE TYPE, DIT AU MOMENT OU IL SE FAIT.
+   *
+   * Une reunion video plafonne plus bas qu'une audio. Quelqu'un qui a choisi
+   * huit personnes en audio, puis bascule en video, doit l'apprendre sur-le-champ
+   * — pas apres avoir clique sur « Creer ». L'avis est donc un ETAT DERIVE et non
+   * un message lance par le clic : il apparait a l'instant ou la case change, et
+   * s'efface de lui-meme des qu'on retire assez de monde ou qu'on revient a
+   * l'audio.
+   */
+  const avisBasculeVideo =
+    plafonds && typeMedia === 2 && capacite?.depasse
+      ? t("meet_cap_switch_video", {
+          choisis: selectedParticipants.size,
+          video: plafonds.video,
+          audio: plafonds.audio,
+        })
+      : null
+
+  /**
+   * Le compteur, ecrit une fois et pose aux deux etapes : sous le choix du type,
+   * et en tete de la liste des contacts. Deux copies du meme JSX auraient fini
+   * par diverger.
+   *
+   * `aria-live` : le nombre change a chaque case cochee sans qu'aucun focus ne
+   * bouge. Sans annonce, un lecteur d'ecran ne dirait jamais qu'il ne reste
+   * qu'une place.
+   */
+  const compteurPlaces = capacite ? (
+    <p
+      className={`meeting-capacite${capacite.restantes === 0 ? " pleine" : ""}`}
+      aria-live="polite"
+    >
+      {capacite.restantes > 0
+        ? t("meet_cap_seats", { restantes: capacite.restantes, plafond: capacite.plafond })
+        : t("meet_cap_seats_none", { plafond: capacite.plafond })}
+    </p>
+  ) : null
+
+  /**
+   * Plus une place : on cesse d'accepter de NOUVEAUX choix.
+   *
+   * On ne verrouille que l'ajout, jamais le retrait — une case deja cochee reste
+   * decochable, sans quoi une liste trop grande deviendrait un cul-de-sac. Et
+   * rien n'est verrouille tant que les plafonds sont inconnus : un ecran qui
+   * refuse sans savoir pourquoi serait pire que pas de garde-fou du tout.
+   */
+  const plusDePlace = capacite !== null && capacite.restantes === 0
   const filteredContacts = searchQuery.trim()
     ? contacts.filter((c) => {
         const query = searchQuery.toLowerCase()
@@ -98,7 +198,21 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
       onClose()
       onSuccess()
     } catch (err) {
-      showError(err instanceof Error ? err.message : t("meet_create_failed"))
+      /*
+       * LE REFUS DE PLAFOND N'EST PAS UNE ERREUR COMME LES AUTRES.
+       *
+       * Le serveur en donne les nombres exacts ; sa phrase, elle, est en
+       * francais et ne sortirait pas d'ici dans une autre langue. On la refait
+       * donc, et surtout on ajoute CE QU'IL FAUT FAIRE — l'audio accueille plus
+       * de monde. Un refus qui n'ouvre aucune porte ne fait que bloquer.
+       */
+      const refus = lireRefusPlafond(err)
+      if (refus) {
+        const { titre, texte } = refusPlafondEnMots({ refus, plafonds, creation: true, t })
+        showError(titre, texte)
+      } else {
+        showError(err instanceof Error ? err.message : t("meet_create_failed"))
+      }
     } finally {
       setLoading(false)
     }
@@ -151,6 +265,22 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
                   {t("video_label")}
                 </label>
               </div>
+              {/* COMBIEN DE MONDE TIENT DANS CHAQUE TYPE, avant meme d'ouvrir la
+                  liste des contacts. C'est la seule information qui rende le
+                  choix audio/video eclaire — et la seule qui evite de composer
+                  une liste de douze personnes pour se la faire refuser. Absent
+                  si le serveur n'a pas donne ses chiffres : on n'en invente
+                  aucun. */}
+              {plafonds && (
+                <p className="meeting-capacite-note">
+                  {t("meet_cap_hint", { video: plafonds.video, audio: plafonds.audio })}
+                </p>
+              )}
+              {avisBasculeVideo && (
+                <p className="meeting-capacite-avis" role="status">
+                  {avisBasculeVideo}
+                </p>
+              )}
             </div>
 
             <div className="form-group">
@@ -173,6 +303,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
 
             <div className="form-group">
               <label>{t("meet_participants", { count: selectedParticipants.size })}</label>
+              {compteurPlaces}
               <button className="btn-secondary" onClick={() => setStep("participants")}>
                 {t("meet_add_participants")}
               </button>
@@ -180,6 +311,15 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
           </div>
         ) : (
           <div className="modal-body">
+            {/* LE COMPTEUR EST EN TETE DE LA LISTE, pas au pied : il doit se lire
+                PENDANT qu'on coche, pas apres. C'est tout l'ecart entre prevenir
+                et punir. */}
+            {compteurPlaces}
+            {avisBasculeVideo && (
+              <p className="meeting-capacite-avis" role="status">
+                {avisBasculeVideo}
+              </p>
+            )}
             <input
               type="text"
               placeholder={t("meet_search_placeholder")}
@@ -204,7 +344,7 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
                     langues lisaient « Ajouter » sur ce bouton. */}
                 <button
                   type="button"
-                  disabled={!isValidAlanyaNumber(manualNumber)}
+                  disabled={!isValidAlanyaNumber(manualNumber) || plusDePlace}
                   onClick={() => {
                     setSelectedParticipants((prev) =>
                       new Set(prev).add(normalizeAlanyaNumber(manualNumber))
@@ -223,10 +363,16 @@ export function CreateMeetingModal({ isOpen, onClose, onSuccess }: CreateMeeting
 
             <div className="participants-list">
               {filteredContacts.map((contact) => (
-                <label key={contact.id} className="participant-item">
+                <label
+                  key={contact.id}
+                  className={`participant-item${
+                    plusDePlace && !selectedParticipants.has(contact.phone) ? " hors-plafond" : ""
+                  }`}
+                >
                   <input
                     type="checkbox"
                     checked={selectedParticipants.has(contact.phone)}
+                    disabled={plusDePlace && !selectedParticipants.has(contact.phone)}
                     onChange={(e) => {
                       const next = new Set(selectedParticipants)
                       if (e.target.checked) {
