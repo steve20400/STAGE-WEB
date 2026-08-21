@@ -109,6 +109,12 @@ interface ReunionBrute {
   plafond?: number
   occupants?: number
   restantes?: number
+  /* LE MEME NOMBRE, SOUS L'AUTRE NOM DU SERVEUR. Ses refus de plafond appellent
+     « actuel » ce que son comptage appelle « occupants » — un seul et meme
+     chiffre : les personnes qui tiennent une place, organisateur compris. Les
+     deux mots sont deja dans SON vocabulaire ; les accepter tous les deux ne
+     devine rien et evite qu'un compteur disparaisse pour un synonyme. */
+  actuel?: number
 }
 
 /**
@@ -120,7 +126,8 @@ interface ReunionBrute {
  * montrer que montrer un chiffre a soi.
  */
 function capaciteBrute(brut: ReunionBrute): CapaciteReunion | null {
-  const { plafond, occupants } = brut
+  const { plafond } = brut
+  const occupants = typeof brut.occupants === "number" ? brut.occupants : brut.actuel
   if (typeof plafond !== "number" || typeof occupants !== "number") return null
   return {
     plafond,

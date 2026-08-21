@@ -1097,6 +1097,44 @@ export default function MeetingRoomPage() {
     }
   }, [meeting?.jeSuisOrganisateur])
 
+  /**
+   * LE COMPTEUR DU PANNEAU SE RELIT PENDANT QU'ON LE REGARDE.
+   *
+   * `meeting` n'etait lu qu'a l'ouverture de la page et apres un ajout reussi.
+   * Or une salle bouge sans cesse : on y entre, on en sort, l'organisateur
+   * exclut quelqu'un. Un compteur fige a « plus de place » ne redescendait donc
+   * JAMAIS, et le panneau restait verrouille alors qu'une place venait de se
+   * liberer — un cul-de-sac que rien n'explique, exactement le contraire de ce
+   * qu'une prevention doit produire. Fige dans l'autre sens, il promettait une
+   * place que le serveur refusait ensuite.
+   *
+   * RELU A L'OUVERTURE, puis toutes les dix secondes, et SEULEMENT tant que le
+   * panneau est ouvert : c'est le seul moment ou ce chiffre est sous les yeux et
+   * ou il decide de quelque chose. Referme, il ne coute plus rien. Dix secondes,
+   * comme la file des demandes d'invitation juste au-dessus : deux cadences
+   * differentes pour un meme panneau se verraient.
+   *
+   * L'ECHEC EST AVALE, sans toast ni bandeau : une relecture manquee laisse le
+   * dernier etat connu, ce qui vaut mieux qu'un message d'erreur pose par-dessus
+   * une reunion qui, elle, fonctionne. Le refus du serveur reste la barriere.
+   */
+  useEffect(() => {
+    if (panneauOuvert !== "ajouter" || !meetingId) return
+    let vivant = true
+    const relire = () =>
+      void fetchMeeting(Number(meetingId))
+        .then((m) => {
+          if (vivant) setMeeting(m)
+        })
+        .catch(() => undefined)
+    relire()
+    const minuteur = window.setInterval(relire, 10000)
+    return () => {
+      vivant = false
+      window.clearInterval(minuteur)
+    }
+  }, [panneauOuvert, meetingId])
+
   /** Ajouter une personne depuis le panneau — contacts ou pavé. */
   const ajouterPersonneParNumero = async (numero: string, nom: string) => {
     if (!meetingId) return
