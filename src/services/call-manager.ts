@@ -289,6 +289,10 @@ class PeerSession {
   private pc: RTCPeerConnection | null = null
   private started = false
   private remoteReady = false
+  /** Une renegociation a ete demandee pendant une negociation en vol. */
+  private renegociationDemandee = false
+  /** Qui cede en cas de collision d'offres. Voir le commentaire a la creation. */
+  private poli = false
   private pendingSignals: WebrtcSignal[] = []
   private iceQueue: RTCIceCandidateInit[] = []
   remoteStream: MediaStream | null = null
@@ -319,6 +323,22 @@ class PeerSession {
     this.started = true
 
     const pc = new RTCPeerConnection({ iceServers: this.iceServers })
+    // COLLISION D'OFFRES. Deux pairs qui renegocient dans le meme tour — deux
+    // partages d'ecran lances ensemble — s'envoyaient chacun une offre, et
+    // chacun rejetait celle de l'autre : les deux connexions restaient en
+    // « have-local-offer » DEFINITIVEMENT, video morte pour le reste de la
+    // reunion, sans qu'aucun geste ne puisse en sortir.
+    //
+    // La regle est celle du canevas standard : l'un des deux est POLI et cede,
+    // l'autre tient. La politesse se decide par comparaison d'identifiants, donc
+    // a l'identique des deux cotes et sans se concerter — et par une comparaison
+    // qui les DEPARTAGE forcement, contrairement a un tirage au sort.
+    this.poli = (myUserId() ?? "") > this.peerId
+    pc.addEventListener("signalingstatechange", () => {
+      if (pc.signalingState !== "stable" || !this.renegociationDemandee) return
+      this.renegociationDemandee = false
+      void this.renegocier()
+    })
     this.pc = pc
 
     pc.onicecandidate = (event) => {
@@ -539,7 +559,14 @@ class PeerSession {
    */
   async renegocier() {
     const pc = this.pc
-    if (!pc || pc.signalingState !== "stable") return
+    if (!pc) return
+    if (pc.signalingState !== "stable") {
+      // ON DIFFERE AU LIEU D'ABANDONNER. Renoncer en silence laissait la piste
+      // posee sans jamais partir : la direction avait bien bascule, mais aucune
+      // offre ne la portait. Le drapeau est rejoue des le retour a « stable ».
+      this.renegociationDemandee = true
+      return
+    }
     try {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
@@ -563,6 +590,18 @@ class PeerSession {
 
     try {
       if (signal.kind === "offer" && signal.sdp) {
+        if (pc.signalingState !== "stable") {
+          if (!this.poli) {
+            // L'impoli garde la sienne : l'autre cedera, et sa renegociation
+            // differee repartira toute seule au retour a « stable ».
+            return
+          }
+          // Le poli remballe son offre pour accepter celle d'en face. Sans ce
+          // retour en arriere, `setRemoteDescription` jetterait et la connexion
+          // resterait bloquee.
+          await pc.setLocalDescription({ type: "rollback" })
+          this.renegociationDemandee = true
+        }
         await pc.setRemoteDescription({ type: "offer", sdp: signal.sdp })
         this.remoteReady = true
         await this.flushIceQueue()
