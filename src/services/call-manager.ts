@@ -334,11 +334,37 @@ class PeerSession {
       })
     }
 
+    /*
+     * UNE PISTE QUI ARRIVE SANS FLUX NE DOIT PLUS ETRE JETEE.
+     *
+     * `event.streams` est VIDE des que la ligne media d'en face n'annonce aucun
+     * `msid`. Ce n'est pas un cas theorique : c'est celui d'un emetteur declare
+     * par `addTransceiver` — donc sans flux associe — puis rempli par
+     * `replaceTrack`. Autrement dit le partage d'ecran d'un poste entre SANS
+     * webcam, exactement ce que l'ecoute seule a rendu possible.
+     *
+     * Le `if` d'avant faisait sortir sans rien poser. La piste d'ecran passait
+     * alors bel et bien sur le fil — direction et codecs negocies — mais
+     * n'atteignait jamais `remoteStreams`, donc jamais l'element <video> de la
+     * salle. Chacun mettait le presentateur en vedette devant un cadre NOIR, et
+     * comme la vedette prend toute la scene, le spectateur ne voyait plus rien
+     * du tout : ni l'ecran annonce, ni la vignette d'avant. Le presentateur,
+     * lui, voyait son propre ecran et se croyait suivi.
+     *
+     * On reprend donc le flux deja constitue pour ce pair et on y AJOUTE la
+     * piste. Reprendre le MEME objet est ce qui compte : l'element <video> de la
+     * salle pointe deja dessus, et une piste ajoutee a un flux vivant s'affiche
+     * sans qu'il faille rebrancher quoi que ce soit.
+     *
+     * Cette garde vaut aussi pour l'interoperabilite : rien n'oblige un pair —
+     * l'application mobile, un client plus ancien — a annoncer un `msid`, et le
+     * seul fait qu'il n'en annonce pas ne doit pas rendre son image invisible.
+     */
     pc.ontrack = (event) => {
-      if (event.streams.length > 0) {
-        this.remoteStream = event.streams[0]
-        this.onUpdated()
-      }
+      const flux = event.streams[0] ?? this.remoteStream ?? new MediaStream()
+      if (!flux.getTracks().includes(event.track)) flux.addTrack(event.track)
+      this.remoteStream = flux
+      this.onUpdated()
     }
 
     // Diagnostic : visible dans la console (F12) si le media ne passe pas.
@@ -432,15 +458,57 @@ class PeerSession {
    * On est entre en ecoute seule, et le micro finit par etre accorde. La
    * mecanique de `replaceVideoTrack` ne convient pas ici : elle substitue une
    * piste a une autre sur un emetteur qui EMET deja, alors que la ligne a ete
-   * negociee en reception seule. Il faut en changer le SENS, ce dont `addTrack`
-   * se charge — il reprend le transceiver en reception seule et le passe en
-   * emission-reception — et ce changement de sens doit etre renegocie ; voir
-   * `renegocier`, que l'appelant enchaine.
+   * negociee en reception seule. Il faut en changer le SENS, et ce changement
+   * doit etre renegocie ; voir `renegocier`, que l'appelant enchaine.
+   *
+   * ⚠️ ON REPREND LA LIGNE EXISTANTE, ON N'EN OUVRE PAS UNE SECONDE.
+   *
+   * `addTrack` faisait ce travail tout seul — il reprend un transceiver en
+   * reception seule et le passe en emission-reception — mais SEULEMENT tant que
+   * ce transceiver n'a JAMAIS EMIS. La regle est dans la specification, et elle
+   * mord ici : qui entre sans camera, partage son ecran, puis arrete ce partage,
+   * laisse derriere lui une ligne video qui a deja emis. La camera reprise
+   * ensuite n'y retournait pas — `addTrack` ouvrait une SECONDE ligne video.
+   *
+   * Ce qu'il en coutait, mesure au banc : le pair se retrouvait avec deux pistes
+   * video dans le meme flux, la premiere morte et la seconde vivante. Un
+   * element <video> n'affiche que la PREMIERE — le correspondant restait donc
+   * noir pour toujours, camera reprise ou nouveau partage, sans que rien ne le
+   * signale. Et `replaceVideoTrack`, cherchant « la » ligne video, n'avait plus
+   * de reponse unique a donner.
+   *
+   * On substitue donc la piste sur la ligne qui existe, quitte a n'en ouvrir une
+   * qu'a defaut. `setStreams` va avec : une ligne posee par `addTransceiver`
+   * n'a aucun flux associe, et sans lui le pair recevrait la piste sans rien ou
+   * l'accrocher — voir `replaceVideoTrack`, meme cause, meme remede.
    */
-  ajouterPisteLocale(piste: MediaStreamTrack, flux: MediaStream): boolean {
+  async ajouterPisteLocale(piste: MediaStreamTrack, flux: MediaStream): Promise<boolean> {
     const pc = this.pc
     if (!pc) return false
     this.localStream = flux
+
+    const ligne = pc
+      .getTransceivers()
+      .find(
+        (item) =>
+          item.receiver.track?.kind === piste.kind &&
+          !item.sender.track &&
+          item.currentDirection !== "stopped"
+      )
+    if (ligne) {
+      try {
+        await ligne.sender.replaceTrack(piste)
+        if (typeof ligne.sender.setStreams === "function") ligne.sender.setStreams(flux)
+        if (ligne.direction === "recvonly") ligne.direction = "sendrecv"
+        else if (ligne.direction === "inactive") ligne.direction = "sendonly"
+        return true
+      } catch (err) {
+        // La ligne existante s'est derobee : on retombe sur l'ouverture d'une
+        // nouvelle, qui vaut mieux que de rester muet.
+        console.warn(`[webrtc] reprise de la ligne ${piste.kind} impossible :`, err)
+      }
+    }
+
     try {
       pc.addTrack(piste, flux)
       return true
@@ -559,14 +627,36 @@ class PeerSession {
   async replaceVideoTrack(track: MediaStreamTrack | null): Promise<boolean> {
     const pc = this.pc
     if (!pc) return false
-    // `sender.track` peut etre nul — piste retiree, ou emetteur pas encore
-    // associe. On retombe alors sur le transceiver video, sinon le
-    // correspondant reste sur l'ancienne image apres un changement de camera.
-    const transceiver = pc
-      .getTransceivers()
-      .find((item) => item.sender.track?.kind === "video" || item.receiver.track?.kind === "video")
-    const sender =
-      pc.getSenders().find((item) => item.track?.kind === "video") ?? transceiver?.sender
+    /*
+     * UNE SEULE LIGNE, CHOISIE UNE SEULE FOIS — l'emetteur et le transceiver
+     * doivent etre les DEUX BOUTS DU MEME m-line.
+     *
+     * Ils etaient cherches separement : le transceiver par la premiere ligne
+     * qui touche a la video dans un sens OU DANS L'AUTRE, l'emetteur par la
+     * premiere piste video posee. Tant qu'il n'y a qu'une ligne video, les deux
+     * recherches tombent sur la meme et rien ne se voit. Des qu'il y en a DEUX,
+     * elles divergent en silence : la piste est substituee sur une ligne
+     * pendant que la direction est corrigee sur une AUTRE. Mesure au banc — la
+     * piste d'ecran partait sur la ligne 2, la direction etait relue sur la
+     * ligne 1, et personne ne renegociait ce qu'il fallait.
+     *
+     * Deux lignes video sur une meme connexion ne sont pas une vue de l'esprit :
+     * `addTrack` ne REUTILISE jamais un transceiver qui a deja emis, si bien
+     * qu'une camera reprise en cours de reunion — apres un partage termine — en
+     * ouvre une seconde. Voir `ajouterPisteLocale`.
+     *
+     * On prend donc le transceiver EN PREMIER, et l'emetteur est le sien. Meme
+     * ordre de preference qu'avant : une ligne qui emet deja de la video
+     * l'emporte, a defaut celle qui en recoit — `sender.track` peut etre nul,
+     * piste retiree ou emetteur pas encore associe, et sans ce repli le
+     * correspondant resterait sur l'ancienne image apres un changement de
+     * camera.
+     */
+    const lignes = pc.getTransceivers()
+    const transceiver =
+      lignes.find((item) => item.sender.track?.kind === "video") ??
+      lignes.find((item) => item.receiver.track?.kind === "video")
+    const sender = transceiver?.sender
     if (!sender) return false
     try {
       await sender.replaceTrack(track)
@@ -577,6 +667,32 @@ class PeerSession {
     if (!track || !transceiver) return false
     if (transceiver.direction === "recvonly" || transceiver.direction === "inactive") {
       transceiver.direction = "sendrecv"
+      /*
+       * ET IL FAUT AUSSI LUI DONNER UN FLUX — sans quoi la piste part et
+       * n'arrive nulle part.
+       *
+       * Cette ligne a ete declaree par `addTransceiver` : son emetteur n'a
+       * AUCUN flux associe, et `replaceTrack` ne lui en donne pas. L'offre
+       * annonce alors `a=msid:-`, le pair recoit bien la piste, mais son
+       * evenement `track` arrive avec `streams` VIDE — et une piste sans flux
+       * n'a rien ou s'afficher. Basculer la direction faisait passer les
+       * paquets ; il manquait de quoi les rattacher a l'arrivee.
+       *
+       * `this.localStream` est le meme objet que le flux local du module :
+       * `appliquerPisteVideo` remplace les PISTES qu'il contient sans jamais
+       * changer le flux lui-meme, si bien que son identifiant — le `msid` que
+       * porte le SDP — reste celui deja annonce pour l'audio. Les deux pistes
+       * arrivent donc dans le meme flux chez le pair, comme pour un poste qui
+       * avait sa camera des l'entree.
+       *
+       * `setStreams` est verifiee avant d'etre appelee : elle manque aux
+       * navigateurs les plus anciens, et son absence ne doit pas faire echouer
+       * la bascule de direction, qui elle vaut toujours mieux que rien. Le
+       * `ontrack` du pair sait desormais recoudre une piste sans flux.
+       */
+      if (this.localStream && typeof sender.setStreams === "function") {
+        sender.setStreams(this.localStream)
+      }
       return true
     }
     return false
@@ -2598,7 +2714,7 @@ async function adopterLesPistes(flux: MediaStream): Promise<void> {
   for (const session of peers.values()) {
     let aChange = false
     for (const piste of ajoutees) {
-      if (session.ajouterPisteLocale(piste, cible)) aChange = true
+      if (await session.ajouterPisteLocale(piste, cible)) aChange = true
     }
     if (aChange) await session.renegocier()
   }
