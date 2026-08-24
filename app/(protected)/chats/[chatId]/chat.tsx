@@ -27,6 +27,7 @@ import { findLocalGroup, toChatInfoMock } from "../../../../src/data/local-group
 import { useToast } from "../../../../src/components/toast"
 import {
   formatBytes,
+  applyMessageEditToCache,
   deleteChatMessage,
   fetchMessages,
   fetchMessagesCacheFirst,
@@ -64,6 +65,7 @@ import {
   publishTyping,
   subscribeToConversation,
   subscribeToMessageDeleted,
+  subscribeToMessageEdited,
   subscribeToPresence,
   subscribeToStatus,
   subscribeToTyping,
@@ -4392,6 +4394,12 @@ function MessageBubble({
                     color: isMe ? "rgba(255, 255, 255, 0.75)" : "var(--text-faint)",
                   }}
                 >
+                  {/* « modifie » AVANT l'heure, et en italique, comme le
+                    mobile : les deux clients doivent se lire pareil. Le `gap`
+                    du parent suffit a l'espacer, rien a ajouter ici. */}
+                  {msg.editedAt && (
+                    <span style={{ fontStyle: "italic" }}>{t("thr_message_modifie")}</span>
+                  )}
                   {formatTime(msg.timestamp)}
                   {isMe && <StatusIcon status={msg.status} />}
                 </span>
@@ -4785,6 +4793,40 @@ export default function ChatRoomPage() {
       })
     })
 
+    // Abonnement aux EDITIONS de messages.
+    //
+    // Le serveur diffuse `message_edited` a tous les participants depuis
+    // toujours, et le mobile le traite ; c'est le web qui ne l'ecoutait pas. Un
+    // message modifie gardait donc son ancien texte jusqu'a ce qu'on rouvre la
+    // conversation — le fameux « il faut rafraichir pour voir la modification ».
+    const unsubscribeEdited = subscribeToMessageEdited(chatId, (event) => {
+      if (cancelled) return
+
+      // Le cache IndexedDB doit suivre, sinon le cache-first repeint l'ancien
+      // texte au rechargement suivant avant que le reseau ne le corrige.
+      void applyMessageEditToCache(chatId, event.messageId, event.content, event.editedAt)
+
+      setMessages((prev) => {
+        const ancien = prev.find((m) => m.id === event.messageId)
+        if (!ancien) return prev
+
+        // Meme raison qu'a la suppression : les traductions sont rangees sous
+        // l'empreinte du TEXTE. Celle de l'ancien contenu ne correspond plus a
+        // rien d'affiche et deviendrait introuvable une fois l'etat remplace —
+        // pire, une traduction perimee pourrait etre reservie pour un texte qui
+        // a change de sens. On l'oublie AVANT de poser le nouveau contenu.
+        if (ancien.content && ancien.content !== event.content) {
+          void oublierTraductionsDuTexte(ancien.content)
+        }
+
+        return prev.map((m) =>
+          m.id === event.messageId
+            ? { ...m, content: event.content, editedAt: event.editedAt }
+            : m
+        )
+      })
+    })
+
     // Apres une coupure du WebSocket, on recharge l'historique pour rattraper
     // les messages arrives pendant la deconnexion.
     // Après reconnexion WS : delta sync — on ne recharge que les messages
@@ -4817,6 +4859,7 @@ export default function ChatRoomPage() {
       unsubscribeStatus()
       unsubscribePresence()
       unsubscribeDeleted()
+      unsubscribeEdited()
       unsubscribeConnected()
       clearInterval(pollId)
       if (typingTimeoutId) clearTimeout(typingTimeoutId)

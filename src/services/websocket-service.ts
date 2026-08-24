@@ -919,6 +919,57 @@ export function sendDeleteMessage(messageId: string, scope: "me" | "everyone") {
   sendRaw({ type: "delete_message", messageId, scope })
 }
 
+/* ----------------- Edition de messages ----------------- */
+
+export interface MessageEditedEvent {
+  messageId: string
+  convId: string
+  content: string
+  editedAt: Date
+}
+
+/**
+ * S'abonne aux EDITIONS de messages d'une conversation.
+ *
+ * Pourquoi cet abonnement a manque si longtemps. Le serveur diffuse
+ * `message_edited` a TOUS les participants depuis toujours (`ws-server.mjs`,
+ * `handleEditMessage`), et le mobile le traite. Le web, lui, ne connaissait que
+ * `message_deleted` : un message modifie gardait donc son ancien texte a
+ * l'ecran jusqu'a ce qu'on rouvre la conversation, qui la rechargeait alors en
+ * REST — ou `editedAt` et le nouveau contenu sont pourtant presents. D'ou le
+ * symptome « il faut rafraichir pour voir la modification », qui ne venait ni
+ * du serveur, ni de l'emetteur, mais de ce seul trou d'ecoute.
+ */
+export function subscribeToMessageEdited(
+  conversationId: string,
+  handler: (event: MessageEditedEvent) => void
+): () => void {
+  return addListener((event) => {
+    if (event.type !== "message_edited" || event.convId !== conversationId) return
+
+    const messageId = String(event.messageId ?? "")
+    // Le serveur refuse deja un contenu vide : `handleEditMessage` sort AVANT
+    // d'ecrire quand le texte est vide. Une trame sans texte est donc anormale,
+    // et l'accepter viderait la bulle a l'ecran alors que la base, elle, n'a pas
+    // bouge — l'affichage mentirait jusqu'au prochain rechargement.
+    const content = typeof event.content === "string" ? event.content : null
+    if (!messageId || content === null) return
+
+    const brut = event.editedAt
+    const datee = typeof brut === "string" ? new Date(brut) : null
+
+    handler({
+      messageId,
+      convId: conversationId,
+      content,
+      // Une date illisible ne doit pas faire disparaitre la mention « modifie » :
+      // on retombe sur l'instant de reception, qui n'en differe que de quelques
+      // millisecondes. Le fait QU'IL Y AIT eu edition compte plus que l'heure.
+      editedAt: datee && !Number.isNaN(datee.getTime()) ? datee : new Date(),
+    })
+  })
+}
+
 /**
  * Transfere un message vers plusieurs conversations.
  * Resout avec les resultats renvoyes par l'evenement "forwarded".

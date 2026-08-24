@@ -90,6 +90,16 @@ export interface ChatMessageMock {
   durationMs?: number
   /** Message supprime "pour tous" : on affiche un placeholder. */
   isDeleted?: boolean
+  /**
+   * Renseigne = le message a ete modifie apres coup ; on affiche « modifie »
+   * a cote de l'heure, comme le mobile. Absent = jamais modifie.
+   *
+   * La DATE elle-meme n'est pas affichee aujourd'hui — seule sa presence
+   * compte. Elle est conservee plutot qu'un simple booleen parce que le
+   * serveur la fournit deja (REST et WebSocket) et qu'un « modifie a 14h03 »
+   * ne demanderait alors aucun aller-retour supplementaire.
+   */
+  editedAt?: Date
 }
 
 export const CHAT_COLORS = [

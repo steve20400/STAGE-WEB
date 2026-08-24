@@ -37,6 +37,12 @@ export interface BackendMessage {
     isDeleted: boolean
   } | null
   deletedAt?: string | null
+  /**
+   * Date de la derniere modification, ou null si le message n'a jamais ete
+   * modifie. Servie par `GET /api/conversations/{id}/messages` comme par le
+   * cache IndexedDB, qui la range au meme nom.
+   */
+  editedAt?: string | null
   media?: Array<{
     id: string
     url: string
@@ -114,6 +120,14 @@ export function toFrontMessage(
   const media = m.media?.[0]
   const deletedAt = (m as BackendMessage).deletedAt ?? null
 
+  // Le cache IndexedDB repasse par cette fonction (`fetchMessagesCacheFirst` le
+  // relit en `BackendMessage`), et il peut avoir range la date en horodatage
+  // numerique la ou le REST envoie une chaine ISO. `new Date` accepte les deux ;
+  // reste a ecarter une valeur illisible, qui donnerait une Date « Invalid »
+  // affichee telle quelle.
+  const brutEdite = (m as BackendMessage).editedAt ?? null
+  const dateEditee = brutEdite ? new Date(brutEdite) : null
+
   return {
     id: m.id,
     senderId: isMine ? "me" : m.senderId,
@@ -140,6 +154,7 @@ export function toFrontMessage(
     fileName: media?.filename,
     fileSize: formatBytes(media?.sizeBytes),
     isDeleted: Boolean(deletedAt),
+    editedAt: dateEditee && !Number.isNaN(dateEditee.getTime()) ? dateEditee : undefined,
   }
 }
 
@@ -169,6 +184,10 @@ function cacheBackendMessages(backendMessages: BackendMessage[]): void {
       replyToId: m.replyToId,
       replyTo: m.replyTo,
       deletedAt: m.deletedAt,
+      // Sans cette ligne, la mention « modifie » disparaissait au rechargement
+      // suivant : le cache-first reaffiche d'abord ce qui est range ici, et il
+      // aurait rendu le bon texte sans dire qu'il avait ete modifie.
+      editedAt: m.editedAt,
       media: m.media,
     }))
   )
@@ -523,4 +542,39 @@ export async function persistIncomingWsMessage(message: WsMessagePayload): Promi
  */
 export async function removeMessageFromDB(messageId: string): Promise<void> {
   await removeMessageFromCache(messageId)
+}
+
+/**
+ * Reporte une edition dans le cache IndexedDB.
+ *
+ * Appelee a la reception d'un evenement `message_edited`. Sans elle, l'ecran
+ * affichait bien le nouveau texte, mais le cache gardait l'ancien : au
+ * rechargement suivant, le cache-first repeignait la version perimee avant que
+ * le reseau ne la corrige — le bug reapparaissait le temps d'un clignotement.
+ *
+ * ⚠️ LECTURE PUIS ECRITURE, obligatoirement. Le depot ecrit par `db.put`, qui
+ * REMPLACE l'enregistrement entier : ecrire seulement `{id, content}` effacerait
+ * l'expediteur, les medias, la citation et l'horodatage. On repart donc de
+ * l'enregistrement existant, dont on ne change que les deux champs concernes.
+ *
+ * Limite assumee : on ne fouille que la fenetre recente du cache. Un message
+ * plus ancien que cette fenetre n'y est pas retrouve, et son cache reste perime
+ * jusqu'au prochain passage du reseau — qui, lui, fait autorite. L'etat React
+ * est juste dans tous les cas, c'est ce que voit l'utilisateur.
+ */
+export async function applyMessageEditToCache(
+  convId: string,
+  messageId: string,
+  content: string,
+  editedAt: Date
+): Promise<void> {
+  try {
+    const caches = await loadCachedMessages(convId, 500)
+    const existant = caches.find((m) => m.id === messageId)
+    if (!existant) return
+    await cacheMessage({ ...existant, content, editedAt: editedAt.toISOString() })
+  } catch {
+    // IndexedDB indisponible (navigation privee, quota) : l'etat React reste
+    // juste, seul le cache est en retard. Rien a signaler a l'utilisateur.
+  }
 }
