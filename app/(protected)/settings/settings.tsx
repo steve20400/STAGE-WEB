@@ -59,6 +59,7 @@ import {
   changePasswordApi,
   demanderAjoutEmail,
   confirmerAjoutEmail,
+  revelerCodeRecuperationAvecMotDePasse,
   demanderReinitialisation,
   updateProfileApi,
 } from "../../../src/services/auth-api"
@@ -1806,6 +1807,17 @@ export default function SettingsPage() {
    * formulaire change ENTIEREMENT d'un temps a l'autre (mot de passe + adresse,
    * puis code seul), et deux etats nommes se relisent mieux qu'une negation.
    */
+  /*
+   * Code de recuperation — revele a la demande, JAMAIS charge d'avance.
+   *
+   * `null` = pas encore revele. `sansCodeRecuperation` distingue le troisieme
+   * etat : le compte n'en a pas du tout (il a une adresse), ce qui n'est pas
+   * une anomalie et merite son propre message.
+   */
+  const [codeRecuperation, setCodeRecuperation] = useState<string | null>(null)
+  const [sansCodeRecuperation, setSansCodeRecuperation] = useState(false)
+  const [codeMdp, setCodeMdp] = useState("")
+
   const [emailEtape, setEmailEtape] = useState<"saisie" | "code">("saisie")
   const [nouvelEmail, setNouvelEmail] = useState("")
   const [emailMdp, setEmailMdp] = useState("")
@@ -2085,6 +2097,30 @@ export default function SettingsPage() {
       setEmailMdp("")
       success(t("set_email_changed"), nouvelEmail.trim().toLowerCase())
       setNouvelEmail("")
+    } catch (err) {
+      toastError(t("error"), err instanceof Error ? err.message : t("error"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /**
+   * Revele le code de recuperation, apres verification du mot de passe.
+   *
+   * ⚠️ Le mot de passe est EFFACE de l'etat des que l'operation aboutit : le
+   * garder en memoire de composant apres coup n'apporte rien et l'expose.
+   */
+  const revelerCodeRecuperation = async () => {
+    setSaving(true)
+    try {
+      const res = await revelerCodeRecuperationAvecMotDePasse(codeMdp)
+      setCodeMdp("")
+      if (res.idRecuperation === null) {
+        // Compte ouvert AVEC une adresse : pas de code, et c'est normal.
+        setSansCodeRecuperation(true)
+      } else {
+        setCodeRecuperation(res.idRecuperation)
+      }
     } catch (err) {
       toastError(t("error"), err instanceof Error ? err.message : t("error"))
     } finally {
@@ -3108,6 +3144,98 @@ export default function SettingsPage() {
                       }}
                     >
                       {saving ? t("set_modifying") : t("set_email_send_code")}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/*
+                CODE DE RECUPERATION — le revoir, pour qui s'est inscrit sans
+                adresse. Place juste apres le bloc de l'adresse : ce sont les
+                deux moyens de reprendre le compte, et on les lit ensemble.
+
+                🔴 IL N'EST JAMAIS CHARGE D'AVANCE. `GET /api/account/recovery-id`
+                n'est appele qu'au clic : le code est un secret equivalent a un
+                mot de passe, et le poser dans l'etat de la page a l'ouverture
+                des reglages le ferait transiter et journaliser a chaque visite,
+                pour rien.
+
+                ⚠️ PROTEGE PAR LE MOT DE PASSE, comme le changement d'adresse
+                juste au-dessus. Le mobile utilise la biometrie ; le navigateur
+                n'en a pas d'equivalent fiable, et laisser le code apparaitre
+                d'un simple clic sur une session ouverte serait plus faible que
+                sur telephone. La menace est la meme : un poste deverrouille
+                laisse quelques minutes.
+              */}
+              <div className="s-card">
+                <div className="s-card-title">{t("set_recovery_code_section")}</div>
+                <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+                  {t("set_recovery_code_explain")}
+                </div>
+
+                {codeRecuperation !== null ? (
+                  <>
+                    <div
+                      style={{
+                        fontFamily: "monospace",
+                        fontSize: 22,
+                        fontWeight: 700,
+                        letterSpacing: 4,
+                        textAlign: "center",
+                        padding: "18px 0",
+                        marginBottom: 10,
+                        border: "1px dashed var(--border)",
+                        borderRadius: 10,
+                      }}
+                    >
+                      {/* En deux groupes de cinq, pour la recopie a la main. Le
+                          serveur ignore les separateurs a la saisie. */}
+                      {codeRecuperation.slice(0, 5)} {codeRecuperation.slice(5)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // La valeur BRUTE, sans l'espace de presentation : ce
+                        // qui est colle doit pouvoir etre renvoye tel quel.
+                        void navigator.clipboard?.writeText(codeRecuperation)
+                        success(t("auth_recovery_code_copied"), "")
+                      }}
+                      style={{
+                        background: "none", border: "1px solid var(--border)",
+                        borderRadius: 9, padding: "10px 20px", cursor: "pointer",
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    >
+                      {t("auth_recovery_code_copied")}
+                    </button>
+                  </>
+                ) : sansCodeRecuperation ? (
+                  // Un compte ouvert AVEC une adresse n'a pas de code, et ce
+                  // n'est pas une anomalie : son adresse suffit a la reprise. On
+                  // le dit, plutot que d'offrir un bouton qui ne revelerait rien.
+                  <div className="s-hint">{t("set_recovery_code_none")}</div>
+                ) : (
+                  <>
+                    <Field
+                      label={t("current_password")}
+                      value={codeMdp}
+                      onChange={setCodeMdp}
+                      type="password"
+                      placeholder=""
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void revelerCodeRecuperation()}
+                      disabled={saving || !codeMdp}
+                      style={{
+                        background: "var(--accent)", border: "none", borderRadius: 9,
+                        padding: "12px 24px", fontSize: 14, fontWeight: 700,
+                        color: "var(--bg-base)", cursor: "pointer",
+                        fontFamily: "'DM Sans', sans-serif",
+                        opacity: saving || !codeMdp ? 0.4 : 1,
+                      }}
+                    >
+                      {t("set_recovery_code_reveal")}
                     </button>
                   </>
                 )}

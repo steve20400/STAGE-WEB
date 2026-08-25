@@ -549,6 +549,23 @@ export async function reinitialiserParCodeRecuperation(
   })
 }
 
+/**
+ * POST /api/account/recovery-id — revoir son code, SOUS MOT DE PASSE.
+ *
+ * 🔴 LE NAVIGATEUR PASSE PAR `POST`, LE MOBILE PAR `GET`. L'asymétrie est dans
+ * les clients, pas dans ce qu'on protège : le mobile se garde par la biométrie
+ * avant d'appeler, le navigateur n'a pas d'équivalent fiable. Sans ce contrôle
+ * serveur, il aurait fallu soit livrer le secret sur un simple clic — un poste
+ * laissé ouvert au bureau suffit alors à le lire —, soit afficher un champ de
+ * mot de passe que rien ne vérifie, ce qui est pire.
+ */
+export async function revelerCodeRecuperationAvecMotDePasse(motDePasse: string) {
+  return apiRequest<{ idRecuperation: string | null; aAdresse: boolean }>(
+    "/api/account/recovery-id",
+    { method: "POST", body: { password: motDePasse } },
+  )
+}
+
 /** GET /api/account/recovery-id — revoir son code (utilisateur connecté). */
 export async function lireCodeRecuperation() {
   return apiRequest<{ idRecuperation: string | null; aAdresse: boolean }>(
