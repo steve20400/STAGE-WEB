@@ -10,7 +10,7 @@ import {
 import "../chats/[chatId]/chat-room-page.css"
 
 /**
- * Assistant IA (Gemini via le backend) — meme ecran que sur l'app mobile :
+ * Assistant Alanya (via le backend) — meme ecran que sur l'app mobile :
  * un fil unique par utilisateur, bulle terracotta pour soi, bulle claire
  * pour l'assistant.
  */

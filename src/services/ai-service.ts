@@ -1,6 +1,12 @@
 import { apiRequest } from "../lib/api-client"
 
-/** Message du fil de discussion avec l'assistant (Gemini cote backend). */
+/**
+ * Message du fil de discussion avec l'Assistant Alanya.
+ *
+ * Le client ne sait RIEN de ce qui repond derriere, et c'est voulu : le
+ * fournisseur ne doit apparaitre nulle part hors de `src/lib/assistant.ts`,
+ * cote serveur. Ces deux depots sont publics.
+ */
 export interface AiMessage {
   id: string
   role: "USER" | "MODEL"
