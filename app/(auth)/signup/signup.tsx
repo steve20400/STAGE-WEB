@@ -2,6 +2,8 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { requestRegistrationOtp } from "../../../src/services/auth-api"
+import { drapeau, listerPays, type Pays } from "../../../src/services/pays-service"
+import { formaterTelephone } from "../../../src/services/telephone"
 import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from "../../../src/i18n"
 const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./signup-page.css"
@@ -15,6 +17,14 @@ type Step = 1 | 2 | 3 | 4
 interface FormData {
   name: string
   phone: string
+  /**
+   * Identifiant de la table `pays`. `null` tant que rien n'est choisi.
+   *
+   * ⚠️ Il vient de `GET /api/pays`, JAMAIS d'une liste locale. Le web en portait
+   * une, codée en dur et fausse (`src/data/countries.ts` : « 1 = Cameroun »
+   * quand la table dit « 1 = Afrique du Sud »).
+   */
+  idPays: number | null
   email: string
   password: string
   confirm: string
@@ -113,6 +123,7 @@ export default function SignUpPage() {
   const [form, setForm] = useState<FormData>({
     name: "",
     phone: "",
+    idPays: null,
     email: "",
     password: "",
     confirm: "",
@@ -126,6 +137,15 @@ export default function SignUpPage() {
   /** Le code de recuperation, une fois emis. Vide dans le parcours avec adresse. */
   const [codeRecuperation, setCodeRecuperation] = useState("")
   const [codeNote, setCodeNote] = useState(false)
+  /**
+   * Parcours SANS adresse, choisi a l'etape 1.
+   *
+   * ⚠️ Un etat, et non une simple navigation : l'etape 2 doit savoir QUEL
+   * bouton presenter. Sans lui, elle afficherait « creer le compte » (qui
+   * exige une adresse) a quelqu'un qui vient justement d'y renoncer.
+   */
+  const [sansEmail, setSansEmail] = useState(false)
+  const [pays, setPays] = useState<Pays[]>([])
   const [countdown, setCountdown] = useState(0)
 
   const strength = useMemo(() => passwordStrength(form.password), [form.password])
@@ -136,6 +156,21 @@ export default function SignUpPage() {
     const id = window.setTimeout(() => setCountdown((value) => value - 1), 1000)
     return () => window.clearTimeout(id)
   }, [countdown])
+
+  // La table de reference des pays. Un echec ne bloque PAS l'inscription : le
+  // menu reste vide et le compte se cree sans pays, plutot qu'un parcours
+  // interrompu des le premier ecran par une table de reference indisponible.
+  useEffect(() => {
+    let vivant = true
+    void listerPays()
+      .then((liste) => {
+        if (vivant) setPays(liste)
+      })
+      .catch(() => {})
+    return () => {
+      vivant = false
+    }
+  }, [])
 
   const submitStep1 = (event: React.FormEvent) => {
     event.preventDefault()
@@ -162,6 +197,10 @@ export default function SignUpPage() {
     if (form.password.length < 8) return setError(t("password_min_8"))
     if (strength.score < 2) return setError(t("auth_password_weak"))
     if (!match) return setError(t("passwords_differ"))
+
+    // Parcours sans adresse : pas de code a envoyer ni a attendre, le compte se
+    // cree tout de suite et l'etape 4 presente le code de recuperation.
+    if (sansEmail) return void submitSansEmail()
 
     setLoading(true)
 
@@ -201,7 +240,8 @@ export default function SignUpPage() {
     try {
       const { idRecuperation } = await registerWithoutEmail({
         name: form.name.trim(),
-        phone: "",
+        phone: form.phone.trim(),
+        idPays: form.idPays,
         password: form.password,
       })
       setCodeRecuperation(idRecuperation)
@@ -230,7 +270,12 @@ export default function SignUpPage() {
       await register(
         {
           name: form.name.trim(),
-          phone: "",
+          // Le téléphone et le pays voyagent enfin : ils étaient laissés vides
+          // ici alors que le mobile les envoie et que le serveur les accepte
+          // depuis toujours. Deux portes d'entrée, deux comptes de complétude
+          // différente pour le même produit.
+          phone: form.phone.trim(),
+          idPays: form.idPays,
           email: form.email.trim().toLowerCase(),
           password: form.password,
         },
@@ -364,12 +409,104 @@ export default function SignUpPage() {
                 <label htmlFor="email">{t("email")}</label>
               </div>
 
+              {/*
+                TÉLÉPHONE + PAYS — les mêmes informations que le mobile.
+                Le web ne demandait que nom + adresse ; le mobile demande aussi
+                le pays et le numéro, et le serveur les accepte depuis toujours.
+                Les deux clients créaient donc des comptes de complétude
+                différente selon la porte d'entrée.
+              */}
+              <div className="fp-field" style={{ marginTop: 12 }}>
+                <select
+                  id="pays"
+                  value={form.idPays ?? ""}
+                  onChange={(e) => {
+                    const id = e.target.value ? Number(e.target.value) : null
+                    setForm((prev) => ({ ...prev, idPays: id }))
+                    // Le numéro déjà saisi est reformaté avec le nouvel
+                    // indicatif : changer de pays après avoir tapé son numéro
+                    // laisserait sinon un affichage qui ment sur ce qui partira.
+                    if (form.phone.trim()) {
+                      const p = pays.find((x) => x.idPays === id)
+                      if (p) {
+                        setForm((prev) => ({
+                          ...prev,
+                          phone: formaterTelephone(prev.phone, p.prefix, p.iso2),
+                        }))
+                      }
+                    }
+                  }}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 9 }}
+                >
+                  <option value="">
+                    {pays.length === 0 ? t("loading") : t("set_country")}
+                  </option>
+                  {pays.map((p) => (
+                    <option key={p.idPays} value={p.idPays}>
+                      {drapeau(p.iso2)} {p.libelle} ({p.prefix})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="fp-field">
+                <input
+                  id="phone"
+                  type="tel"
+                  placeholder=" "
+                  value={form.phone}
+                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  /*
+                   * Mise en forme à la SORTIE du champ, pas à chaque frappe.
+                   * Reformater pendant la saisie oblige à replacer le curseur à
+                   * chaque caractère et se bat avec l'utilisateur dès qu'il
+                   * corrige au milieu de son numéro.
+                   */
+                  onBlur={() => {
+                    const p = pays.find((x) => x.idPays === form.idPays)
+                    if (!p || !form.phone.trim()) return
+                    setForm((prev) => ({
+                      ...prev,
+                      phone: formaterTelephone(prev.phone, p.prefix, p.iso2),
+                    }))
+                  }}
+                  autoComplete="tel"
+                  maxLength={20}
+                />
+                <label htmlFor="phone">{t("set_phone")}</label>
+              </div>
+
               <button
                 type="submit"
                 className="btn-submit"
                 disabled={!form.name.trim() || !form.email.trim() || !validEmail(form.email)}
               >
                 {t("continue_action")} -&gt;
+              </button>
+
+              {/*
+                🔴 LE CHEMIN SANS ADRESSE EST ICI, ET C'EST TOUT LE CORRECTIF.
+                Il avait été posé à l'étape 2 — inatteignable, puisque l'étape 1
+                EXIGE une adresse valide pour laisser continuer. L'inscription
+                sans adresse était donc annoncée et impossible.
+                Il reste volontairement secondaire : une adresse se retrouve, un
+                code noté sur un papier se perd.
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  setError("")
+                  setSansEmail(true)
+                  setStep(2)
+                }}
+                disabled={form.name.trim().length < 2}
+                style={{
+                  marginTop: 10, background: "none", border: "none",
+                  textDecoration: "underline", cursor: "pointer",
+                  fontSize: 13, width: "100%",
+                }}
+              >
+                {t("auth_no_email_link")}
               </button>
               <div className="login-link">
                 {t("have_account")} <Link to="/login">{t("login")}</Link>
@@ -382,7 +519,7 @@ export default function SignUpPage() {
               <StepHeader
                 step={2}
                 title={t("signup_title_secure")}
-                subtitle={t("signup_sub_secure", { email: form.email.trim().toLowerCase() })}
+                subtitle={sansEmail ? t("auth_no_email_warning") : t("signup_sub_secure", { email: form.email.trim().toLowerCase() })}
               />
 
               <div className="field">
@@ -463,29 +600,19 @@ export default function SignUpPage() {
               </div>
 
               {/*
-                Second chemin, VOLONTAIREMENT SECONDAIRE : l'adresse se
-                retrouve, un code note sur un papier se perd. Elle garde donc le
-                bouton plein, et ceci n'est qu'un lien.
+                Le choix se fait desormais a l'ETAPE 1, ou l'adresse est saisie.
+                Ce lien y a ete deplace : ici, il etait inatteignable — l'etape 1
+                EXIGE une adresse valide pour laisser continuer, et l'inscription
+                sans adresse etait donc annoncee et impossible.
+
+                Ce qui reste ici est le RAPPEL de la consequence, affiche
+                seulement a qui a fait ce choix.
               */}
-              <button
-                type="button"
-                onClick={() => void submitSansEmail()}
-                disabled={loading}
-                style={{
-                  marginTop: 12,
-                  background: "none",
-                  border: "none",
-                  textDecoration: "underline",
-                  cursor: loading ? "default" : "pointer",
-                  fontSize: 13,
-                  width: "100%",
-                }}
-              >
-                {t("auth_no_email_link")}
-              </button>
-              <p style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-                {t("auth_no_email_warning")}
-              </p>
+              {sansEmail && (
+                <p style={{ fontSize: 12, opacity: 0.7, marginTop: 10 }}>
+                  {t("auth_no_email_warning")}
+                </p>
+              )}
             </form>
           )}
 

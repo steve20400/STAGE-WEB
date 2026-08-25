@@ -30,6 +30,8 @@ export interface LoginPayload {
 export interface RegistrationDraft {
   name: string
   phone: string
+  /** Identifiant de la table `pays`, depuis GET /api/pays. */
+  idPays?: number | null
   email: string
   password: string
 }
@@ -270,6 +272,12 @@ export async function completeRegistration(draft: RegistrationDraft, otp: string
       body: {
         pseudo: draft.name.trim(),
         password: draft.password,
+        // Le nom, le telephone et le pays voyagent comme sur mobile. Ils
+        // etaient omis ici : deux portes d entree, deux comptes de
+        // completude differente pour le meme produit.
+        nom: draft.name.trim(),
+        ...(draft.phone?.trim() ? { mobile: draft.phone.trim() } : {}),
+        ...(draft.idPays != null ? { idPays: draft.idPays } : {}),
         deviceId: getOrCreateWebDeviceId(),
       },
     })
@@ -439,6 +447,10 @@ export async function registerSansEmail(draft: Omit<RegistrationDraft, "email">)
     body: {
       pseudo: draft.name.trim(),
       password: draft.password,
+      // Mêmes champs que le parcours avec adresse, et que le mobile.
+      nom: draft.name.trim(),
+      ...(draft.phone?.trim() ? { mobile: draft.phone.trim() } : {}),
+      ...(draft.idPays != null ? { idPays: draft.idPays } : {}),
       deviceId: getOrCreateWebDeviceId(),
     },
   })
