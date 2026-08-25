@@ -1339,9 +1339,46 @@ function brancherVoixDistanteSiPossible() {
   }
 }
 
+/**
+ * Ce qu'on demande a la camera, et pourquoi ce n'est pas « true ».
+ *
+ * Demander `video: true` laisse le navigateur choisir, et il choisit du PAYSAGE
+ * — 16/9, typiquement 1280 x 720. Or les vignettes sont en `object-fit: cover`,
+ * qui agrandit l'image jusqu'a remplir le cadre et coupe ce qui depasse. Sur un
+ * telephone tenu droit, un cadre presque carre recevait donc une image deux fois
+ * plus large que haute : elle etait agrandie du double, et l'on ne voyait plus
+ * qu'un visage en gros plan. Ce n'etait pas un zoom, c'etait du RECADRAGE.
+ *
+ * On demande donc une image dont la forme SUIT CELLE DE L'ECRAN. En portrait,
+ * l'image arrive portrait, le recadrage devient marginal, et le cadrage retrouve
+ * les epaules et l'arriere-plan. En paysage, rien ne change.
+ *
+ * `ideal` et non `exact` : une camera qui ne sait pas produire cette forme
+ * repond au mieux plutot que d'echouer. Un `exact` refuse ferait retomber toute
+ * l'entree en reunion sur la cascade « pas de camera », pour une question de
+ * cadrage.
+ *
+ * 960 sur le grand cote, pas 1280 : dans un maillage, chacun encode son image
+ * autant de fois qu'il a d'interlocuteurs. Les pixels qu'on economise ici sont
+ * economises cinq fois a six participants — et personne ne regarde une vignette
+ * de reunion en haute definition.
+ */
+function contraintesVideo(): MediaTrackConstraints {
+  const portrait =
+    typeof window !== "undefined" && window.matchMedia?.("(orientation: portrait)")?.matches
+  return {
+    facingMode: "user",
+    width: { ideal: portrait ? 540 : 960 },
+    height: { ideal: portrait ? 960 : 540 },
+  }
+}
+
 async function ensureLocalStream(isVideo: boolean): Promise<MediaStream> {
   if (localStream) return localStream
-  localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo })
+  localStream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: isVideo ? contraintesVideo() : false,
+  })
   // `mediaManquant` est remis a jour ICI, et pas seulement a l'entree en salle.
   //
   // Cette fonction est rappelee a CHAQUE pair : entre en ecoute seule, puis
@@ -2718,10 +2755,10 @@ export async function reprendreLeMediaLocal(): Promise<CallManagerState["mediaMa
     // sur la plupart des telephones.
     const tentatives: MediaStreamConstraints[] = []
     if (!aAudio()) {
-      if (veutVideo && !aVideo()) tentatives.push({ audio: true, video: true })
+      if (veutVideo && !aVideo()) tentatives.push({ audio: true, video: contraintesVideo() })
       tentatives.push({ audio: true, video: false })
     } else {
-      tentatives.push({ audio: false, video: true })
+      tentatives.push({ audio: false, video: contraintesVideo() })
     }
     for (const contraintes of tentatives) {
       try {
@@ -2828,10 +2865,21 @@ export async function switchCamera(): Promise<boolean> {
   // `facingMode` n'est generalement pas renseigne. La face opposee ensuite,
   // pour les mobiles qui masquent les identifiants.
   const tentatives: MediaStreamConstraints[] = []
+  // La FORME est reprise ici aussi : sans elle, changer de camera ramenerait du
+  // paysage sur un ecran tenu droit, et le recadrage rendrait le gros plan qu'on
+  // vient de supprimer. `contraintesVideo()` porte l'orientation ; le choix de
+  // l'objectif la complete sans l'annuler.
+  const forme = contraintesVideo()
   if (suivante) {
-    tentatives.push({ video: { deviceId: { exact: suivante.deviceId } }, audio: false })
+    tentatives.push({
+      video: { ...forme, deviceId: { exact: suivante.deviceId } },
+      audio: false,
+    })
   }
-  tentatives.push({ video: { facingMode: { exact: cibleFacing } }, audio: false })
+  tentatives.push({
+    video: { ...forme, facingMode: { exact: cibleFacing } },
+    audio: false,
+  })
 
   for (const contraintes of tentatives) {
     try {
