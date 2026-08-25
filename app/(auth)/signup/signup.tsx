@@ -136,6 +136,16 @@ export default function SignUpPage() {
   const [demoOtp, setDemoOtp] = useState("")
   /** Le code de recuperation, une fois emis. Vide dans le parcours avec adresse. */
   const [codeRecuperation, setCodeRecuperation] = useState("")
+  /**
+   * L'Alanya ID attribue au compte, rappele avec le code de recuperation.
+   *
+   * 🔴 IL EST INDISPENSABLE A LA REPRISE, et il manquait ici : la
+   * reinitialisation par code exige le code ET l'Alanya ID depuis le durcissement
+   * du 25/08/2026. Sans ce rappel, le web remettait un code de recuperation a
+   * quelqu'un qui n'apprenait nulle part le second element qu'on lui redemandera
+   * — le mobile, lui, l'affichait deja.
+   */
+  const [alanyaId, setAlanyaId] = useState("")
   const [codeNote, setCodeNote] = useState(false)
   /**
    * Parcours SANS adresse, choisi a l'etape 1.
@@ -238,13 +248,17 @@ export default function SignUpPage() {
 
     setLoading(true)
     try {
-      const { idRecuperation } = await registerWithoutEmail({
+      const { user, idRecuperation } = await registerWithoutEmail({
         name: form.name.trim(),
         phone: form.phone.trim(),
         idPays: form.idPays,
         password: form.password,
       })
       setCodeRecuperation(idRecuperation)
+      // `phone` d'une session PORTE l'Alanya ID, pas le numero de telephone —
+      // c'est la convention du client web (voir `accountKey` dans
+      // `auth-provider.tsx`), et `registerSansEmail` y pose bien `publicNumber`.
+      setAlanyaId(user.phone)
       setStep(4)
     } catch (e) {
       setError(e instanceof Error ? e.message : t("auth_otp_send_failed"))
@@ -655,6 +669,15 @@ export default function SignUpPage() {
               >
                 {t("auth_recovery_code_copied")}
               </button>
+
+              {/*
+                L'Alanya ID est rappele ICI parce que la REPRISE en a besoin :
+                le code sert a reinitialiser le mot de passe, mais le serveur
+                exige aussi le numero du compte. Meme rappel que sur le mobile.
+              */}
+              <div style={{ textAlign: "center", fontSize: 13, opacity: 0.75, marginTop: 8 }}>
+                {t("auth_recovery_code_your_number", { number: alanyaId })}
+              </div>
 
               <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "16px 0", fontSize: 14 }}>
                 <input

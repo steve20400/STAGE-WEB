@@ -491,6 +491,33 @@ export async function reinitialiserParEmail(email: string, code: string, motDePa
 }
 
 /**
+ * POST /api/auth/reset-password/verify — la paire { code, Alanya ID }
+ * désigne-t-elle un compte ?
+ *
+ * Sert à n'ouvrir l'étape du nouveau mot de passe que si la preuve est bonne :
+ * sans elle, on saisissait un mot de passe pour apprendre ensuite que le code
+ * était faux, et tout était à refaire.
+ *
+ * 🔴 CE N'EST PAS UNE AUTORISATION, et il n'en revient aucun jeton. La
+ * réinitialisation qui suit renvoie les deux mêmes éléments et refait le même
+ * contrôle : le pouvoir de reprendre le compte reste attaché à la paire.
+ *
+ * ⚠️ Elle consomme un essai du plafond de reprise, qu'elle PARTAGE avec
+ * `reinitialiserParCodeRecuperation` (même compteur côté serveur) : une reprise
+ * réussie en coûte deux sur cinq par quart d'heure. Ne jamais l'appeler à la
+ * frappe — seulement sur un geste explicite.
+ */
+export async function verifierCodeRecuperation(idRecuperation: string, alanyaId: string) {
+  await apiRequest<{ verified: boolean }>("/api/auth/reset-password/verify", {
+    method: "POST",
+    body: {
+      idRecuperation: idRecuperation.trim(),
+      publicNumber: alanyaId.trim(),
+    },
+  })
+}
+
+/**
  * POST /api/auth/reset-password — chemin par CODE DE RÉCUPÉRATION.
  *
  * 🔴 LE CODE **ET** L'ALANYA ID SONT EXIGÉS. Le code seul suffisait d'abord ;
