@@ -34,6 +34,7 @@ import {
 } from "../data/prototype-auth"
 import {
   completeRegistration,
+  registerSansEmail,
   deleteCurrentAccount,
   loginWithPassword,
   logoutAllSessions,
@@ -50,6 +51,10 @@ interface AuthContextValue {
   isAuthenticated: boolean
   login: (payload: LoginPayload) => Promise<SessionUser>
   register: (draft: RegistrationDraft, otp: string) => Promise<SessionUser>
+  /** Inscription sans adresse : rend AUSSI le code de recuperation, montre une seule fois. */
+  registerWithoutEmail: (
+    draft: Omit<RegistrationDraft, "email">,
+  ) => Promise<{ user: SessionUser; idRecuperation: string }>
   logout: () => Promise<void>
   logoutEverywhere: () => Promise<void>
   updateUser: (user: SessionUser) => void
@@ -164,6 +169,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsReady(true)
     return nextUser
   }, [])
+
+  /**
+   * Inscription SANS adresse : le compte est cree sans code de confirmation.
+   *
+   * Rend le CODE DE RECUPERATION avec la session — il n'est montre qu'une fois,
+   * et c'est le seul moyen de reprendre ce compte. L'appelant DOIT le presenter
+   * avant de laisser l'utilisateur entrer dans l'application.
+   *
+   * ⚠️ La session est installee AVANT que le code soit montre, volontairement :
+   * si l'ecran suivant echouait, l'utilisateur serait au moins connecte et
+   * pourrait retrouver son code dans les reglages. L'inverse — montrer d'abord,
+   * connecter ensuite — laisserait un compte cree et inaccessible en cas de
+   * pepin.
+   */
+  const registerWithoutEmail = useCallback(
+    async (draft: Omit<RegistrationDraft, "email">) => {
+      const { session, idRecuperation } = await registerSansEmail(draft)
+      const nextUser = storeAuthenticatedSession(session)
+      await claimLocalCaches(accountKey(nextUser))
+      saveSessionUser(nextUser)
+      setUser(nextUser)
+      setIsReady(true)
+      return { user: nextUser, idRecuperation }
+    },
+    [],
+  )
 
   /**
    * Quitte la session localement, et immediatement : temps reel coupe, jetons et
@@ -284,6 +315,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(user),
       login,
       register,
+      registerWithoutEmail,
       logout,
       logoutEverywhere,
       updateUser,

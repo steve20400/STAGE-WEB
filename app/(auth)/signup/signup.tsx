@@ -7,7 +7,10 @@ const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
 import "./signup-page.css"
 import { BrandName } from "../../../src/components/brand-name"
 
-type Step = 1 | 2 | 3
+// Etape 4 : le CODE DE RECUPERATION, pour une inscription sans adresse. Elle
+// n'existe pas dans le parcours avec adresse, ou l'etape 3 (le code recu par
+// courriel) mene directement a l'application.
+type Step = 1 | 2 | 3 | 4
 
 interface FormData {
   name: string
@@ -101,7 +104,7 @@ function OtpInput({ value, onChange }: { value: string[]; onChange: (value: stri
 export default function SignUpPage() {
   const navigate = useNavigate()
   const { language, setLanguage, t } = useTranslation()
-  const { register } = useAuth()
+  const { register, registerWithoutEmail } = useAuth()
 
   const [step, setStep] = useState<Step>(1)
   const [error, setError] = useState("")
@@ -120,6 +123,9 @@ export default function SignUpPage() {
 
   const [otpDigits, setOtpDigits] = useState<string[]>(Array(OTP_LEN).fill(""))
   const [demoOtp, setDemoOtp] = useState("")
+  /** Le code de recuperation, une fois emis. Vide dans le parcours avec adresse. */
+  const [codeRecuperation, setCodeRecuperation] = useState("")
+  const [codeNote, setCodeNote] = useState(false)
   const [countdown, setCountdown] = useState(0)
 
   const strength = useMemo(() => passwordStrength(form.password), [form.password])
@@ -173,6 +179,35 @@ export default function SignUpPage() {
       setStep(3)
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t("auth_otp_send_failed"))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /**
+   * Inscription SANS adresse.
+   *
+   * ⚠️ Le mot de passe est controle ICI aussi, comme dans `submitStep2` : ce
+   * chemin ne passe pas par l'etape du code, et sans ce controle un mot de
+   * passe trop court n'echouerait qu'au serveur, apres la creation du compte.
+   */
+  const submitSansEmail = async () => {
+    setError("")
+    if (form.password.length < 8) return setError(t("password_min_8"))
+    if (strength.score < 2) return setError(t("auth_password_weak"))
+    if (!match) return setError(t("passwords_differ"))
+
+    setLoading(true)
+    try {
+      const { idRecuperation } = await registerWithoutEmail({
+        name: form.name.trim(),
+        phone: "",
+        password: form.password,
+      })
+      setCodeRecuperation(idRecuperation)
+      setStep(4)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("auth_otp_send_failed"))
     } finally {
       setLoading(false)
     }
@@ -426,7 +461,92 @@ export default function SignUpPage() {
                   {loading ? t("auth_creating") : t("auth_create_account_cta")}
                 </button>
               </div>
+
+              {/*
+                Second chemin, VOLONTAIREMENT SECONDAIRE : l'adresse se
+                retrouve, un code note sur un papier se perd. Elle garde donc le
+                bouton plein, et ceci n'est qu'un lien.
+              */}
+              <button
+                type="button"
+                onClick={() => void submitSansEmail()}
+                disabled={loading}
+                style={{
+                  marginTop: 12,
+                  background: "none",
+                  border: "none",
+                  textDecoration: "underline",
+                  cursor: loading ? "default" : "pointer",
+                  fontSize: 13,
+                  width: "100%",
+                }}
+              >
+                {t("auth_no_email_link")}
+              </button>
+              <p style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+                {t("auth_no_email_warning")}
+              </p>
             </form>
+          )}
+
+          {/*
+            ETAPE 4 — LE CODE DE RECUPERATION. Il N'AFFICHE PAS, IL FAIT NOTER.
+            Sans adresse, c'est le seul moyen de reprendre le compte, et il ne
+            sera plus montre ici : la case a cocher est ce qui distingue un
+            geste conscient d'un appui reflexe sur « Continuer ».
+          */}
+          {step === 4 && (
+            <div>
+              <StepHeader
+                step={4}
+                title={t("auth_recovery_code_title")}
+                subtitle={t("auth_recovery_code_keep")}
+              />
+              <div
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: 26,
+                  fontWeight: 700,
+                  letterSpacing: 4,
+                  textAlign: "center",
+                  padding: "20px 0",
+                  margin: "8px 0",
+                  border: "1px dashed currentColor",
+                  borderRadius: 12,
+                }}
+              >
+                {codeRecuperation.slice(0, 5)} {codeRecuperation.slice(5)}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  // La valeur BRUTE, sans l'espace de presentation : ce qui est
+                  // colle doit pouvoir etre renvoye tel quel.
+                  void navigator.clipboard?.writeText(codeRecuperation)
+                }}
+                style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", width: "100%" }}
+              >
+                {t("auth_recovery_code_copied")}
+              </button>
+
+              <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "16px 0", fontSize: 14 }}>
+                <input
+                  type="checkbox"
+                  checked={codeNote}
+                  onChange={(e) => setCodeNote(e.target.checked)}
+                />
+                {t("auth_recovery_code_confirm")}
+              </label>
+
+              <button
+                type="button"
+                className="btn-submit"
+                disabled={!codeNote}
+                onClick={() => navigate("/chats")}
+              >
+                {t("auth_continue")}
+              </button>
+            </div>
           )}
 
           {step === 3 && (

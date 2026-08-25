@@ -392,3 +392,128 @@ export async function updateProfileApi(payload: {
 }): Promise<{ pseudo: string | null; avatarUrl: string | null; statusMsg: string | null }> {
   return apiRequest("/api/account/profile", { method: "PATCH", body: payload })
 }
+
+/* ==========================================================================
+ * INSCRIPTION SANS ADRESSE, ET RÉCUPÉRATION PAR CODE
+ *
+ * L'adresse ne sert qu'à REPRENDRE le compte. Depuis le 25/08/2026 elle est
+ * facultative : qui n'en donne pas reçoit un code de récupération de 10
+ * caractères, montré une seule fois.
+ * ========================================================================== */
+
+interface ReponseInscriptionSansEmail {
+  setupToken: string
+  publicNumber: string
+  idRecuperation: string
+  needsSetup?: boolean
+}
+
+/**
+ * Inscription SANS adresse : le compte est créé immédiatement.
+ *
+ * Il n'y a rien à confirmer, donc pas d'OTP : `register` sans champ `email`
+ * rend directement le `setupToken`, et on enchaîne sur `setup` dans la foulée.
+ *
+ * ⚠️ LE CORPS EST VIDE, il ne contient pas `email: ""`. Le serveur refuse la
+ * chaîne vide à dessein — ne pas fournir le champ est une intention, l'envoyer
+ * vide est une erreur de formulaire.
+ *
+ * ⚠️ PAS DE REPLI « PROTOTYPE » ici, contrairement à `completeRegistration` :
+ * ce parcours n'existe que côté serveur, et un compte de démonstration local
+ * n'aurait pas de code de récupération à montrer — on afficherait un écran vide
+ * en promettant à l'utilisateur que c'est son seul moyen de reprise.
+ */
+export async function registerSansEmail(draft: Omit<RegistrationDraft, "email">) {
+  const reponse = await apiRequest<ReponseInscriptionSansEmail>("/api/auth/register", {
+    method: "POST",
+    body: {},
+  })
+
+  if (!reponse.setupToken || !reponse.idRecuperation) {
+    throw new Error(tr("auth_verify_unexpected"))
+  }
+
+  const setup = await apiRequest<AuthTokensResponse>("/api/auth/setup", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${reponse.setupToken}` },
+    body: {
+      pseudo: draft.name.trim(),
+      password: draft.password,
+      deviceId: getOrCreateWebDeviceId(),
+    },
+  })
+
+  const base: SessionUser = {
+    name: draft.name.trim(),
+    phone: reponse.publicNumber,
+    email: "",
+    statusMsg: tr("set_status_available"),
+    avatar: null,
+  }
+
+  return {
+    session: {
+      user: toSessionUser(setup.user, base),
+      token: setup.accessToken,
+      refreshToken: setup.refreshToken,
+    } satisfies AuthSession,
+    idRecuperation: reponse.idRecuperation,
+    publicNumber: reponse.publicNumber,
+  }
+}
+
+/** POST /api/auth/forgot-password — envoie le code de reprise par courriel. */
+export async function demanderCodeReinitialisation(email: string) {
+  await apiRequest<{ message?: string }>("/api/auth/forgot-password", {
+    method: "POST",
+    body: { email: email.trim().toLowerCase() },
+  })
+}
+
+/** POST /api/auth/reset-password — chemin par ADRESSE (code à 6 chiffres). */
+export async function reinitialiserParEmail(email: string, code: string, motDePasse: string) {
+  await apiRequest<{ message?: string }>("/api/auth/reset-password", {
+    method: "POST",
+    body: { email: email.trim().toLowerCase(), code: code.trim(), password: motDePasse },
+  })
+}
+
+/**
+ * POST /api/auth/reset-password — chemin par CODE DE RÉCUPÉRATION.
+ *
+ * ⚠️ N'ENVOYER NI `email` NI `code` avec : le serveur refuse explicitement un
+ * mélange des deux chemins plutôt que d'en choisir un.
+ *
+ * La saisie part TELLE QUELLE : c'est le serveur qui relève la casse, ignore
+ * les séparateurs et traduit les I/L/O mal lus. La nettoyer ici ferait une
+ * seconde règle à tenir accordée avec la sienne.
+ */
+export async function reinitialiserParCodeRecuperation(idRecuperation: string, motDePasse: string) {
+  await apiRequest<{ message?: string }>("/api/auth/reset-password", {
+    method: "POST",
+    body: { idRecuperation: idRecuperation.trim(), password: motDePasse },
+  })
+}
+
+/** GET /api/account/recovery-id — revoir son code (utilisateur connecté). */
+export async function lireCodeRecuperation() {
+  return apiRequest<{ idRecuperation: string | null; aAdresse: boolean }>(
+    "/api/account/recovery-id",
+  )
+}
+
+/** POST /api/account/email — ajouter une adresse : demande du code. */
+export async function demanderAjoutEmail(email: string) {
+  await apiRequest<{ message?: string }>("/api/account/email", {
+    method: "POST",
+    body: { email: email.trim().toLowerCase() },
+  })
+}
+
+/** POST /api/account/email/verify — ajouter une adresse : confirmation. */
+export async function confirmerAjoutEmail(email: string, code: string) {
+  await apiRequest<{ message?: string }>("/api/account/email/verify", {
+    method: "POST",
+    body: { email: email.trim().toLowerCase(), code: code.trim() },
+  })
+}
