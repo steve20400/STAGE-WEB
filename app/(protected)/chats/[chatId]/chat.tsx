@@ -44,6 +44,7 @@ import {
   contactsDepuisContenu,
   nomAffichable,
   positionDepuisContenu,
+  LONGUEUR_MAX_CONTENU,
 } from "../../../../src/services/message-payload"
 import {
   fetchChatConversations,
@@ -5163,7 +5164,11 @@ export default function ChatRoomPage() {
 
   // Auto-resize du textarea + emission typing via WebSocket
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value)
+    // Coupe defensive : `maxLength` sur le textarea couvre la frappe et le
+    // coller, mais pas tout (glisser-deposer de texte, certaines saisies
+    // predictives). Ce qui depasse serait coupe par le serveur de toute facon —
+    // autant que l'ecran montre des maintenant ce qui sera reellement envoye.
+    setInput(e.target.value.slice(0, LONGUEUR_MAX_CONTENU))
     e.target.style.height = "auto"
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
 
@@ -6209,7 +6214,45 @@ export default function ChatRoomPage() {
                   onKeyDown={handleKeyDown}
                   rows={1}
                   aria-label={t("type_message")}
+                  /*
+                   * La colonne `message.content` est un VARCHAR(500) : au-dela,
+                   * le serveur COUPE. Borner la saisie evite d'ecrire un texte
+                   * qui arriverait ampute sans avertissement.
+                   *
+                   * `maxLength` borne aussi le COLLER, pas seulement la frappe
+                   * — c'est le cas qui compte, personne ne tape 500 caracteres
+                   * a la main. La coupe defensive de `handleInput` reste utile
+                   * pour ce que l'attribut ne couvre pas (glisser-deposer de
+                   * texte, saisie predictive de certains navigateurs).
+                   */
+                  maxLength={LONGUEUR_MAX_CONTENU}
                 />
+                {/*
+                 * Compteur « reste N caracteres », visible seulement a partir de
+                 * 50 caracteres de la fin : toujours affiche, il occuperait une
+                 * place permanente pour une limite que la quasi-totalite des
+                 * messages n'atteint jamais.
+                 */}
+                {LONGUEUR_MAX_CONTENU - input.length <= 50 && (
+                  <span
+                    className="compteur-longueur"
+                    aria-live="polite"
+                    style={{
+                      fontSize: "11px",
+                      marginRight: "6px",
+                      alignSelf: "flex-end",
+                      // A zero la saisie est bloquee : le rouge explique
+                      // pourquoi le clavier « ne repond plus ».
+                      color:
+                        input.length >= LONGUEUR_MAX_CONTENU
+                          ? "var(--danger, #d33)"
+                          : "var(--text-muted, #888)",
+                      fontWeight: input.length >= LONGUEUR_MAX_CONTENU ? 600 : 400,
+                    }}
+                  >
+                    {LONGUEUR_MAX_CONTENU - input.length}
+                  </span>
+                )}
 
                 {input.trim() ? (
                   <button

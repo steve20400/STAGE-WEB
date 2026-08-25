@@ -19,6 +19,21 @@
  *                               "accuracy":12.5,"label":"Douala"}}
  */
 
+/**
+ * Longueur maximale d'un message, en caracteres.
+ *
+ * 🔴 CE N'EST PAS UN CHOIX D'INTERFACE, c'est la taille de la colonne :
+ * `message.content` est un `VARCHAR(500)` depuis le 25/08/2026. Le serveur
+ * COUPE ce qui depasse (`tronqueContenu` dans `message-payload.mjs`), donc sans
+ * cette borne a la saisie l'utilisateur ecrit un texte, l'envoie, et en voit
+ * arriver une version raccourcie sans que rien ne l'ait prevenu.
+ *
+ * ⚠️ MIROIR de `LONGUEUR_MAX_CONTENU` cote serveur et de `longueurMaxContenu`
+ * dans `alanya/lib/models/message_payload.dart`. La changer ici seul ne
+ * changerait rien : c'est la base qui tranche.
+ */
+export const LONGUEUR_MAX_CONTENU = 500
+
 export interface SharedContact {
   name: string | null
   phones: string[]
