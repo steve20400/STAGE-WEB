@@ -353,6 +353,31 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
         {/* Un non-agent ne doit RIEN voir (demande user 15/08/2026) — pas un
             lien qui menerait a un message "reserve". isAgent n'est qu'un
             reflet d'affichage ; la vraie garde reste le 403 serveur. */}
+        {/*
+          Annuaire des collegues — RESERVE AUX AGENTS, comme « Clients
+          abandonnes » juste apres, et pour la meme raison : il montre les
+          services d une entreprise et les gens qui les tiennent, ce qui n a
+          aucun sens pour un particulier.
+
+          ⚠️ `isAgent` n'est qu'un reflet d'affichage ; la vraie garde reste le
+          403 de `GET /api/collegues`. Un lien masqué ne protège rien.
+
+          On REUTILISE le meme drapeau plutot que d en interroger un second :
+          deux sources pour la meme question finiraient par ne plus repondre
+          pareil, et l un des deux menus apparaitrait sans l autre.
+        */}
+        {isAgent && (
+          <Link
+            to="/collegues"
+            className={`sb-link ${pathname === "/collegues" ? "active" : ""}`}
+            onClick={onClose}
+            title={t("colleagues")}
+          >
+            <Icons.Contacts />
+            <span className="sb-link-label">{t("colleagues")}</span>
+          </Link>
+        )}
+
         {isAgent && (
           <Link
             to="/abandoned-clients"

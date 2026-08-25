@@ -27,6 +27,7 @@ import ConvInfoPage from "../app/(protected)/chats/[chatId]/chat-info"
 import ChatsSplit, { ChatEmptyState } from "../app/(protected)/chats/chats-split"
 import SectionSplit from "../app/(protected)/section-split"
 import ContactsPage from "../app/(protected)/contacts/contacts"
+import ColleguesPage from "../app/(protected)/collegues/collegues"
 import StatusPage from "../app/(protected)/status/status"
 import MeetingsPage from "../app/(protected)/meetings/meetings"
 import MeetingRoomPage from "../app/(protected)/meetings/[meetingId]/meeting-room"
@@ -126,6 +127,23 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     <Route index element={<ChatEmptyState />} />
                     <Route path=":chatId" element={<ChatRoomPage />} />
                   </Route>
+
+                  {/*
+                    Annuaire des collegues. La route existe pour tous ; c est le
+                    serveur qui refuse par 403 a qui n est pas agent, et le menu
+                    qui masque l entree. Une route conditionnee cote client
+                    donnerait un 404 la ou un 403 explique.
+                  */}
+                  <Route
+                    path="/collegues"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <ColleguesPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
 
                   <Route
                     path="/contacts"
