@@ -23,6 +23,12 @@ export interface ConversationMock {
   unread: number
   online: boolean
   isGroup: boolean
+  /**
+   * Conversation avec SOI-MEME — le « Moi » ou l'on se garde des notes. Vient du
+   * serveur, qui seul sait qu'une conversation non-groupe a UN participant est
+   * la sienne ; le client ne le recalcule pas.
+   */
+  isSelf?: boolean
   members?: string[]
   membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string; role?: string }>
   isPinned?: boolean

@@ -2,11 +2,18 @@
 import { useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
+import { useAuth } from "../../../../src/components/auth-provider"
 import { NomDuTitulaire } from "../../../../src/components/nom-du-titulaire"
 import { CONTACT_COLORS, normalizePhone } from "../../../../src/data/contacts"
 import { useContacts } from "../../../../src/hooks/use-contacts"
+import { toInitials } from "../../../../src/data/session-user"
+import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import { addContactByPhone } from "../../../../src/services/contacts-service"
-import { createGroupChat, createPrivateChat } from "../../../../src/services/chats-service"
+import {
+  createGroupChat,
+  createPrivateChat,
+  createSelfChat,
+} from "../../../../src/services/chats-service"
 import {
   ALANYA_NUMBER_FORMATTED_MAX_LENGTH,
   formatAlanyaNumber,
@@ -20,6 +27,10 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
   const { success, error } = useToast()
   const { contacts, addContact } = useContacts()
+  const { user: moi } = useAuth()
+
+  /** Mon numero, en chiffres nus, pour comparer une saisie a lui. */
+  const monNumero = normalizePhone(moi?.phone ?? "").replace(/\D/g, "")
 
   const [mode, setMode] = useState<Mode>("chat")
   const [query, setQuery] = useState("")
@@ -38,6 +49,45 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       return contact.name.toLowerCase().includes(q) || contact.phone.includes(query)
     })
   }, [contacts, query])
+
+  /*
+   * L'ENTREE « MOI », EN TETE DE LISTE ET EN MODE DISCUSSION SEULEMENT.
+   *
+   * En tete parce que c'est la SEULE porte : le serveur refuse qu'on s'ajoute
+   * soi-meme au repertoire (`POST /api/contacts` -> 400 SELF), mes notes ne
+   * peuvent donc jamais apparaitre parmi les contacts ci-dessous, quoi qu'on
+   * tape. C'est aussi l'endroit ou WhatsApp la pose, donc celui ou on la cherche.
+   *
+   * En mode discussion seulement : un groupe ajoute son createur d'office, se
+   * proposer comme membre a cocher n'aurait aucun sens.
+   */
+
+  /** Le mot « Moi » dans la langue courante — le meme que porte la liste. */
+  const libelleMoi = t("l2_me")
+
+  /**
+   * La recherche atteint aussi cette entree : par son libelle, par mon nom, et
+   * par mon numero — compose avec ou sans espaces. Sans cela, taper son propre
+   * numero ne ramenait rien du tout, et c'est precisement le geste qu'on attend
+   * de quelqu'un qui veut s'ecrire.
+   */
+  const moiCorrespond = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (q === "") return true
+    const chiffres = q.replace(/\D/g, "")
+    if (chiffres !== "" && monNumero !== "" && monNumero.includes(chiffres)) return true
+    return libelleMoi.toLowerCase().includes(q) || (moi?.name ?? "").toLowerCase().includes(q)
+  }, [query, monNumero, libelleMoi, moi?.name])
+
+  const ouvrirMesNotes = async () => {
+    try {
+      const conversation = await createSelfChat()
+      navigate(`/chats/${conversation.id}`)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : t("conv_create_failed")
+      error(t("l2_conversation_failed"), message)
+    }
+  }
 
   const toggleSelection = (id: string) => {
     setSelected((prev) => {
@@ -88,6 +138,18 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
 
     if (!isValidAlanyaNumber(phone)) {
       error(t("l2_invalid_number"), t("use_alanya_id"))
+      return
+    }
+
+    /*
+     * SON PROPRE NUMERO : ce n'est pas un contact, c'est l'entree « Moi ».
+     *
+     * Le serveur refuse de toute facon (`400 SELF`), mais son message est en
+     * francais et ne dit pas ou aller. On arrete donc la saisie ici, avec le
+     * seul renseignement utile : la porte est en tete de liste.
+     */
+    if (monNumero !== "" && phone === monNumero) {
+      error(t("add_failed"), t("self_is_not_a_contact"))
       return
     }
 
@@ -147,6 +209,13 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
         .ncm-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-default); display: flex; align-items: center; justify-content: center; }
         .ncm-item.checked .ncm-check { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
         .ncm-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 28px 12px; }
+        /* L'entree « Moi » : meme ligne que les contacts, mais detachee d'eux
+           par un filet — elle n'en est pas un, et le repertoire commence en
+           dessous. */
+        .ncm-moi { border-bottom: 1px solid var(--border-subtle); }
+        .ncm-moi .ncm-name { font-weight: 700; }
+        .ncm-moi .ncm-avatar { overflow: hidden; background: var(--brand); color: var(--brand-text); }
+        .ncm-moi .ncm-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .ncm-foot { border-top: 1px solid var(--border-subtle); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .ncm-foot-label { color: var(--text-muted); font-size: 12px; }
         .ncm-main-btn { border: none; border-radius: 9px; background: var(--accent); color: var(--accent-text); font-weight: 700; font-size: 13px; padding: 10px 14px; cursor: pointer; }
@@ -225,7 +294,39 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="ncm-list">
-            {filtered.length === 0 && (
+            {/* Sans numero en session, l'entree n'aurait rien a ouvrir : on la
+                cache plutot que d'offrir un bouton qui echouerait. */}
+            {mode === "chat" && monNumero !== "" && moiCorrespond && (
+              <div
+                className="ncm-item ncm-moi"
+                role="button"
+                tabIndex={0}
+                onClick={() => void ouvrirMesNotes()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    void ouvrirMesNotes()
+                  }
+                }}
+              >
+                <div className="ncm-avatar">
+                  {avatarDisplaySrc(moi?.avatar) ? (
+                    <img src={avatarDisplaySrc(moi?.avatar)!} alt="" />
+                  ) : (
+                    toInitials(moi?.name ?? libelleMoi)
+                  )}
+                </div>
+                <div className="ncm-meta">
+                  <div className="ncm-name">{libelleMoi}</div>
+                  <div className="ncm-phone">{t("self_chat_hint")}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Le repli « aucun contact » ne parle que du repertoire : l'entree
+                « Moi » au-dessus n'en fait pas partie, et l'afficher juste sous
+                elle donnerait a croire qu'elle n'existe pas non plus. */}
+            {filtered.length === 0 && !(mode === "chat" && monNumero !== "" && moiCorrespond) && (
               <div className="ncm-empty">{t("l2_no_contact_for", { requete: query })}</div>
             )}
 

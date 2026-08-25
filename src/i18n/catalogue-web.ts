@@ -1121,6 +1121,19 @@ export const WEB_TRANSLATION_KEYS = [
   "clist_dial_outside",
   "clist_dial_unknown",
   "clist_not_contact",
+  // Menu « trois points » d'un contact (menu-contact.tsx). Les trois actions
+  // elles-memes reutilisent des cles existantes : `send_message`, `audio_call`
+  // et `video_call`. Ne vivent ici que les libelles que le menu est seul a
+  // porter — son intitule accessible et le cas « ecrire a soi-meme ».
+  "mc_actions",
+  "mc_actions_for",
+  "mc_write_to",
+  "mc_note_to_self",
+  // Conversation avec soi-meme — le « Moi » de WhatsApp. Le NOM de cette
+  // conversation reutilise `l2_me`, deja traduit partout : ne vivent ici que
+  // les deux mentions qui lui sont propres.
+  "self_chat_hint",
+  "self_is_not_a_contact",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
@@ -2278,6 +2291,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Ce numéro n'est pas dans votre répertoire, mais il peut tout de même rejoindre la liste.",
     clist_dial_unknown: "Aucun compte Alanya ne correspond au numéro {numero}.",
     clist_not_contact: "Hors répertoire",
+    mc_actions: "Actions du contact",
+    mc_actions_for: "Actions pour {nom}",
+    mc_write_to: "Écrire à {nom}",
+    mc_note_to_self: "M'écrire une note",
+    self_chat_hint: "Vos notes, visibles de vous seul",
+    self_is_not_a_contact: "Ce numéro est le vôtre. Utilisez l'entrée « Moi », en tête de liste, pour vous écrire.",
   },
   en: {
     thr_download_image: "Download the image",
@@ -3419,6 +3438,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     clist_dial_outside: "This number isn't in your address book, but it can still join the list.",
     clist_dial_unknown: "No Alanya account uses the number {numero}.",
     clist_not_contact: "Not in your contacts",
+    mc_actions: "Contact actions",
+    mc_actions_for: "Actions for {nom}",
+    mc_write_to: "Message {nom}",
+    mc_note_to_self: "Message yourself",
+    self_chat_hint: "Your notes, visible only to you",
+    self_is_not_a_contact: "This number is your own. Use the “Me” entry at the top of the list to write to yourself.",
   },
   es: {
     thr_download_image: "Descargar la imagen",
@@ -4566,6 +4591,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Este número no está en tu agenda, pero puedes añadirlo a la lista igualmente.",
     clist_dial_unknown: "Ninguna cuenta de Alanya tiene el número {numero}.",
     clist_not_contact: "Fuera de tu agenda",
+    mc_actions: "Acciones del contacto",
+    mc_actions_for: "Acciones para {nom}",
+    mc_write_to: "Escribir a {nom}",
+    mc_note_to_self: "Escribirme una nota",
+    self_chat_hint: "Tus notas, visibles solo para ti",
+    self_is_not_a_contact: "Este número es el tuyo. Usa la entrada «Yo», al principio de la lista, para escribirte.",
   },
   de: {
     thr_download_image: "Bild herunterladen",
@@ -5725,6 +5756,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Diese Nummer ist nicht in deinem Adressbuch – der Liste hinzufügen kannst du sie trotzdem.",
     clist_dial_unknown: "Zur Nummer {numero} gehört kein Alanya-Konto.",
     clist_not_contact: "Nicht im Adressbuch",
+    mc_actions: "Kontaktaktionen",
+    mc_actions_for: "Aktionen für {nom}",
+    mc_write_to: "{nom} schreiben",
+    mc_note_to_self: "Notiz an mich schreiben",
+    self_chat_hint: "Deine Notizen, nur für dich sichtbar",
+    self_is_not_a_contact: "Das ist deine eigene Nummer. Nutze den Eintrag „Ich“ oben in der Liste, um dir selbst zu schreiben.",
   },
   pt: {
     thr_download_image: "Transferir a imagem",
@@ -6872,6 +6909,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     clist_dial_outside: "Este número não está nos seus contactos, mas pode ser adicionado à lista.",
     clist_dial_unknown: "Nenhuma conta Alanya tem o número {numero}.",
     clist_not_contact: "Fora dos contactos",
+    mc_actions: "Ações do contacto",
+    mc_actions_for: "Ações para {nom}",
+    mc_write_to: "Escrever a {nom}",
+    mc_note_to_self: "Escrever uma nota para mim",
+    self_chat_hint: "As suas notas, visíveis apenas para si",
+    self_is_not_a_contact: "Este número é o seu. Use a entrada «Eu», no topo da lista, para escrever para si.",
   },
   ru: {
     thr_download_image: "Скачать изображение",
@@ -8013,6 +8056,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Этого номера нет в вашей адресной книге, но его всё равно можно добавить в список.",
     clist_dial_unknown: "Аккаунт Alanya с номером {numero} не найден.",
     clist_not_contact: "Нет в контактах",
+    mc_actions: "Действия с контактом",
+    mc_actions_for: "Действия: {nom}",
+    mc_write_to: "Написать {nom}",
+    mc_note_to_self: "Написать себе",
+    self_chat_hint: "Ваши заметки, видны только вам",
+    self_is_not_a_contact: "Это ваш собственный номер. Используйте пункт «Я» в начале списка, чтобы написать себе.",
   },
   zh: {
     thr_download_image: "下载图片",
@@ -9117,6 +9166,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     clist_dial_outside: "该号码不在您的通讯录中，但仍然可以加入这个分组。",
     clist_dial_unknown: "没有与号码 {numero} 匹配的 Alanya 账户。",
     clist_not_contact: "不在通讯录中",
+    mc_actions: "联系人操作",
+    mc_actions_for: "{nom} 的操作",
+    mc_write_to: "给 {nom} 发消息",
+    mc_note_to_self: "给自己发消息",
+    self_chat_hint: "你的笔记，仅自己可见",
+    self_is_not_a_contact: "这是你自己的号码。请使用列表顶部的“我”给自己发消息。",
   },
   sv: {
     thr_download_image: "Ladda ner bilden",
@@ -10260,6 +10315,12 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     clist_dial_outside: "Numret finns inte i din adressbok, men det kan ändå läggas till i listan.",
     clist_dial_unknown: "Inget Alanya-konto har numret {numero}.",
     clist_not_contact: "Inte i adressboken",
+    mc_actions: "Kontaktåtgärder",
+    mc_actions_for: "Åtgärder för {nom}",
+    mc_write_to: "Skriv till {nom}",
+    mc_note_to_self: "Skriv till mig själv",
+    self_chat_hint: "Dina anteckningar, bara synliga för dig",
+    self_is_not_a_contact: "Det här är ditt eget nummer. Använd posten ”Jag” högst upp i listan för att skriva till dig själv.",
   },
   no: {
     thr_download_image: "Last ned bildet",
@@ -11403,5 +11464,11 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
       "Nummeret står ikke i adresseboken din, men det kan likevel legges til i listen.",
     clist_dial_unknown: "Ingen Alanya-konto har nummeret {numero}.",
     clist_not_contact: "Ikke i adresseboken",
+    mc_actions: "Kontakthandlinger",
+    mc_actions_for: "Handlinger for {nom}",
+    mc_write_to: "Skriv til {nom}",
+    mc_note_to_self: "Skriv til meg selv",
+    self_chat_hint: "Notatene dine, bare synlige for deg",
+    self_is_not_a_contact: "Dette er ditt eget nummer. Bruk oppføringen «Meg» øverst i lista for å skrive til deg selv.",
   },
 }

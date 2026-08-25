@@ -4455,6 +4455,17 @@ export default function ChatRoomPage() {
 
   // Conversation chargee depuis le backend (GET /api/chats trouve par id)
   const [backendChat, setBackendChat] = useState<ConversationMock | null>(null)
+  /**
+   * Conversation avec SOI-MEME — le « Moi » ou l'on se garde des notes.
+   *
+   * Le drapeau vient du serveur et n'est pas recalcule ici : lui seul sait qu'une
+   * conversation non-groupe a UN seul participant est la sienne, et une seconde
+   * regle finirait par diverger de la sienne.
+   *
+   * Il sert a retirer les boutons d'APPEL : s'appeler soi-meme n'aboutirait a
+   * rien, et proposer une action qui echoue est pire que ne rien proposer.
+   */
+  const cestMoiMeme = backendChat?.isSelf === true
   const [chatLoading, setChatLoading] = useState(true)
 
   useEffect(() => {
@@ -5621,7 +5632,11 @@ export default function ChatRoomPage() {
               promettre une action impossible. */}
           {!verrou.parUnAutre && (
             <>
-              {/* Appel audio */}
+              {/* Les APPELS n'ont pas de sens vers soi-meme : les boutons
+                  disparaissent plutot que d'echouer sous le doigt. Le menu de
+                  contact partage applique deja la meme regle. */}
+              {!cestMoiMeme && (
+                <>
               <button
                 className="action-btn"
                 aria-label={t("audio_call")}
@@ -5660,6 +5675,8 @@ export default function ChatRoomPage() {
                   <rect x="1" y="5" width="15" height="14" rx="2" />
                 </svg>
               </button>
+                </>
+              )}
             </>
           )}
           {/* Verrou de conversation. Absent — pas seulement desactive — quand un

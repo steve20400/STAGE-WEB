@@ -29,6 +29,7 @@ import {
   type PersonneBloquee,
 } from "../../../../src/services/blocked-service"
 import { AvatarCircle } from "../../../../src/components/avatar-circle"
+import { MenuContact } from "../../../../src/components/menu-contact"
 
 type BackendGroupMember =
   | string
@@ -173,7 +174,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const [showAddMember, setShowAddMember] = useState(false)
 
   const color = COLORS[conv.color]
-  const isAdmin = members.find((member) => member.id === getMyUserId())?.role === "admin"
+  /**
+   * Mon identifiant de compte, lu une fois : il sert a la fois a savoir si
+   * j'administre le groupe et a reconnaitre MA ligne dans la liste des membres.
+   */
+  const monId = getMyUserId()
+  const isAdmin = members.find((member) => member.id === monId)?.role === "admin"
 
   const removeMember = (id: string) => {
     const member = members.find((entry) => entry.id === id)
@@ -743,7 +749,15 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               {conv.isGroup &&
                 members.map((member) => {
                   const memberColor = COLORS[member.color]
-                  const isMe = member.id === "me"
+                  /**
+                   * « Moi » se reconnait a l'identifiant de compte, jamais a la
+                   * chaine "me" : aucun des deux constructeurs de cette page
+                   * n'a jamais pose cet identifiant-la. La comparaison etait
+                   * donc toujours fausse — la mention « Vous » ne s'affichait
+                   * pas, et un administrateur voyait sur sa propre ligne les
+                   * boutons pour se promouvoir et se retirer lui-meme.
+                   */
+                  const isMe = monId !== null && member.id === monId
 
                   return (
                     <div className="member-item" key={member.id}>
@@ -777,6 +791,23 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                           <div className="m-alanya-id">{formatAlanyaNumber(member.alanyaId)}</div>
                         )}
                       </div>
+                      {/* Ecrire, appeler en audio, appeler en video : le meme
+                          menu que dans le repertoire, sur le meme membre. Il ne
+                          reprend PAS les deux boutons voisins — promouvoir et
+                          retirer ne visent pas la personne mais son role dans
+                          ce groupe, et ils n'appartiennent qu'a l'administrateur
+                          tandis que le menu vaut pour tout le monde. */}
+                      {member.alanyaId && (
+                        <MenuContact
+                          userId={member.id}
+                          numero={member.alanyaId}
+                          nom={member.name}
+                          // Session illisible : on ne repond pas « non » a sa
+                          // place, le menu reconnait aussi le titulaire au numero.
+                          estMoi={monId !== null ? isMe : undefined}
+                          compact
+                        />
+                      )}
                       {!isMe && isAdmin && (
                         <div className="m-actions">
                           {member.role !== "admin" && (

@@ -8,10 +8,16 @@ import {
 } from "../../../src/services/calls-service"
 import "./calls-page.css"
 import { RowActionsMenu } from "../../../src/components/row-actions-menu"
+import { MenuContact } from "../../../src/components/menu-contact"
 import { useToast } from "../../../src/components/toast"
 import { createPrivateChat } from "../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../src/services/call-manager"
-import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
+import { loadSessionUser } from "../../../src/data/session-user"
+import {
+  formatAlanyaNumber,
+  isValidAlanyaNumber,
+  normalizeAlanyaNumber,
+} from "../../../src/lib/alanya-number"
 import { ApiError } from "../../../src/lib/api-client"
 import { Dialer } from "./dialer"
 import { AvatarCircle } from "../../../src/components/avatar-circle"
@@ -58,6 +64,24 @@ function formatGroupHeader(date: Date): string {
   return date.toLocaleDateString(langue, { day: "numeric", month: "long", year: "numeric" })
 }
 
+/**
+ * Ce qui, dans une ligne d'historique, peut etre compose et joint.
+ *
+ * `contactId` porte le numero du correspondant pour un appel a deux, mais
+ * l'identifiant de la conversation — ou de l'appel — quand le serveur n'a pas
+ * envoye de numero, et pour tout appel de groupe. Un identifiant technique n'a
+ * ni titulaire ni menu de contact : on ne le confond pas avec un numero au
+ * pretexte qu'il contient des chiffres, d'ou le filtre sur les caracteres.
+ */
+const CARACTERES_DE_NUMERO = /^[0-9+\s().-]+$/
+
+function numeroDuPair(call: CallRecord): string | null {
+  if (call.isGroup) return null
+  const brut = call.contactId ?? ""
+  if (!CARACTERES_DE_NUMERO.test(brut) || !isValidAlanyaNumber(brut)) return null
+  return normalizeAlanyaNumber(brut)
+}
+
 function DirectionArrow({ direction }: { direction: CallDirection }) {
   const color = direction === "missed" ? "#ef4444" : direction === "in" ? "#4ade80" : "#60a5fa"
   return (
@@ -85,6 +109,12 @@ export default function CallsPage() {
   const [callsHistory, setCallsHistory] = useState<CallRecord[]>([])
   const [dialerOpen, setDialerOpen] = useState(false)
   const { error } = useToast()
+  /**
+   * Mon propre numero, pour reconnaitre ma ligne dans l'historique : on peut
+   * s'appeler soi-meme depuis un autre appareil, et le menu ne doit alors pas
+   * proposer de se joindre au telephone.
+   */
+  const monNumero = normalizeAlanyaNumber(loadSessionUser()?.phone ?? "")
 
   useEffect(() => {
     let cancelled = false
@@ -428,6 +458,7 @@ export default function CallsPage() {
                 {header && <div className="date-header">{header}</div>}
                 {calls.map((call) => {
                   const color = COLORS[call.contactColor]
+                  const numeroPair = numeroDuPair(call)
                   const statusLabel =
                     call.status === "missed"
                       ? t("call_missed")
@@ -519,23 +550,47 @@ export default function CallsPage() {
 
                       <div className="call-right">
                         <div className="call-ts">{formatItemTime(call.ts)}</div>
-                        <RowActionsMenu
-                          ariaLabel={t("a2_actions_for", { name: call.contactName })}
-                          actions={[
-                            {
-                              label: t("call_back_audio"),
-                              onSelect: () => void rappeler(call, "audio"),
-                            },
-                            {
-                              label: t("call_back_video"),
-                              onSelect: () => void rappeler(call, "video"),
-                            },
-                            {
-                              label: t("open_conversation"),
-                              onSelect: () => navigate(`/chats/${call.contactId}`),
-                            },
-                          ]}
-                        />
+                        {numeroPair ? (
+                          /* Un correspondant a un numero : c'est le meme menu
+                             que dans le repertoire, dans un groupe et dans une
+                             reunion. Il REMPLACE les trois actions d'ici plutot
+                             que de s'y ajouter — elles disaient deja ecrire,
+                             audio et video, en d'autres mots. Au passage,
+                             « ouvrir la conversation » cesse de mener nulle
+                             part : elle naviguait vers `/chats/<numero>`, alors
+                             que cette route attend un identifiant de
+                             conversation. */
+                          <MenuContact
+                            numero={numeroPair}
+                            nom={call.contactName}
+                            // Sans numero de session lisible, on laisse le menu
+                            // trancher lui-meme plutot que d'affirmer un « non ».
+                            estMoi={monNumero ? numeroPair === monNumero : undefined}
+                            compact
+                          />
+                        ) : (
+                          /* Appel de groupe, ou correspondant dont le serveur
+                             n'a pas donne le numero : il n'y a personne a qui
+                             ecrire ni qui appeler nommement, la ligne garde
+                             donc ses propres actions. */
+                          <RowActionsMenu
+                            ariaLabel={t("a2_actions_for", { name: call.contactName })}
+                            actions={[
+                              {
+                                label: t("call_back_audio"),
+                                onSelect: () => void rappeler(call, "audio"),
+                              },
+                              {
+                                label: t("call_back_video"),
+                                onSelect: () => void rappeler(call, "video"),
+                              },
+                              {
+                                label: t("open_conversation"),
+                                onSelect: () => navigate(`/chats/${call.convId ?? call.contactId}`),
+                              },
+                            ]}
+                          />
+                        )}
                       </div>
                     </div>
                   )

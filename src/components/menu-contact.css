@@ -1,0 +1,138 @@
+/* ============================================================
+   Menu « trois points » d'un contact — LE menu partage.
+
+   Meme objet partout : reglages d'un groupe, participants d'une
+   reunion, repertoire, listes d'appel. L'allure est reprise des
+   deux menus qui existaient deja, pour qu'un utilisateur
+   reconnaisse la meme chose d'un ecran a l'autre :
+     - le bouton, du menu d'une ligne de liste (row-actions-menu) ;
+     - le panneau, du menu de la fenetre reduite (.fr-menu).
+
+   Aucune couleur en dur : tout passe par les variables des quatre
+   themes (clair, nuit, et leurs variantes « soft »).
+   ============================================================ */
+
+/* L'ancre porte le positionnement du panneau. `flex-shrink: 0` :
+   dans une ligne dense, le menu ne doit jamais etre compresse par
+   un nom trop long. */
+.mc-ancre {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.mc-bouton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.mc-bouton:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+/* Ouvert : le bouton reste marque, sinon on perd de vue d'ou sort
+   le panneau quand plusieurs lignes se ressemblent. */
+.mc-bouton.ouvert {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.mc-bouton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Variante resserree, pour une ligne dense (vignette de participant,
+   ligne de repertoire compacte) : meme objet, moins de marges. */
+.mc-bouton.compact {
+  padding: 3px 5px;
+  border-radius: 7px;
+}
+
+.mc-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 60;
+  min-width: 190px;
+  /* Ni plus large ni plus haut que l'ecran : un panneau qui deborde
+     n'est atteignable dans aucun sens d'ouverture. */
+  max-width: min(280px, calc(100vw - 24px));
+  max-height: min(60vh, 320px);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  box-shadow: 0 14px 34px var(--overlay);
+  text-align: left;
+  cursor: default;
+}
+
+/* Pas la place en dessous : le panneau bascule au-dessus du bouton. */
+.mc-menu.vers-le-haut {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.mc-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.mc-item:hover {
+  background: var(--bg-hover);
+}
+.mc-item:focus-visible {
+  outline: none;
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+/* Le temps que la conversation se cree cote serveur : les entrees
+   restent lisibles mais ne repartent pas une seconde fois. */
+.mc-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Le libelle peut passer sur deux lignes (un nom long, une langue
+   verbeuse) sans que l'icone se retrecisse. */
+.mc-item-texte {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mc-icone {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.mc-item:hover .mc-icone,
+.mc-item:focus-visible .mc-icone {
+  color: var(--accent);
+}
+
+/* Panneau sorti du flux : il ne depend plus de son conteneur, donc plus aucun
+   `overflow` ne peut le trancher. Sa place est calculee a l'ouverture depuis la
+   position du bouton, en coordonnees d'ecran. */
+.mc-menu.mc-menu-flottant {
+  position: fixed;
+  z-index: 2000;
+}

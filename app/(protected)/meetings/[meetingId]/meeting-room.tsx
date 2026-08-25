@@ -45,6 +45,7 @@ import {
 import { useTranslation, type Cle } from "../../../../src/i18n"
 import { ApiError } from "../../../../src/lib/api-client"
 import { MeetingChat } from "../../../../src/components/meeting-chat"
+import { MenuContact } from "../../../../src/components/menu-contact"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
 import { PaveNumerique } from "../../../../src/components/pave-numerique"
 import {
@@ -1194,6 +1195,11 @@ export default function MeetingRoomPage() {
   const maMain = mainsLevees.has(getMyUserId() ?? "")
   /** Notre propre nom, pour l'initiale affichee quand on est seul dans la salle. */
   const monNom = loadSessionUser()?.name ?? t("l2_me")
+  /**
+   * Notre identifiant de compte, tel que le serveur nomme les participants :
+   * c'est par lui qu'on reconnait sa propre ligne dans la liste des invites.
+   */
+  const monIdentifiant = getMyUserId()
 
   /**
    * Traduction d'une cle QUI N'EST PAS ENCORE AU CATALOGUE (voir `CleAVenir`).
@@ -1330,6 +1336,26 @@ export default function MeetingRoomPage() {
     if (!meetingId) return
     sendMeetingMute(Number(meetingId), participantId, media)
   }
+
+  /**
+   * Le menu de contact d'un invite : ecrire, appeler en audio, appeler en video.
+   *
+   * IL PARAIT AUSSI DANS LA BANDE DE LA SALLE, depuis que le panneau sait
+   * flotter. La bande defile a l'horizontale : `overflow-x: auto` force l'axe
+   * vertical a etre decoupe lui aussi — c'est la regle CSS qui lie les deux
+   * axes — et un panneau pose sous le bouton y etait tranche net par le bord.
+   * On l'avait donc simplement retire pendant la reunion, ce qui laissait un
+   * ecran incoherent avec tous les autres : l'utilisateur cherchait un menu
+   * present partout ailleurs.
+   *
+   * Le prop `flottant` sort le panneau du flux et lui donne sa place en
+   * coordonnees d'ecran, calculee a l'ouverture depuis le bouton. Plus aucun
+   * `overflow` ne peut le trancher.
+   *
+   * Il faut aussi un numero : le serveur ne le renvoie pas toujours, et sans lui
+   * il n'y a ni conversation a ouvrir ni appel a passer.
+   */
+  const montrerMenuContact = (p: ParticipantReunion) => Boolean(p.numero)
 
   const handleExclure = async (participantId: string, nom: string) => {
     if (!meetingId || !confirm(t("meet_exclude_confirm", { name: nom }))) return
@@ -1976,6 +2002,25 @@ export default function MeetingRoomPage() {
                   </div>
                   <div className="participant-ligne">
                     <div className="participant-name">{p.nom}</div>
+                    {/* Le menu s'ajoute aux gestes de l'organisateur, il ne les
+                        reprend pas : couper un micro et exclure agissent sur la
+                        REUNION, ecrire et appeler sur la personne — et ces
+                        derniers valent pour tous les invites, pas seulement
+                        pour celui qui preside. */}
+                    {montrerMenuContact(p) && (
+                      <MenuContact
+                        userId={p.id}
+                        numero={p.numero}
+                        nom={p.nom}
+                        // Session illisible : on ne repond pas « non » a sa
+                        // place, le menu reconnait aussi le titulaire au numero.
+                        estMoi={monIdentifiant ? p.id === monIdentifiant : undefined}
+                        compact
+                        // La bande des participants decoupe ses debordements :
+                        // sans cela le panneau serait tranche par son bord.
+                        flottant
+                      />
+                    )}
                     {/* Couper le micro, couper la camera : a cote de la croix,
                         parce que c'est le meme droit et le meme geste — agir
                         sur quelqu'un depuis sa vignette. Une coupure n'est PAS

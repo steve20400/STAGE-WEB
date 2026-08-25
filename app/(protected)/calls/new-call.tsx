@@ -7,6 +7,9 @@ import { createPrivateChat } from "../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../src/services/call-manager"
 import "./calls-page.css"
 import { AvatarCircle } from "../../../src/components/avatar-circle"
+import { MenuContact } from "../../../src/components/menu-contact"
+import { loadSessionUser } from "../../../src/data/session-user"
+import { normalizeAlanyaNumber } from "../../../src/lib/alanya-number"
 import { useTranslation } from "../../../src/i18n"
 
 export default function NewCallPage() {
@@ -24,6 +27,8 @@ export default function NewCallPage() {
   const [query, setQuery] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(presetContact)
   const [type, setType] = useState<"audio" | "video">(presetType)
+  /** Mon propre numero : un contact enregistre a son nom n'est pas a appeler. */
+  const monNumero = normalizeAlanyaNumber(loadSessionUser()?.phone ?? "")
 
   const filtered = useMemo(() => {
     return contacts.filter((contact) => {
@@ -156,6 +161,19 @@ export default function NewCallPage() {
 
               <div className="call-right">
                 {selected ? <span className="missed-badge">{t("a2_selected")}</span> : null}
+                {/* Choisir puis lancer reste le chemin de cet ecran ; le menu
+                    est le raccourci, pour appeler sans passer par le bouton du
+                    bas — ou pour ecrire, ce que cet ecran ne savait pas faire.
+                    Ouvrir le menu ne selectionne pas la ligne : le bouton
+                    retient le clic lui-meme. */}
+                <MenuContact
+                  numero={contact.phone}
+                  nom={contact.name}
+                  estMoi={
+                    monNumero ? normalizeAlanyaNumber(contact.phone) === monNumero : undefined
+                  }
+                  compact
+                />
               </div>
             </div>
           )

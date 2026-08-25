@@ -4,6 +4,7 @@ import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data
 import {
   fetchChatConversations,
   fetchChatConversationsCacheFirst,
+  type ConversationListItem,
 } from "../../../src/services/chats-service"
 import {
   subscribeToAllMessages,
@@ -32,6 +33,23 @@ function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
   if (type === "audio") return `[${traduire(langue, "cinfo_audio")}] `
   if (type === "image") return `[${traduire(langue, "l2_image")}] `
   return ""
+}
+
+/**
+ * Le nom sous lequel s'affiche une conversation.
+ *
+ * MES NOTES NE SONT PAS UN CORRESPONDANT. Une conversation avec soi-meme n'a
+ * qu'un participant — moi — et le nom d'un tete-a-tete se lit d'ordinaire chez
+ * l'AUTRE. Faute d'autre, elle s'annoncerait sous mon propre nom, ou sous mon
+ * numero, comme si quelqu'un d'autre m'ecrivait. Le serveur le sait deja et
+ * envoie `isSelf` : on s'en sert plutot que de deviner a la forme des membres.
+ *
+ * Le libelle se relit ici, a chaque rendu (meme raison que `lastMsgIcon`), et
+ * non au chargement : un changement de langue se voit donc aussitot, sans
+ * attendre le prochain passage sur le reseau.
+ */
+function nomConversation(conv: ConversationListItem): string {
+  return conv.isSelf ? traduire(langueInitiale(), "l2_me") : conv.name
 }
 
 /**
@@ -198,7 +216,7 @@ export default function ChatsPage() {
     [membresDuFiltre]
   )
 
-  const [conversations, setConversations] = useState<ConversationMock[]>([])
+  const [conversations, setConversations] = useState<ConversationListItem[]>([])
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -278,7 +296,9 @@ export default function ChatsPage() {
         if (filter === "locked") return c.lock != null
         return true
       })
-      .filter((c) => c.name.toLowerCase().includes(query.toLowerCase()))
+      // Sur le nom AFFICHE, pas sur celui du serveur : sinon chercher « Moi »
+      // ne trouverait pas mes notes dans une langue autre que le francais.
+      .filter((c) => nomConversation(c).toLowerCase().includes(query.toLowerCase()))
   }, [conversations, query, filter, idListeActive, estDansListeActive, estConversationBloquee])
 
   const pinned = filtered.filter((c) => c.isPinned)
@@ -550,9 +570,10 @@ export default function ChatsPage() {
   )
 }
 
-function ConvItem({ conv }: { conv: ConversationMock }) {
+function ConvItem({ conv }: { conv: ConversationListItem }) {
   const { t } = useTranslation()
   const color = CHAT_COLORS[conv.colorIdx % CHAT_COLORS.length]
+  const nom = nomConversation(conv)
   return (
     <NavLink
       to={`/chats/${conv.id}`}
@@ -566,14 +587,20 @@ function ConvItem({ conv }: { conv: ConversationMock }) {
             style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
           />
         ) : (
-          conv.initials
+          // Les initiales suivent le nom affiche : sinon le « M » de « Moi »
+          // resterait apres un passage au chinois, ou l'inverse.
+          conv.isSelf ? toInitials(nom) : conv.initials
         )}
-        {conv.online && !conv.isGroup && <div className="av-dot" />}
+        {/* Pas de pastille de presence sur mes propres notes : je suis
+            forcement la, l'annoncer n'apprendrait rien. Le service met deja
+            `online` a faux pour cette conversation ; la condition ici garde
+            l'affichage juste meme si une donnee de cache ancienne dit autrement. */}
+        {conv.online && !conv.isGroup && !conv.isSelf && <div className="av-dot" />}
         {conv.isGroup && <div className="group-stack">{conv.members?.length ?? "+"}</div>}
       </div>
       <div className="conv-meta">
         <div className="conv-name">
-          {conv.name}
+          {nom}
           {conv.isPinned && <span className="pin-icon">{t("l2_pinned_badge")}</span>}
           {conv.isGroup && (
             <span

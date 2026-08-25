@@ -1,8 +1,9 @@
 import { loadLocalConversations } from "../data/local-conversations"
 import { loadLocalGroups, toConversationMock } from "../data/local-groups"
 import { type ConversationMock, type MessageType } from "../mocks/chat-data"
-import { getMyUserId, toInitials } from "../data/session-user"
+import { getMyUserId, loadSessionUser, toInitials } from "../data/session-user"
 import { apiRequest } from "../lib/api-client"
+import { langueInitiale, traduire } from "../i18n"
 import {
   cacheConversations,
   loadCachedConversations,
@@ -24,11 +25,36 @@ export function getChatConversations(): ConversationMock[] {
   return [...localConversations, ...groupFallbacks]
 }
 
+/**
+ * Conversation de la liste, augmentee de ce que le web seul a besoin de savoir.
+ *
+ * `ConversationMock` est la forme partagee par tous les ecrans ; ce complement
+ * n'existe que pour la conversation avec soi-meme, et vit donc ici plutot que
+ * dans le type commun. Comme il l'etend, tout ce qui attend une
+ * `ConversationMock` accepte encore une `ConversationListItem`.
+ */
+export interface ConversationListItem extends ConversationMock {
+  /**
+   * Mes notes personnelles — le « Moi » de WhatsApp.
+   *
+   * Vient du serveur tel quel (voir `BackendConversation.isSelf`). On ne le
+   * rededuit jamais de la forme des membres : c'est SA definition, et une
+   * seconde regle finirait par diverger de la sienne.
+   */
+  isSelf?: boolean
+}
+
 /** Conversation telle que renvoyee par GET /api/conversations. */
 interface BackendConversation {
   id: string
   isGroup: boolean
   title: string | null
+  /**
+   * Vrai pour la conversation du compte avec lui-meme (non-groupe, un seul
+   * participant). Le serveur l'envoie explicitement pour qu'aucun client n'ait
+   * a reconnaitre cette forme par lui-meme.
+   */
+  isSelf?: boolean
   avatarUrl?: string | null
   members?: Array<{
     id: string
@@ -76,15 +102,39 @@ function pickColorIdx(id: string): number {
   return sum % 5
 }
 
-function toFrontConversation(c: BackendConversation): ConversationMock {
-  const name = c.title ?? "Conversation"
+function toFrontConversation(c: BackendConversation): ConversationListItem {
+  const isSelf = c.isSelf === true
+
+  /*
+   * LE TITRE DU « MOI » EST TRADUIT ICI, PAS PRIS TEL QUEL.
+   *
+   * Le serveur rend « Moi » — le mot francais, en dur dans la route. Il convient
+   * a un client francais et a lui seul, alors que le web parle neuf langues. On
+   * le remplace donc par la traduction de la langue courante.
+   *
+   * Lue au chargement et non au rendu : c'est la limite de l'endroit. L'ecran
+   * des discussions reprend la traduction a chaque rendu (voir `ConvItem`), un
+   * changement de langue s'y voit donc aussitot ; les autres ecrans la rattrapent
+   * a leur prochain chargement.
+   */
+  const name = isSelf ? traduire(langueInitiale(), "l2_me") : (c.title ?? "Conversation")
+
   // GET /api/conversations renvoie isOnline pour chaque membre (deja masque a 0
   // par le backend si le pair a choisi de cacher sa presence).
   const myId = getMyUserId()
-  const peer = c.isGroup ? undefined : c.members?.find((m) => m.id !== myId)
+  /*
+   * Mes notes n'ont pas de correspondant, donc pas de pastille verte.
+   *
+   * Le `find` ci-dessous suffirait presque — le seul membre EST moi, il serait
+   * ecarte. Presque : quand la session locale est incomplete, `getMyUserId()`
+   * rend `null`, plus rien n'est ecarte, et je me verrais annonce « en ligne »
+   * au-dessus de mes propres notes. `isSelf` tranche avant d'en arriver la.
+   */
+  const peer = c.isGroup || isSelf ? undefined : c.members?.find((m) => m.id !== myId)
 
   return {
     id: c.id,
+    isSelf,
     name,
     initials: toInitials(name),
     colorIdx: pickColorIdx(c.id),
@@ -106,7 +156,7 @@ function toFrontConversation(c: BackendConversation): ConversationMock {
  * Persiste le résultat dans IndexedDB pour un affichage instantané au prochain chargement.
  * En cas d'erreur, retombe sur le cache IndexedDB puis sur les conversations locales.
  */
-export async function fetchChatConversations(): Promise<ConversationMock[]> {
+export async function fetchChatConversations(): Promise<ConversationListItem[]> {
   try {
     const response = await apiRequest<{ conversations: BackendConversation[] }>(
       "/api/conversations"
@@ -118,6 +168,10 @@ export async function fetchChatConversations(): Promise<ConversationMock[]> {
       (response.conversations ?? []).map((c) => ({
         id: c.id,
         isGroup: c.isGroup,
+        // Le drapeau voyage avec la conversation : sans lui, au demarrage a
+        // froid, la liste relit le cache, ne reconnait plus mes notes et leur
+        // rend le titre francais fige au dernier passage sur le reseau.
+        isSelf: c.isSelf,
         title: c.title,
         avatarUrl: c.avatarUrl,
         members: c.members,
@@ -162,8 +216,8 @@ export async function fetchChatConversations(): Promise<ConversationMock[]> {
  * Utilisée par chats.tsx pour un affichage instantané.
  */
 export async function fetchChatConversationsCacheFirst(
-  onCached: (conversations: ConversationMock[]) => void,
-  onFresh: (conversations: ConversationMock[]) => void
+  onCached: (conversations: ConversationListItem[]) => void,
+  onFresh: (conversations: ConversationListItem[]) => void
 ): Promise<void> {
   // Étape 1 : lecture cache instantanée
   try {
@@ -189,13 +243,40 @@ export async function fetchChatConversationsCacheFirst(
 /**
  * POST /api/conversations — Cree (ou recupere si elle existe deja) une conversation
  * directe avec le numero Alanya du contact. Renvoie l'id backend.
+ *
+ * Composer SON PROPRE numero est un usage prevu : le serveur rend alors la
+ * conversation du compte avec lui-meme et le signale par `isSelf`. Aucun appelant
+ * n'a de cas particulier a traiter — c'est le meme appel, et l'ecran de
+ * discussion s'ouvre pareil.
  */
-export async function createPrivateChat(publicNumber: string): Promise<{ id: string }> {
-  const response = await apiRequest<{ id: string; isGroup: boolean }>("/api/conversations", {
-    method: "POST",
-    body: { publicNumber },
-  })
-  return { id: response.id }
+export async function createPrivateChat(
+  publicNumber: string
+): Promise<{ id: string; isSelf: boolean }> {
+  const response = await apiRequest<{ id: string; isGroup: boolean; isSelf?: boolean }>(
+    "/api/conversations",
+    {
+      method: "POST",
+      body: { publicNumber },
+    }
+  )
+  return { id: response.id, isSelf: response.isSelf === true }
+}
+
+/**
+ * Ouvre (ou cree) MES notes personnelles — le « Moi » de WhatsApp.
+ *
+ * Le numero de la session est resolu ici, une fois, plutot que dans chaque ecran
+ * qui offre l'entree : le repertoire ne peut pas fournir ce contact, le serveur
+ * refusant de s'ajouter soi-meme (`POST /api/contacts` -> 400 SELF). Sans ce
+ * point unique, chaque appelant irait rechercher le numero a sa facon.
+ *
+ * Rejette quand la session locale n'a pas de numero — le serveur ne saurait pas
+ * qui ouvrir, et un appel sans numero echouerait de toute facon plus loin.
+ */
+export async function createSelfChat(): Promise<{ id: string; isSelf: boolean }> {
+  const monNumero = (loadSessionUser()?.phone ?? "").replace(/\D/g, "")
+  if (monNumero === "") throw new Error("SESSION_SANS_NUMERO")
+  return createPrivateChat(monNumero)
 }
 
 /**
@@ -220,7 +301,7 @@ export async function createGroupChat(
  */
 export async function fetchConversationById(
   conversationId: string
-): Promise<ConversationMock | null> {
+): Promise<ConversationListItem | null> {
   // Essai cache IndexedDB d'abord
   try {
     const cached = await loadCachedConversation(conversationId)
