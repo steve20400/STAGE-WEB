@@ -4913,8 +4913,40 @@ export default function ChatRoomPage() {
     lastMessageIdRef.current = newestId
   }, [messages])
 
+  /**
+   * ON RESTE COLLE AU BAS TANT QUE LE FIL GRANDIT.
+   *
+   * Le calage initial ne se faisait qu'UNE FOIS, au premier rendu — et a cet
+   * instant les images, les apercus de lien, les cartes et les fiches de
+   * document n'ont pas encore leur hauteur. On se posait donc sur un bas qui
+   * n'etait pas le vrai : le contenu grandissait ensuite, et l'on se retrouvait
+   * loin au-dessus du dernier message, oblige de defiler vers le bas alors
+   * qu'on n'avait rien manque.
+   *
+   * L'observateur de taille recolle au bas a chaque fois que le contenu
+   * s'agrandit, jusqu'a ce que l'utilisateur touche lui-meme au defilement.
+   * C'est lui qui decide d'arreter, pas un delai devine : une image lente sur
+   * un reseau lent depasserait n'importe quelle duree qu'on aurait fixee.
+   */
+  const ancrageInitialRef = useRef(true)
+  useEffect(() => {
+    const corps = messagesBodyRef.current
+    if (!corps || typeof ResizeObserver === "undefined") return
+    const observateur = new ResizeObserver(() => {
+      if (!ancrageInitialRef.current) return
+      // `scrollTop` plutot que `scrollIntoView` : on est deja en bas, il s'agit
+      // de RESTER colle, pas d'y aller — et un defilement anime a chaque image
+      // chargee donnerait une page qui tressaute.
+      corps.scrollTop = corps.scrollHeight
+    })
+    observateur.observe(corps)
+    for (const enfant of Array.from(corps.children)) observateur.observe(enfant)
+    return () => observateur.disconnect()
+  }, [chatId, messages.length])
+
   // Chaque conversation possède son propre chargement initial.
   useEffect(() => {
+    ancrageInitialRef.current = true
     initialScrollDoneRef.current = false
     lastMessageIdRef.current = null
     isNearBottomRef.current = true
@@ -4952,6 +4984,12 @@ export default function ChatRoomPage() {
     if (!premier) return
 
     setFrontiereNonLus(premier)
+    // L'ANCRAGE AU BAS S'ARRETE ICI. Il sert a compenser les images qui
+    // arrivent quand on ouvre sur le dernier message ; mais des qu'il y a du
+    // non-lu, la place voulue est la FRONTIERE, pas le bas. Sans cette ligne,
+    // l'observateur de taille ramenerait le fil au bas a la premiere image
+    // chargee, et la reprise de lecture serait perdue.
+    ancrageInitialRef.current = false
     // Un tour de boucle pour laisser le separateur entrer dans le DOM : il
     // n'existe pas encore au moment ou l'on demande le defilement.
     requestAnimationFrame(() => {
@@ -5066,6 +5104,10 @@ export default function ChatRoomPage() {
     const body = messagesBodyRef.current
     if (!body) return
     const distanceDuBas = body.scrollHeight - body.scrollTop - body.clientHeight
+    // Des qu'on s'eloigne du bas, l'ancrage automatique s'arrete : c'est le
+    // geste de l'utilisateur qui y met fin, et lui seul. Tant qu'il reste au
+    // bas, le fil continue de se recoller pendant que les images arrivent.
+    if (distanceDuBas > 100) ancrageInitialRef.current = false
     isNearBottomRef.current = distanceDuBas < 100
     // 240 px : au-dela, le bas n'est plus a portee de regard, le bouton se
     // justifie. En deca il ferait doublon avec un simple coup de molette.
