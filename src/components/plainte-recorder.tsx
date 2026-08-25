@@ -180,7 +180,20 @@ export function PlainteRecorder({ session }: { session: IvrSession }) {
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
 
-    const blob = new Blob(morceauxRef.current, { type: rec.mimeType || "audio/webm" })
+    // 🔴 TYPE SANS PARAMÈTRE — meme regle que `enregistrement-appel.ts`.
+    //
+    // Le navigateur produit « audio/webm;codecs=opus ». La liste blanche du
+    // serveur comparait la chaine ENTIERE et rejetait le « ;codecs=… » par un
+    // 415, que le panneau affiche « Ce type de fichier n'est pas pris en
+    // compte » (signale par le user le 25/08/2026). Le mobile passait, lui :
+    // il produit « audio/mp4 », sans parametre.
+    //
+    // Le serveur normalise desormais de son cote, ce qui repare aussi les
+    // navigateurs deja ouverts. On garde neanmoins la coupe ici, pour que les
+    // DEUX enregistreurs de ce depot se comportent pareil — c'est d'avoir
+    // corrige le premier seul qui a laisse celui-ci casse pendant cinq jours.
+    const typeBlob = (rec.mimeType || "audio/webm").split(";")[0].trim()
+    const blob = new Blob(morceauxRef.current, { type: typeBlob })
     // ⚠️ Un enregistrement VIDE n'est pas envoyable, et le dire vaut mieux que
     // de deposer un fichier que personne ne pourra ecouter.
     if (blob.size === 0) {
