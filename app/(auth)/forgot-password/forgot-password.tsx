@@ -41,6 +41,8 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [codeRecuperation, setCodeRecuperation] = useState("")
+  /** Second facteur : l Alanya ID du compte a reprendre. */
+  const [alanyaId, setAlanyaId] = useState("")
   const [motDePasse, setMotDePasse] = useState("")
   const [codeEnvoye, setCodeEnvoye] = useState(false)
   const [enCours, setEnCours] = useState(false)
@@ -49,11 +51,11 @@ export default function ForgotPasswordPage() {
 
   const peutEnvoyer = useMemo(() => {
     if (mode === "code") {
-      return codeRecuperation.trim().length > 0 && motDePasse.length >= 8
+      return codeRecuperation.trim().length > 0 && alanyaId.trim().length > 0 && motDePasse.length >= 8
     }
     if (!codeEnvoye) return adresseValide(email)
     return code.trim().length === 6 && motDePasse.length >= 8
-  }, [mode, codeRecuperation, motDePasse, codeEnvoye, email, code])
+  }, [mode, codeRecuperation, alanyaId, motDePasse, codeEnvoye, email, code])
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -62,7 +64,7 @@ export default function ForgotPasswordPage() {
     setEnCours(true)
     try {
       if (mode === "code") {
-        await reinitialiserParCodeRecuperation(codeRecuperation, motDePasse)
+        await reinitialiserParCodeRecuperation(codeRecuperation, alanyaId, motDePasse)
       } else if (!codeEnvoye) {
         await demanderCodeReinitialisation(email)
         setCodeEnvoye(true)
@@ -165,6 +167,26 @@ export default function ForgotPasswordPage() {
                   style={{ fontFamily: "monospace", letterSpacing: 2 }}
                 />
                 <label htmlFor="code-recuperation">{t("auth_recovery_code")}</label>
+              </div>
+              {/*
+                Second facteur. Pas de filtre sur les chiffres a la saisie :
+                l'Alanya ID est AFFICHE formate par paires dans toute
+                l'application, c'est sous cette forme que l'utilisateur le
+                connait, et le serveur n'en retient que les chiffres. Le
+                contraindre ici rejetterait la facon la plus naturelle de le
+                recopier.
+              */}
+              <div className="fp-field">
+                <input
+                  id="alanya-id"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder=" "
+                  value={alanyaId}
+                  onChange={(e) => setAlanyaId(e.target.value)}
+                  autoComplete="off"
+                />
+                <label htmlFor="alanya-id">{t("auth_recovery_alanya_id")}</label>
               </div>
               <div className="fp-field">
                 <input

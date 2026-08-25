@@ -481,17 +481,32 @@ export async function reinitialiserParEmail(email: string, code: string, motDePa
 /**
  * POST /api/auth/reset-password — chemin par CODE DE RÉCUPÉRATION.
  *
+ * 🔴 LE CODE **ET** L'ALANYA ID SONT EXIGÉS. Le code seul suffisait d'abord ;
+ * c'était un secret unique dont la fuite aurait ouvert tous les comptes sans
+ * adresse d'un coup. L'Alanya ID n'est pas un secret — les contacts le
+ * connaissent — mais il empêche la reprise EN MASSE : un code volé ne dit plus
+ * à quel compte il appartient.
+ *
  * ⚠️ N'ENVOYER NI `email` NI `code` avec : le serveur refuse explicitement un
  * mélange des deux chemins plutôt que d'en choisir un.
  *
- * La saisie part TELLE QUELLE : c'est le serveur qui relève la casse, ignore
- * les séparateurs et traduit les I/L/O mal lus. La nettoyer ici ferait une
- * seconde règle à tenir accordée avec la sienne.
+ * Les deux saisies partent TELLES QUELLES : c'est le serveur qui relève la
+ * casse, ignore les séparateurs, traduit les I/L/O mal lus et ne retient que
+ * les chiffres de l'Alanya ID. Les nettoyer ici ferait une seconde règle à
+ * tenir accordée avec la sienne.
  */
-export async function reinitialiserParCodeRecuperation(idRecuperation: string, motDePasse: string) {
+export async function reinitialiserParCodeRecuperation(
+  idRecuperation: string,
+  alanyaId: string,
+  motDePasse: string,
+) {
   await apiRequest<{ message?: string }>("/api/auth/reset-password", {
     method: "POST",
-    body: { idRecuperation: idRecuperation.trim(), password: motDePasse },
+    body: {
+      idRecuperation: idRecuperation.trim(),
+      publicNumber: alanyaId.trim(),
+      password: motDePasse,
+    },
   })
 }
 
