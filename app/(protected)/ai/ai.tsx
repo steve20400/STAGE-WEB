@@ -110,9 +110,6 @@ export default function AiAssistantPage() {
         </div>
         <div className="room-info">
           <div className="room-name">{t("s2_ai_name")}</div>
-          <div className="room-sub" style={{ color: "var(--text-muted)" }}>
-            {t("ai_powered_by")}
-          </div>
         </div>
         <div className="room-actions">
           <button
