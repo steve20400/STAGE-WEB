@@ -517,11 +517,22 @@ export async function lireCodeRecuperation() {
   )
 }
 
-/** POST /api/account/email — ajouter une adresse : demande du code. */
-export async function demanderAjoutEmail(email: string) {
+/**
+ * POST /api/account/email — poser ou REMPLACER l'adresse : demande du code.
+ *
+ * 🔴 LE MOT DE PASSE COURANT EST EXIGÉ, pour ajouter comme pour remplacer.
+ * L'adresse EST un moyen de reprendre le compte : sans lui, quiconque emprunte
+ * une session ouverte y inscrit la sienne, puis reprend le compte plus tard par
+ * « mot de passe oublié ».
+ *
+ * ⚠️ Le code part sur la NOUVELLE adresse, jamais sur l'ancienne : c'est la
+ * nouvelle qu'il s'agit de prouver joignable, et l'ancienne est justement celle
+ * que l'utilisateur ne relève plus.
+ */
+export async function demanderAjoutEmail(email: string, motDePasse: string) {
   await apiRequest<{ message?: string }>("/api/account/email", {
     method: "POST",
-    body: { email: email.trim().toLowerCase() },
+    body: { email: email.trim().toLowerCase(), password: motDePasse },
   })
 }
 

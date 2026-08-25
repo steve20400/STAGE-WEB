@@ -57,6 +57,8 @@ import {
 } from "../../../src/services/audio-output"
 import {
   changePasswordApi,
+  demanderAjoutEmail,
+  confirmerAjoutEmail,
   demanderReinitialisation,
   updateProfileApi,
 } from "../../../src/services/auth-api"
@@ -1797,6 +1799,18 @@ export default function SettingsPage() {
   })
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null)
 
+  /*
+   * Changement d'adresse e-mail, en deux temps.
+   *
+   * `emailEtape` porte l'avancement plutot qu'un booleen « code envoye » : le
+   * formulaire change ENTIEREMENT d'un temps a l'autre (mot de passe + adresse,
+   * puis code seul), et deux etats nommes se relisent mieux qu'une negation.
+   */
+  const [emailEtape, setEmailEtape] = useState<"saisie" | "code">("saisie")
+  const [nouvelEmail, setNouvelEmail] = useState("")
+  const [emailMdp, setEmailMdp] = useState("")
+  const [emailCode, setEmailCode] = useState("")
+
   // Notifications
   const [notifMessages, setNotifMessages] = useState(() => {
     const cached = localStorage.getItem("notif_messages")
@@ -2037,6 +2051,44 @@ export default function SettingsPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : t("set_image_unreadable")
       toastError(t("set_avatar_rejected"), message)
+    }
+  }
+
+  /**
+   * Poser ou REMPLACER l'adresse du compte, en deux temps.
+   *
+   * ⚠️ Rien n'est ecrit tant que le code n'est pas revenu : poser l'adresse des
+   * la demande ferait d'une faute de frappe une adresse definitive, et ferait
+   * PERDRE l'ancienne au passage.
+   */
+  const demanderEmail = async () => {
+    setSaving(true)
+    try {
+      await demanderAjoutEmail(nouvelEmail, emailMdp)
+      setEmailEtape("code")
+      success(t("set_email_code_sent"), nouvelEmail.trim().toLowerCase())
+    } catch (err) {
+      toastError(t("error"), err instanceof Error ? err.message : t("error"))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const confirmerEmail = async () => {
+    setSaving(true)
+    try {
+      await confirmerAjoutEmail(nouvelEmail, emailCode)
+      setEmailEtape("saisie")
+      setEmailCode("")
+      // Le mot de passe est efface des l'operation terminee : le garder en
+      // memoire de composant apres coup n'apporte rien et l'expose.
+      setEmailMdp("")
+      success(t("set_email_changed"), nouvelEmail.trim().toLowerCase())
+      setNouvelEmail("")
+    } catch (err) {
+      toastError(t("error"), err instanceof Error ? err.message : t("error"))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2970,6 +3022,95 @@ export default function SettingsPage() {
                 >
                   {saving ? t("set_modifying") : t("modify_password")}
                 </button>
+              </div>
+
+              {/*
+                ADRESSE E-MAIL DU COMPTE — la poser, ou la REMPLACER.
+                Place juste apres le mot de passe : les deux sont les moyens de
+                reprendre le compte, et le changement d'adresse exige justement
+                le mot de passe.
+              */}
+              <div className="s-card">
+                <div className="s-card-title">{t("set_email_section")}</div>
+                <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+                  {t("set_email_explain")}
+                </div>
+
+                {emailEtape === "code" ? (
+                  <>
+                    <Field
+                      label={t("enter_code")}
+                      value={emailCode}
+                      onChange={(v) => setEmailCode(v.replace(/\D/g, "").slice(0, 6))}
+                      type="text"
+                      placeholder="123456"
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        onClick={() => void confirmerEmail()}
+                        disabled={saving || emailCode.length !== 6}
+                        style={{
+                          background: "var(--accent)", border: "none", borderRadius: 9,
+                          padding: "12px 24px", fontSize: 14, fontWeight: 700,
+                          color: "var(--bg-base)", cursor: "pointer",
+                          fontFamily: "'DM Sans', sans-serif",
+                          opacity: saving || emailCode.length !== 6 ? 0.4 : 1,
+                        }}
+                      >
+                        {t("verify")}
+                      </button>
+                      {/* Abandonner remet TOUT a zero, y compris le mot de
+                          passe saisi : le laisser en memoire apres un abandon
+                          n'a aucune raison d'etre. */}
+                      <button
+                        onClick={() => {
+                          setEmailEtape("saisie")
+                          setEmailCode("")
+                          setEmailMdp("")
+                        }}
+                        style={{
+                          background: "none", border: "1px solid var(--border)",
+                          borderRadius: 9, padding: "12px 24px", fontSize: 14,
+                          cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                        }}
+                      >
+                        {t("cancel")}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Le mot de passe D'ABORD : l'ordre dit que c'est le compte
+                        qu'on s'apprete a toucher, pas un simple reglage. */}
+                    <Field
+                      label={t("current_password")}
+                      value={emailMdp}
+                      onChange={setEmailMdp}
+                      type="password"
+                      placeholder=""
+                    />
+                    <Field
+                      label={t("set_email_new")}
+                      value={nouvelEmail}
+                      onChange={setNouvelEmail}
+                      type="text"
+                      placeholder="nom@exemple.com"
+                    />
+                    <button
+                      onClick={() => void demanderEmail()}
+                      disabled={saving || !emailMdp || !nouvelEmail.includes("@")}
+                      style={{
+                        background: "var(--accent)", border: "none", borderRadius: 9,
+                        padding: "12px 24px", fontSize: 14, fontWeight: 700,
+                        color: "var(--bg-base)", cursor: "pointer",
+                        fontFamily: "'DM Sans', sans-serif",
+                        opacity: saving || !emailMdp || !nouvelEmail.includes("@") ? 0.4 : 1,
+                      }}
+                    >
+                      {saving ? t("set_modifying") : t("set_email_send_code")}
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Pseudo de cet appareil. Place juste avant la liste des
