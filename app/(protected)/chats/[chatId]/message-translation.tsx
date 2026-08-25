@@ -72,6 +72,18 @@ export function MessageTranslation({
   // Un compteur plutot qu'un booleen : deux echecs de suite doivent relancer
   // l'effet, ce qu'une valeur qui ne change pas ne ferait pas.
   const [essai, setEssai] = useState(0)
+  /**
+   * L'appareil est-il, en lui-meme, incapable de traduire ?
+   *
+   * Ce n'est pas la meme chose qu'un echec : c'est une PROPRIETE de l'appareil,
+   * constante pour toute la session et identique pour tous les messages. Elle ne
+   * se repare pas depuis une bulle, seulement en choisissant un autre moteur
+   * dans les Parametres — qui l'annoncent deja.
+   */
+  const appareilSansMoteur =
+    etat.phase === "erreur" &&
+    (etat.code === "moteur-indisponible" ||
+      (etat.code === "local-indisponible" && !moteurLocalPresent()))
 
   useEffect(() => {
     let vivant = true
@@ -144,7 +156,23 @@ export function MessageTranslation({
           </div>
         </>
       )}
-      {etat.phase === "erreur" && (
+      {/* L'APPAREIL QUI NE SAIT PAS TRADUIRE SE TAIT, ET NE LE REPETE PAS.
+          
+          Quand le navigateur n'a pas de moteur de traduction, l'echec est le
+          MEME pour tous les messages et ne changera pas de la session. Or la
+          traduction automatique demande une traduction par bulle : l'avis
+          s'affichait donc sous CHACUNE, et le fil se remplissait d'une meme
+          phrase repetee a l'infini, qui n'apprenait rien de plus la centieme
+          fois que la premiere.
+          
+          Ce cas-la se dit UNE FOIS, et a l'endroit ou l'on peut y remedier :
+          les Parametres l'annoncent deja dans la section des traductions, avec
+          la marche a suivre. Ici, on n'affiche plus rien.
+          
+          Les autres echecs restent affiches : un paquet de langue a installer
+          ou un moteur momentanement injoignable se REPARENT depuis la bulle, et
+          les taire priverait l'utilisateur du bouton qui debloque. */}
+      {etat.phase === "erreur" && !appareilSansMoteur && (
         <EchecTraduction
           code={etat.code}
           texte={texte}
