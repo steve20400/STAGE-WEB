@@ -22,6 +22,8 @@ import {
   type ListeContacts,
 } from "../../../src/services/contact-lists-service"
 import { teinteCss } from "../contacts/contact-lists-affichage"
+import {
+} from "../../../src/services/message-payload"
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import "./chats-page.css"
 
@@ -33,6 +35,60 @@ function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
   if (type === "audio") return `[${traduire(langue, "cinfo_audio")}] `
   if (type === "image") return `[${traduire(langue, "l2_image")}] `
   return ""
+}
+
+/**
+ * LA LIGNE SOUS LE NOM DE LA CONVERSATION — l'apercu du dernier message.
+ *
+ * 🔴 UN MESSAGE STRUCTURE NE PORTE PAS DE TEXTE. Le `content` d'une fiche de
+ * contact ou d'une position est du JSON (`services/message-payload`, miroir du
+ * format que le serveur impose aux trois clients). La liste l'affichait tel
+ * quel : on lisait `{"v":1,"contacts":[{"name":"Jean Dupont",…` sous le nom de
+ * la conversation, et l'expediteur voyait exactement la meme chose apres avoir
+ * envoye une fiche.
+ *
+ * Le resume se lit AVEC les lecteurs partages — jamais avec un `JSON.parse`
+ * ecrit ici : ils ecartent deja une charge mal formee, une fiche sans nom ni
+ * numero, une latitude hors bornes. Une seconde lecture locale finirait par
+ * diverger de la leur, et la liste annoncerait une fiche que la discussion
+ * refuserait d'afficher.
+ *
+ * Traduit au RENDU comme `lastMsgIcon` juste au-dessus, et pour la meme raison :
+ * un libelle calcule au chargement garderait la langue de ce moment-la.
+ *
+ * Les media gardent leur forme d'origine — `[Image] legende` : leur contenu EST
+ * la legende, il n'y a rien a decoder.
+ */
+function apercuDernierMessage(conv: ConversationMock): string {
+  const langue = langueInitiale()
+
+  if (conv.lastMessageType === "contact" || conv.lastMessageType === "location") {
+    /*
+     * LE SERVEUR A DEJA FAIT CE TRAVAIL, ET MIEUX QUE NOUS.
+     *
+     * `lastMessage` ne contient PAS le JSON de la fiche : le serveur y ecrit
+     * deja un libelle — « 👤 Jean Dupont », « 📍 Douala ». Tenter de le decoder
+     * ici partait donc d'une premisse fausse, et le nom se perdait en route :
+     * la liste affichait « Contact » la ou elle affichait le nom de la personne
+     * auparavant. Une correction qui retire de l'information.
+     *
+     * On rend donc le libelle tel quel, SANS le prefixe de type : ces deux
+     * formes portent deja leur propre pictogramme, et y ajouter le trombone des
+     * fichiers donnait « [Fichier] 👤 Jean Dupont » — un contact annonce comme
+     * une piece jointe.
+     *
+     * Le repli ne sert qu'au cache local, seul chemin ou `lastMessage` peut
+     * etre vide : une ligne vide se lirait comme une conversation sans dernier
+     * message.
+     */
+    if (conv.lastMessage) return conv.lastMessage
+    return traduire(
+      langue,
+      conv.lastMessageType === "contact" ? "f2_contact" : "thr_gps_position"
+    )
+  }
+
+  return `${lastMsgIcon(conv.lastMessageType)}${conv.lastMessage}`
 }
 
 /**
@@ -646,8 +702,7 @@ function ConvItem({ conv }: { conv: ConversationListItem }) {
           )}
         </div>
         <div className={`conv-preview ${conv.unread > 0 ? "unread" : ""}`}>
-          {lastMsgIcon(conv.lastMessageType)}
-          {conv.lastMessage}
+          {apercuDernierMessage(conv)}
         </div>
       </div>
       <div className="conv-right">

@@ -1,0 +1,250 @@
+/* ============================================================
+   Fiche de contact dans une bulle de discussion.
+
+   Contrainte de place : la fiche vit DANS une bulle, dont la
+   largeur est plafonnee (`min(78%, 560px)` cote discussion).
+   Tout ici doit donc tenir a 360 px — les trois boutons y
+   compris, qui gardent 40 px de haut pour rester touchables au
+   doigt.
+
+   Aucune couleur en dur : les quatre themes (clair, nuit, et
+   leurs variantes « soft ») passent par les variables. Sur la
+   bulle de l'expediteur, le fond n'est PAS le meme d'un theme a
+   l'autre — terracotta ici, bleu clair la, avec un texte tantot
+   creme tantot encre : les teintes y sont donc derivees de
+   `currentColor`, la seule couleur dont on sait qu'elle contraste
+   avec ce fond.
+   ============================================================ */
+
+/*
+ * 🔴 LE PLANCHER DE LARGEUR EST CE QUI REND LA RANGEE LISIBLE.
+ *
+ * La bulle se dimensionne sur son contenu : sans plancher, la fiche se
+ * reduisait a la largeur de son nom, et les trois boutons se partageaient
+ * alors 69 px chacun — « Hinzufügen » y sortait « Hinzufüge », « Сообщение »
+ * y sortait « Сообщени ». Un bouton dont le mot est coupe net ne dit plus
+ * ce qu'il fait.
+ *
+ * 252 px, et pas davantage : la bulle est plafonnee a 78 % de la colonne, ce
+ * qui ne laisse que ~263 px sur un telephone de 360 px. Au-dela, la fiche
+ * deborderait de sa propre bulle.
+ */
+.fc-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 252px;
+  max-width: 360px;
+}
+
+.fc-illisible {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.fc-carte {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+/* Bulle de l'expediteur : le fond de la bulle prime, la carte s'y
+   pose en voile clair ou sombre selon le texte qu'elle herite. */
+.fc-liste.est-moi .fc-carte {
+  border-color: color-mix(in srgb, currentColor 26%, transparent);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.fc-entete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fc-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+.fc-liste.est-moi .fc-avatar {
+  color: inherit;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+}
+.fc-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* `min-width: 0` : sans lui, un nom long refuse de se couper et
+   pousse la carte au-dela de la largeur de la bulle. */
+.fc-identite {
+  min-width: 0;
+  flex: 1;
+}
+
+.fc-nom {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-numero {
+  font-size: 12px;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-mention {
+  font-size: 10.5px;
+  opacity: 0.7;
+}
+.fc-mention.sur-alanya {
+  font-weight: 600;
+  opacity: 1;
+  color: var(--success);
+}
+.fc-liste.est-moi .fc-mention.sur-alanya {
+  /* Le vert du theme ne contraste pas forcement avec le fond de la
+     bulle de l'expediteur : on garde la couleur du texte. */
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* ── Les trois actions ─────────────────────────────────────── */
+
+.fc-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-subtle);
+}
+.fc-liste.est-moi .fc-actions {
+  border-top-color: color-mix(in srgb, currentColor 22%, transparent);
+}
+
+/*
+ * `flex: 1 1 0` avec `min-width: 0` : les trois parts sont EGALES
+ * quelle que soit la longueur des libelles. Sans le plancher a 0,
+ * une langue verbeuse (« In deinen Kontakten ») elargirait sa part
+ * et ecraserait les deux autres.
+ *
+ * L'icone est AU-DESSUS du libelle, et non a cote : dans une bulle,
+ * la place se compte au pixel, et l'icone posee a gauche mangeait
+ * les 19 px qui manquaient a « Позвонить » ou « Meddelande » pour
+ * tenir sur une ligne. Empilee, elle ne prend rien a la largeur.
+ *
+ * 44 px de haut : la fiche se lit aussi au doigt, et un bouton
+ * plus bas que 40 px se rate.
+ */
+.fc-action {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 2px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--accent);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    opacity 0.15s ease;
+}
+.fc-liste.est-moi .fc-action {
+  color: inherit;
+}
+
+.fc-action:hover:not(:disabled) {
+  background: var(--accent-dim);
+}
+.fc-liste.est-moi .fc-action:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.fc-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fc-liste.est-moi .fc-action:focus-visible {
+  outline-color: currentColor;
+}
+
+.fc-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Etat, pas action : la place de « Ajouter » quand la personne est
+   deja au repertoire. Meme gabarit, pour que la rangee ne bouge
+   pas — seul le contenu change, et le changement se voit. */
+.fc-action.etat {
+  cursor: default;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.fc-icone {
+  flex-shrink: 0;
+}
+
+/*
+ * Le libelle passe sur deux lignes plutot que d'etre coupe :
+ * « In deinen Kontakten », « Nos seus contactos » n'ont aucune
+ * chance de tenir sur une ligne, et un mot tranche net ne dit plus
+ * ce que fait le bouton.
+ *
+ * `overflow-wrap: anywhere` est le filet : un mot SEUL trop long
+ * ne peut pas se replier sur un espace qui n'existe pas — c'est
+ * exactement ainsi que « Hinzufügen » ressortait « Hinzufüge ».
+ * Faute de mieux il se coupe, mais il se voit en entier.
+ */
+.fc-action-texte {
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-align: center;
+}
+
+/* Telephone etroit : la bulle n'offre plus 252 px (78 % de 320 px
+   moins ses marges en laisse 232). La fiche cede son plancher au
+   lieu de deborder, et resserre son texte pour compenser. */
+@media (max-width: 380px) {
+  .fc-liste {
+    min-width: 232px;
+  }
+  .fc-action {
+    font-size: 10.5px;
+  }
+}

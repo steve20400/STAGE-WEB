@@ -1,0 +1,441 @@
+/* Fenetre d'envoi d'une fiche de contact (partager-contact.tsx).
+ *
+ * Toutes les couleurs viennent des variables de theme : la feuille sert les
+ * QUATRE themes sans une seule teinte ecrite en dur. Les seules exceptions sont
+ * les ombres, en noir translucide — une ombre tiree d'une variable de theme
+ * disparaitrait sur fond sombre — et c'est deja la convention des autres
+ * fenetres du depot.
+ *
+ * Prefixe `pc-` : cette feuille est chargee par le fil de discussion, aux cotes
+ * de `chat-room-page.css`. Un nom generique y serait repris par les bulles. */
+
+/* z-index : au-dessus du fil et de son en-tete, sous la visionneuse d'image
+   (9000) et la fenetre d'appel reduite (9600), qui doivent passer par-dessus.
+   Meme etage que le selecteur de transfert (8500), qui n'est jamais ouvert en
+   meme temps. */
+.pc-voile {
+  position: fixed;
+  inset: 0;
+  z-index: 8600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--overlay);
+  backdrop-filter: blur(6px);
+  animation: pc-fondu 0.16s ease-out;
+}
+
+@keyframes pc-fondu {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes pc-montee {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.pc-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 100%);
+  /* `dvh` en second : sur mobile, `vh` compte la barre d'adresse comme si elle
+     n'existait pas et le pied de la fenetre finit sous l'ecran. La premiere
+     declaration reste pour les navigateurs qui ignorent `dvh`. */
+  max-height: 86vh;
+  max-height: 86dvh;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px #00000080;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  /* Le rayon doit couper l'en-tete et le pied, qui ont leur propre fond. */
+  overflow: hidden;
+  animation: pc-montee 0.18s ease-out;
+}
+/* La fenetre prend le focus a l'ouverture : sans cette regle, le navigateur
+   dessinerait un cadre autour de tout le contenu, ce qui n'apprend rien. */
+.pc-modal:focus {
+  outline: none;
+}
+
+.pc-tete {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pc-titre {
+  min-width: 0;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+.pc-fermer {
+  flex-shrink: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 40 px : la cible reste atteignable au doigt meme si la croix est petite. */
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.pc-fermer svg {
+  width: 16px;
+  height: 16px;
+}
+.pc-fermer:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.pc-fermer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* `min-height: 0` est indispensable : sans lui, un enfant flex refuse de
+   rapetisser sous la taille de son contenu, et c'est la fenetre entiere qui
+   deborde de l'ecran au lieu de faire defiler l'interieur. */
+.pc-corps {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Arrive en bas, la molette ne doit pas se mettre a faire defiler la
+     discussion restee derriere le voile. */
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+/* ══════════════════════════════════════════════════ Les deux voies */
+
+.pc-modes {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+}
+
+.pc-mode {
+  flex: 1 1 0;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.pc-mode:hover {
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+/* Ecrit `.pc-mode.pc-mode-on` : il lui faut au moins la specificite de
+   `.pc-mode:hover`, sinon survoler la voie deja retenue la repeindrait en gris. */
+.pc-mode.pc-mode-on {
+  background: var(--accent-dim);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════ Voie 1 : le repertoire */
+
+.pc-recherche {
+  position: relative;
+}
+.pc-loupe {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.pc-recherche-input {
+  width: 100%;
+  min-height: 44px;
+  /* Retrait a gauche : la loupe occupe la place. */
+  padding: 10px 12px 10px 36px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.pc-recherche-input::placeholder {
+  color: var(--text-ghost);
+}
+.pc-recherche-input:focus {
+  border-color: var(--accent-border);
+}
+
+/* Le repertoire peut compter des centaines de lignes : cette zone a SA propre
+   hauteur et SON propre defilement, sans quoi le pied — donc « Envoyer » —
+   sortirait de l'ecran a mesure que le carnet grandit. */
+.pc-liste {
+  max-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-base);
+  list-style: none;
+}
+
+.pc-ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  /* 48 px : c'est la LIGNE qui est la cible, pas la case a cocher. */
+  min-height: 48px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pc-ligne:hover {
+  background: var(--bg-hover);
+}
+/* Retrait NEGATIF : le cadre de focus est dessine a l'interieur de la ligne.
+   Pose vers l'exterieur, il serait rogne par le bord de la zone defilante. */
+.pc-ligne:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* Ligne cochee : fond teinte ET case remplie. Deux signaux pour un seul etat,
+   le fond seul etant trop tenu dans les themes clairs. */
+.pc-ligne-on {
+  background: var(--accent-dim);
+}
+
+.pc-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+}
+.pc-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.pc-ligne-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pc-ligne-nom {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pc-ligne-num {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Case CARREE : dans cette application le rond sert au choix unique. La forme
+   dit deja qu'on peut en cocher plusieurs. */
+.pc-case {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-default);
+  border-radius: 6px;
+  color: transparent;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.pc-case svg {
+  width: 12px;
+  height: 12px;
+}
+.pc-ligne-on .pc-case {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.pc-vide {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ══════════════════════════════════════════ Voie 2 : la composition */
+
+.pc-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.pc-label {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ═════════════════════════════════════════════ Pied et validation */
+
+/* Pied fixe, avec son propre fond : la liste defile dessous, elle ne doit pas
+   apparaitre au travers. */
+.pc-pied {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+}
+
+/* Texte pousse a gauche du pied : le compte des fiches retenues, ou la raison
+   d'un refus. */
+.pc-pied-info {
+  margin-right: auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.pc-annuler,
+.pc-valider {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
+}
+
+.pc-annuler {
+  border: 1px solid var(--border-default);
+  background: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.pc-annuler:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.pc-valider {
+  border: none;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+.pc-valider:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.pc-valider:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pc-annuler:focus-visible,
+.pc-valider:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Telephone : la fenetre prend toute la largeur et se colle au bas, comme les
+   feuilles de l'application mobile. Le pied reste a portee du pouce. */
+@media (max-width: 560px) {
+  .pc-voile {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .pc-modal {
+    width: 100%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    border-radius: 18px 18px 0 0;
+    border-bottom: none;
+  }
+  .pc-pied {
+    /* Barre de gestes iOS et barre de navigation Android : sans ce retrait, le
+       bouton d'envoi passe dessous et devient intouchable. */
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}

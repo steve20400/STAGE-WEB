@@ -41,11 +41,12 @@ import {
 } from "../../../../src/services/messages-service"
 import {
   apercuStructure,
-  contactsDepuisContenu,
-  nomAffichable,
   positionDepuisContenu,
   LONGUEUR_MAX_CONTENU,
 } from "../../../../src/services/message-payload"
+// La fiche de contact a quitte ce fichier : elle n'est plus une vignette de
+// rendu mais un objet qui agit (repertoire, appel, conversation).
+import { FicheContact } from "../../../../src/components/fiche-contact"
 import {
   fetchChatConversations,
   fetchConversationById,
@@ -86,6 +87,7 @@ import {
 } from "../../../../src/services/traduction-service"
 import ChatInfoPage from "./chat-info"
 import { CLE_ERREUR, EVENEMENT_ECHEC_AUTO, MessageTranslation } from "./message-translation"
+import { PartagerContact } from "./partager-contact"
 import "./chat-room-page.css"
 
 type Message = ChatMessageMock
@@ -1272,87 +1274,6 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
           {lat.toFixed(6)}, {lng.toFixed(6)}
         </div>
       </a>
-    </div>
-  )
-}
-
-/**
- * Fiche de contact reçue (message de type `contact`).
- *
- * La charge utile est du JSON dans `content` — format imposé par le serveur,
- * voir `services/message-payload.ts`. Sans ce rendu, le web affichait ce JSON
- * en clair dans la bulle.
- *
- * ⚠️ Une charge illisible n'affiche PAS une carte vide : on rend la mention
- * générique, et on ne prétend pas connaître un contact qu'on ne sait pas lire.
- */
-function ContactCard({ content, isMe }: { content: string | null; isMe: boolean }) {
-  const contacts = contactsDepuisContenu(content)
-  if (!contacts) {
-    return <div style={{ opacity: 0.8, fontSize: 13 }}>👤 Contact</div>
-  }
-  const bordure = isMe ? "#ffffff28" : "var(--border-subtle)"
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 200 }}>
-      {contacts.map((c, i) => (
-        <div
-          key={i}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "6px 8px",
-            borderRadius: 8,
-            border: `1px solid ${bordure}`,
-            background: isMe ? "#ffffff10" : "var(--bg-elevated)",
-          }}
-        >
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: "50%",
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: isMe ? "#ffffff20" : "var(--accent-soft, #E8B84B33)",
-              fontWeight: 600,
-              fontSize: 14,
-              overflow: "hidden",
-            }}
-          >
-            {c.avatarUrl ? (
-              <img
-                src={c.avatarUrl}
-                alt=""
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              nomAffichable(c).charAt(0).toUpperCase()
-            )}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: 13.5,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {nomAffichable(c)}
-            </div>
-            {c.phones.length > 0 && nomAffichable(c) !== c.phones[0] && (
-              <div style={{ fontSize: 12, opacity: 0.75 }}>{c.phones[0]}</div>
-            )}
-            {c.alanyaId && (
-              <div style={{ fontSize: 10.5, opacity: 0.65 }}>Sur Alanya</div>
-            )}
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -4299,7 +4220,7 @@ function MessageBubble({
                   {/* Fiche de contact et position : leur `content` est du JSON,
                     il ne doit JAMAIS passer par le rendu de texte ci-dessous. */}
                   {!msg.isDeleted && msg.type === "contact" && (
-                    <ContactCard content={msg.content ?? null} isMe={isMe} />
+                    <FicheContact content={msg.content ?? null} isMe={isMe} />
                   )}
                   {!msg.isDeleted && msg.type === "location" && (
                     <LocationCard content={msg.content ?? null} isMe={isMe} />
@@ -4523,6 +4444,8 @@ export default function ChatRoomPage() {
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
+  /** Fenetre de choix du contact a envoyer (repertoire ou numero compose). */
+  const [partageContact, setPartageContact] = useState(false)
   const [infoPanelOpen, setInfoPanelOpen] = useState(false)
 
   /**
@@ -5206,6 +5129,59 @@ export default function ChatRoomPage() {
       setSending(false)
     }
   }, [input, sending, replyTo, chatId, error, t])
+
+  /**
+   * Envoi d'une FICHE DE CONTACT.
+   *
+   * ⚠️ AUCUNE ROUTE NOUVELLE. La charge JSON — deja encodee et bornee par
+   * `partager-contact.tsx` — part par le meme `sendChatMessage` que le texte,
+   * avec le type `contact`. Le serveur connait ce type depuis toujours
+   * (`sendMessageSchema` accepte CONTACT et valide la charge par `chargeValide`)
+   * et c'est precisement pour cela qu'il ne fallait rien ajouter cote serveur.
+   *
+   * Le message optimiste porte deja son type : sans lui, la bulle afficherait
+   * le JSON brut le temps que le serveur reponde, puis se transformerait en
+   * fiche. La reponse a une fiche (`replyTo`) suit le meme chemin que partout
+   * ailleurs.
+   */
+  const envoyerFicheContact = useCallback(
+    async (charge: string) => {
+      if (sending) return
+
+      const tempId = `tmp-${Date.now()}`
+      const optimiste: Message = {
+        id: tempId,
+        senderId: "me",
+        content: charge,
+        type: "contact",
+        status: "sending",
+        timestamp: new Date(),
+        replyTo: replyTo?.id,
+      }
+
+      setMessages((prev) => [...prev, optimiste])
+      setReplyTo(null)
+      setSending(true)
+
+      try {
+        const saved = await sendChatMessage(chatId, charge, "contact", {
+          replyToId: replyTo?.id,
+        })
+        setMessages((prev) => {
+          const dejaRecu = prev.some((m) => m.id === saved.id)
+          if (dejaRecu) return prev.filter((m) => m.id !== tempId)
+          return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: m.timestamp } : m))
+        })
+      } catch (err) {
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "sending" } : m)))
+        const detail = err instanceof Error ? err.message : t("send_failed")
+        error(t("f2_message_not_sent"), detail)
+      } finally {
+        setSending(false)
+      }
+    },
+    [chatId, error, replyTo, sending, t]
+  )
 
   // Touche Entree = envoi (Shift+Entree = saut de ligne)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -6174,6 +6150,40 @@ export default function ChatRoomPage() {
                   </div>
                   {t("f2_any_file")}
                 </button>
+                {/* Fiche de contact. Seule entree du menu qui n'ouvre PAS le
+                    selecteur de fichiers : elle ouvre la fenetre de choix, d'ou
+                    l'on prend un contact du repertoire ou l'on compose un
+                    numero. L'allure est celle des entrees voisines ; la teinte
+                    vient de la variable d'accent et non d'une couleur ecrite en
+                    dur, pour suivre les quatre themes. */}
+                <button
+                  className="attach-opt"
+                  onClick={() => {
+                    setShowAttach(false)
+                    setPartageContact(true)
+                  }}
+                >
+                  <div
+                    className="attach-icon"
+                    style={{ background: "var(--accent-dim)", color: "var(--accent)" }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M19 8v6M22 11h-6" />
+                    </svg>
+                  </div>
+                  {t("pc_menu_entry")}
+                </button>
               </div>
             )}
 
@@ -6406,6 +6416,14 @@ export default function ChatRoomPage() {
               setForwardMsg(null)
             }
           }}
+        />
+      )}
+
+      {/* Choix du contact a envoyer : repertoire ou numero compose. */}
+      {partageContact && (
+        <PartagerContact
+          onFermer={() => setPartageContact(false)}
+          onEnvoyer={(charge) => void envoyerFicheContact(charge)}
         />
       )}
     </div>

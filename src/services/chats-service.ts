@@ -78,11 +78,27 @@ interface BackendConversation {
   updatedAt?: string
 }
 
+/**
+ * Type du dernier message, tel que la liste des discussions le comprend.
+ *
+ * 🔴 LES TYPES STRUCTURES DOIVENT FIGURER ICI. Le contenu d'un message CONTACT
+ * ou LOCATION n'est pas du texte mais du JSON (voir `services/message-payload`,
+ * miroir du format que le serveur impose aux trois clients). Tant qu'ils
+ * retombaient sur `"text"`, la liste ne pouvait pas les reconnaitre et affichait
+ * la charge brute — `{"v":1,"contacts":[…]}` — sous le nom de la conversation,
+ * a l'expediteur comme au destinataire.
+ *
+ * Le RESUME, lui, ne se calcule pas ici mais au rendu (`chats.tsx`) : la langue
+ * y est relue a chaque affichage, alors qu'un libelle fige ici garderait la
+ * langue du chargement jusqu'au prochain passage sur le reseau.
+ */
 function mapLastMessageType(type?: string): MessageType {
   const t = (type ?? "").toUpperCase()
   if (t === "IMAGE") return "image"
   if (t === "AUDIO") return "audio"
   if (t === "FILE" || t === "VIDEO") return "file"
+  if (t === "CONTACT") return "contact"
+  if (t === "LOCATION") return "location"
   return "text"
 }
 

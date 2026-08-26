@@ -125,6 +125,44 @@ export function positionDepuisContenu(content: string | null | undefined): Share
   }
 }
 
+/**
+ * Version de la charge, écrite dans `v`. Un client plus ancien la lit et sait.
+ *
+ * ⚠️ MIROIR de `VERSION_CHARGE` (serveur) et de `versionCharge` (Flutter).
+ */
+export const VERSION_CHARGE = 1
+
+/**
+ * Encode la charge d'un message CONTACT.
+ *
+ * ⚠️ MIROIR EXACT de `encodeContacts` dans
+ * `alanya/lib/models/message_payload.dart` : mêmes clés, même ordre, et surtout
+ * mêmes OMISSIONS. Un champ nul est ABSENT de la charge, il n'y figure pas à
+ * `null` — c'est ce que le mobile envoie déjà, c'est ce que le serveur relit, et
+ * c'est aussi ce qui tient la charge sous la longueur de la colonne (voir
+ * [LONGUEUR_MAX_CONTENU] : le serveur REFUSE une charge structurée trop longue
+ * au lieu de la couper, parce que couper du JSON le détruit).
+ *
+ * Le lecteur — [contactsDepuisContenu] — écarte un contact sans nom ET sans
+ * numéro : cet encodeur fait de même, sinon l'expéditeur verrait dans sa propre
+ * bulle une fiche que le destinataire, lui, ne verrait jamais.
+ */
+export function encodeContacts(contacts: SharedContact[]): string {
+  const charge = contacts
+    .filter((c) => (c.name ?? "").trim().length > 0 || c.phones.length > 0)
+    .slice(0, 10)
+    .map((c) => {
+      const entree: Record<string, unknown> = {}
+      const nom = (c.name ?? "").trim()
+      if (nom.length > 0) entree["name"] = nom.slice(0, 200)
+      if (c.phones.length > 0) entree["phones"] = c.phones.slice(0, 10)
+      if (c.alanyaId) entree["alanyaId"] = c.alanyaId.slice(0, 10)
+      if (c.avatarUrl) entree["avatarUrl"] = c.avatarUrl.slice(0, 500)
+      return entree
+    })
+  return JSON.stringify({ v: VERSION_CHARGE, contacts: charge })
+}
+
 /** Titre affichable d'un contact : le nom, sinon le premier numéro. */
 export function nomAffichable(c: SharedContact): string {
   if (c.name) return c.name
