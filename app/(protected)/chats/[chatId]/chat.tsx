@@ -3128,6 +3128,21 @@ function MessageBubble({
    */
   const texteATraduire = useMemo(() => {
     if (msg.isDeleted || msg.type === "system") return ""
+    /*
+     * LE CONTENU D'UNE FICHE N'EST PAS DE LA PROSE, C'EST DU JSON.
+     *
+     * `content` porte du texte pour un message ordinaire et pour la legende
+     * d'un media — mais pour un CONTACT ou une POSITION, il porte la charge
+     * structuree. L'offrir a la traduction affichait le JSON en clair sous la
+     * fiche, et le moteur traduisait consciencieusement les NOMS DE CHAMPS :
+     * « name » devenait « nom », « phones » « telephones ». Une charge illisible
+     * par le correspondant, montree a l'ecran par-dessus le marche.
+     *
+     * Le rendu de la legende ecarte deja ces deux types quelques lignes plus
+     * bas ; la traduction, elle, ne le faisait pas — un garde posee a un seul
+     * des deux endroits.
+     */
+    if (msg.type === "contact" || msg.type === "location") return ""
     const brut = (msg.content ?? "").trim()
     if (!brut) return ""
     const prose = extractGpsCoords(brut) ? removeGpsCoordinates(brut) : brut
