@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { CallDisplayMode } from "../services/call-manager"
 import { toInitials } from "../data/session-user"
+import { AvatarCircle } from "./avatar-circle"
 import { useTranslation } from "../i18n"
 import "./participant-grid.css"
 
@@ -33,6 +34,15 @@ export interface Participant {
   id: string
   stream: MediaStream
   name: string
+  /**
+   * Photo de profil, quand on la connait.
+   *
+   * Sans elle, la tuile d'un participant dont la camera est coupee montrait ses
+   * INITIALES alors que sa photo existait ailleurs dans l'application. Le
+   * commentaire de ce fichier promettait pourtant de « retomber sur la photo » :
+   * il decrivait une intention que le type rendait impossible.
+   */
+  avatarUrl?: string | null
 }
 
 /**
@@ -135,8 +145,16 @@ function TuileParticipant({
         // Muet volontairement : le son passe par les <audio> de l'ecran d'appel.
         <video ref={videoRef} autoPlay playsInline muted className="pg-video" />
       ) : (
+        // `AvatarCircle` teste la photo, resout son URL — les avatars sont
+        // stockes en URL relative et exigent le jeton de session — et retombe
+        // sur les initiales. Recopier ces trois etapes ici serait la quatorzieme
+        // copie du meme bloc, et c'est en le recopiant qu'on l'oublie.
         <div className="pg-avatar" aria-hidden>
-          {toInitials(participant.name)}
+          <AvatarCircle
+            avatar={participant.avatarUrl}
+            initials={toInitials(participant.name)}
+            className="pg-avatar-photo"
+          />
         </div>
       )}
 

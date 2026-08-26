@@ -472,6 +472,23 @@ export default function MeetingRoomPage() {
     return noms
   }, [meeting])
 
+  /**
+   * Les photos, lues au meme endroit que les noms.
+   *
+   * La reunion les porte deja pour chaque participant : la tuile d'une camera
+   * coupee peut donc montrer un visage au lieu de deux lettres. Elles ne
+   * viennent PAS de l'etat d'appel, qui ne connait que le correspondant d'un
+   * appel a deux et laisserait les autres sans photo.
+   */
+  const photosConnues = useMemo(() => {
+    const photos: Record<string, string | null> = {}
+    if (meeting) {
+      photos[meeting.organisateur.id] = meeting.organisateur.avatarUrl
+      for (const p of meeting.participants) photos[p.id] = p.avatarUrl
+    }
+    return photos
+  }, [meeting])
+
   // L'ordre d'insertion des flux est l'ordre d'arrivee des participants.
   const participantsDistants = useMemo(
     () =>
@@ -479,8 +496,9 @@ export default function MeetingRoomPage() {
         id,
         stream,
         name: callState.participantNames[id] ?? nomsConnus[id] ?? t("participant"),
+        avatarUrl: photosConnues[id] ?? null,
       })),
-    [fluxDistants, callState.participantNames, nomsConnus, t]
+    [fluxDistants, callState.participantNames, nomsConnus, photosConnues, t]
   )
 
   /**
