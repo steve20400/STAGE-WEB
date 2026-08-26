@@ -1,4 +1,6 @@
 import { useState } from "react"
+import { apiRequest } from "../lib/api-client"
+import { useTranslation } from "../i18n"
 
 interface CallRatingModalProps {
   idHist: string
@@ -11,6 +13,7 @@ interface CallRatingModalProps {
  */
 export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalProps) {
   const [rating, setRating] = useState<number>(5)
+  const { t } = useTranslation()
   const [comment, setComment] = useState<string>("")
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,24 +23,25 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
     setLoading(true)
     setError(null)
     try {
-      const token = localStorage.getItem("access_token") ?? ""
-      const res = await fetch("/api/queue/rate", {
+      /*
+       * `apiRequest` ET NON `fetch`, et ce n'est pas un detail de style : c'est
+       * ce qui empechait l'evaluation de partir.
+       *
+       * L'appel direct visait « /api/queue/rate » en chemin RELATIF — donc le
+       * site qui sert l'application, pas l'API, qui vit sur une autre origine.
+       * Et il lisait le jeton sous « access_token », une cle qui n'existe pas :
+       * la session est rangee ailleurs. Deux causes, dont chacune suffisait a
+       * tout bloquer ; l'utilisateur choisissait ses etoiles, cliquait, et la
+       * fenetre restait la.
+       *
+       * `apiRequest` porte l'origine, le jeton, et rejoue la requete une fois
+       * apres avoir rafraichi une session expiree — ce qu'un `fetch` a la main
+       * ne fera jamais.
+       */
+      await apiRequest("/api/queue/rate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          idHist,
-          note: rating,
-          avisCommentaire: comment.trim(),
-        }),
+        body: { idHist, note: rating, avisCommentaire: comment.trim() },
       })
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message ?? "Erreur lors de l'envoi de la note")
-      }
 
       setSubmitted(true)
       setTimeout(() => {
@@ -45,7 +49,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
         onClose()
       }, 1500)
     } catch (err: any) {
-      setError(err?.message ?? "Erreur réseau")
+      setError(t("rate_failed"))
     } finally {
       setLoading(false)
     }
@@ -81,19 +85,19 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
           <div>
             <div style={{ fontSize: 40, marginBottom: 8 }}>✨</div>
             <h3 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0" }}>
-              Merci pour votre évaluation !
+              {t("rate_thanks")}
             </h3>
             <p style={{ fontSize: 14, opacity: 0.75, margin: 0 }}>
-              Votre avis a été enregistré avec succès.
+              {t("rate_saved")}
             </p>
           </div>
         ) : (
           <>
             <h3 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0" }}>
-              Évaluez votre appel
+              {t("rate_title")}
             </h3>
             <p style={{ fontSize: 13, opacity: 0.75, margin: "0 0 20px 0" }}>
-              Comment s'est passée votre communication avec l'agent ?
+              {t("rate_subtitle")}
             </p>
 
             {error && (
@@ -145,7 +149,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              placeholder="Un commentaire ou une remarque ? (optionnel)"
+              placeholder={t("rate_comment_ph")}
               rows={3}
               style={{
                 width: "100%",
@@ -180,7 +184,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
                   cursor: "pointer",
                 }}
               >
-                Passer
+                {t("rate_skip")}
               </button>
               <button
                 type="button"
@@ -199,7 +203,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
                   boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
                 }}
               >
-                {loading ? "..." : "Envoyer"}
+                {loading ? "..." : t("rate_send")}
               </button>
             </div>
           </>
