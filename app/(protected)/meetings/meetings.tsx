@@ -13,10 +13,20 @@ import {
   type Reunion,
 } from "../../../src/services/meetings-service"
 import { getMyUserId } from "../../../src/data/session-user"
+import { subscribeToMeetingRoster } from "../../../src/services/websocket-service"
 import { CreateMeetingModal } from "./create-meeting-modal"
 import "./meetings.css"
 
 type MeetingTab = "ongoing" | "upcoming" | "ended"
+
+/**
+ * Delai avant de relire la liste apres l'annonce d'un changement.
+ *
+ * Il COALESCE une rafale plutot qu'il ne temporise : trois personnes ajoutees
+ * d'un coup produisent trois annonces a quelques millisecondes d'intervalle, et
+ * la meme liste serait redemandee trois fois. Imperceptible a l'oeil.
+ */
+const DELAI_RELECTURE = 250
 
 /**
  * Une reunion sans heure de debut a demarre a sa creation : le serveur pose
@@ -71,6 +81,38 @@ export default function MeetingsPage() {
     }, 10000)
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+    }
+  }, [loadMeetings])
+
+  /**
+   * ETRE CONVIE A UNE REUNION SE VOIT TOUT DE SUITE, ET NE PLUS L'ETRE AUSSI.
+   *
+   * La liste battait deja toutes les dix secondes ; le verbe de salle lui donne
+   * l'instant. C'est le meme pont que dans la salle : les routes REST qui
+   * modifient une reunion vivent dans un autre processus que le serveur temps
+   * reel, et ne pouvaient prevenir que par notification poussee — laquelle vise
+   * des appareils, pas un ecran ouvert.
+   *
+   * `null` et non un identifiant : cet ecran ne regarde aucune reunion en
+   * particulier, il les regarde toutes.
+   *
+   * LE BATTEMENT RESTE, et doit rester : il rattrape ce qu'une socket coupee a
+   * laisse passer, et couvre ce que le verbe ne dit pas — une reunion creee par
+   * quelqu'un d'autre, une reunion terminee, une heure de debut qui arrive.
+   */
+  useEffect(() => {
+    let minuteur: number | null = null
+    const desabonner = subscribeToMeetingRoster(null, () => {
+      // Une relecture deja programmee absorbe la suite de la rafale.
+      if (minuteur !== null) return
+      minuteur = window.setTimeout(() => {
+        minuteur = null
+        void loadMeetings()
+      }, DELAI_RELECTURE)
+    })
+    return () => {
+      if (minuteur !== null) window.clearTimeout(minuteur)
+      desabonner()
     }
   }, [loadMeetings])
 

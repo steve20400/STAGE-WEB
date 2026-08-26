@@ -194,6 +194,67 @@ export async function fetchMeeting(id: number): Promise<Reunion> {
   return versReunion(res)
 }
 
+/* ----------------- Deux lectures de la meme reunion ----------------- */
+
+/**
+ * Ces deux lectures decrivent-elles le MEME etat ?
+ *
+ * A QUOI CELA SERT. La salle relit la reunion des que le serveur annonce un
+ * changement, et le panneau d'ajout la relit toutes les dix secondes. Chaque
+ * lecture rend un objet NEUF : le poser tel quel dans l'etat de React fait
+ * repasser tout ce qui en derive — la table des noms, la liste des tuiles — et
+ * rejouer les effets qui branchent les flux video, pour rien. Rien ne clignote
+ * (les vignettes sont reconciliees par identifiant et gardent leur `<video>`),
+ * mais c'est un remue-menage inutile a chaque battement de l'horloge.
+ *
+ * Quand rien n'a bouge, l'appelant garde l'objet PRECEDENT — meme reference,
+ * donc aucun recalcul en aval — et l'ecran ne s'en apercoit pas.
+ *
+ * ON COMPARE CE QUE L'ECRAN MONTRE, champ par champ, et non un `JSON.stringify`
+ * de la reponse brute : les nombres du serveur — places restantes, duree de
+ * presence — doivent faire difference, et un champ que le serveur ajouterait
+ * sans que rien ne l'affiche ne doit pas provoquer de faux changement.
+ */
+function champsPersonne(p: Personne): unknown[] {
+  return [p.id, p.nom, p.numero, p.avatarUrl]
+}
+
+/**
+ * `JSON.stringify` d'un TABLEAU de champs, et non une concatenation : colles
+ * bout a bout, un nom « AB » suivi d'un numero « C » rendrait la meme signature
+ * qu'un nom « A » suivi d'un numero « BC ». Un changement passe inapercu vaudrait
+ * ici exactement le defaut qu'on repare.
+ */
+function signatureReunion(r: Reunion): string {
+  return JSON.stringify([
+    r.id,
+    r.objet,
+    r.type,
+    r.salle,
+    r.terminee,
+    r.invitationAuto,
+    r.debut,
+    r.dureeSecondes,
+    r.jeSuisOrganisateur,
+    champsPersonne(r.organisateur),
+    // Les places viennent du serveur : elles font partie de l'etat visible, au
+    // meme titre que la liste elle-meme.
+    r.capacite && [r.capacite.plafond, r.capacite.occupants, r.capacite.restantes],
+    r.participants.map((p) => [
+      ...champsPersonne(p),
+      p.statut,
+      p.connecte,
+      p.entreeA,
+      p.dureeSecondes,
+    ]),
+  ])
+}
+
+/** Vrai si `avant` existe et decrit exactement le meme etat que `apres`. */
+export function memeReunion(avant: Reunion | null, apres: Reunion): boolean {
+  return avant !== null && signatureReunion(avant) === signatureReunion(apres)
+}
+
 /* ----------------- Plafond de participants ----------------- */
 
 /**

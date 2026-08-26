@@ -593,6 +593,34 @@ const CALL_EVENT_TYPES = new Set([
   "ivr_error",
   "queue_rating_available",
 ])
+
+/**
+ * LA COMPOSITION DE LA REUNION A CHANGE — le verbe de salle qui l'annonce.
+ *
+ * POURQUOI CE VERBE EXISTE. L'API Next.js et le serveur temps reel sont deux
+ * PROCESSUS distincts : une route REST qui ajoute quelqu'un n'a aucun acces aux
+ * sockets et ne peut prevenir que des APPAREILS, par notification poussee — les
+ * nouveaux invites, donc, et eux seuls. Ceux qui etaient deja dans la salle ne
+ * voyaient bouger ni le nombre de participants ni la liste, et devaient sortir
+ * et revenir. Le serveur ouvre desormais un pont : la route previent le serveur
+ * temps reel, qui diffuse CE verbe a toute la salle.
+ *
+ * IL NE PORTE PAS LA NOUVELLE LISTE, et c'est voulu : il DIT qu'elle a change,
+ * le client la RELIT. Une liste transportee ici aurait sa propre forme, a garder
+ * d'accord avec celle de `GET /api/meetings/:id` — deux verites pour une seule
+ * reunion.
+ *
+ * UN SEUL VERBE POUR TOUS LES CAS, le motif etant DANS la trame — c'est la
+ * decision du serveur, et elle protege les clients deja deployes : celui qui ne
+ * connait pas encore un motif relit quand meme, la ou un type inconnu serait
+ * tombe dans le filtre ci-dessous sans laisser de trace. L'exclusion et le
+ * changement de role emprunteront donc ce chemin sans une ligne de plus ici.
+ *
+ * Le nom est celui que porte `VERBE_COMPOSITION` dans le backend
+ * (`src/lib/salle-temps-reel.ts`) ; c'est la seule source a suivre s'il change.
+ */
+const VERBE_COMPOSITION = "meeting_participants_changed"
+
 const MEETING_EVENT_TYPES = new Set([
   "meeting_signal",
   "meeting_joined",
@@ -612,6 +640,10 @@ const MEETING_EVENT_TYPES = new Set([
   // dans le vide chez le destinataire — son micro resterait ouvert sans que rien
   // dans le code de la coupure ne cloche.
   "meeting_mute",
+  // Le meme piege, une troisieme fois : sans ce type ici, le pont ouvert par le
+  // serveur pour annoncer un ajout ou une exclusion aboutirait a un mur, et la
+  // salle continuerait de n'apprendre les arrivees qu'en sortant et revenant.
+  VERBE_COMPOSITION,
 ])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
@@ -638,6 +670,62 @@ export function subscribeToMeetingEvents(handler: (event: ServerEvent) => void):
     if (event.type === "error" && (event as { meetingId?: unknown }).meetingId != null) {
       handler(event)
     }
+  })
+}
+
+/** Ce que porte l'annonce d'un changement de composition. */
+export interface MeetingRosterEvent {
+  /** La reunion visee. */
+  meetingId: number
+  /**
+   * CE QUI a change, en CODE — jamais une phrase : le serveur ne rend aucun
+   * texte affichable, et cette application parle neuf langues.
+   *
+   * Le serveur emet aujourd'hui `PARTICIPANTS_ADDED`, `PARTICIPANT_REMOVED` et
+   * `ROLE_CHANGED`. Le type reste une chaine libre A DESSEIN : un motif inconnu
+   * ne doit pas empecher la relecture, qui reste juste quoi qu'il arrive.
+   */
+  motif: string | null
+  /** Qui a provoque le changement. Deja connu de toute la salle. */
+  parUserId: string | null
+  /** Combien de lignes bougent. Un nombre, pas une liste : rien a fusionner. */
+  nombre: number | null
+}
+
+/**
+ * S'abonne aux changements de composition d'une reunion.
+ *
+ * L'appelant n'a rien a en tirer sinon un ordre : RELIRE. Le motif, l'auteur et
+ * le nombre sont la pour l'ecran qui voudra un jour NOMMER le changement — « X
+ * vient d'ajouter deux personnes » —, ce qu'aucun ne fait aujourd'hui, faute de
+ * cle au catalogue.
+ *
+ * PASSE PAR `subscribeToMeetingEvents`, et non par un branchement direct sur la
+ * socket : il n'y a qu'UNE porte pour les evenements de salle, et c'est elle. Un
+ * second chemin marcherait tout aussi bien, mais laisserait `MEETING_EVENT_TYPES`
+ * croire que le verbe y est facultatif — c'est exactement l'oubli qui a deja
+ * coute deux defauts dans ce fichier.
+ *
+ * @param meetingId la reunion a suivre, ou `null` pour TOUTES — ce que veut la
+ *   liste des reunions, qui n'en regarde aucune en particulier.
+ */
+export function subscribeToMeetingRoster(
+  meetingId: number | null,
+  handler: (event: MeetingRosterEvent) => void
+): () => void {
+  return subscribeToMeetingEvents((event) => {
+    if (event.type !== VERBE_COMPOSITION) return
+    // Une trame sans reunion identifiable ne peut declencher aucune relecture
+    // sensee : on ne devine pas de quelle salle il s'agit.
+    const cible = Number(event.meetingId)
+    if (!Number.isFinite(cible)) return
+    if (meetingId !== null && cible !== meetingId) return
+    handler({
+      meetingId: cible,
+      motif: typeof event.motif === "string" ? event.motif : null,
+      parUserId: typeof event.parUserId === "string" ? event.parUserId : null,
+      nombre: typeof event.nombre === "number" ? event.nombre : null,
+    })
   })
 }
 

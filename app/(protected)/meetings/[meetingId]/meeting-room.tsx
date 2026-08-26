@@ -16,6 +16,7 @@ import {
   chargerPlafondsReunion,
   lireRefusPlafond,
   refusPlafondEnMots,
+  memeReunion,
   type DemandeInvitation,
   type PlafondsReunion,
 } from "../../../../src/services/meetings-service"
@@ -41,6 +42,7 @@ import {
   sendMeetingHand,
   sendMeetingMute,
   subscribeToMeetingEvents,
+  subscribeToMeetingRoster,
 } from "../../../../src/services/websocket-service"
 import { useTranslation, type Cle } from "../../../../src/i18n"
 import { ApiError } from "../../../../src/lib/api-client"
@@ -90,6 +92,18 @@ type CleAVenir = "meet_share_screen" | "meet_screen_shared" | "meet_muted_by" | 
  * salle et le message lu par le principal interesse s'effacent ensemble.
  */
 const DUREE_MARQUE_COUPURE = 4000
+
+/**
+ * Delai avant de relire une reunion dont le serveur vient d'annoncer qu'elle a
+ * change.
+ *
+ * IL SERT A COALESCER UNE RAFALE, pas a temporiser. L'organisateur qui ajoute
+ * trois personnes d'un coup produit trois annonces a quelques millisecondes
+ * d'intervalle, et trois relectures rendraient trois fois la meme liste. Assez
+ * court pour rester imperceptible — la mise a jour reste immediate a l'oeil —,
+ * assez long pour que la rafale entiere tienne dedans.
+ */
+const DELAI_RELECTURE = 250
 
 function MeetingControlIcon({
   kind,
@@ -1099,6 +1113,25 @@ export default function MeetingRoomPage() {
   }, [meeting?.jeSuisOrganisateur])
 
   /**
+   * POSE UNE RELECTURE SANS RIEN DEMONTER DE CE QUI N'A PAS BOUGE.
+   *
+   * TOUS LES RAFRAICHISSEMENTS PASSENT PAR ICI, et jamais par `setMeeting` nu.
+   * Chaque lecture rend un objet NEUF : le poser tel quel ferait repasser tout
+   * ce qui en derive — la table des noms, donc la liste des tuiles — et rejouer
+   * les effets qui branchent les flux, pour rien. Quand l'etat decrit est le
+   * meme, on garde la reference PRECEDENTE et l'ecran ne bouge pas d'un pixel.
+   *
+   * ⚠️ ON NE PASSE JAMAIS PAR `null`, ET ON NE RETOUCHE PAS `loading` : c'est ce
+   * qui distingue une mise a jour d'un clignotement. Vider la liste avant de la
+   * remplir demonterait les `<video>` des vignettes, et couperait l'image de
+   * toute la salle a chaque arrivee. Une relecture qui echoue ne pose rien : le
+   * dernier etat connu reste a l'ecran.
+   */
+  const poserReunion = useCallback((relue: Reunion) => {
+    setMeeting((precedente) => (memeReunion(precedente, relue) ? precedente : relue))
+  }, [])
+
+  /**
    * LE COMPTEUR DU PANNEAU SE RELIT PENDANT QU'ON LE REGARDE.
    *
    * `meeting` n'etait lu qu'a l'ouverture de la page et apres un ajout reussi.
@@ -1125,7 +1158,7 @@ export default function MeetingRoomPage() {
     const relire = () =>
       void fetchMeeting(Number(meetingId))
         .then((m) => {
-          if (vivant) setMeeting(m)
+          if (vivant) poserReunion(m)
         })
         .catch(() => undefined)
     relire()
@@ -1134,7 +1167,64 @@ export default function MeetingRoomPage() {
       vivant = false
       window.clearInterval(minuteur)
     }
-  }, [panneauOuvert, meetingId])
+  }, [panneauOuvert, meetingId, poserReunion])
+
+  /**
+   * LA SALLE APPREND QU'ON VIENT D'Y AJOUTER QUELQU'UN, SANS EN SORTIR.
+   *
+   * LE DEFAUT QUE CECI REPARE. Ajouter un invite passe par une route REST, qui
+   * vit dans un AUTRE PROCESSUS que le serveur temps reel : elle n'a aucun acces
+   * aux sockets de la salle, et son seul moyen de prevenir quelqu'un etait la
+   * notification poussee — qui vise des APPAREILS, donc les nouveaux invites, et
+   * eux seuls. Ceux qui etaient deja dans la salle ne voyaient bouger ni le
+   * nombre de participants ni la liste des invites, et devaient sortir et
+   * revenir. Le serveur diffuse desormais un verbe de salle a chaque changement
+   * de composition ; il ne dit QUE cela, et c'est ici qu'on relit.
+   *
+   * ON NE RECALCULE RIEN, et c'est le fond de l'affaire : ni la liste, ni les
+   * places. Le plafond depend de l'entreprise de l'ORGANISATEUR et « qui occupe
+   * une place » est une regle serveur — l'organisateur compte meme absent, celui
+   * qui a decline ne compte plus. Une seconde regle ecrite ici finirait par
+   * diverger de la sienne, et l'ecran annoncerait une place libre dans une salle
+   * pleine. `fetchMeeting` rapporte les deux, on les pose.
+   *
+   * CE N'EST PAS L'ARRIVEE DANS LA SALLE. Un invite ajoute n'est pas encore
+   * entre : ses tuiles video, elles, naissent de `meeting_user_joined` et du
+   * flux WebRTC, pris en charge par le gestionnaire d'appels. Ici on tient la
+   * liste des CONVIES et les compteurs, rien d'autre.
+   *
+   * LE VERBE VAUT POUR TOUT CHANGEMENT DE COMPOSITION — l'exclusion et ce qui
+   * viendra ensuite passeront par le meme chemin sans une ligne de plus, la
+   * reaction etant deja « relire », et non « ajouter la personne annoncee ».
+   */
+  useEffect(() => {
+    const id = Number(meetingId)
+    if (!Number.isFinite(id) || id <= 0) return
+    let vivant = true
+    let minuteur: number | null = null
+
+    const desabonner = subscribeToMeetingRoster(id, () => {
+      // Une relecture deja programmee absorbe la suite de la rafale.
+      if (minuteur !== null) return
+      minuteur = window.setTimeout(() => {
+        minuteur = null
+        void fetchMeeting(id)
+          .then((relue) => {
+            if (vivant) poserReunion(relue)
+          })
+          // L'ECHEC EST AVALE, sans toast : une relecture manquee laisse le
+          // dernier etat connu, ce qui vaut mieux qu'un message d'erreur pose
+          // par-dessus une reunion qui, elle, fonctionne.
+          .catch(() => undefined)
+      }, DELAI_RELECTURE)
+    })
+
+    return () => {
+      vivant = false
+      if (minuteur !== null) window.clearTimeout(minuteur)
+      desabonner()
+    }
+  }, [meetingId, poserReunion])
 
   /** Ajouter une personne depuis le panneau — contacts ou pavé. */
   const ajouterPersonneParNumero = async (numero: string, nom: string) => {
@@ -1152,8 +1242,10 @@ export default function MeetingRoomPage() {
       setRechercheContact("")
       setChiffresAjout("")
       setOngletAjout("contacts")
-      // Recharger la réunion pour mettre à jour la liste
-      setMeeting(await fetchMeeting(Number(meetingId)))
+      // Recharger la réunion pour mettre à jour la liste. Les autres, eux,
+      // l'apprennent par le verbe de salle que le serveur diffuse a la suite de
+      // cette route : voir l'ecoute plus haut.
+      poserReunion(await fetchMeeting(Number(meetingId)))
     } catch (err) {
       /*
        * SALLE PLEINE : on garde le panneau OUVERT, contrairement au succes.
@@ -1363,7 +1455,7 @@ export default function MeetingRoomPage() {
       await exclureDeReunion(parseInt(meetingId, 10), participantId)
       // On relit la reunion plutot que de retirer la ligne localement : le
       // serveur est seul a savoir ce qu'il a reellement efface.
-      setMeeting(await fetchMeeting(parseInt(meetingId, 10)))
+      poserReunion(await fetchMeeting(parseInt(meetingId, 10)))
       success(t("meet_excluded", { name: nom }))
     } catch (err) {
       showError(t("error"), err instanceof Error ? err.message : t("meet_exclude_failed"))
