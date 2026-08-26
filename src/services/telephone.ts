@@ -51,6 +51,21 @@ export function normaliserTelephone(saisie: string, prefixePays: string): string
   let n = chiffres(saisie)
   if (n === "") return ""
 
+  /*
+   * 🔴 UN « + » EN TÊTE DIT « CE NUMÉRO EST DÉJÀ COMPLET » — on n'y ajoute rien.
+   *
+   * Sans cette sortie, l'indicatif du compte se collait devant un numéro
+   * étranger : « +221 34543678 » sur un compte déclaré en France ressortait
+   * « +3322134543678 », injoignable — et `users.mobile` est UNIQUE.
+   *
+   * Le cas est fréquent et légitime : on vit dans un pays et on garde une ligne
+   * d'un autre. C'est la raison même pour laquelle changer de pays ne touche
+   * pas au numéro.
+   *
+   * ⚠️ Le test porte sur la SAISIE BRUTE : `chiffres()` a déjà retiré le « + ».
+   */
+  if (saisie.trim().startsWith("+")) return `+${n}`
+
   const indicatif = chiffres(prefixePays)
 
   // « 00 » international : la forme longue de « + ».
@@ -74,6 +89,19 @@ export function formaterTelephone(
   if (canonique === "") return ""
 
   const indicatif = chiffres(prefixePays)
+
+  /*
+   * 🔴 LE NUMÉRO NE PORTE PAS L'INDICATIF DEMANDÉ : on le rend tel quel.
+   *
+   * Le découpage suppose que `canonique` commence par `indicatif` pour savoir
+   * où finit l'indicatif. Sinon la soustraction de longueurs mange des chiffres
+   * et en réattribue d'autres : « +33612345678 » présenté avec « +237 »
+   * ressortait « +237 12 34 56 78 » — un AUTRE numéro, pas une mise en forme.
+   */
+  if (indicatif !== "" && !canonique.startsWith(`+${indicatif}`)) {
+    return canonique
+  }
+
   const national = canonique.slice(1 + indicatif.length)
   if (national === "") return `+${indicatif}`
 
