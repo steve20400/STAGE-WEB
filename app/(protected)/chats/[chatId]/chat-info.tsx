@@ -367,8 +367,13 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           user-select: all; -webkit-user-select: all;
         }
         .cip-alanya-id strong { color: var(--text-secondary); font-weight: 600; letter-spacing: 0.4px; }
-        .cip-actions { display: flex; justify-content: center; gap: 16px; }
-        .ca-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+        /* Les boutons gardent leur largeur naturelle et la rangee passe a la
+           ligne plutot que de les comprimer. Sans cela, quatre libelles dans
+           une colonne etroite etaient serres sous la largeur de leur texte :
+           le mot debordait de sa boite et se retrouvait coupe — « Message »
+           le premier, parce qu'il est le plus long. */
+        .cip-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 12px; }
+        .ca-btn { display: flex; flex-direction: column; align-items: center; gap: 5px; background: none; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; flex: 0 0 auto; }
         .ca-icon {
           width: 42px;
           height: 42px;
@@ -382,7 +387,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           color: var(--accent);
         }
         .ca-btn:hover .ca-icon { background: var(--accent-dim); border-color: var(--accent-border); }
-        .ca-label { font-size: 10px; color: var(--text-muted); }
+        /* Le libelle ne se coupe jamais : il impose sa largeur au bouton, et
+           c'est la rangee qui s'adapte. */
+        .ca-label { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
 
         .cip-body { flex: 1; overflow-y: auto; }
         .cip-body::-webkit-scrollbar { width: 3px; }
