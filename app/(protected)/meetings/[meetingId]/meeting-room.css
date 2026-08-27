@@ -1583,7 +1583,13 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  overflow: hidden;
+  /* `auto` et non `hidden` : le panneau est plafonne a 60 % de la hauteur
+     d'ecran, et sur un telephone le pave numerique remplit deja cette hauteur.
+     Avec `hidden`, la rangee d'actions etait COUPEE NET — le bouton qui valide
+     le numero existait dans le code, invisible et inatteignable, et l'on
+     croyait qu'il avait ete oublie. Rien ne signalait la coupure : c'est le
+     propre de `hidden`. */
+  overflow-y: auto;
   animation: panneauEntree 0.24s cubic-bezier(0.32, 0.72, 0, 1);
 }
 @keyframes panneauEntree {
@@ -1752,6 +1758,13 @@
   margin-top: 8px;
 }
 .meeting-panneau-pave-actions {
+  /* Collee au bas du panneau : meme quand le contenu defile, le bouton qui
+     valide reste sous les yeux. Le fond est opaque, sinon les touches du pave
+     defileraient sous lui. */
+  position: sticky;
+  bottom: 0;
+  background: var(--bg-surface);
+  padding-block: 8px;
   display: flex;
   gap: 8px;
   margin-top: 10px;

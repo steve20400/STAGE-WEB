@@ -716,7 +716,27 @@ export function subscribeToMeetingRoster(
   handler: (event: MeetingRosterEvent) => void
 ): () => void {
   return subscribeToMeetingEvents((event) => {
-    if (event.type !== VERBE_COMPOSITION) return
+    /*
+     * TROIS VERBES, PAS UN SEUL.
+     *
+     * `meeting_participants_changed` annonce ce que l'API a change — un ajout,
+     * une exclusion. Mais il ne dit RIEN de qui entre ou sort de la salle : ces
+     * deux mouvements-la naissent des sockets, et n'ont jamais touche l'API.
+     *
+     * On ne suivait donc que la moitie des changements : la liste montrait
+     * fidelement les CONVIES et se trompait sur les PRESENTS. Il fallait quitter
+     * la reunion et y revenir pour voir qu'un participant etait arrive — sur
+     * chaque appareil, ce qui defait tout l'interet d'une liste vivante.
+     *
+     * L'entree et la sortie declenchent donc la meme relecture. La reaction
+     * etant « relire » et non « appliquer ce qu'on m'annonce », suivre trois
+     * verbes plutot qu'un ne coute rien de plus qu'une lecture de trop.
+     */
+    const suivi =
+      event.type === VERBE_COMPOSITION ||
+      event.type === "meeting_user_joined" ||
+      event.type === "meeting_user_left"
+    if (!suivi) return
     // Une trame sans reunion identifiable ne peut declencher aucune relecture
     // sensee : on ne devine pas de quelle salle il s'agit.
     const cible = Number(event.meetingId)
@@ -724,7 +744,14 @@ export function subscribeToMeetingRoster(
     if (meetingId !== null && cible !== meetingId) return
     handler({
       meetingId: cible,
-      motif: typeof event.motif === "string" ? event.motif : null,
+      motif:
+        typeof event.motif === "string"
+          ? event.motif
+          : event.type === "meeting_user_joined"
+            ? "PARTICIPANT_JOINED"
+            : event.type === "meeting_user_left"
+              ? "PARTICIPANT_LEFT"
+              : null,
       parUserId: typeof event.parUserId === "string" ? event.parUserId : null,
       nombre: typeof event.nombre === "number" ? event.nombre : null,
     })
