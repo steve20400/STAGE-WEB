@@ -366,6 +366,26 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           deux sources pour la meme question finiraient par ne plus repondre
           pareil, et l un des deux menus apparaitrait sans l autre.
         */}
+        {/*
+          Annuaire des entreprises — POUR TOUT LE MONDE, contrairement a
+          « Collegues » juste apres. Ce sont des standards publics : un agent a
+          le droit d appeler le service client d une autre societe comme
+          n importe qui, et la route serveur l accepte deja explicitement.
+
+          ⚠️ PAS DE GARDE  ICI, et surtout ne pas en ajouter une par
+          symetrie avec le lien voisin : ce serait cacher a un agent un annuaire
+          auquel il a droit.
+        */}
+        <Link
+          to="/entreprises"
+          className={`sb-link ${pathname === "/entreprises" ? "active" : ""}`}
+          onClick={onClose}
+          title={t("companies")}
+        >
+          <Icons.Contacts />
+          <span className="sb-link-label">{t("companies")}</span>
+        </Link>
+
         {isAgent && (
           <Link
             to="/collegues"

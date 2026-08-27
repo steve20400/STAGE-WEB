@@ -28,6 +28,7 @@ import ChatsSplit, { ChatEmptyState } from "../app/(protected)/chats/chats-split
 import SectionSplit from "../app/(protected)/section-split"
 import ContactsPage from "../app/(protected)/contacts/contacts"
 import ColleguesPage from "../app/(protected)/collegues/collegues"
+import EntreprisesPage from "../app/(protected)/entreprises/entreprises"
 import StatusPage from "../app/(protected)/status/status"
 import MeetingsPage from "../app/(protected)/meetings/meetings"
 import MeetingRoomPage from "../app/(protected)/meetings/[meetingId]/meeting-room"
@@ -134,6 +135,24 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                     qui masque l entree. Une route conditionnee cote client
                     donnerait un 404 la ou un 403 explique.
                   */}
+                  {/*
+                    Annuaire des entreprises. Ouvert a TOUS les comptes, et pas
+                    seulement aux particuliers : la route serveur le dit deja en
+                    toutes lettres — un annuaire de standards publics n a aucune
+                    raison d etre refuse a un agent, qui a le droit d appeler le
+                    service client d une autre entreprise comme n importe qui.
+                  */}
+                  <Route
+                    path="/entreprises"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <EntreprisesPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+
                   <Route
                     path="/collegues"
                     element={
