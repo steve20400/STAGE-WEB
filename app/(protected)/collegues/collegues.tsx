@@ -14,6 +14,7 @@ import {
   type Collegue,
   type ServiceCollegues,
 } from "../../../src/services/collegues-service"
+import "./collegues-page.css"
 
 /**
  * ANNUAIRE DES COLLÈGUES — pendant web de l'onglet mobile.
@@ -52,6 +53,24 @@ export default function ColleguesPage() {
   /** Le service ouvert, ou `null` quand on est sur la liste des services. */
   const [serviceOuvert, setServiceOuvert] = useState<string | null>(null)
   const [membres, setMembres] = useState<Collegue[] | null>(null)
+
+  /**
+   * Deux colonnes ou une seule ?
+   *
+   * La MEME borne que la media query de la feuille. Le CSS suffirait a placer
+   * les colonnes, mais pas a decider du BOUTON DE RETOUR ni de ce que la droite
+   * affiche : cote a cote, il n'y a nulle part ou revenir. On ecoute donc la
+   * meme condition ici, plutot que de la deviner.
+   */
+  const [deuxColonnes, setDeuxColonnes] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 901px)").matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 901px)")
+    const suivre = (e: MediaQueryListEvent) => setDeuxColonnes(e.matches)
+    mq.addEventListener("change", suivre)
+    return () => mq.removeEventListener("change", suivre)
+  }, [])
 
   const [requete, setRequete] = useState("")
   const [resultats, setResultats] = useState<Collegue[] | null>(null)
@@ -140,46 +159,88 @@ export default function ColleguesPage() {
 
   const enRecherche = resultats !== null || cherche
 
+  /**
+   * Le titre suit ce que la page MONTRE.
+   *
+   * A deux colonnes, les services et les membres sont visibles ENSEMBLE : le
+   * titre redevient celui de la page, et c'est la colonne de droite qui nomme le
+   * service ouvert. Empile, il n'y a qu'une liste a l'ecran, et le titre est le
+   * seul endroit qui puisse dire laquelle.
+   */
   const titre = useMemo(() => {
     if (enRecherche) return t("colleagues_search_hint")
+    if (deuxColonnes) return t("colleagues")
     return serviceOuvert ?? t("colleagues")
-  }, [enRecherche, serviceOuvert, t])
+  }, [enRecherche, deuxColonnes, serviceOuvert, t])
+
+  /** Empile seulement : cote a cote, il n'y a nulle part ou revenir. */
+  const montrerRetour = !deuxColonnes && serviceOuvert !== null && !enRecherche
 
   return (
-    <div className="s-page">
-      <header className="s-head">
-        {serviceOuvert && !enRecherche && (
+    <div className="cl-page">
+      <header className="cl-head">
+        {montrerRetour && (
           <button
             type="button"
-            className="s-back"
+            className="cl-back"
             onClick={() => {
               setServiceOuvert(null)
               setMembres(null)
             }}
+            title={t("back")}
             aria-label={t("back")}
           >
-            &larr;
+            <FlecheRetour />
           </button>
         )}
         <h1>{titre}</h1>
       </header>
 
-      <div style={{ padding: "0 16px 12px" }}>
+      <div className="cl-search">
         <input
           type="search"
           value={requete}
           onChange={(e) => setRequete(e.target.value)}
           placeholder={t("colleagues_search_hint")}
           aria-label={t("colleagues_search_hint")}
-          style={{ width: "100%", padding: "10px 14px", borderRadius: 9 }}
         />
       </div>
 
-      {enRecherche
-        ? rendreCollegues(cherche ? null : resultats, t("colleagues_no_match"))
-        : serviceOuvert
-          ? rendreCollegues(membres, t("colleagues_service_empty"))
-          : rendreServices()}
+      <div className="cl-corps">
+        {/* LA GAUCHE. Empile, elle disparait des qu'un service est ouvert ou
+            qu'on cherche — c'est l'ecran d'origine. */}
+        {(deuxColonnes || (!serviceOuvert && !enRecherche)) && (
+          <div className="cl-colonne cl-colonne-services">{rendreServices()}</div>
+        )}
+
+        {/* LA DROITE. Elle porte les membres, les resultats de recherche, ou
+            l'invitation a choisir. Empilee, elle ne parait que lorsqu'elle a
+            quelque chose a dire. */}
+        {(deuxColonnes || serviceOuvert || enRecherche) && (
+          <div className="cl-colonne cl-colonne-membres">
+            {enRecherche ? (
+              rendreCollegues(cherche ? null : resultats, t("colleagues_no_match"))
+            ) : serviceOuvert ? (
+              <>
+                {/* Le nom du service EN TETE de sa colonne : a deux colonnes, le
+                    titre de page ne le porte plus, et une liste de visages sans
+                    en-tete ne dit pas de qui elle parle. */}
+                {deuxColonnes && (
+                  <div className="cl-head" style={{ paddingInline: 0 }}>
+                    <h1>{serviceOuvert}</h1>
+                  </div>
+                )}
+                {rendreCollegues(membres, t("colleagues_service_empty"))}
+              </>
+            ) : (
+              <div className="cl-vide-droite">
+                <IconeAnnuaire />
+                <p>{t("col_pick_service")}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 
@@ -188,7 +249,7 @@ export default function ColleguesPage() {
   function rendreServices() {
     if (echec) {
       return (
-        <p className="s-hint" style={{ padding: 16 }}>
+        <p className="cl-hint">
           {t("server_unreachable")}{" "}
           <button type="button" onClick={() => void chargerServices()}>
             {t("retry")}
@@ -196,37 +257,37 @@ export default function ColleguesPage() {
         </p>
       )
     }
-    if (services === null) return <p className="s-hint" style={{ padding: 16 }}>{t("loading")}</p>
+    if (services === null) return <p className="cl-hint">{t("loading")}</p>
     if (services.length === 0) {
       // Le message dit POURQUOI la liste est vide. « Aucun service n est
       // configure » serait faux quand c est l entreprise qui restreint : des
       // services existent, on n a pas le droit de les voir.
       return (
-        <p className="s-hint" style={{ padding: 16 }}>
+        <p className="cl-hint">
           {t(porteeRestreinte ? "colleagues_own_service_only" : "colleagues_no_service")}
         </p>
       )
     }
 
     return (
-      <ul style={{ listStyle: "none", margin: 0, padding: "0 16px 24px" }}>
+      <ul className="cl-liste">
         {services.map((s) => (
-          <li key={s.nom} style={{ marginBottom: 8 }}>
+          <li key={s.nom}>
             <button
               type="button"
+              className={`cl-service${serviceOuvert === s.nom ? " ouvert" : ""}`}
+              // A deux colonnes, la ligne reste designee pendant qu'on lit ses
+              // membres a droite : sans cela, rien ne dit laquelle a produit
+              // l'autre.
+              aria-current={serviceOuvert === s.nom ? "true" : undefined}
               onClick={() => void ouvrirService(s.nom)}
-              style={{
-                width: "100%", textAlign: "left", padding: "14px 16px",
-                borderRadius: 10, cursor: "pointer",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}
             >
-              <span style={{ fontWeight: 600 }}>{s.nom}</span>
+              <span className="cl-service-nom">{s.nom}</span>
               {/*
                 L'effectif est ANNONCÉ, y compris à zéro : un service configuré
                 mais sans personne est une information, pas une ligne à cacher.
               */}
-              <span className="s-hint" style={{ fontSize: 13 }}>
+              <span className="cl-service-effectif">
                 {s.effectif === 0
                   ? t("colleagues_count_none")
                   : s.effectif === 1
@@ -241,30 +302,19 @@ export default function ColleguesPage() {
   }
 
   function rendreCollegues(liste: Collegue[] | null, messageVide: string) {
-    if (liste === null) return <p className="s-hint" style={{ padding: 16 }}>{t("loading")}</p>
-    if (liste.length === 0) return <p className="s-hint" style={{ padding: 16 }}>{messageVide}</p>
+    if (liste === null) return <p className="cl-hint">{t("loading")}</p>
+    if (liste.length === 0) return <p className="cl-hint">{messageVide}</p>
 
     return (
-      <ul style={{ listStyle: "none", margin: 0, padding: "0 16px 24px" }}>
+      <ul className="cl-liste">
         {liste.map((c) => (
-          <li
-            key={c.id}
-            style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "12px 14px", borderRadius: 10, marginBottom: 8,
-              border: "1px solid var(--border)",
-            }}
-          >
+          <li key={c.id} className="cl-membre">
             <AvatarCircle avatar={c.avatarUrl} initials={initiales(c.nom)} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis" }}>
-                {c.nom}
-              </div>
+            <div className="cl-membre-texte">
+              <div className="cl-membre-nom">{c.nom}</div>
               {/* L'Alanya ID FORMATÉ, comme partout ailleurs : c'est sous cette
                   forme que les gens le lisent et le recopient. */}
-              <div className="s-hint" style={{ fontSize: 13 }}>
-                {formatAlanyaNumber(c.publicNumber)}
-              </div>
+              <div className="cl-membre-num">{formatAlanyaNumber(c.publicNumber)}</div>
               {/* L'AGENCE, juste sous le numéro (demande du user, 26/08/2026).
 
                   ⚠️ RIEN DU TOUT quand elle manque, et pas un tiret : un agent
@@ -274,31 +324,84 @@ export default function ColleguesPage() {
 
                   Le mobile affiche exactement la même chose au même endroit :
                   les deux clients lisent le même champ du même serveur. */}
-              {c.agence ? (
-                <div
-                  className="s-hint"
-                  style={{
-                    fontSize: 12,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {c.agence}
-                </div>
-              ) : null}
+              {c.agence ? <div className="cl-membre-agence">{c.agence}</div> : null}
             </div>
-            <button type="button" onClick={() => void appeler(c)}>
-              {t("call")}
-            </button>
-            <button type="button" onClick={() => void ecrire(c)}>
-              {t("send_message")}
-            </button>
+            {/* Le LIBELLE disparait sur telephone, l'icone reste : deux boutons
+                de texte plus un nom plus un avatar ne tiennent pas sur 360 px.
+                `aria-label` porte le mot dans les deux cas — ce que le lecteur
+                d'ecran annonce ne doit pas dependre de la largeur. */}
+            <div className="cl-membre-actions">
+              <button
+                type="button"
+                className="cl-action"
+                onClick={() => void appeler(c)}
+                title={t("call")}
+                aria-label={t("call")}
+              >
+                <IconeAppel />
+                <span>{t("call")}</span>
+              </button>
+              <button
+                type="button"
+                className="cl-action"
+                onClick={() => void ecrire(c)}
+                title={t("send_message")}
+                aria-label={t("send_message")}
+              >
+                <IconeMessage />
+                <span>{t("send_message")}</span>
+              </button>
+            </div>
           </li>
         ))}
       </ul>
     )
   }
+}
+
+/*
+ * Icones DESSINEES et non caracteres.
+ *
+ * « ← » et « ☎ » se rendent dans la police du texte : leur trait est plus fin
+ * que tout ce qui les entoure, et leur taille varie d'une plateforme a l'autre.
+ * Un trace suit la couleur et l'epaisseur qu'on lui donne.
+ */
+function FlecheRetour() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  )
+}
+
+function IconeAnnuaire() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9.5" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+function IconeAppel() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z" />
+    </svg>
+  )
+}
+
+function IconeMessage() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.4 8.4 0 0 1 8.4-9 8.4 8.4 0 0 1 8.6 8.6Z" />
+    </svg>
+  )
 }
 
 /** Les initiales, pour l'avatar de repli. */

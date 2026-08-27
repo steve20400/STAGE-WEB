@@ -1,0 +1,383 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Sans:wght@300;400;500;600&display=swap");
+
+/*
+ * ANNUAIRE DES COLLEGUES.
+ *
+ * Cette page n'avait AUCUNE feuille : ses classes (`s-page`, `s-head`, `s-back`,
+ * `s-hint`) n'existaient nulle part, et le reste tenait dans des styles en
+ * ligne. Le bouton de retour etait donc un bouton de navigateur nu, et les
+ * bordures pointaient vers `--border`, une variable qui n'existe pas — elles
+ * etaient transparentes.
+ *
+ * DEUX COLONNES plutot qu'un empilement pleine largeur : les noms de service
+ * sont courts, et leur donner tout l'ecran laissait une colonne de texte au
+ * milieu du vide, avec un aller-retour a chaque consultation. La liste tient a
+ * gauche, les membres s'ouvrent a droite.
+ */
+
+.cl-page {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  font-family: "DM Sans", sans-serif;
+  color: var(--text-primary);
+}
+
+/* ─────────────────────────────────────────────── En-tete */
+
+.cl-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px 10px;
+  flex-shrink: 0;
+}
+
+.cl-head h1 {
+  margin: 0;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  /* Un nom de service long ne doit pas repousser le compteur hors du cadre. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Le compteur suit le titre au lieu de flotter en fin de ligne : lie au nom, il
+   se lit comme sa precision et non comme une donnee separee. */
+.cl-head-compte {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  padding-top: 4px;
+}
+
+/*
+ * LE BOUTON DE RETOUR.
+ *
+ * Meme dessin que celui de l'ecran de conversation — c'est le geste identique,
+ * il doit avoir la meme allure. Une cible de 34 px : au-dessous, on le manque au
+ * doigt, et c'est precisement sur telephone qu'il sert, la ou les deux colonnes
+ * laissent place a l'empilement.
+ *
+ * Une FLECHE DESSINEE et non le caractere « ← » : celui-ci se rend dans la
+ * police du texte, ou son trait est plus fin que tout ce qui l'entoure.
+ */
+.cl-back {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-left: -6px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.cl-back:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.cl-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cl-back svg {
+  width: 19px;
+  height: 19px;
+}
+
+/* ─────────────────────────────────────────────── Recherche */
+
+.cl-search {
+  position: relative;
+  flex-shrink: 0;
+  padding: 0 18px 12px;
+}
+
+.cl-search input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.cl-search input::placeholder {
+  color: var(--text-muted);
+}
+
+.cl-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ─────────────────────────────────────────────── Les deux colonnes */
+
+.cl-corps {
+  display: grid;
+  /* Environ un tiers, mais borne des deux cotes : en pourcentage pur, un grand
+     ecran donnait 600 px a des noms de service qui en demandent 200, et un
+     ecran etroit les coupait. */
+  grid-template-columns: clamp(240px, 32%, 380px) 1fr;
+  gap: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.cl-colonne {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 18px 24px;
+}
+
+/* Un filet, pas une cloison : il separe les deux colonnes sans decouper la
+   page en deux cartes. */
+.cl-colonne-services {
+  border-right: 1px solid var(--border-subtle);
+}
+
+/* ─────────────────────────────────────────────── Liste des services */
+
+.cl-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cl-liste > li + li {
+  margin-top: 6px;
+}
+
+.cl-service {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.cl-service:hover {
+  background: var(--bg-elevated);
+}
+
+.cl-service:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Le service ouvert reste designe pendant qu'on lit ses membres a droite :
+   sans cela, deux colonnes cote a cote ne disent plus laquelle a produit
+   l'autre. */
+.cl-service.ouvert {
+  background: var(--bg-elevated);
+  border-color: var(--accent);
+}
+
+.cl-service-nom {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-service-effectif {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ─────────────────────────────────────────────── Fiches des collegues */
+
+.cl-membre {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 11px;
+  background: var(--bg-surface);
+}
+
+.cl-membre-texte {
+  flex: 1;
+  min-width: 0;
+}
+
+.cl-membre-nom {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-membre-num,
+.cl-membre-agence {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-membre-num {
+  font-size: 12.5px;
+}
+
+.cl-membre-agence {
+  font-size: 11.5px;
+}
+
+/* Les deux gestes, cote a cote. Ils portent une ICONE en plus du mot : la
+   rangee se retrecit sur telephone, et l'icone survit a la disparition du
+   libelle. */
+.cl-membre-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.cl-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.cl-action:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.cl-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cl-action svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* ─────────────────────────────────────────────── Etats */
+
+.cl-hint {
+  padding: 16px 2px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.cl-hint button {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* L'invitation a choisir un service : centree, elle occupe la colonne de droite
+   sans se faire passer pour une erreur. */
+.cl-vide-droite {
+  display: flex;
+  height: 100%;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.cl-vide-droite svg {
+  width: 26px;
+  height: 26px;
+  opacity: 0.55;
+}
+
+.cl-vide-droite p {
+  margin: 0;
+  font-size: 13.5px;
+  max-width: 260px;
+}
+
+/* ─────────────────────────────────────────────── Telephone et tablette etroite
+ *
+ * Sous 900 px, deux colonnes ne tiennent plus : la gauche etoufferait la droite.
+ * On revient a l'empilement d'origine — une liste a la fois — et c'est la que le
+ * bouton de retour reprend son role.
+ */
+@media (max-width: 900px) {
+  .cl-corps {
+    grid-template-columns: 1fr;
+  }
+
+  .cl-colonne-services {
+    border-right: none;
+  }
+
+  .cl-colonne {
+    padding-inline: 16px;
+  }
+
+  .cl-head,
+  .cl-search {
+    padding-inline: 16px;
+  }
+
+  /* Le libelle cede la place a l'icone : deux boutons de texte plus un nom
+     plus un avatar ne tiennent pas sur 360 px sans tout comprimer. */
+  .cl-action span {
+    display: none;
+  }
+
+  .cl-action {
+    padding: 8px;
+  }
+}
