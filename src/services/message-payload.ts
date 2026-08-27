@@ -174,6 +174,13 @@ export function nomAffichable(c: SharedContact): string {
  * Libellé d'une ligne pour un message structuré (liste de conversations,
  * citation d'une réponse). Sans lui, ces endroits afficheraient le JSON brut.
  */
+/**
+ * ⚠️ LE WEB NE L'APPELLE PLUS — voir `apercuStructureTraduit` dans l'ecran de
+ * conversation. Ses libelles sont en FRANCAIS EN DUR, et ne peuvent pas etre
+ * traduits ici : ce fichier est le miroir du backend et du Flutter, qui n'ont
+ * pas l'i18n du web. Il reste parce que le miroir doit rester complet ; ne pas
+ * s'en resservir pour afficher quoi que ce soit.
+ */
 export function apercuStructure(type: string, content: string | null | undefined): string | null {
   if (type === "contact" || type === "CONTACT") {
     const contacts = contactsDepuisContenu(content)

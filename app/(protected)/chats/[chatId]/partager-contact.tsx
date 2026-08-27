@@ -355,6 +355,40 @@ export function PartagerContact({
 
           {onglet === "repertoire" ? (
             <>
+              {/* LE NUMERO COMPOSE SE VOIT AUSSI ICI.
+                  Les deux onglets alimentent la meme selection — c'est voulu —
+                  mais le numero composé n'apparaissait QUE sur son onglet. Qui
+                  composait un numero, se ravisait, revenait au repertoire et
+                  cochait quelqu'un l'envoyait sans le voir : le pied annoncait
+                  bien « 2 », alors qu'une seule ligne etait cochee a l'ecran.
+                  Le montrer ici, et permettre de le retirer, suffit — vider le
+                  numero au changement d'onglet aurait interdit de composer PUIS
+                  de cocher, ce que l'ecran autorise volontairement. */}
+              {ficheComposee && (
+                <div className="pc-compose-rappel">
+                  <span className="pc-compose-rappel-texte">
+                    <span className="pc-compose-rappel-num">
+                      {formatAlanyaNumber(ficheComposee.phones[0])}
+                    </span>
+                    <span className="pc-compose-rappel-note">
+                      {ficheComposee.name ?? t("pc_dialed_kept")}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="pc-compose-rappel-x"
+                    onClick={() => {
+                      setRefus(null)
+                      setCompose("")
+                    }}
+                    title={t("pc_dialed_drop")}
+                    aria-label={t("pc_dialed_drop")}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               <div className="pc-recherche">
                 <IconeLoupe />
                 <input

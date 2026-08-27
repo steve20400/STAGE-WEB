@@ -40,7 +40,8 @@ import {
   toFrontMessage,
 } from "../../../../src/services/messages-service"
 import {
-  apercuStructure,
+  contactsDepuisContenu,
+  nomAffichable,
   positionDepuisContenu,
   LONGUEUR_MAX_CONTENU,
 } from "../../../../src/services/message-payload"
@@ -2730,8 +2731,53 @@ function hasQuotedMedia(msg: Message): boolean {
  * position porte du JSON dans `content`, et une citation qui tient sur une
  * ligne afficherait `{"v":1,…}`.
  */
+/**
+ * Apercu TRADUIT d'un message structure : fiche de contact, position.
+ *
+ * `apercuStructure` rend les memes libelles en francais EN DUR. On ne peut pas
+ * l'y traduire : `message-payload.ts` est le miroir exact de sa version backend
+ * et de sa version Flutter, et n'a donc pas le droit d'importer l'i18n du web.
+ * Le decodage reste la-bas — partage par les trois clients — et seule la MISE
+ * EN MOTS revient ici.
+ *
+ * Rend `null` quand le message n'est pas structure : l'appelant continue alors
+ * son enchainement habituel.
+ */
+function apercuStructureTraduit(msg: Message): string | null {
+  const langue = langueInitiale()
+  const type = msg.type
+  const contenu = msg.content ?? null
+
+  if (type === "contact") {
+    const contacts = contactsDepuisContenu(contenu)
+    // Charge illisible : on nomme au moins la NATURE du message, plutot que de
+    // laisser passer le JSON brut.
+    if (contacts === null) return `👤 ${traduire(langue, "a2_contact")}`
+    const premier = nomAffichable(contacts[0])
+    if (contacts.length === 1) return `👤 ${premier}`
+    const autres = contacts.length - 1
+    // Deux cles et non un pluriel calcule : « 1 autre » et « 2 autres » ne se
+    // forment pas de la meme facon d'une langue a l'autre.
+    return `👤 ${traduire(
+      langue,
+      autres === 1 ? "mp_contact_plus_one" : "mp_contact_plus_many",
+      { name: premier, count: autres }
+    )}`
+  }
+
+  if (type === "location") {
+    const position = positionDepuisContenu(contenu)
+    if (position === null) return `📍 ${traduire(langue, "mp_position")}`
+    return position.label
+      ? `📍 ${position.label}`
+      : `📍 ${traduire(langue, "mp_position_shared")}`
+  }
+
+  return null
+}
+
 function quotedMediaLabel(msg: Message): string {
-  const structure = apercuStructure(msg.type, msg.content ?? null)
+  const structure = apercuStructureTraduit(msg)
   if (structure) return structure
   const caption = msg.content?.trim()
   if (caption) return caption
