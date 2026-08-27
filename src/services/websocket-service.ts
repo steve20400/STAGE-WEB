@@ -347,8 +347,10 @@ function connect() {
     const handshakeRejected = event.code === 4001 || !opened
     if (handshakeRejected && Date.now() - lastTokenRefreshAt > TOKEN_REFRESH_THROTTLE_MS) {
       lastTokenRefreshAt = Date.now()
+      // "ok" seulement : un serveur injoignable n est pas une raison de
+      // renoncer, la reconnexion periodique s en charge.
       const refreshed = await tryRefreshTokens()
-      if (refreshed) {
+      if (refreshed === "ok") {
         connect()
         return
       }

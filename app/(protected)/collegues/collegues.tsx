@@ -251,6 +251,28 @@ export default function ColleguesPage() {
               <div className="s-hint" style={{ fontSize: 13 }}>
                 {formatAlanyaNumber(c.publicNumber)}
               </div>
+              {/* L'AGENCE, juste sous le numéro (demande du user, 26/08/2026).
+
+                  ⚠️ RIEN DU TOUT quand elle manque, et pas un tiret : un agent
+                  sans fonction rattachée n'a pas d'agence, et le cas est réel
+                  en production. Une ligne creuse sous le numéro se lirait comme
+                  une donnée perdue, alors qu'il n'y a rien à dire.
+
+                  Le mobile affiche exactement la même chose au même endroit :
+                  les deux clients lisent le même champ du même serveur. */}
+              {c.agence ? (
+                <div
+                  className="s-hint"
+                  style={{
+                    fontSize: 12,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {c.agence}
+                </div>
+              ) : null}
             </div>
             <button type="button" onClick={() => void appeler(c)}>
               {t("call")}

@@ -73,15 +73,41 @@ interface TokenPair {
   refreshToken: string
 }
 
-let refreshPromise: Promise<boolean> | null = null
+let refreshPromise: Promise<ResultatRafraichissement> | null = null
 
 /**
  * POST /api/auth/refresh — echange le refresh token contre un nouveau couple
  * access/refresh (rotation cote backend). Retourne false si impossible.
  */
-export async function tryRefreshTokens(): Promise<boolean> {
+/**
+ * Ce que le rafraîchissement a donné.
+ *
+ * 🔴 TROIS ÉTATS, ET NON UN BOOLÉEN, parce que les deux façons d'échouer
+ * appellent des conduites OPPOSÉES (corrigé le 27/08/2026) :
+ *
+ *  - `refuse` — le serveur a RÉPONDU et a dit non : le jeton de rafraîchissement
+ *    est mort (expiré, révoqué, session évincée). Effacer la session est alors
+ *    la bonne conduite ;
+ *  - `injoignable` — on n'a pas eu de réponse, ou une panne serveur : réseau
+ *    coupé, délai dépassé, 502 pendant un redéploiement. Le jeton est
+ *    probablement encore bon, et il faut le GARDER.
+ *
+ * Le booléen d'avant confondait les deux, et `apiRequest` effaçait la session
+ * dans les deux cas — `clearSessionToken()` retirant AUSSI le jeton de
+ * rafraîchissement. Une coupure passagère au moment où le jeton d'accès venait
+ * d'expirer suffisait donc à détruire la session : c'est la cause des
+ * « déconnexions intempestives » signalées par le user le 26/08/2026.
+ *
+ * ⚠️ UN 5xx N'EST PAS UN REFUS. Le serveur qui redémarre répond 502 par Nginx ;
+ * le lire comme « votre session est morte » déconnecterait tout le monde à
+ * chaque déploiement.
+ */
+export type ResultatRafraichissement = "ok" | "refuse" | "injoignable"
+
+export async function tryRefreshTokens(): Promise<ResultatRafraichissement> {
   const refreshToken = loadRefreshToken()
-  if (!refreshToken) return false
+  // Rien a rafraichir : c est un refus, pas une panne.
+  if (!refreshToken) return "refuse"
 
   if (!refreshPromise) {
     refreshPromise = (async () => {
@@ -112,15 +138,22 @@ export async function tryRefreshTokens(): Promise<boolean> {
           } catch {
             // Corps illisible : on reste sur un échec sans explication.
           }
-          return false
+          // 4xx : le serveur a juge le jeton. 5xx : il est en panne, et le
+          // jeton n y est pour rien — un 502 de Nginx pendant un redeploiement
+          // ne doit pas deconnecter tout le monde.
+          return response.status >= 500 ? "injoignable" : "refuse"
         }
         const pair = (await response.json()) as TokenPair
-        if (!pair.accessToken || !pair.refreshToken) return false
+        // Reponse 200 mais illisible : on ne sait pas quoi croire, et detruire
+        // la session sur un doute coute plus cher que de reessayer.
+        if (!pair.accessToken || !pair.refreshToken) return "injoignable"
         saveSessionToken(pair.accessToken)
         saveRefreshToken(pair.refreshToken)
-        return true
+        return "ok"
       } catch {
-        return false
+        // Reseau coupe, delai depasse, DNS : AUCUNE reponse du serveur. On garde
+        // les jetons.
+        return "injoignable"
       } finally {
         refreshPromise = null
       }
@@ -171,11 +204,15 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   // Access token expire -> on tente un refresh puis on rejoue la requete une fois.
   if (response.status === 401 && !path.startsWith("/api/auth/")) {
     const refreshed = await tryRefreshTokens()
-    if (refreshed) {
+    if (refreshed === "ok") {
       response = await rawRequest(path, options)
-    } else {
+    } else if (refreshed === "refuse") {
+      // Le serveur a dit non : la session est bel et bien morte.
       clearSessionToken()
     }
+    // "injoignable" : on ne touche a RIEN. La requete ressortira en erreur, et
+    // la session repartira au prochain reseau. C est ce qui evite la
+    // deconnexion intempestive sur une coupure passagere.
   }
 
   const text = await response.text()

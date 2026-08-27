@@ -33,6 +33,15 @@ export interface Collegue {
   nom: string
   avatarUrl: string | null
   isOnline: number
+  /**
+   * L'agence de rattachement, ou `null`.
+   *
+   * NUL, ET JAMAIS UNE CHAÎNE VIDE : un agent sans fonction rattachée n'a pas
+   * d'agence, et le cas est réel en production. Le distinguer permet de ne rien
+   * afficher du tout, là où un libellé vide dessinerait une ligne creuse sous
+   * le numéro.
+   */
+  agence: string | null
 }
 
 interface ReponseServices {
