@@ -1,3 +1,13 @@
+/** Un fichier attache a un message, tel que le backend le decrit. */
+export interface MediaJointe {
+  id: string
+  url: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  durationMs: number | null
+}
+
 export type MessageStatus = "sending" | "sent" | "delivered" | "read"
 // `contact` et `location` : fiches de contact et positions partagées. Leur
 // charge utile est du JSON dans `content` — voir `services/message-payload.ts`,
@@ -94,6 +104,19 @@ export interface ChatMessageMock {
   mediaUrl?: string
   mediaMime?: string
   durationMs?: number
+  /**
+   * TOUS les medias du message, quand il en porte plusieurs.
+   *
+   * Le mobile envoie un lot de fichiers comme UN SEUL message portant N medias,
+   * la ou le web en envoie N messages d'un media chacun. Les champs `mediaUrl` /
+   * `mediaMime` ci-dessus ne decrivent que le PREMIER : tant qu'on s'en tenait a
+   * eux, un envoi de trois videos depuis un telephone s'affichait ici comme une
+   * seule video, et les deux autres etaient perdues sans le moindre signe.
+   *
+   * Absent ou de longueur 1 quand le message ne porte qu'un media : les champs
+   * simples suffisent alors, et tout le rendu existant continue de les lire.
+   */
+  medias?: MediaJointe[]
   /** Message supprime "pour tous" : on affiche un placeholder. */
   isDeleted?: boolean
   /**

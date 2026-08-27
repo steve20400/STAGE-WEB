@@ -2900,6 +2900,38 @@ function isAlbumCandidate(msg: Message): boolean {
   )
 }
 
+/**
+ * Un message portant PLUSIEURS medias devient autant de tuiles pour la grille.
+ *
+ * Le mobile envoie un lot de fichiers comme UN message a N medias ; le web en
+ * envoie N a un media chacun. Les deux doivent aboutir a la meme grille, sinon
+ * un envoi paraitrait groupe ou eparpille selon l'appareil qui l'a emis.
+ *
+ * Les tuiles GARDENT l'id du message d'origine : c'est bien un seul message, et
+ * supprimer ou transferer doit porter sur lui. Seule la premiere reprend la
+ * legende, sans quoi elle se repeterait sous chaque tuile.
+ */
+function eclaterMedias(msg: Message): Message[] {
+  const lot = msg.medias
+  if (!lot || lot.length < 2) return [msg]
+  return lot.map((media, i) => ({
+    ...msg,
+    content: i === 0 ? msg.content : "",
+    type: media.mimeType?.startsWith("video/")
+      ? "video"
+      : media.mimeType?.startsWith("image/")
+        ? "image"
+        : media.mimeType?.startsWith("audio/")
+          ? "audio"
+          : "file",
+    mediaUrl: media.url,
+    mediaMime: media.mimeType,
+    fileName: media.filename,
+    fileSize: formatBytes(media.sizeBytes),
+    durationMs: media.durationMs ?? undefined,
+  }))
+}
+
 /** Fusionne les suites de medias d'un meme expediteur envoyes coup sur coup. */
 function groupMediaRuns(items: TimelineItem[]): TimelineItem[] {
   const out: TimelineItem[] = []
@@ -4590,8 +4622,17 @@ export default function ChatRoomPage() {
       if (attachRef.current && !attachRef.current.contains(event.target as Node))
         setShowAttach(false)
     }
+    // Echap ferme aussi : c'est ce que font les autres menus du depot, et un
+    // menu qu'on ne peut fermer qu'a la souris exclut qui navigue au clavier.
+    const closeEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowAttach(false)
+    }
     document.addEventListener("pointerdown", closeOutside)
-    return () => document.removeEventListener("pointerdown", closeOutside)
+    document.addEventListener("keydown", closeEscape)
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside)
+      document.removeEventListener("keydown", closeEscape)
+    }
   }, [showAttach])
 
   /**
@@ -5536,7 +5577,13 @@ export default function ChatRoomPage() {
   // Fil unifie : messages + evenements d'appel (facon WhatsApp), tries par date.
   const timeline: TimelineItem[] = groupMediaRuns(
     [
-      ...messages.map((msg): TimelineItem => ({ kind: "msg", ts: msg.timestamp, msg })),
+      // Un message a plusieurs medias devient directement un lot : `groupMediaRuns`
+      // le laisse alors intact, puisqu'il ne fusionne que des messages voisins.
+      ...messages.flatMap((msg): TimelineItem[] => {
+        const tuiles = eclaterMedias(msg)
+        if (tuiles.length < 2) return [{ kind: "msg", ts: msg.timestamp, msg }]
+        return [{ kind: "album", ts: msg.timestamp, msgs: tuiles }]
+      }),
       ...callEvents.map((call): TimelineItem => ({ kind: "call", ts: call.ts, call })),
     ].sort((a, b) => a.ts.getTime() - b.ts.getTime())
   )
@@ -5828,7 +5875,17 @@ export default function ChatRoomPage() {
                       onReply={setReplyTo}
                       onQuickReply={sendQuickReplyText}
                       onOpenImage={(url, name) => setLightbox({ url, name })}
-                      onDelete={(_, scope) => lot.forEach((m) => handleDelete(m, scope))}
+                      // Dedoublonne par id : les tuiles issues d'UN message a
+                      // plusieurs medias le partagent, et il ne faut pas
+                      // envoyer N suppressions pour un seul message.
+                      onDelete={(_, scope) => {
+                        const vus = new Set<string>()
+                        lot.forEach((m) => {
+                          if (vus.has(m.id)) return
+                          vus.add(m.id)
+                          handleDelete(m, scope)
+                        })
+                      }}
                       onForward={setForwardMsg}
                       onCopy={handleCopy}
                       isGroup={chat?.isGroup}
@@ -6204,7 +6261,13 @@ export default function ChatRoomPage() {
 
             <button
               className="attach-btn"
-              onMouseEnter={() => setShowAttach(true)}
+              /* PAS D'OUVERTURE AU SURVOL. `onMouseEnter` se declenche sur
+                 tactile au PREMIER CONTACT : le menu surgissait donc des qu'on
+                 posait le doigt pour faire defiler la zone de saisie, et il
+                 fallait le refermer avant de pouvoir ecrire. Sur ordinateur, il
+                 s'ouvrait sous le curseur qui ne faisait que passer.
+                 Le clic ouvre, le clic ailleurs ferme, Echap ferme — le meme
+                 geste que tous les autres menus de l'application. */
               onClick={() => setShowAttach((v) => !v)}
               aria-expanded={showAttach}
               aria-label={t("attach_file")}

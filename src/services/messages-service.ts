@@ -117,6 +117,9 @@ export function toFrontMessage(
   myId: string | null
 ): ChatMessageMock {
   const isMine = myId !== null && m.senderId === myId
+  // Le PREMIER media alimente les champs simples, que tout le rendu lit deja.
+  // La liste complete voyage a cote, pour les messages qui en portent plusieurs
+  // — ce que fait le mobile quand on envoie un lot de fichiers d'un coup.
   const media = m.media?.[0]
   const deletedAt = (m as BackendMessage).deletedAt ?? null
 
@@ -150,6 +153,7 @@ export function toFrontMessage(
       : undefined,
     mediaUrl: media?.url,
     mediaMime: media?.mimeType,
+    medias: m.media,
     durationMs: media?.durationMs ?? undefined,
     fileName: media?.filename,
     fileSize: formatBytes(media?.sizeBytes),
