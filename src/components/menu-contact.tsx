@@ -222,8 +222,7 @@ export function MenuContact({
    * passe sur deux lignes — un nom long, une langue verbeuse — et le menu
    * debordait alors en bas de l'ecran sans que le calcul s'en apercoive.
    */
-  useEffect(() => {
-    if (!ouvert) return
+  const placer = useCallback(() => {
     const cadre = panneau.current
     const ancrage = ancre.current
     if (!cadre || !ancrage) return
@@ -238,13 +237,35 @@ export function MenuContact({
     // Flottant : le panneau quitte le flux, il faut donc lui donner sa place a
     // l'ecran. `right` plutot que `left` pour qu'il reste aligne sur le bouton
     // quand il est plus large que lui, comme dans le flux.
-    if (flottant) {
-      setCoordonnees({
-        top: versHaut ? place.top - hauteur - 6 : place.bottom + 6,
-        right: Math.max(8, window.innerWidth - place.right),
-      })
+    if (!flottant) return
+    // Borne le haut : un panneau plus haut que la place au-dessus remontait en
+    // coordonnee negative, donc hors de l'ecran par le haut.
+    const haut = versHaut ? Math.max(8, place.top - hauteur - 6) : place.bottom + 6
+    setCoordonnees({
+      top: haut,
+      right: Math.max(8, window.innerWidth - place.right),
+    })
+  }, [flottant])
+
+  useEffect(() => {
+    if (!ouvert) return
+    placer()
+    if (!flottant) return
+    // Les coordonnees sont figees a l'ouverture : sans ces deux ecouteurs, le
+    // panneau reste plante a l'ecran pendant que son bouton s'en va. La liste
+    // des participants d'une reunion DEFILE, et un participant qui arrive
+    // reordonne les lignes sous le menu ouvert.
+    //
+    // `capture` parce que le defilement d'un conteneur interne ne remonte pas
+    // jusqu'a `window` en phase de bouillonnement.
+    const suivre = () => placer()
+    window.addEventListener("scroll", suivre, true)
+    window.addEventListener("resize", suivre)
+    return () => {
+      window.removeEventListener("scroll", suivre, true)
+      window.removeEventListener("resize", suivre)
     }
-  }, [ouvert, cestMoi, flottant])
+  }, [ouvert, cestMoi, flottant, placer])
 
   // Ouverture au clavier : le focus part sur l'entree demandee une fois le
   // panneau rendu.
@@ -369,6 +390,9 @@ export function MenuContact({
           // discussion, rejoindre un appel : elle ne doit pas se declencher
           // en ouvrant le menu.
           e.stopPropagation()
+          // Oublie la place precedente : la ligne a pu bouger depuis, et
+          // reafficher d'abord l'ancienne ferait sauter le panneau.
+          if (!ouvert) setCoordonnees(null)
           setOuvert((valeur) => !valeur)
         }}
       >
@@ -390,7 +414,20 @@ export function MenuContact({
           role="menu"
           aria-label={libelleBouton}
           ref={panneau}
-          className={`mc-menu${versLeHaut ? " vers-le-haut" : ""}`}
+          className={`mc-menu${versLeHaut ? " vers-le-haut" : ""}${
+            flottant ? " mc-menu-flottant" : ""
+          }`}
+          // Tant que la mesure n'a pas eu lieu, le panneau flottant n'a pas
+          // encore de place : le montrer le ferait apparaitre une frame a
+          // l'endroit ou le navigateur l'a pose, puis sauter. `hidden` garde la
+          // mise en page — donc la hauteur mesurable — sans rien afficher.
+          style={
+            flottant
+              ? coordonnees
+                ? { top: coordonnees.top, right: coordonnees.right }
+                : { visibility: "hidden" }
+              : undefined
+          }
           onKeyDown={surToucheDansLeMenu}
           onClick={(e) => e.stopPropagation()}
           // Le menu sert aussi dans la fenetre d'appel reduite, qui se deplace

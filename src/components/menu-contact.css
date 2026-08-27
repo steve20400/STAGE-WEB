@@ -135,4 +135,11 @@
 .mc-menu.mc-menu-flottant {
   position: fixed;
   z-index: 2000;
+  /* `bottom` vient de `.vers-le-haut`, ou il vaut `calc(100% + 6px)` compte sur
+     la LIGNE du contact. En position fixe, ce pourcentage se lit sur la fenetre :
+     le panneau serait renvoye une hauteur d'ecran plus bas. Le sens d'ouverture
+     est deja porte par la coordonnee `top` calculee, qui suffit. */
+  bottom: auto;
+  /* La hauteur disponible n'est plus celle du conteneur mais celle de l'ecran. */
+  max-height: min(70vh, 340px);
 }

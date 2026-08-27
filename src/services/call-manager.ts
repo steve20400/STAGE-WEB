@@ -2678,6 +2678,50 @@ export function toggleMicrophone(): boolean {
 }
 
 /**
+ * COUPE le micro sans le rallumer — pour la coupure demandee par l'organisateur.
+ *
+ * Une BASCULE ne convient pas ici : appliquee a un micro deja coupe, elle le
+ * ROUVRIRAIT. L'organisateur coupe un micro parce qu'il fait du bruit ; le
+ * rouvrir serait l'exact contraire du geste demande, et l'interesse verrait
+ * « votre micro a ete coupe » au moment ou il se met a emettre.
+ *
+ * Renvoie `true` si quelque chose a reellement ete coupe. Sans piste, il n'y a
+ * rien a couper et rien a promettre.
+ */
+export function couperMicrophone(): boolean {
+  const pistes = localStream?.getAudioTracks() ?? []
+  if (pistes.length === 0) return false
+  pistes.forEach((track) => {
+    track.enabled = false
+  })
+  setState({ micOn: false })
+  return true
+}
+
+/**
+ * COUPE la camera sans la rallumer. Meme raisonnement que pour le micro.
+ *
+ * Pendant un partage d'ecran, la piste video locale est l'ECRAN et non la
+ * camera : la couper eteindrait la presentation chez tout le monde. On
+ * n'enregistre alors que l'intention, honoree au retour de la camera —
+ * exactement ce que fait deja la bascule.
+ */
+export function couperCamera(): boolean {
+  if (state.partageParMoi) {
+    if (cameraAvantPartage) cameraAvantPartage.camOn = false
+    setState({ camOn: false })
+    return true
+  }
+  const pistes = localStream?.getVideoTracks() ?? []
+  if (pistes.length === 0) return false
+  pistes.forEach((track) => {
+    track.enabled = false
+  })
+  setState({ camOn: false })
+  return true
+}
+
+/**
  * Installe une nouvelle piste video locale, et la pousse a TOUS les pairs.
  *
  * Sans le `replaceTrack` sur chaque connexion, les correspondants gardent

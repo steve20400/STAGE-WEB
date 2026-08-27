@@ -29,6 +29,8 @@ import {
   reprendreLeMediaLocal,
   partageEcranSupporte,
   setCallAudioOutput,
+  couperCamera,
+  couperMicrophone,
   toggleCamera,
   toggleMicrophone,
 } from "../../../../src/services/call-manager"
@@ -1369,6 +1371,17 @@ export default function MeetingRoomPage() {
       minuteursCoupure.current.set(cible, minuteur)
 
       if (cible !== (getMyUserId() ?? "")) return
+
+      // ON COUPE POUR DE BON. Jusqu'ici cet ecran se contentait de DIRE que le
+      // micro avait ete coupe : la pastille se posait, le message s'affichait,
+      // et la piste continuait d'emettre. L'interesse se croyait muet et
+      // parlait — c'est le pire des deux mondes, car il ne verifiait meme plus.
+      //
+      // Une coupure et non une bascule : appliquee a un micro deja coupe, une
+      // bascule le ROUVRIRAIT au moment precis ou l'ecran annonce l'inverse.
+      if (media === "audio") couperMicrophone()
+      else couperCamera()
+
       const auteur = String(event.fromUserId ?? "")
       const nomAuteur =
         (auteur && auteur === meeting?.organisateur.id ? meeting.organisateur.nom : "") ||
