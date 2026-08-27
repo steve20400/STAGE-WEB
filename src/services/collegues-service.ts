@@ -46,6 +46,25 @@ export interface Collegue {
 
 interface ReponseServices {
   services?: ServiceCollegues[]
+  porteeRestreinte?: boolean
+}
+
+/**
+ * Les services, ET la raison d'une liste vide.
+ *
+ * 🔴 LES DEUX ENSEMBLE, parce qu'une liste vide seule ne dit pas POURQUOI.
+ * L'écran affichait « Aucun service n'est configuré » dans tous les cas ; depuis
+ * que l'entreprise peut resserrer le répertoire au propre service de l'agent
+ * (`company.collegue`), ce texte peut être faux — des services existent, on n'a
+ * simplement pas le droit de les voir.
+ */
+export interface ListeServices {
+  services: ServiceCollegues[]
+  /**
+   * Faux par défaut : c'est le comportement d'avant ce réglage, et un serveur
+   * qui ne renvoie pas le champ ne doit pas faire croire à une restriction.
+   */
+  porteeRestreinte: boolean
 }
 
 interface ReponseCollegues {
@@ -53,9 +72,12 @@ interface ReponseCollegues {
 }
 
 /** Les services de mon entreprise. */
-export async function listerServices(): Promise<ServiceCollegues[]> {
+export async function listerServices(): Promise<ListeServices> {
   const reponse = await apiRequest<ReponseServices>("/api/collegues")
-  return reponse.services ?? []
+  return {
+    services: reponse.services ?? [],
+    porteeRestreinte: reponse.porteeRestreinte ?? false,
+  }
 }
 
 /** Les collègues d'un service. */

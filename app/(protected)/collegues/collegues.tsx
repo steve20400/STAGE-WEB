@@ -42,6 +42,11 @@ export default function ColleguesPage() {
   const navigate = useNavigate()
 
   const [services, setServices] = useState<ServiceCollegues[] | null>(null)
+  /**
+   * L'entreprise limite-t-elle le répertoire au service de chacun ?
+   * Sert UNIQUEMENT à dire vrai quand la liste revient vide.
+   */
+  const [porteeRestreinte, setPorteeRestreinte] = useState(false)
   const [echec, setEchec] = useState(false)
 
   /** Le service ouvert, ou `null` quand on est sur la liste des services. */
@@ -55,7 +60,9 @@ export default function ColleguesPage() {
   const chargerServices = useCallback(async () => {
     setEchec(false)
     try {
-      setServices(await listerServices())
+      const liste = await listerServices()
+      setServices(liste.services)
+      setPorteeRestreinte(liste.porteeRestreinte)
     } catch {
       setEchec(true)
     }
@@ -191,7 +198,14 @@ export default function ColleguesPage() {
     }
     if (services === null) return <p className="s-hint" style={{ padding: 16 }}>{t("loading")}</p>
     if (services.length === 0) {
-      return <p className="s-hint" style={{ padding: 16 }}>{t("colleagues_no_service")}</p>
+      // Le message dit POURQUOI la liste est vide. « Aucun service n est
+      // configure » serait faux quand c est l entreprise qui restreint : des
+      // services existent, on n a pas le droit de les voir.
+      return (
+        <p className="s-hint" style={{ padding: 16 }}>
+          {t(porteeRestreinte ? "colleagues_own_service_only" : "colleagues_no_service")}
+        </p>
+      )
     }
 
     return (
