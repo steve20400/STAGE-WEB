@@ -43,9 +43,15 @@ export default function WelcomePage() {
             <Link to="/login" className="btn-nav">
               {t("login")}
             </Link>
-            <Link to="/developer/auth" className="btn-nav" style={{ background: "var(--accent, #0284c7)", color: "#ffffff", borderColor: "var(--accent, #0284c7)", fontWeight: 600 }}>
-              Espace Développeur
-            </Link>
+            {/* PAS DE LIEN VERS L'ESPACE DEVELOPPEUR ICI.
+                Cette page est la premiere que voit quelqu'un qui arrive sur
+                l'application : elle s'adresse aux UTILISATEURS, et une console
+                d'API a cote du bouton de connexion n'y a rien a dire. Le lien
+                etait par ailleurs le seul libelle EN DUR de la barre — les huit
+                autres langues montraient du francais — et le seul a se peindre
+                d'un bleu etranger a la palette.
+                L'espace reste accessible par sa route ; c'est au site vitrine
+                de le presenter. */}
           </div>
         </nav>
 
