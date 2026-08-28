@@ -31,6 +31,7 @@ import {
   subscribeToCallEvents,
   subscribeToMeetingEvents,
   sendMeetingSignal,
+  subscribeToWsConnected,
   sendMeetingJoin,
   sendMeetingLeave,
   sendMeetingScreen,
@@ -1139,6 +1140,30 @@ export function sendIvrChoice(digit: number) {
   if (!peutTaper) return
   setState({ ivr: { ...session, envoiEnCours: true, message: null } })
   /*
+   * GARDE-FOU : le pave se REVERROUILLAIT DEFINITIVEMENT si aucune reponse
+   * n'arrivait.
+   *
+   * `envoiEnCours` ne retombe que sur une trame du serveur — sept endroits, tous
+   * declenches par une reponse. Une socket qui tombe entre l'appui et la reponse,
+   * une trame perdue, un serveur qui ne repond pas a cette touche-la : le
+   * drapeau reste vrai POUR TOUJOURS, et le premier `return` ci-dessus refuse en
+   * silence toutes les touches suivantes. L'appelant tape, retape, et le menu ne
+   * bouge plus — sans message, sans indice.
+   *
+   * Huit secondes : au-dela, une reponse n'arrivera plus, et rendre le pave vaut
+   * mieux que le garder ferme sur une promesse perdue. Si la reponse arrive
+   * quand meme, elle repose le drapeau elle-meme et ce minuteur ne trouve plus
+   * rien a liberer.
+   */
+  const idAppel = state.activeCallId
+  window.setTimeout(() => {
+    const courante = state.ivr
+    if (!courante || !courante.envoiEnCours) return
+    // Ne pas deverrouiller la session d'un AUTRE appel entre-temps.
+    if (state.activeCallId !== idAppel) return
+    setState({ ivr: { ...courante, envoiEnCours: false } })
+  }, 8000)
+  /*
    * ⚠️ ON NE COUPE RIEN SUR UN CENTRE VOCAL, et c'est ce qui rend le refus
    * indolore : si la touche est acceptee, `ivr_play` rappelle `playIvrAudio`,
    * qui coupe lui-meme ce qui jouait ; si elle est refusee, l'accueil ou le son
@@ -1229,6 +1254,17 @@ let salleReunion: number | null = null
  */
 let presentateurs: string[] = []
 let desabonnementSalle: (() => void) | null = null
+/**
+ * Reinscription dans la salle apres une coupure de la socket.
+ *
+ * L'appartenance a une salle est portee par la SOCKET, pas par la base : le
+ * serveur range les membres dans `meetingRooms`, une carte en memoire indexee
+ * par connexion. Quand la socket tombe et se rouvre, la nouvelle n'est
+ * inscrite NULLE PART — le client croit etre en reunion, le serveur ne le sert
+ * plus, et il ne recoit plus ni signal WebRTC, ni arrivee, ni depart, ni fin.
+ * La salle se fige, sans le moindre message.
+ */
+let desabonnementReconnexion: (() => void) | null = null
 // callId -> (userId -> signaux recus avant que la session soit prete)
 const signalBuffer = new Map<string, Map<string, WebrtcSignal[]>>()
 let localStream: MediaStream | null = null
@@ -1617,6 +1653,10 @@ function clearCall(markEnded: boolean) {
   if (desabonnementSalle) {
     desabonnementSalle()
     desabonnementSalle = null
+  }
+  if (desabonnementReconnexion) {
+    desabonnementReconnexion()
+    desabonnementReconnexion = null
   }
   salleReunion = null
   presentateurs = []
@@ -2372,6 +2412,15 @@ export async function joinMeetingRoom(
   desabonnementSalle = subscribeToMeetingEvents((event) => {
     if (Number(event.meetingId) !== meetingId) return
     void traiterEvenementSalle(event)
+  })
+
+  desabonnementReconnexion?.()
+  desabonnementReconnexion = subscribeToWsConnected(() => {
+    // `meeting_join` est IDEMPOTENT cote serveur (`dejaDansLaSalle`) : le
+    // renvoyer sur une socket qui n'etait pas tombee ne fait rien. On ne
+    // cherche donc pas a distinguer la premiere ouverture d'une reprise, ce qui
+    // demanderait un etat de plus pour aucun gain.
+    if (salleReunion !== null) sendMeetingJoin(salleReunion)
   })
 
   sendMeetingJoin(meetingId)
