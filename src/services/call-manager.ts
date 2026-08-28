@@ -171,6 +171,14 @@ export interface IvrSession {
   message: string | null
   /** Touche envoyee, reponse pas encore arrivee -> clavier verrouille. */
   envoiEnCours: boolean
+  /**
+   * Musiques a jouer quand tous les agents d'un service sont occupes.
+   *
+   * Arrivent des `ivr_menu`, donc bien avant d'etre utiles : le navigateur a
+   * toute la duree de l'invite pour les mettre en cache, et la musique demarre
+   * a l'instant du refus au lieu d'ouvrir sur un silence.
+   */
+  queueUrls: string[]
 }
 
 export type CallRole = "outgoing" | "ongoing" | null
@@ -907,11 +915,63 @@ function playIvrAudio(url: string, loop: boolean) {
   })
 }
 
+/**
+ * Generation de lecture. Chaque `stopIvrAudio` l'incremente.
+ *
+ * Sans ce compteur, l'enchainement d'une liste survit a son arret : la piste en
+ * cours finit, son `ended` se declenche, et il lance la suivante — la musique
+ * d'attente repartirait ALORS QUE L'AGENT A DECROCHE, par-dessus la
+ * conversation. Le mobile prend la meme precaution.
+ */
+let generationIvr = 0
+
 function stopIvrAudio() {
+  generationIvr += 1
   if (!ivrAudio) return
   ivrAudio.pause()
   ivrAudio.currentTime = 0
+  // Sans cela, l'enchainement pose plus bas rappellerait la suite apres l'arret.
+  ivrAudio.onended = null
   ivrAudio = null
+}
+
+/**
+ * LA MUSIQUE D'ATTENTE, quand tous les agents d'un service sont occupes.
+ *
+ * Le web restait MUET pendant que le mobile jouait la liste `vocal_attente` :
+ * meme serveur, meme charge, deux experiences opposees — un silence que rien
+ * n'explique a l'ecran, et qu'on prend pour un appel coupe.
+ *
+ * MEME ELEMENT que le reste du standard, via `playIvrAudio` : Safari
+ * n'autorise la lecture que sur un element deja debloque par un geste, et en
+ * ouvrir un second la ferait refuser.
+ *
+ * Les pistes s'enchainent sur `ended` plutot que par `loop`, qui ne sait
+ * reboucler que sur un seul fichier.
+ */
+function playIvrQueueList(urls: string[], boucler: boolean) {
+  if (urls.length === 0) return
+  if (urls.length === 1) {
+    playIvrAudio(urls[0], boucler)
+    return
+  }
+  const jouer = (index: number) => {
+    const i = index % urls.length
+    playIvrAudio(urls[i], false)
+    // `playIvrAudio` a incremente la generation en coupant : on capture APRES.
+    const mienne = generationIvr
+    const element = ivrAudio
+    if (!element) return
+    element.onended = () => {
+      // Un arret — agent qui decroche, retour au menu — a change la generation :
+      // cette liste-ci n'a plus rien a jouer.
+      if (mienne !== generationIvr) return
+      const suivant = i + 1
+      if (suivant >= urls.length && !boucler) return
+      jouer(suivant)
+    }
+  }
+  jouer(0)
 }
 
 /** Une chaine vide vaut absence : elle afficherait une ligne blanche. */
@@ -1798,6 +1858,9 @@ async function handleServerEvent(event: CallServerEvent) {
       centerName: String(event.centerName ?? state.peerName ?? tr("v2_call_center")),
       centerNumber: (event.centerNumber as string | null) ?? null,
       promptUrl: (event.promptUrl as string | null) ?? null,
+      // Retenues des maintenant : elles ne serviront qu'en cas de service
+      // occupe, mais les recevoir tot laisse le navigateur les mettre en cache.
+      queueUrls: Array.isArray(event.queueUrls) ? event.queueUrls.map(String) : [],
       holdUrl: (event.holdUrl as string | null) ?? null,
       options: parseIvrOptions(event.options),
       // ⚠️ CE MESSAGE ARRIVE AUSSI AU RETOUR A L'ACCUEIL d'un centre vocal : le
@@ -1960,7 +2023,27 @@ async function handleServerEvent(event: CallServerEvent) {
         serviceChoisi: retry ? null : session.serviceChoisi,
       },
     })
-    if (retry) return
+    if (retry) {
+      /*
+       * TOUS LES AGENTS SONT OCCUPES : on fait patienter au lieu de se taire.
+       *
+       * Le serveur renvoie ici la liste `vocal_attente`. Le mobile la joue
+       * depuis toujours ; le web restait muet — meme serveur, meme charge, deux
+       * experiences opposees, et un silence qu'on prend pour un appel coupe.
+       *
+       * `stopIvrAudio` a deja ete appele plus haut (le refus n'est pas « sans
+       * effet » ici), la liste part donc sur un element libre. On ne joue PAS
+       * en plus le `holdUrl` de la meme charge : ce serait deux sons
+       * superposes.
+       */
+      const file = Array.isArray(event.queueUrls)
+        ? event.queueUrls.map(String)
+        : session.queueUrls
+      if (String(event.code ?? "") === "busy" && file.length > 0) {
+        playIvrQueueList(file, true)
+      }
+      return
+    }
     // Fin sans retour possible. Le message reste affiche : le serveur n'envoie
     // volontairement AUCUN `call_ended` avec, sinon l'ecran se fermerait dans la
     // meme milliseconde et le texte serait illisible.
