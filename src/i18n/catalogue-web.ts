@@ -1080,6 +1080,7 @@ export const WEB_TRANSLATION_KEYS = [
   "meet_auto_invite",
   "meet_auto_invite_hint",
   "meet_invite_requested",
+  "meet_request_this_number",
   "meet_invite_sent",
   // Plafond de participants d'une reunion.
   //
@@ -1278,6 +1279,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint:
       "Quand vous êtes absent, les demandes sont toujours acceptées automatiquement.",
     meet_invite_requested: "Demande d'invitation envoyée",
+    meet_request_this_number: "Demander ce numéro",
     meet_invite_sent: "{name} a été invité à la réunion",
     meet_cap_hint:
       "Une réunion vidéo accueille {video} personnes, une réunion audio {audio} — organisateur compris. Chaque participant envoie son flux à tous les autres : au-delà, la qualité s'effondre pour tout le monde.",
@@ -2495,6 +2497,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite: "Automatically accept requests",
     meet_auto_invite_hint: "When you are away, requests are always accepted automatically.",
     meet_invite_requested: "Invitation request sent",
+    meet_request_this_number: "Request this number",
     meet_invite_sent: "{name} has been invited to the meeting",
     meet_cap_hint:
       "A video meeting holds {video} people, an audio meeting {audio} — organiser included. Every participant sends their stream to everyone else: beyond that, quality collapses for all.",
@@ -3700,6 +3703,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint:
       "Cuando no esté disponible, las solicitudes siempre se aceptan automáticamente.",
     meet_invite_requested: "Solicitud de invitación enviada",
+    meet_request_this_number: "Solicitar este número",
     meet_invite_sent: "{name} ha sido invitado a la reunión",
     meet_cap_hint:
       "Una reunión de vídeo admite {video} personas; una de audio, {audio} — organizador incluido. Cada participante envía su flujo a todos los demás: más allá, la calidad se hunde para todos.",
@@ -4910,6 +4914,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite: "Anfragen automatisch akzeptieren",
     meet_auto_invite_hint: "Wenn Sie abwesend sind, werden Anfragen immer automatisch akzeptiert.",
     meet_invite_requested: "Einladungsanfrage gesendet",
+    meet_request_this_number: "Diese Nummer anfragen",
     meet_invite_sent: "{name} wurde zur Besprechung eingeladen",
     meet_cap_hint:
       "Eine Videokonferenz fasst {video} Personen, eine Audiokonferenz {audio} — Organisator eingerechnet. Jeder Teilnehmer sendet seinen Stream an alle anderen: darüber hinaus bricht die Qualität für alle ein.",
@@ -6135,6 +6140,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite_hint:
       "Quando estiver ausente, as solicitações são sempre aceitas automaticamente.",
     meet_invite_requested: "Solicitação de convite enviada",
+    meet_request_this_number: "Solicitar este número",
     meet_invite_sent: "{name} foi convidado para a reunião",
     meet_cap_hint:
       "Uma reunião de vídeo comporta {video} pessoas; uma de áudio, {audio} — organizador incluído. Cada participante envia o seu fluxo a todos os outros: além disso, a qualidade cai para todos.",
@@ -7345,6 +7351,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite: "Автоматически принимать запросы",
     meet_auto_invite_hint: "Когда вас нет, запросы всегда принимаются автоматически.",
     meet_invite_requested: "Запрос на приглашение отправлен",
+    meet_request_this_number: "Запросить этот номер",
     meet_invite_sent: "{name} приглашён на встречу",
     meet_cap_hint:
       "Видеовстреча вмещает {video} человек, аудиовстреча — {audio}, включая организатора. Каждый участник отправляет свой поток всем остальным: сверх этого качество падает у всех.",
@@ -8546,6 +8553,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite: "自动接受邀请请求",
     meet_auto_invite_hint: "您不在线时，请求始终自动接受。",
     meet_invite_requested: "邀请请求已发送",
+    meet_request_this_number: "申请此号码",
     meet_invite_sent: "{name} 已被邀请加入会议",
     meet_cap_hint:
       "视频会议最多容纳 {video} 人，语音会议 {audio} 人，均含发起人。每位参与者都要把自己的画面发给其他所有人：超过之后，所有人的质量都会崩塌。",
@@ -9710,6 +9718,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite: "Acceptera förfrågningar automatiskt",
     meet_auto_invite_hint: "När du är borta accepteras förfrågningar alltid automatiskt.",
     meet_invite_requested: "Inbjudningsförfrågan skickad",
+    meet_request_this_number: "Begär detta nummer",
     meet_invite_sent: "{name} har bjudits in till mötet",
     meet_cap_hint:
       "Ett videomöte rymmer {video} personer, ett ljudmöte {audio} — organisatören inräknad. Varje deltagare skickar sin ström till alla andra: därutöver rasar kvaliteten för alla.",
@@ -10916,6 +10925,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     meet_auto_invite: "Godta forespørsler automatisk",
     meet_auto_invite_hint: "Når du er borte, godtas forespørsler alltid automatisk.",
     meet_invite_requested: "Invitasjonsforespørsel sendt",
+    meet_request_this_number: "Be om dette nummeret",
     meet_invite_sent: "{name} er invitert til møtet",
     meet_cap_hint:
       "Et videomøte rommer {video} personer, et lydmøte {audio} — arrangøren medregnet. Hver deltaker sender strømmen sin til alle de andre: utover dette faller kvaliteten for alle.",

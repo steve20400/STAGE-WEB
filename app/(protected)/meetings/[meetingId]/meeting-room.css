@@ -1749,25 +1749,36 @@
 .meeting-panneau-pave {
   padding: 12px 16px;
 }
+/*
+ * LE PIED DU PAVE, COLLE D'UN SEUL BLOC.
+ *
+ * Le bouton seul etait colle. La ligne d'aide — celle qui dit POURQUOI il est
+ * eteint — restait dans le flux et tombait sous la ligne de coupe : on voyait
+ * un bouton gris sans jamais lire ce qui le grisait.
+ *
+ * Le fond opaque court sur TOUTE la largeur. Il ne faisait que 220 px, la
+ * largeur du bouton, et les touches du pave defilaient a decouvert de chaque
+ * cote — des chiffres glissant derriere un bouton immobile.
+ */
+.meeting-panneau-pave-pied {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  padding-block: 6px 8px;
+  margin-top: 8px;
+}
 /* Passee SOUS le pave, comme celle de l'invitation directe. */
 .meeting-panneau-aide {
   text-align: center;
   min-height: 18px;
   font-size: 11px;
   color: var(--text-muted);
-  margin-top: 8px;
 }
 .meeting-panneau-pave-actions {
-  /* Collee au bas du panneau : meme quand le contenu defile, le bouton qui
-     valide reste sous les yeux. Le fond est opaque, sinon les touches du pave
-     defileraient sous lui. */
-  position: sticky;
-  bottom: 0;
-  background: var(--bg-surface);
-  padding-block: 8px;
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 6px;
   max-width: 220px;
   margin-left: auto;
   margin-right: auto;

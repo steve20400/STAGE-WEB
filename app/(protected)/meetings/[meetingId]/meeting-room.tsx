@@ -2613,22 +2613,45 @@ export default function MeetingRoomPage() {
               {/* L'etat de la SAISIE. Le nom du titulaire, lui, se lit sous les
                   chiffres, dans le pave — et c'est un NOM COMPLET, la ou cette
                   ligne n'affichait qu'un pseudo. */}
-              <div className="meeting-panneau-aide" aria-live="polite">
-                {chiffresAjout.length === 0
-                  ? t("dial_hint_number")
-                  : isValidAlanyaNumber(chiffresAjout)
-                    ? t("number_complete")
-                    : t("digits_too_short", { n: chiffresAjout.length })}
-              </div>
-              <div className="meeting-panneau-pave-actions">
-                <button
-                  onClick={validerNumeroAjout}
-                  disabled={!isValidAlanyaNumber(chiffresAjout) || salleComplete}
-                >
-                  {meeting?.jeSuisOrganisateur
-                    ? t("invite_this_number")
-                    : t("meet_invite_requested")}
-                </button>
+              {/* LE PIED EST COLLE D'UN SEUL BLOC, ligne d'aide COMPRISE.
+                  Seul le bouton l'etait : la ligne qui dit POURQUOI il est
+                  eteint — « numero trop court », « salle pleine » — restait
+                  dans le flux et tombait sous la ligne de coupe. On voyait donc
+                  un bouton gris sans jamais lire ce qui le grisait. */}
+              <div className="meeting-panneau-pave-pied">
+                <div className="meeting-panneau-aide" aria-live="polite">
+                  {chiffresAjout.length === 0
+                    ? t("dial_hint_number")
+                    : isValidAlanyaNumber(chiffresAjout)
+                      ? t("number_complete")
+                      : t("digits_too_short", { n: chiffresAjout.length })}
+                </div>
+                <div className="meeting-panneau-pave-actions">
+                  <button
+                    onClick={validerNumeroAjout}
+                    disabled={!isValidAlanyaNumber(chiffresAjout) || salleComplete}
+                    // La raison au survol ET au lecteur d'ecran : sur un bouton
+                    // desactive, la ligne d'aide peut avoir defile hors champ.
+                    title={
+                      salleComplete
+                        ? t("meet_full_room", {
+                            plafond: placesReunion?.plafond ?? 0,
+                            actuel: placesReunion?.occupants ?? 0,
+                          })
+                        : !isValidAlanyaNumber(chiffresAjout)
+                          ? t("digits_too_short", { n: chiffresAjout.length })
+                          : undefined
+                    }
+                  >
+                    {/* Un bouton annonce CE QU'IL VA FAIRE. Pour un simple
+                        invite il portait « Demande d'invitation envoyee » — le
+                        texte du toast de SUCCES, donc un bouton qui se lisait
+                        comme un accuse de reception avant tout appui. */}
+                    {meeting?.jeSuisOrganisateur
+                      ? t("invite_this_number")
+                      : t("meet_request_this_number")}
+                  </button>
+                </div>
               </div>
             </div>
           )}
