@@ -2451,6 +2451,43 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
     return
   }
 
+  /*
+   * LA REUNION EST TERMINEE PAR L'ORGANISATEUR.
+   *
+   * Le maillage WebRTC vit entre les navigateurs : marquer la reunion close en
+   * base ne coupe RIEN. Sans cette branche, tout le monde continuait de filmer
+   * et de s'entendre sur une reunion officiellement finie, et ne l'apprenait
+   * qu'en quittant de soi-meme.
+   *
+   * On raccroche pour de bon plutot que d'afficher un avis a valider : le
+   * mobile fait deja ainsi, et laisser le choix reviendrait a laisser des
+   * cameras allumees sur une salle que l'organisateur a fermee.
+   */
+  if (event.type === "meeting_ended") {
+    // Une annonce venue d'une AUTRE reunion ne doit pas raccrocher celle-ci.
+    if (Number(event.meetingId) !== salleReunion) return
+    setState({ error: tr("meet_ended_by_host") })
+    await hangUp()
+    return
+  }
+
+  /*
+   * JE VIENS D'ETRE EXCLU.
+   *
+   * Meme raison : l'exclusion s'ecrivait en base et s'annoncait a la salle, mais
+   * l'exclu gardait ses connexions ouvertes — il continuait de parler et de
+   * filmer parmi des gens qui le croyaient parti.
+   */
+  if (event.type === "meeting_kicked") {
+    if (Number(event.meetingId) !== salleReunion) return
+    // ⚠️ SANS CE TEST, TOUTE LA SALLE SORT : le verbe est diffuse a tous pour
+    // que chacun relise la composition, mais un seul est concerne.
+    if (String(event.toUserId ?? "") !== (myUserId() ?? "")) return
+    setState({ error: tr("meet_kicked_toast") })
+    await hangUp()
+    return
+  }
+
   if (event.type === "meeting_joined") {
     // Ceux qui etaient deja la : c'est a eux d'offrir, on se contente de tenir
     // la session prete a recevoir leur offre. Meme role que

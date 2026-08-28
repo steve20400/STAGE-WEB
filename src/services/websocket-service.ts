@@ -646,6 +646,14 @@ const MEETING_EVENT_TYPES = new Set([
   // serveur pour annoncer un ajout ou une exclusion aboutirait a un mur, et la
   // salle continuerait de n'apprendre les arrivees qu'en sortant et revenant.
   VERBE_COMPOSITION,
+  // Une quatrieme et une cinquieme fois. Terminer une reunion et exclure
+  // quelqu'un agissent sur la BASE ; le maillage WebRTC, lui, vit entre les
+  // navigateurs et ne la consulte jamais. Sans ces deux verbes ici, la reunion
+  // se termine et l'exclusion se prononce pendant que les images et les voix
+  // continuent de circuler — le plus long a diagnostiquer, puisque tout le
+  // reste du chemin est juste.
+  "meeting_ended",
+  "meeting_kicked",
 ])
 
 /** S'abonne aux evenements d'appel (toutes conversations confondues). */
