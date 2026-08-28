@@ -16,6 +16,7 @@ import {
   type FicheEntreprise,
   type TypeEntreprise,
 } from "../../../src/services/entreprises-service"
+import "./entreprises-page.css"
 
 /**
  * ANNUAIRE DES ENTREPRISES — pendant web de l'onglet mobile.
@@ -366,20 +367,24 @@ export default function EntreprisesPage() {
 
   return (
     <section style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "16px 16px 10px",
-        }}
-      >
+      <header className="ent-head">
         {vue.niveau !== "types" ? (
-          <button type="button" onClick={retour} aria-label={t("back")}>
-            {t("back")}
+          <button type="button" className="ent-back" onClick={retour} aria-label={t("back")}>
+            {/* Une fleche, pas le mot traduit : le libelle changeait la largeur
+                du bouton d'une langue a l'autre et poussait le titre. Le mot
+                reste dans `aria-label`, pour qui n'a que la voix. */}
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M15 18l-6-6 6-6"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
         ) : null}
-        <h1 style={{ margin: 0, fontSize: 20, flex: 1, minWidth: 0 }}>{titre}</h1>
+        <h1>{titre}</h1>
       </header>
 
       {/* La recherche n'est offerte qu'aux niveaux de liste : sur une fiche ou

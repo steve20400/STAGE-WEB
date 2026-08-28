@@ -1,0 +1,80 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=DM+Sans:wght@300;400;500&display=swap");
+
+/*
+ * ANNUAIRE DES ENTREPRISES — feuille de la page.
+ *
+ * La page est arrivee SANS feuille : son bouton de retour etait un `<button>`
+ * nu, rendu par le navigateur avec sa bordure grise et son gris systeme, et sa
+ * classe `s-hint` — utilisee SEIZE fois pour du texte secondaire — n'existait
+ * dans aucun fichier CSS du depot. Tout ce texte se peignait donc de la couleur
+ * du texte principal : la hierarchie annoncee par le balisage ne se voyait pas.
+ *
+ * Meme langage visuel que `collegues-page.css`, page voisine dans le menu :
+ * deux annuaires qui ne se ressemblent pas donnent deux applications.
+ */
+
+.ent-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px 10px;
+  flex-shrink: 0;
+}
+
+.ent-head h1 {
+  margin: 0;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  /* Un nom d'entreprise long ne doit pas pousser le reste hors du cadre. */
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Le retour est une CIBLE CARREE, pas un mot.
+ *
+ * Il portait le libelle traduit de « Retour » : selon la langue, le bouton
+ * changeait de largeur et poussait le titre — et en allemand il mangeait un
+ * tiers de la ligne. La fleche vaut dans les neuf langues ; le mot reste dans
+ * `aria-label`, pour qui n'a que la voix.
+ *
+ * `margin-left: -6px` : le creux optique de la fleche la faisait paraitre
+ * rentree par rapport au titre en dessous. On aligne ce qu'on VOIT.
+ */
+.ent-back {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-left: -6px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.ent-back:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.ent-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Texte secondaire : la classe que la page appelait deja seize fois. */
+.s-hint {
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
