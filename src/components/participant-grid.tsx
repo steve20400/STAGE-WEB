@@ -43,6 +43,15 @@ export interface Participant {
    * il decrivait une intention que le type rendait impossible.
    */
   avatarUrl?: string | null
+  /**
+   * Ce pair a-t-il coupe son micro ? Vient de l'annonce `meeting_state`, jamais
+   * de la piste — voir la note au-dessus de `TuileParticipant`.
+   *
+   * ABSENT = jamais annonce = suppose ouvert. Les appels ordinaires n'ont aucun
+   * canal `meeting_state` : ils laissent le champ vide et gardent la pastille
+   * « ouvert », exactement comme avant.
+   */
+  muted?: boolean
 }
 
 /**
@@ -89,32 +98,19 @@ function usePisteVideoVivante(stream: MediaStream): boolean {
   return vivante
 }
 
-/** Meme principe pour le micro : une piste audio coupee passe en `muted`. */
-function usePisteAudioVivante(stream: MediaStream): boolean {
-  const [vivante, setVivante] = useState(true)
-
-  useEffect(() => {
-    const evaluer = () =>
-      setVivante(
-        stream.getAudioTracks().some((piste) => piste.readyState === "live" && !piste.muted)
-      )
-    evaluer()
-
-    const pistes = stream.getAudioTracks()
-    for (const piste of pistes) {
-      piste.addEventListener("mute", evaluer)
-      piste.addEventListener("unmute", evaluer)
-    }
-    return () => {
-      for (const piste of pistes) {
-        piste.removeEventListener("mute", evaluer)
-        piste.removeEventListener("unmute", evaluer)
-      }
-    }
-  }, [stream])
-
-  return vivante
-}
+/*
+ * ⚠️ IL N'Y A PAS D'EQUIVALENT AUDIO A `usePisteVideoVivante`, ET C'EST VOULU.
+ *
+ * Un crochet lisait ici `piste.muted` pour deduire qu'un pair s'etait coupe.
+ * Il ne pouvait pas marcher : `muted` decrit une piste qui N'ARRIVE PAS —
+ * reseau, source disparue — et non une piste volontairement fermee. Couper son
+ * micro met `enabled` a faux chez l'EMETTEUR, ce qui laisse partir des trames
+ * de silence : rien ne change chez le recepteur, et l'evenement `mute` ne se
+ * declenche jamais. La pastille affichait donc « micro ouvert » en permanence.
+ *
+ * L'information ne peut que se DIRE : elle arrive par `meeting_state`, portee
+ * jusqu'ici par la propriete `muted` du participant.
+ */
 
 function TuileParticipant({
   participant,
@@ -126,7 +122,9 @@ function TuileParticipant({
   const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const imageVivante = usePisteVideoVivante(participant.stream)
-  const microVivant = usePisteAudioVivante(participant.stream)
+  // Non annonce = suppose ouvert. Afficher « coupe » sur un simple silence
+  // reseau ferait taire quelqu'un qui parle.
+  const microVivant = participant.muted !== true
   const montrerVideo = isVideo && imageVivante
 
   useEffect(() => {

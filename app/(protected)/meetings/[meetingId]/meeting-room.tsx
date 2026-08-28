@@ -499,8 +499,18 @@ export default function MeetingRoomPage() {
         stream,
         name: callState.participantNames[id] ?? nomsConnus[id] ?? t("participant"),
         avatarUrl: photosConnues[id] ?? null,
+        // Annonce par le pair lui-meme (`meeting_state`). Rien dans sa piste ne
+        // permettrait de le deviner : couper son micro n'agit que chez lui.
+        muted: callState.peersMuted[id],
       })),
-    [fluxDistants, callState.participantNames, nomsConnus, photosConnues, t]
+    [
+      fluxDistants,
+      callState.participantNames,
+      callState.peersMuted,
+      nomsConnus,
+      photosConnues,
+      t,
+    ]
   )
 
   /**

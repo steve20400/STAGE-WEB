@@ -8,7 +8,6 @@ import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
 import {
   acceptIncomingCall,
-  dismissIncomingCallLocally,
   rejectIncomingCall,
 } from "../../src/services/call-manager"
 import { toInitials } from "../../src/data/session-user"
@@ -584,7 +583,17 @@ function GlobalIncomingCall() {
         void rejectIncomingCall()
       }}
       onTimeout={() => {
-        dismissIncomingCallLocally()
+        // LE DELAI REFUSE, IL NE DISPARAIT PLUS EN SILENCE.
+        //
+        // L'ecran se fermait au bout de 30 s sans rien dire au serveur, qui
+        // fait sonner l'agent 95 s : plus personne ne pouvait decrocher ici,
+        // et l'appelant patientait encore une minute avant que le serveur
+        // constate l'absence de reponse et le rende au menu.
+        //
+        // Un refus part donc a l'echeance, et l'appel passe immediatement a la
+        // suite — un autre service, un autre agent — au lieu d'attendre une
+        // expiration que personne n'observe.
+        void rejectIncomingCall()
       }}
     />
   )

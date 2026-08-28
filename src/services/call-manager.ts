@@ -260,6 +260,23 @@ export interface CallManagerState {
    */
   partageParMoi: boolean
   /**
+   * QUI a coupe son micro, parmi les pairs de la salle.
+   *
+   * Rien dans WebRTC ne dit qu'un correspondant s'est coupe : `track.muted`
+   * decrit une piste qui n'arrive PAS (reseau, source absente), pas une piste
+   * volontairement fermee — couper son micro met `enabled` a faux chez
+   * l'emetteur, ce qui laisse partir des trames de silence et ne change RIEN
+   * chez le recepteur. L'information ne peut donc que se DIRE.
+   *
+   * Le mobile la dit deja, par un `meeting_signal` portant `kind:
+   * "meeting_state"`. Le web ne l'emettait ni ne la lisait : chaque camp
+   * affichait l'autre micro ouvert en permanence.
+   *
+   * Absent d'une entree = jamais annonce = suppose ouvert. C'est le bon defaut :
+   * afficher « coupe » sur un silence reseau ferait taire quelqu'un qui parle.
+   */
+  peersMuted: Record<string, boolean>
+  /**
    * QUI presente, moi ou un autre, ou personne — l'ecran que la salle met en
    * grand.
    *
@@ -811,6 +828,7 @@ function initialState(): CallManagerState {
     transferPending: false,
     pendingRatingIdHist: null,
     partageParMoi: false,
+    peersMuted: {},
     partageParPeerId: null,
   }
 }
@@ -2394,6 +2412,9 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
   }
 
   if (event.type === "meeting_user_joined") {
+    // L'arrivant n'etait pas la quand les autres se sont annonces : sans ce
+    // rappel il verrait tous les micros ouverts, y compris les coupes.
+    diffuserEtatMedia(String(event.userId ?? "") || undefined)
     const id = String(event.userId ?? "")
     if (!id) return
     const nom = String(event.displayName ?? "")
@@ -2494,6 +2515,19 @@ async function traiterEvenementSalle(event: Record<string, unknown>) {
   if (event.type === "meeting_signal") {
     const from = String(event.fromUserId ?? "")
     if (!from) return
+
+    // ⚠️ AVANT TOUT TRAITEMENT WebRTC. Cette trame n'est PAS une negociation :
+    // laissee passer, elle serait mise en attente dans les signaux differes, ou
+    // pire, ouvrirait une session en repondeur sur ce qui n'est pas une offre.
+    const charge = event.signal as { kind?: string; muted?: boolean } | null
+    if (charge?.kind === "meeting_state") {
+      const coupe = charge.muted === true
+      if (state.peersMuted[from] !== coupe) {
+        setState({ peersMuted: { ...state.peersMuted, [from]: coupe } })
+      }
+      return
+    }
+
     const session = peers.get(from)
     if (session) await session.handleSignal(event.signal as WebrtcSignal)
     else {
@@ -2579,6 +2613,15 @@ export async function acceptIncomingCall(): Promise<string | null> {
 
 /** Ferme seulement la sonnerie/overlay de CET appareil (timeout ou autre appareil a décroché).
     Aucun endpoint reject/end n'est appelé : l'appel déjà accepté reste vivant. */
+/**
+ * Ferme l'ecran d'appel entrant SANS rien dire au serveur.
+ *
+ * ⚠️ PLUS AUCUN APPELANT depuis que l'echeance de 30 s refuse pour de bon :
+ * disparaitre en silence laissait le serveur faire sonner 95 s dans le vide,
+ * et l'appelant patienter une minute de plus. Gardee pour le cas ou il
+ * faudrait un jour fermer l'ecran sans decider a la place de l'utilisateur —
+ * mais si ce cas ne vient pas, elle est a supprimer.
+ */
 export function dismissIncomingCallLocally(): void {
   if (!state.incoming) return
   signalBuffer.delete(state.incoming.callId)
@@ -2657,6 +2700,31 @@ export async function hangUp(): Promise<void> {
   }
 }
 
+/**
+ * Annonce MON etat micro/camera aux pairs de la salle.
+ *
+ * Convention du mobile, reprise a l'identique : un `meeting_signal` de pair a
+ * pair portant `kind: "meeting_state"`. Le serveur relaie sans inspecter, il
+ * n'a donc rien a apprendre.
+ *
+ * ⚠️ La MAIN LEVEE n'entre pas ici. Elle a son propre verbe serveur
+ * (`meeting_hand`) : la joindre a cette annonce donnerait DEUX sources pour un
+ * meme booleen, celle du serveur et celle-ci posee sur ma seule foi, qui
+ * finiraient par se contredire. Le mobile prend la meme precaution.
+ *
+ * `versUnSeul` sert a l'arrivant : il n'etait pas la quand les autres se sont
+ * annonces, et sans ce rappel il verrait tous les micros ouverts.
+ */
+function diffuserEtatMedia(versUnSeul?: string): void {
+  if (salleReunion === null) return
+  const moi = myUserId() ?? ""
+  const charge = { kind: "meeting_state", muted: !state.micOn, cameraOff: !state.camOn }
+  const cibles = versUnSeul ? [versUnSeul] : [...peers.keys()]
+  for (const peerId of cibles) {
+    if (peerId && peerId !== moi) sendMeetingSignal(salleReunion, peerId, charge as never)
+  }
+}
+
 /** Coupe/retablit le micro (pistes audio locales). */
 export function toggleMicrophone(): boolean {
   const pistes = localStream?.getAudioTracks() ?? []
@@ -2674,6 +2742,8 @@ export function toggleMicrophone(): boolean {
     track.enabled = next
   })
   setState({ micOn: next })
+  // Les autres ne peuvent pas le DEDUIRE : on le leur dit.
+  diffuserEtatMedia()
   return next
 }
 
@@ -2695,6 +2765,7 @@ export function couperMicrophone(): boolean {
     track.enabled = false
   })
   setState({ micOn: false })
+  diffuserEtatMedia()
   return true
 }
 
@@ -2710,6 +2781,7 @@ export function couperCamera(): boolean {
   if (state.partageParMoi) {
     if (cameraAvantPartage) cameraAvantPartage.camOn = false
     setState({ camOn: false })
+    diffuserEtatMedia()
     return true
   }
   const pistes = localStream?.getVideoTracks() ?? []
@@ -2718,6 +2790,7 @@ export function couperCamera(): boolean {
     track.enabled = false
   })
   setState({ camOn: false })
+  diffuserEtatMedia()
   return true
 }
 
@@ -2814,11 +2887,25 @@ export async function reprendreLeMediaLocal(): Promise<CallManagerState["mediaMa
     }
   }
 
+  // ⚠️ DEUX QUESTIONS DIFFERENTES, ET C'EST TOUT LE DEFAUT CORRIGE ICI.
+  //
+  // « Ai-je une piste ? » decide de `mediaManquant` : sans piste, il n'y a rien
+  // a reprendre et le bandeau doit le dire.
+  //
+  // « Ma piste EMET-elle ? » decide du BOUTON. `micOn` se deduisait de la
+  // simple EXISTENCE de la piste : apres « Reessayer le media », un micro que
+  // l'utilisateur avait lui-meme coupe rouvrait a l'ecran sans rouvrir en fait.
+  // Le bouton annoncait un micro ouvert sur une piste `enabled: false` — il
+  // fallait le couper puis le rouvrir pour reconcilier les deux, ce que
+  // personne ne devine.
+  const audioEmet = () => localStream?.getAudioTracks().some((p) => p.enabled) ?? false
+  const videoEmet = () => localStream?.getVideoTracks().some((p) => p.enabled) ?? false
+
   const manquant = !aAudio() ? "tout" : veutVideo && !aVideo() ? "camera" : "aucun"
-  const patch: Partial<CallManagerState> = { micOn: aAudio() }
+  const patch: Partial<CallManagerState> = { micOn: audioEmet() }
   // Pendant un partage, la piste video locale est l'ECRAN : `camOn` y note
   // l'intention de camera et ne se deduit pas des pistes. Voir `toggleCamera`.
-  if (!state.partageParMoi) patch.camOn = aVideo()
+  if (!state.partageParMoi) patch.camOn = videoEmet()
   // `mediaManquant` ne vaut que pour une reunion — hors salle il reste « aucun ».
   if (salleReunion !== null) patch.mediaManquant = manquant
   setState(patch)
@@ -2963,6 +3050,7 @@ export function toggleCamera(): boolean {
   if (state.partageParMoi) {
     if (cameraAvantPartage) cameraAvantPartage.camOn = next
     setState({ camOn: next })
+    diffuserEtatMedia()
     return next
   }
   const pistes = localStream?.getVideoTracks() ?? []
@@ -2974,6 +3062,7 @@ export function toggleCamera(): boolean {
     track.enabled = next
   })
   setState({ camOn: next })
+  diffuserEtatMedia()
   return next
 }
 
