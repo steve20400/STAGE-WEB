@@ -43,6 +43,10 @@ import {
 } from "../../../../src/services/messages-service"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
 import {
+  compresserImage,
+  type ResultatCompression,
+} from "../../../../src/lib/image-compression"
+import {
   contactsDepuisContenu,
   nomAffichable,
   positionDepuisContenu,
@@ -1994,6 +1998,16 @@ interface PendingMedia {
   mime: string
   durationMs?: number
   caption: string
+  /**
+   * Compression en cours, lancee des la SELECTION.
+   *
+   * Elle tourne pendant que l'utilisateur regarde son apercu et tape sa
+   * legende : au moment d'envoyer, elle est le plus souvent deja finie. La
+   * lancer a l'envoi ferait attendre devant un bouton qui ne repond pas.
+   *
+   * `null` pour tout ce qui n'est pas une image.
+   */
+  compression: Promise<ResultatCompression> | null
 }
 
 /** Ce dont un apercu plein contenu a besoin, qu'il vienne du disque ou du serveur. */
@@ -5591,7 +5605,26 @@ export default function ChatRoomPage() {
       const mime =
         ext === "aac" || ext === "acc" ? "audio/aac" : file.type || "application/octet-stream"
       const durationMs = kind === "audio" ? await readAudioDuration(file) : undefined
-      prepared.push({ file, url: URL.createObjectURL(file), kind, mime, durationMs, caption: "" })
+      prepared.push({
+        file,
+        url: URL.createObjectURL(file),
+        kind,
+        mime,
+        durationMs,
+        caption: "",
+        /*
+         * L'APERCU MONTRE L'ORIGINAL, ON ENVOIE LE COMPRESSE.
+         *
+         * L'URL blob ci-dessus pointe le fichier d'origine : l'apercu reste
+         * donc net et immediat, sans attendre l'encodage. Ce qui part sur le
+         * reseau, lui, est le resultat de cette promesse.
+         *
+         * Sequentiel, et c'est voulu : la selection multiple autorise dix
+         * fichiers, et dix bitmaps 12 Mpx decodes ensemble retiennent pres de
+         * 500 Mo. La boucle qui nous porte est deja sequentielle.
+         */
+        compression: kind === "image" ? compresserImage(file) : null,
+      })
     }
     if (prepared.length > 0) {
       setPendingMedia(prepared)
@@ -5632,16 +5665,29 @@ export default function ChatRoomPage() {
 
   /** Confirmation : chaque fichier part avec sa propre legende, dans l'ordre choisi. */
   const sendPendingMedia = useCallback(() => {
-    pendingMedia.forEach((item) => {
-      void sendMediaMessage(
-        item.file,
-        item.file.name,
-        item.mime,
-        item.kind,
-        item.durationMs,
-        item.caption.trim()
-      )
-    })
+    /*
+     * On attend la compression AVANT d'envoyer, mais on ferme l'ecran TOUT DE
+     * SUITE : l'utilisateur a fini son geste, il n'a pas a regarder une barre
+     * tourner. Les bulles optimistes apparaissent des que chaque fichier est
+     * pret, dans l'ordre de la selection.
+     */
+    const lot = pendingMedia
+    void (async () => {
+      for (const item of lot) {
+        // `compression` ne rejette jamais : elle rend l'original en cas de
+        // doute. Le `catch` n'est la que si une refonte future l'oubliait.
+        const pret = await item.compression?.catch(() => null)
+        const fichier = pret?.fichier ?? item.file
+        await sendMediaMessage(
+          fichier,
+          fichier.name,
+          fichier.type || item.mime,
+          item.kind,
+          item.durationMs,
+          item.caption.trim()
+        )
+      }
+    })()
     closeMediaComposer()
   }, [pendingMedia, sendMediaMessage, closeMediaComposer])
 

@@ -2,7 +2,9 @@ import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useToast } from "../../../src/components/toast"
 import { toInitials } from "../../../src/data/session-user"
-import { resolveMediaUrl } from "../../../src/services/media-service"
+import { resolveMediaUrl,
+  TAILLE_MEDIA_MAX_OCTETS,
+} from "../../../src/services/media-service"
 import {
   deleteStatus,
   fetchStatusFeed,
@@ -226,7 +228,9 @@ export default function StatusPage() {
 
   const submitMediaStatus = async (file: File) => {
     if (posting) return
-    if (file.size > 50 * 1024 * 1024) {
+    // La MEME borne que la messagerie et que le serveur. Elle etait ecrite en
+    // dur ici : le jour ou l'une des trois change, les deux autres mentent.
+    if (file.size > TAILLE_MEDIA_MAX_OCTETS) {
       error(t("set_file_too_large"), t("l2_max_50_mb"))
       return
     }
