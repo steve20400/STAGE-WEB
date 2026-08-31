@@ -5652,14 +5652,41 @@ export default function ChatRoomPage() {
   )
 
   /** Nom affichable d'un expediteur : membre du groupe, contact, sinon debut d'UUID. */
+  /**
+   * QUI a ecrit ce message. Le seul endroit qui reponde a cette question.
+   *
+   * ⚠️ LE REPLI NE DOIT JAMAIS ETRE `chat.name`. En groupe, `chat.name` est le
+   * TITRE DU GROUPE : les bulles se signaient « Direction Commerciale » au lieu
+   * du nom de leur auteur. Et comme la recherche dans l'annuaire juste avant
+   * etait DU CODE MORT — elle comparait `Contact.id`, l'identifiant de la
+   * LIGNE d'annuaire, a un `senderId`, l'identifiant de la PERSONNE, deux uuid
+   * qui ne se rencontrent jamais — on tombait sur ce repli a chaque fois qu'un
+   * expediteur manquait aux participants.
+   *
+   * Et il en manque : un membre qui QUITTE le groupe est supprime des
+   * participants (suppression dure cote API, sans date de depart), alors que
+   * ses messages restent. Ses bulles portaient donc le nom du groupe.
+   */
   const resolveSenderName = (senderId: string): string => {
     if (senderId === "me") return t("you")
+
     const backendMember = chat?.membersInfo?.find(
       (m: { id: string; pseudo?: string | null; publicNumber?: string }) => m.id === senderId
     )
     if (backendMember?.pseudo) return backendMember.pseudo
     if (backendMember?.publicNumber) return backendMember.publicNumber
-    return contacts.find((c) => c.id === senderId)?.name ?? chat?.name ?? senderId.slice(0, 8)
+
+    // Par la PERSONNE, et non par la ligne d'annuaire.
+    const duRepertoire = contacts.find((c) => c.userId && c.userId === senderId)?.name
+    if (duRepertoire) return duRepertoire
+
+    // Hors groupe, le titre de la conversation EST le nom du correspondant :
+    // le repli y reste juste.
+    if (!chat?.isGroup) return chat?.name ?? senderId.slice(0, 8)
+
+    // En groupe, mieux vaut avouer qu'on ne sait pas que nommer quelqu'un a
+    // tort. Un identifiant technique ne dit rien non plus a qui lit.
+    return t("chat_member_unknown")
   }
 
   /**
@@ -5915,7 +5942,7 @@ export default function ChatRoomPage() {
               <div className="date-sep-line" />
             </div>
 
-            {items.map((item) => {
+            {items.map((item, indexFil) => {
               if (item.kind === "call") {
                 return <CallEventChip key={`call-${item.call.id}`} call={item.call} />
               }
@@ -5965,9 +5992,30 @@ export default function ChatRoomPage() {
               const msg = item.msg
               const isMe = msg.senderId === "me"
               const reply = msg.replyTo ? messagesById.get(msg.replyTo) : undefined
-              // Resoudre le nom de l'envoyeur pour les groupes
+              /*
+               * LE NOM SUR LE PREMIER MESSAGE D'UNE SERIE SEULEMENT.
+               *
+               * Repeter le nom sous chaque bulle d'un meme auteur bruite le fil
+               * et fait perdre le fil justement — c'est pourquoi toutes les
+               * messageries l'omettent. Une bulle ouvre une serie des que la
+               * precedente vient de quelqu'un d'autre, ou n'est pas une bulle
+               * du tout : un avis d'appel, une grille de medias ou un separateur
+               * de jour coupent la serie, sinon deux messages separes par une
+               * heure de conversation paraitraient consecutifs.
+               *
+               * Le separateur de non-lus coupe aussi : il marque une reprise de
+               * lecture, et le premier message d'apres doit se presenter.
+               */
+              const precedent = indexFil > 0 ? items[indexFil - 1] : undefined
+              const ouvreUneSerie =
+                precedent === undefined ||
+                precedent.kind !== "msg" ||
+                precedent.msg.senderId !== msg.senderId ||
+                msg.id === frontiereNonLus
               const resolvedName =
-                !isMe && chat?.isGroup ? resolveSenderName(msg.senderId) : undefined
+                !isMe && chat?.isGroup && ouvreUneSerie
+                  ? resolveSenderName(msg.senderId)
+                  : undefined
               // Auteur du message cite : affiche en tete du bloc de citation.
               const quotedSenderId = msg.replySnapshot?.senderId ?? reply?.senderId
               const quoteAuthor = quotedSenderId ? resolveSenderName(quotedSenderId) : undefined

@@ -37,6 +37,9 @@ function toFrontContact(c: BackendContact): Contact {
   const name = c.alias?.trim() || c.user.pseudo?.trim() || c.user.publicNumber
   return {
     id: c.id,
+    // L'API l'envoie depuis toujours et on le jetait : sans lui, aucune
+    // recherche par expediteur ne pouvait aboutir.
+    userId: c.user.id,
     name,
     initials: toInitials(name),
     color: pickColor(c.id),

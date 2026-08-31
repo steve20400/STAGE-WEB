@@ -1,7 +1,22 @@
 export type ContactColor = "amber" | "blue" | "violet" | "teal" | "rose"
 
 export interface Contact {
+  /**
+   * Identifiant de la LIGNE d'annuaire — pas celui de la personne.
+   *
+   * ⚠️ Ne JAMAIS le comparer a un `senderId` de message : ce sont deux uuid
+   * distincts (`Contact.id` et `Contact.contactId` en base). Une recherche
+   * `contacts.find((c) => c.id === senderId)` ne peut jamais aboutir ; elle a
+   * existe ici et faisait tomber l'affichage sur le nom du GROUPE.
+   */
   id: string
+  /**
+   * Identifiant de la PERSONNE, celui que portent les messages.
+   *
+   * Facultatif : les contacts de demonstration n'en ont pas, et un contact
+   * range avant que ce champ existe n'en aura pas non plus.
+   */
+  userId?: string
   name: string
   initials: string
   color: ContactColor
