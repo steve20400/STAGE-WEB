@@ -177,7 +177,15 @@ export default function ColleguesPage() {
   const montrerRetour = !deuxColonnes && serviceOuvert !== null && !enRecherche
 
   return (
-    <div className="cl-page">
+    <div className={`cl-page${serviceOuvert || enRecherche ? " detail-ouvert" : ""}`}>
+      {/*
+        LE VOLET GAUCHE PORTE SON EN-TETE ET SA RECHERCHE.
+        Ils vivaient AU-DESSUS des deux colonnes, donc sur toute la largeur de
+        l'ecran : la barre de recherche traversait la page pour filtrer une
+        liste large de 300 px. Meme faute que si la recherche des discussions
+        s'etendait par-dessus la conversation ouverte.
+      */}
+      <div className="cl-volet-gauche">
       <header className="cl-head">
         {montrerRetour && (
           <button
@@ -206,17 +214,12 @@ export default function ColleguesPage() {
         />
       </div>
 
-      <div className="cl-corps">
-        {/* LA GAUCHE. Empile, elle disparait des qu'un service est ouvert ou
-            qu'on cherche — c'est l'ecran d'origine. */}
-        {(deuxColonnes || (!serviceOuvert && !enRecherche)) && (
-          <div className="cl-colonne cl-colonne-services">{rendreServices()}</div>
-        )}
+        <div className="cl-colonne cl-colonne-services">{rendreServices()}</div>
+      </div>
 
-        {/* LA DROITE. Elle porte les membres, les resultats de recherche, ou
-            l'invitation a choisir. Empilee, elle ne parait que lorsqu'elle a
-            quelque chose a dire. */}
-        {(deuxColonnes || serviceOuvert || enRecherche) && (
+      {/* LE VOLET DROIT. Les membres, les resultats de recherche, ou
+          l'invitation a choisir — jamais vide sans le dire. */}
+      <div className="cl-volet-droit">
           <div className="cl-colonne cl-colonne-membres">
             {enRecherche ? (
               rendreCollegues(cherche ? null : resultats, t("colleagues_no_match"))
@@ -239,7 +242,6 @@ export default function ColleguesPage() {
               </div>
             )}
           </div>
-        )}
       </div>
     </div>
   )

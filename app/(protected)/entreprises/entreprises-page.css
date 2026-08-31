@@ -78,3 +78,160 @@
   color: var(--text-muted);
   font-size: 13.5px;
 }
+
+/*
+ * ═══ DEUX VOLETS, SUR LE MODELE DES DISCUSSIONS ═══
+ *
+ * La page etait une colonne unique en pleine largeur : l'en-tete et la
+ * recherche traversaient l'ecran, et une fiche d'entreprise s'etalait sur toute
+ * la largeur avec des tailles pensees pour du plein ecran.
+ *
+ * Memes largeurs que `.chats-split` — 360 px a gauche, le reste a droite — pour
+ * que passer d'un ecran a l'autre ne deplace rien.
+ */
+.ent-page {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  font-family: "DM Sans", sans-serif;
+  color: var(--text-primary);
+}
+
+.ent-volet-gauche {
+  width: 360px;
+  flex-shrink: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+}
+
+.ent-volet-droit {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Chaque volet defile POUR LUI : jamais la page entiere. */
+.ent-liste,
+.ent-detail {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 12px 20px;
+}
+.ent-detail {
+  padding-inline: 18px;
+}
+
+/* La recherche est CONFINEE au volet gauche — c'est tout le defaut rapporte. */
+.ent-search {
+  display: flex;
+  gap: 8px;
+  padding: 0 18px 12px;
+  flex-shrink: 0;
+}
+.ent-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+.ent-search input::placeholder {
+  color: var(--text-faint);
+}
+.ent-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.ent-search button {
+  flex: none;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/*
+ * L'ETAT VIDE, mot pour mot celui des discussions sans conversation ouverte :
+ * deux ecrans voisins qui se vident differemment donnent deux applications.
+ */
+.ent-vide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 40px;
+  background:
+    linear-gradient(var(--motif-overlay), var(--motif-overlay)),
+    url("/motif-bg.png") repeat;
+  background-size:
+    auto,
+    280px auto;
+}
+.ent-vide-badge {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ent-vide-titre {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--text-primary);
+}
+.ent-vide-sous {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+/*
+ * ═══ UN SEUL VOLET A LA FOIS SUR PETIT ECRAN ═══
+ * Meme regle et meme point de bascule que les discussions.
+ */
+@media (max-width: 900px) {
+  .ent-volet-gauche {
+    width: 100%;
+    border-right: none;
+  }
+  .ent-volet-droit {
+    display: none;
+  }
+  .ent-page.detail-ouvert .ent-volet-gauche {
+    display: none;
+  }
+  .ent-page.detail-ouvert .ent-volet-droit {
+    display: flex;
+  }
+}
+
+/* Sur grand ecran la liste reste visible : le retour du volet droit ne sert
+   qu'a refermer une fiche, il garde donc tout son sens — contrairement aux
+   discussions, ou la fleche disparait. */

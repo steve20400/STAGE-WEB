@@ -49,18 +49,30 @@ import "./entreprises-page.css"
  */
 
 /** Où l'on se trouve dans l'annuaire. */
-type Vue =
+/**
+ * CE QUE MONTRE LE VOLET GAUCHE — une liste, toujours.
+ *
+ * Separe du detail, et c'est tout le decoupage : un seul etat forcait la liste
+ * a DISPARAITRE des qu'on ouvrait une fiche, puisque le meme champ portait les
+ * deux. La page ne pouvait donc pas etre a deux volets.
+ */
+type Liste =
   | { niveau: "types" }
   | { niveau: "entreprises"; type: TypeEntreprise }
   | { niveau: "recherche" }
+
+/** CE QUE MONTRE LE VOLET DROIT, ou `null` quand rien n'est choisi. */
+type Detail =
   | { niveau: "fiche"; entreprise: Entreprise }
   | { niveau: "centres"; entreprise: Entreprise; vocal: boolean }
+  | null
 
 export default function EntreprisesPage() {
   const { t } = useTranslation()
   const { error } = useToast()
 
-  const [vue, setVue] = useState<Vue>({ niveau: "types" })
+  const [voletGauche, setVoletGauche] = useState<Liste>({ niveau: "types" })
+  const [detail, setDetail] = useState<Detail>(null)
   const [types, setTypes] = useState<TypeEntreprise[] | null>(null)
   const [liste, setListe] = useState<Entreprise[] | null>(null)
   const [fiche, setFiche] = useState<FicheEntreprise | null>(null)
@@ -83,7 +95,8 @@ export default function EntreprisesPage() {
 
   const ouvrirType = useCallback(async (type: TypeEntreprise) => {
     setListe(null)
-    setVue({ niveau: "entreprises", type })
+    setVoletGauche({ niveau: "entreprises", type })
+    setDetail(null)
     try {
       setListe(await entreprisesDuType(type.id))
     } catch {
@@ -96,7 +109,8 @@ export default function EntreprisesPage() {
     const q = requete.trim()
     if (q === "") return
     setListe(null)
-    setVue({ niveau: "recherche" })
+    setVoletGauche({ niveau: "recherche" })
+    setDetail(null)
     try {
       setListe(await chercherEntreprises(q))
     } catch {
@@ -107,7 +121,7 @@ export default function EntreprisesPage() {
 
   const ouvrirFiche = useCallback(async (entreprise: Entreprise) => {
     setFiche(null)
-    setVue({ niveau: "fiche", entreprise })
+    setDetail({ niveau: "fiche", entreprise })
     try {
       setFiche(await ficheEntreprise(entreprise.id))
     } catch {
@@ -216,7 +230,9 @@ export default function EntreprisesPage() {
     const nbVocal = centres.filter((c) => estVocal(c)).length
 
     return (
-      <div style={{ padding: "0 16px 24px" }}>
+      // Pas de gouttiere ici : `.ent-detail` la porte deja, et les additionner
+      // rentrait le contenu de 34 px au lieu de 18.
+      <div>
         {/* LA DESCRIPTION D'ABORD : on ouvre une entreprise pour savoir ce
             qu'elle fait, avant de choisir un standard. */}
         {entreprise.description ? (
@@ -239,7 +255,7 @@ export default function EntreprisesPage() {
             <button
               type="button"
               onClick={() =>
-                setVue({ niveau: "centres", entreprise, vocal: false })
+                setDetail({ niveau: "centres", entreprise, vocal: false })
               }
               style={{ ...boutonLigne, marginBottom: 8 }}
             >
@@ -257,7 +273,7 @@ export default function EntreprisesPage() {
             <button
               type="button"
               onClick={() =>
-                setVue({ niveau: "centres", entreprise, vocal: true })
+                setDetail({ niveau: "centres", entreprise, vocal: true })
               }
               style={boutonLigne}
             >
@@ -346,85 +362,171 @@ export default function EntreprisesPage() {
     )
   }
 
-  // ── L'en-tête : titre courant et retour ────────────────────────────────
-  const titre =
-    vue.niveau === "types"
+  // ── Les deux en-tetes : chaque volet nomme ce qu'il montre ─────────────
+  const titreGauche =
+    voletGauche.niveau === "types"
       ? t("companies")
-      : vue.niveau === "entreprises"
-        ? vue.type.libelle
-        : vue.niveau === "recherche"
-          ? t("company_search_hint")
-          : vue.niveau === "fiche"
-            ? vue.entreprise.libelle
-            : vue.vocal
-              ? t("company_vocal_centers")
-              : t("company_call_centers")
+      : voletGauche.niveau === "entreprises"
+        ? voletGauche.type.libelle
+        : t("company_search_hint")
 
-  const retour = () => {
-    if (vue.niveau === "centres") setVue({ niveau: "fiche", entreprise: vue.entreprise })
-    else setVue({ niveau: "types" })
+  const titreDroite =
+    detail === null
+      ? ""
+      : detail.niveau === "fiche"
+        ? detail.entreprise.libelle
+        : detail.vocal
+          ? t("company_vocal_centers")
+          : t("company_call_centers")
+
+  /** Retour DANS LE VOLET GAUCHE : d'une liste d'entreprises vers les types. */
+  const retourListe = () => {
+    setVoletGauche({ niveau: "types" })
+    setDetail(null)
+  }
+
+  /**
+   * Retour DANS LE VOLET DROIT. Les centres reviennent a leur fiche ; une fiche
+   * se referme et rend la main a la liste — sur telephone, c'est ce geste qui
+   * ramene au volet gauche.
+   */
+  const retourDetail = () => {
+    if (detail?.niveau === "centres") setDetail({ niveau: "fiche", entreprise: detail.entreprise })
+    else setDetail(null)
   }
 
   return (
-    <section style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
-      <header className="ent-head">
-        {vue.niveau !== "types" ? (
-          <button type="button" className="ent-back" onClick={retour} aria-label={t("back")}>
-            {/* Une fleche, pas le mot traduit : le libelle changeait la largeur
-                du bouton d'une langue a l'autre et poussait le titre. Le mot
-                reste dans `aria-label`, pour qui n'a que la voix. */}
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M15 18l-6-6 6-6"
+    <div className={`ent-page${detail ? " detail-ouvert" : ""}`}>
+      {/*
+        LE VOLET GAUCHE. Il porte SON en-tete et SA recherche : elles vivaient
+        au-dessus de toute la page et s'etendaient sur la largeur de l'ecran
+        pour commander une liste large de 360 px.
+      */}
+      <div className="ent-volet-gauche">
+        <header className="ent-head">
+          {voletGauche.niveau !== "types" ? (
+            <button
+              type="button"
+              className="ent-back"
+              onClick={retourListe}
+              aria-label={t("back")}
+            >
+              {/* Une fleche, pas le mot traduit : le libelle changeait la largeur
+                  du bouton d'une langue a l'autre et poussait le titre. */}
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M15 18l-6-6 6-6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ) : null}
+          <h1>{titreGauche}</h1>
+        </header>
+
+        {/* La recherche ne vaut que pour les listes d'ou l'on peut chercher. */}
+        {voletGauche.niveau === "types" || voletGauche.niveau === "recherche" ? (
+          <div className="ent-search">
+            <input
+              type="search"
+              value={requete}
+              placeholder={t("company_search_hint")}
+              onChange={(e) => setRequete(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void lancerRecherche()
+              }}
+            />
+            <button type="button" onClick={() => void lancerRecherche()}>
+              {t("search")}
+            </button>
+          </div>
+        ) : null}
+
+        <div className="ent-liste">
+          {voletGauche.niveau === "types" && rendreTypes()}
+          {voletGauche.niveau === "entreprises" && rendreEntreprises(t("company_none_here"))}
+          {voletGauche.niveau === "recherche" && rendreEntreprises(t("company_no_match"))}
+        </div>
+      </div>
+
+      {/* LE VOLET DROIT. Vide tant que rien n'est choisi — et il le DIT, au lieu
+          de laisser une moitie d'ecran blanche. */}
+      <div className="ent-volet-droit">
+        {detail === null ? (
+          <div className="ent-vide">
+            <div className="ent-vide-badge" aria-hidden="true">
+              <svg
+                width="34"
+                height="34"
+                viewBox="0 0 24 24"
+                fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        ) : null}
-        <h1>{titre}</h1>
-      </header>
-
-      {/* La recherche n'est offerte qu'aux niveaux de liste : sur une fiche ou
-          des centres, elle n'aurait rien à filtrer et brouillerait le retour. */}
-      {vue.niveau === "types" || vue.niveau === "recherche" ? (
-        <div style={{ padding: "0 16px 12px", display: "flex", gap: 8 }}>
-          <input
-            type="search"
-            value={requete}
-            placeholder={t("company_search_hint")}
-            onChange={(e) => setRequete(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void lancerRecherche()
-            }}
-            style={{ flex: 1, minWidth: 0 }}
-          />
-          <button type="button" onClick={() => void lancerRecherche()}>
-            {t("search")}
-          </button>
-        </div>
-      ) : null}
-
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-        {vue.niveau === "types" && rendreTypes()}
-        {vue.niveau === "entreprises" && rendreEntreprises(t("company_none_here"))}
-        {vue.niveau === "recherche" && rendreEntreprises(t("company_no_match"))}
-        {vue.niveau === "fiche" && rendreFiche(vue.entreprise)}
-        {vue.niveau === "centres" && rendreCentres(vue.vocal)}
+              >
+                <path d="M3 21h18" />
+                <path d="M5 21V7l7-4 7 4v14" />
+                <path d="M9 21v-6h6v6" />
+                <path d="M9 9h.01M15 9h.01M9 12h.01M15 12h.01" />
+              </svg>
+            </div>
+            <div className="ent-vide-titre">{t("companies")}</div>
+            <div className="ent-vide-sous">{t("ent_pick_company")}</div>
+          </div>
+        ) : (
+          <>
+            <header className="ent-head">
+              <button
+                type="button"
+                className="ent-back"
+                onClick={retourDetail}
+                aria-label={t("back")}
+              >
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M15 18l-6-6 6-6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <h1>{titreDroite}</h1>
+            </header>
+            <div className="ent-detail">
+              {detail.niveau === "fiche" && rendreFiche(detail.entreprise)}
+              {detail.niveau === "centres" && rendreCentres(detail.vocal)}
+            </div>
+          </>
+        )}
       </div>
-    </section>
+    </div>
   )
 }
 
+/*
+ * LA LIGNE DE LISTE, calquee sur `.conv-item` des discussions : meme gouttiere
+ * de 12 px, meme espacement, meme rayon. Les deux ecrans doivent se superposer.
+ */
 const boutonLigne: React.CSSProperties = {
   width: "100%",
   display: "flex",
   alignItems: "center",
   gap: 12,
   textAlign: "left",
-  padding: "12px 14px",
+  padding: 12,
+  borderRadius: 11,
+  border: "1px solid transparent",
+  background: "none",
+  color: "inherit",
+  fontFamily: "inherit",
+  fontSize: 14,
+  cursor: "pointer",
 }
 
 const carteCentre: React.CSSProperties = {
