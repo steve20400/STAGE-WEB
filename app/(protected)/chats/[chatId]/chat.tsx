@@ -2796,9 +2796,17 @@ function quotedMediaLabel(msg: Message): string {
 }
 
 /** Meme description, sans pictogramme : les citations posent deja une vignette. */
-function decrireMessageEnLigneSansIcone(msg: Message): string {
+function decrireMessageEnLigneSansIcone(msg: {
+  type: Message["type"]
+  // `string | null` et non `string` : l'instantane d'une citation vient du
+  // serveur, ou un message sans texte porte `null`.
+  content: string | null
+  fileName?: string
+  durationMs?: number
+  isDeleted?: boolean
+}): string {
   return decrireMessage(
-    msg,
+    { ...msg, content: msg.content ?? "" },
     (cle: string, params?: Record<string, string | number>) =>
       traduire(langueInitiale(), cle as never, params),
     (m: unknown) => apercuStructureTraduit(m as Message)
@@ -3277,15 +3285,29 @@ function MessageBubble({
   const quotedAuthorKey = msg.replySnapshot?.senderId ?? replyMsg?.senderId ?? msg.senderId
 
   // Apercu du message cite : snapshot backend en priorite, sinon lookup local.
-  const quote = msg.replySnapshot
+  /*
+   * L'APERCU D'UNE CITATION PASSE PAR LE POINT DE VERITE UNIQUE.
+   *
+   * Il lisait `replySnapshot.content` TEL QUEL. Or une fiche de contact et une
+   * position rangent du JSON dans ce champ : la citation affichait
+   * `{"v":1,"contacts":[{"name":"Jean Dupont",...` en clair. Un vocal, lui,
+   * n'avait droit qu'a « [media] » generique.
+   *
+   * Le fil ne garde que trente messages : des qu'on cite plus haut, `replyMsg`
+   * est absent et c'est CE chemin qui sert. Il n'avait rien d'exceptionnel.
+   *
+   * ⚠️ `replyMsg` D'ABORD quand il est la : l'instantane ne porte ni duree ni
+   * nom de fichier, s'en contenter ferait perdre « (0:42) » et le nom du
+   * document que le chemin complet sait deja afficher.
+   */
+  const sourceCitation = replyMsg ?? msg.replySnapshot ?? undefined
+  const quote = sourceCitation
     ? {
-        content: msg.replySnapshot.isDeleted
-          ? t("message_deleted")
-          : msg.replySnapshot.content || t("f2_media_tag"),
+        // Le repli garde une bulle non vide : la branche par defaut de
+        // `decrireMessage` rend une chaine vide pour un texte sans contenu.
+        content: decrireMessageEnLigneSansIcone(sourceCitation) || t("f2_media_tag"),
       }
-    : replyMsg
-      ? { content: replyMsg.content || t("f2_media_tag") }
-      : undefined
+    : undefined
 
   // Pendant un glisser-pour-repondre, la fleche occupe la meme place que le
   // bouton d'actions : on masque ce dernier le temps du geste.
