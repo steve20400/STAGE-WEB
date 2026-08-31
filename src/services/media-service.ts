@@ -54,3 +54,20 @@ export function formatAudioDuration(durationMs?: number): string {
   const s = totalSec % 60
   return `${m}:${String(s).padStart(2, "0")}`
 }
+
+/**
+ * TAILLE MAXIMALE D'UN MEDIA, EN OCTETS — la meme que celle du serveur.
+ *
+ * ⚠️ L'ECRAN ACCEPTAIT 2 Go LA OU LE SERVEUR EN REFUSE 50 Mo. Un fichier de
+ * 300 Mo passait donc le controle local, se televersait EN ENTIER — plusieurs
+ * minutes sur un reseau mobile, et autant de donnees payees — puis revenait en
+ * 413. L'utilisateur payait le transfert d'un fichier qui n'avait aucune chance
+ * d'etre accepte, et rien ne le lui disait avant la fin.
+ *
+ * `MEDIA_MAX_SIZE_MB` cote serveur vaut 50 par defaut (`src/lib/env.ts`). Si tu
+ * la changes la-bas, change-la ICI : les deux bornes doivent rester egales,
+ * sinon l'une des deux ment. Refuser un peu tot vaut mieux que refuser trop
+ * tard — un fichier refuse a l'ecran ne coute rien.
+ */
+export const TAILLE_MEDIA_MAX_MO = 50
+export const TAILLE_MEDIA_MAX_OCTETS = TAILLE_MEDIA_MAX_MO * 1024 * 1024

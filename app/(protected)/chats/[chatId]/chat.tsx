@@ -57,6 +57,8 @@ import {
 } from "../../../../src/services/chats-service"
 import {
   formatAudioDuration,
+  TAILLE_MEDIA_MAX_MO,
+  TAILLE_MEDIA_MAX_OCTETS,
   resolveMediaUrl,
   uploadMedia,
 } from "../../../../src/services/media-service"
@@ -5575,11 +5577,11 @@ export default function ChatRoomPage() {
     if (!files || files.length === 0) return
     setShowAttach(false)
     const toSend = Array.from(files)
-    const oversized = toSend.filter((f) => f.size > 2000 * 1024 * 1024)
+    const oversized = toSend.filter((f) => f.size > TAILLE_MEDIA_MAX_OCTETS)
     if (oversized.length > 0) {
-      error(t("f2_files_too_large"), t("f2_files_over_limit", { count: oversized.length }))
+      error(t("f2_files_too_large"), t("f2_files_over_limit", { count: oversized.length, max: TAILLE_MEDIA_MAX_MO }))
     }
-    const valid = toSend.filter((f) => f.size <= 2000 * 1024 * 1024)
+    const valid = toSend.filter((f) => f.size <= TAILLE_MEDIA_MAX_OCTETS)
     const prepared: PendingMedia[] = []
     for (const file of valid) {
       const kind = mediaKindFromFile(file)
