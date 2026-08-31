@@ -2008,6 +2008,13 @@ interface PendingMedia {
    * `null` pour tout ce qui n'est pas une image.
    */
   compression: Promise<ResultatCompression> | null
+  /**
+   * L'utilisateur a demande d'envoyer CE fichier tel quel.
+   *
+   * Par fichier et non par conversation : dans un meme lot, on envoie souvent
+   * trois photos ordinaires et un contrat photographie.
+   */
+  garderOriginal?: boolean
 }
 
 /** Ce dont un apercu plein contenu a besoin, qu'il vienne du disque ou du serveur. */
@@ -2461,6 +2468,7 @@ function MediaComposer({
   onRemove,
   onCancel,
   onSend,
+  onBasculerOriginal,
 }: {
   items: PendingMedia[]
   index: number
@@ -2469,9 +2477,35 @@ function MediaComposer({
   onRemove: (index: number) => void
   onCancel: () => void
   onSend: () => void
+  onBasculerOriginal: (index: number) => void
 }) {
   const { t } = useTranslation()
   const current = items[index]
+  /*
+   * CE QUE L'ENVOI VA COUTER, DIT AVANT DE L'ENVOYER.
+   *
+   * Les messageries grand public compressent en silence : l'utilisateur ne
+   * sait pas que sa photo a ete reduite, et decouvre le probleme quand son
+   * correspondant n'arrive pas a lire le document photographie. Ici on
+   * ANNONCE le gain, et on laisse revenir en arriere d'un appui.
+   *
+   * C'est un choix d'application PROFESSIONNELLE : on y photographie des
+   * factures, des contrats, des releves. Le cas « ce cliche doit rester
+   * lisible » n'est pas marginal, il est quotidien.
+   */
+  const [gain, setGain] = useState<ResultatCompression | null>(null)
+  useEffect(() => {
+    let vivant = true
+    setGain(null)
+    current?.compression
+      ?.then((r) => {
+        if (vivant) setGain(r)
+      })
+      .catch(() => undefined)
+    return () => {
+      vivant = false
+    }
+  }, [current])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -2652,6 +2686,46 @@ function MediaComposer({
           flexShrink: 0,
         }}
       >
+        {/*
+          LE GAIN, ANNONCE — et un appui pour y renoncer.
+          Ne parait que si la compression a REELLEMENT reduit quelque chose :
+          une ligne « 280 Ko → 280 Ko » serait du bruit.
+        */}
+        {gain?.compresse && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 8,
+              fontSize: 12,
+              color: "rgba(255,255,255,0.72)",
+            }}
+          >
+            <span>
+              {current.garderOriginal
+                ? formatBytes(gain.tailleAvant)
+                : `${formatBytes(gain.tailleAvant)} → ${formatBytes(gain.tailleApres)}`}
+            </span>
+            <button
+              type="button"
+              onClick={() => onBasculerOriginal(index)}
+              style={{
+                border: 0,
+                borderRadius: 7,
+                padding: "3px 9px",
+                fontFamily: "inherit",
+                fontSize: 11.5,
+                fontWeight: 600,
+                cursor: "pointer",
+                background: current.garderOriginal ? "var(--accent)" : "rgba(255,255,255,0.16)",
+                color: current.garderOriginal ? "var(--accent-text)" : "#fff",
+              }}
+            >
+              {t("media_qualite_originale")}
+            </button>
+          </div>
+        )}
         <textarea
           value={current.caption}
           onChange={(e) => onCaptionChange(index, e.target.value)}
@@ -5593,7 +5667,32 @@ export default function ChatRoomPage() {
     const toSend = Array.from(files)
     const oversized = toSend.filter((f) => f.size > TAILLE_MEDIA_MAX_OCTETS)
     if (oversized.length > 0) {
-      error(t("f2_files_too_large"), t("f2_files_over_limit", { count: oversized.length, max: TAILLE_MEDIA_MAX_MO }))
+      /*
+       * UN REFUS QUI EXPLIQUE, au lieu d'un refus qui constate.
+       *
+       * Une video de 30 s en 1080p — la qualite par defaut de tout telephone —
+       * pese 65 a 75 Mo et ne PEUT PAS passer. L'utilisateur ne le devine pas :
+       * il voit son envoi refuse sans comprendre, recommence, et echoue encore.
+       *
+       * On dit donc le poids REEL du fichier, la limite, et surtout CE QU'IL
+       * FAUT FAIRE — filmer plus court, ou baisser la qualite dans l'appareil
+       * photo. Un message qui ne donne pas d'issue ne sert a rien.
+       */
+      const videoTropLourde = oversized.find((f) => mediaKindFromFile(f) === "video")
+      if (videoTropLourde && oversized.length === 1) {
+        error(
+          t("f2_files_too_large"),
+          t("media_video_trop_lourde", {
+            taille: formatBytes(videoTropLourde.size) ?? "",
+            max: TAILLE_MEDIA_MAX_MO,
+          })
+        )
+      } else {
+        error(
+          t("f2_files_too_large"),
+          t("f2_files_over_limit", { count: oversized.length, max: TAILLE_MEDIA_MAX_MO })
+        )
+      }
     }
     const valid = toSend.filter((f) => f.size <= TAILLE_MEDIA_MAX_OCTETS)
     const prepared: PendingMedia[] = []
@@ -5676,7 +5775,9 @@ export default function ChatRoomPage() {
       for (const item of lot) {
         // `compression` ne rejette jamais : elle rend l'original en cas de
         // doute. Le `catch` n'est la que si une refonte future l'oubliait.
-        const pret = await item.compression?.catch(() => null)
+        const pret = item.garderOriginal
+          ? null
+          : await item.compression?.catch(() => null)
         const fichier = pret?.fichier ?? item.file
         await sendMediaMessage(
           fichier,
@@ -6830,6 +6931,13 @@ export default function ChatRoomPage() {
           onRemove={removePendingMedia}
           onCancel={closeMediaComposer}
           onSend={sendPendingMedia}
+          onBasculerOriginal={(index) =>
+            setPendingMedia((prev) =>
+              prev.map((item, i) =>
+                i === index ? { ...item, garderOriginal: !item.garderOriginal } : item
+              )
+            )
+          }
         />
       )}
 
