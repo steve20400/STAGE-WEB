@@ -16,6 +16,7 @@ import {
   leaveGroup as leaveGroupApi,
   removeGroupMember,
   setGroupMemberRole,
+  definirSourdine,
 } from "../../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { getMyUserId } from "../../../../src/data/session-user"
@@ -58,6 +59,11 @@ interface SharedFile {
 
 interface ConvInfo {
   id: string
+  /**
+   * Notifications coupees pour MOI. Facultatif : le panneau part de « non »
+   * quand l'appelant ne le renseigne pas.
+   */
+  sourdine?: boolean
   name: string
   initials: string
   /** Photo de profil de l'interlocuteur, ou du groupe. */
@@ -145,11 +151,26 @@ interface ConvInfoPanelProps {
 
 export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanelProps) {
   const navigate = useNavigate()
-  const { success, warning, info } = useToast()
+  const { success, warning, info, error } = useToast()
   const conv = propInfo
 
   const [tab, setTab] = useState<"membres" | "fichiers">("membres")
-  const [muteNotifs, setMute] = useState(false)
+  /**
+   * Notifications coupees pour cette conversation.
+   *
+   * ⚠️ SEMEE PAR LE SERVEUR, et non partie de `false`. Cet interrupteur ne
+   * commandait rien : un etat local, un message « Conversation mise en
+   * sourdine », et aucune trace nulle part. Le panneau etant demonte a sa
+   * fermeture, l'etat ne survivait meme pas a l'ecran — on rouvrait et
+   * l'interrupteur etait revenu tout seul.
+   */
+  const [muteNotifs, setMute] = useState(Boolean(propInfo?.sourdine))
+  const [sourdineEnCours, setSourdineEnCours] = useState(false)
+  // La conversation peut arriver APRES le premier rendu : sans ceci,
+  // l'interrupteur resterait sur son etat de depart.
+  useEffect(() => {
+    if (propInfo?.sourdine !== undefined) setMute(propInfo.sourdine)
+  }, [propInfo?.sourdine])
   /**
    * Traduction automatique de cette conversation. Lecture paresseuse : la
    * fonction touche `localStorage`, et ce panneau se remonte a chaque ouverture.
@@ -673,9 +694,25 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               <button
                 className="tgl"
                 style={{ background: muteNotifs ? "var(--accent)" : "var(--border-default)" }}
+                disabled={sourdineEnCours}
                 onClick={() => {
-                  setMute((value) => !value)
-                  info(muteNotifs ? t("cinfo_unmuted_toast") : t("cinfo_muted_toast"))
+                  if (sourdineEnCours) return
+                  const vise = !muteNotifs
+                  setSourdineEnCours(true)
+                  // On bascule tout de suite — un interrupteur doit repondre au
+                  // doigt — mais on REVIENT si le serveur refuse : mieux vaut un
+                  // retour en arriere visible qu'un reglage qu'on croit pose.
+                  setMute(vise)
+                  void definirSourdine(convId ?? conv?.id ?? "", vise)
+                    .then((retenu) => {
+                      setMute(retenu)
+                      info(retenu ? t("cinfo_muted_toast") : t("cinfo_unmuted_toast"))
+                    })
+                    .catch(() => {
+                      setMute(!vise)
+                      error(t("server_unreachable"))
+                    })
+                    .finally(() => setSourdineEnCours(false))
                 }}
                 aria-checked={muteNotifs}
                 role="switch"
@@ -1133,6 +1170,9 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
       members,
       files: [],
       createdAt: "",
+      // L'etat REEL de la sourdine, celui du serveur. L'interrupteur partait de
+      // « non » a chaque ouverture, quel que soit le reglage enregistre.
+      sourdine: conv.sourdine,
       // Pas de description ici : le nombre de membres se compose au rendu, donc
       // il suit la langue choisie meme apres coup.
     }

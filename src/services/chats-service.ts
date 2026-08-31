@@ -80,6 +80,14 @@ interface BackendConversation {
     createdAt: string
   } | null
   unread?: number
+  /**
+   * Notifications coupees pour MOI dans cette conversation.
+   *
+   * Facultatif : un backend anterieur ne l'envoie pas, et l'interrupteur part
+   * alors de « non ». Il ne coupe que la POUSSEE — la conversation continue de
+   * se mettre a jour en direct chez qui la regarde.
+   */
+  sourdine?: boolean
   /** Verrou pose par un appareil du compte courant, ou null. */
   lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null
   updatedAt?: string
@@ -165,6 +173,7 @@ function toFrontConversation(c: BackendConversation): ConversationListItem {
     lastMessageType: mapLastMessageType(c.lastMessage?.type),
     time: formatTime(c.updatedAt ?? c.lastMessage?.createdAt),
     unread: c.unread ?? 0,
+    sourdine: c.sourdine ?? false,
     online: peer?.isOnline === 1,
     isGroup: Boolean(c.isGroup),
     members: c.members?.map((m) => toInitials(m.pseudo ?? m.publicNumber)),
@@ -369,4 +378,27 @@ export async function leaveGroup(convId: string) {
 
 export async function deleteGroupConversation(convId: string) {
   return apiRequest(`/api/conversations/${convId}/delete`, { method: "DELETE" })
+}
+
+/**
+ * Coupe ou retablit les notifications de cette conversation, POUR MOI.
+ *
+ * ⚠️ L'interrupteur qui appelait ceci n'existait pas : il basculait un etat
+ * local, annoncait « Conversation mise en sourdine », et rien n'etait envoye
+ * nulle part. Le panneau etant demonte a sa fermeture, l'etat ne survivait meme
+ * pas a l'ecran — et l'utilisateur continuait d'etre notifie en croyant le
+ * contraire.
+ *
+ * Rend l'etat RETENU PAR LE SERVEUR, et non celui qu'on esperait : c'est lui
+ * que l'ecran doit afficher.
+ */
+export async function definirSourdine(
+  conversationId: string,
+  sourdine: boolean
+): Promise<boolean> {
+  const reponse = await apiRequest<{ convId: string; sourdine: boolean }>(
+    `/api/conversations/${conversationId}/sourdine`,
+    { method: "POST", body: JSON.stringify({ sourdine }) }
+  )
+  return reponse.sourdine
 }

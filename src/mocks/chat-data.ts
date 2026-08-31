@@ -31,6 +31,13 @@ export interface ConversationMock {
   lastMessageType: MessageType
   time: string
   unread: number
+  /**
+   * Notifications coupees pour MOI dans cette conversation.
+   *
+   * Facultatif : absent d'un backend anterieur et des conversations de
+   * demonstration. L'interrupteur part alors de « non ».
+   */
+  sourdine?: boolean
   online: boolean
   isGroup: boolean
   /**
