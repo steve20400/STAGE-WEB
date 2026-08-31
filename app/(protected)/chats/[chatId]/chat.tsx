@@ -39,6 +39,7 @@ import {
   sendChatMessage,
   toFrontMessage,
 } from "../../../../src/services/messages-service"
+import { decrireMessage } from "../../../../src/lib/apercu-message"
 import {
   contactsDepuisContenu,
   nomAffichable,
@@ -2776,16 +2777,32 @@ function apercuStructureTraduit(msg: Message): string | null {
   return null
 }
 
+/**
+ * Libelle d'un message cite.
+ *
+ * ⚠️ CETTE FONCTION NE DECIDE PLUS RIEN — elle delegue a `decrireMessage`, le
+ * point de verite unique. Elle decidait auparavant, et se trompait : le repli
+ * sur `msg.fileName` passait AVANT le test du type, si bien qu'un VOCAL cite
+ * affichait « vocal-1756492013.webm ». Le nom avait pourtant deja ete retire de
+ * la bulle ; la citation suivait un autre chemin, et personne ne l'avait suivi
+ * jusqu'au bout.
+ *
+ * Un nom de fichier n'est garde que pour un DOCUMENT, ou il est ce qu'on
+ * cherche. Pour un vocal, une photo ou une video, il est fabrique par l'appareil
+ * et ne decrit rien.
+ */
 function quotedMediaLabel(msg: Message): string {
-  const structure = apercuStructureTraduit(msg)
-  if (structure) return structure
-  const caption = msg.content?.trim()
-  if (caption) return caption
-  if (msg.fileName) return msg.fileName
-  if (msg.type === "image") return traduire(langueInitiale(), "photo")
-  if (msg.type === "video") return traduire(langueInitiale(), "video_label")
-  if (msg.type === "audio") return traduire(langueInitiale(), "voice_message")
-  return traduire(langueInitiale(), "file")
+  return decrireMessageEnLigneSansIcone(msg)
+}
+
+/** Meme description, sans pictogramme : les citations posent deja une vignette. */
+function decrireMessageEnLigneSansIcone(msg: Message): string {
+  return decrireMessage(
+    msg,
+    (cle: string, params?: Record<string, string | number>) =>
+      traduire(langueInitiale(), cle as never, params),
+    (m: unknown) => apercuStructureTraduit(m as Message)
+  ).texte
 }
 
 /**
