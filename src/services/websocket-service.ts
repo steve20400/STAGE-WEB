@@ -1080,6 +1080,50 @@ export interface MessageEditedEvent {
  * symptome « il faut rafraichir pour voir la modification », qui ne venait ni
  * du serveur, ni de l'emetteur, mais de ce seul trou d'ecoute.
  */
+/** Un message vient d'etre epingle, ou detache. */
+export interface MessagePinnedEvent {
+  convId: string
+  /**
+   * Le message epingle, ou `null` pour un DETACHEMENT.
+   *
+   * ⚠️ `null` EST UNE VALEUR VALIDE, et non une trame incomplete a jeter. Le
+   * serveur detache en diffusant ce meme verbe avec `messageId: null` — copier
+   * le garde-fou de `subscribeToMessageEdited`, qui refuse une trame sans
+   * contenu, donnerait un epinglage qui marche et un detachement qui ne se
+   * propage JAMAIS. Le bandeau resterait alors chez tous les autres.
+   */
+  messageId: string | null
+}
+
+/**
+ * S'abonne aux epinglages d'une conversation.
+ *
+ * ⚠️ RIEN A AJOUTER DANS `CALL_EVENT_TYPES` NI `MEETING_EVENT_TYPES` : ces deux
+ * ensembles filtrent les appels et les salles, pas les messages. La reception
+ * generale, elle, ne filtre rien — le verbe arrivait donc deja dans le
+ * navigateur, et personne ne l'ecoutait. C'est tout le defaut : `message_pinned`
+ * n'apparaissait dans AUCUN fichier du depot web, alors que l'API, la base et le
+ * mobile le traitent depuis toujours.
+ */
+export function subscribeToMessagePinned(
+  conversationId: string,
+  handler: (event: MessagePinnedEvent) => void
+): () => void {
+  return addListener((event) => {
+    if (event.type !== "message_pinned" || event.convId !== conversationId) return
+    const brut = event.messageId
+    handler({
+      convId: conversationId,
+      messageId: typeof brut === "string" && brut.length > 0 ? brut : null,
+    })
+  })
+}
+
+/** Epingle un message, ou detache celui qui l'est (`null`). */
+export function publishPinMessage(conversationId: string, messageId: string | null) {
+  sendRaw({ type: "pin_message", convId: conversationId, messageId })
+}
+
 export function subscribeToMessageEdited(
   conversationId: string,
   handler: (event: MessageEditedEvent) => void

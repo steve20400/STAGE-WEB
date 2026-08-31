@@ -38,6 +38,8 @@ import {
   removeMessageFromDB,
   sendChatMessage,
   toFrontMessage,
+  fetchPinnedMessage,
+  definirMessageEpingle,
 } from "../../../../src/services/messages-service"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
 import {
@@ -72,6 +74,7 @@ import {
   subscribeToMessageEdited,
   subscribeToPresence,
   subscribeToStatus,
+  subscribeToMessagePinned,
   subscribeToTyping,
   subscribeToWsConnected,
 } from "../../../../src/services/websocket-service"
@@ -3160,6 +3163,8 @@ function MessageBubble({
   onCopy,
   isGroup,
   nbLectures,
+  estEpingle,
+  onTogglePin,
   senderName,
   quoteAuthor,
   onJumpToMessage,
@@ -3191,6 +3196,10 @@ function MessageBubble({
    * seulement. `undefined` hors groupe : la bulle n'affiche alors rien de plus.
    */
   nbLectures?: number
+  /** Ce message est celui qui est epingle dans la conversation. */
+  estEpingle?: boolean
+  /** Epingle (id) ou detache (`null`). Absent = l'action n'est pas proposee. */
+  onTogglePin?: (messageId: string | null) => void
 }) {
   // Les actions n'apparaissent pas au survol immediat : le bouton surgissait
   // dans la rangee et decalait la bulle a chaque passage de souris. Il est
@@ -3658,6 +3667,15 @@ function MessageBubble({
                       : null}
                   {msg.type === "audio" && mediaSrc
                     ? menuItem(t("download_audio"), downloadAudio)
+                    : null}
+                  {/* EPINGLER : collectif, visible par toute la conversation.
+                    L'API, la base et le mobile le font depuis toujours ; seul le
+                    web l'ignorait. Le meme bouton detache, parce qu'il n'y a
+                    qu'UN epingle par conversation — epingler ailleurs remplace. */}
+                  {onTogglePin && !msg.isDeleted
+                    ? menuItem(estEpingle ? t("chat_unpin") : t("chat_pin"), () =>
+                        onTogglePin(estEpingle ? null : msg.id)
+                      )
                     : null}
                   {menuItem(t("forward"), () => onForward(msg))}
                   {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
@@ -4615,6 +4633,17 @@ export default function ChatRoomPage() {
    * Sans la semence, le compteur repartirait de zero a chaque rechargement.
    */
   const [lecturesParMembre, setLecturesParMembre] = useState<Record<string, number>>({})
+  /**
+   * LE MESSAGE EPINGLE de la conversation, ou `null`.
+   *
+   * ⚠️ UN SEUL par conversation : le serveur range `pinnedMessageId` sur la
+   * conversation, epingler ailleurs REMPLACE. Ce n'est pas une limite du web.
+   *
+   * Toute la mecanique existait cote API, base et mobile ; le web ignorait
+   * simplement le verbe `message_pinned` — il n'apparaissait dans aucun de ses
+   * fichiers. La trame arrivait pourtant bien dans le navigateur.
+   */
+  const [messageEpingle, setMessageEpingle] = useState<string | null>(null)
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
@@ -4872,6 +4901,20 @@ export default function ChatRoomPage() {
 
     // Abonnement aux accuses de lecture : l'autre a ouvert la conversation,
     // tous nos messages envoyes passent en "lu".
+    // L'epingle courant, a l'ouverture. Les trames ne racontent que la suite.
+    void fetchPinnedMessage(chatId)
+      .then((m) => {
+        if (!cancelled) setMessageEpingle(m?.id ?? null)
+      })
+      .catch(() => undefined)
+
+    const unsubscribeEpingle = subscribeToMessagePinned(chatId, (event) => {
+      if (cancelled) return
+      // `null` = detachement, une valeur VALIDE : la refuser laisserait le
+      // bandeau en place chez tous les autres.
+      setMessageEpingle(event.messageId)
+    })
+
     const unsubscribeStatus = subscribeToStatus(chatId, (event) => {
       if (cancelled) return
       if (myId && event.readBy === myId) return // c'est nous qui avons lu
@@ -4899,6 +4942,12 @@ export default function ChatRoomPage() {
     // Abonnement aux suppressions de messages (pour moi / pour tous)
     const unsubscribeDeleted = subscribeToMessageDeleted(chatId, (event) => {
       if (cancelled) return
+      // BANDEAU FANTOME : supprimer un message ne detache pas l'epingle cote
+      // serveur — `handleDeleteMessage` ne touche pas `pinnedMessageId`. Sans
+      // cette ligne, le bandeau resterait sur un message qui n'existe plus, et
+      // le clic ne menerait nulle part. Le mobile porte ce defaut ; on ne
+      // l'herite pas.
+      setMessageEpingle((actuel) => (actuel === event.messageId ? null : actuel))
       // Supprime aussi du cache IndexedDB
       void removeMessageFromDB(event.messageId)
       setMessages((prev) => {
@@ -4982,6 +5031,7 @@ export default function ChatRoomPage() {
       unsubscribeMessages()
       unsubscribeTyping()
       unsubscribeStatus()
+      unsubscribeEpingle()
       unsubscribePresence()
       unsubscribeDeleted()
       unsubscribeEdited()
@@ -5760,6 +5810,24 @@ export default function ChatRoomPage() {
     return n > 0 ? n : undefined
   }
 
+  /**
+   * Epingle un message, ou detache celui qui l'est.
+   *
+   * On ne pose RIEN en optimiste : `handlePinMessage` echoue en SILENCE cote
+   * serveur — il sort sans repondre quand le message est introuvable ou qu'on
+   * n'est pas participant. Un bandeau pose d'avance resterait alors affiche sur
+   * un epinglage qui n'a jamais eu lieu. C'est l'echo du serveur qui fait foi,
+   * et il nous revient aussi : l'emetteur est dans la liste des destinataires.
+   */
+  const basculerEpingle = useCallback(
+    (messageId: string | null) => {
+      void definirMessageEpingle(chatId, messageId).catch(() => {
+        error(t("server_unreachable"))
+      })
+    },
+    [chatId, error, t]
+  )
+
   const resolveSenderName = (senderId: string): string => {
     if (senderId === "me") return t("you")
 
@@ -6009,6 +6077,41 @@ export default function ChatRoomPage() {
         </div>
       </div>
 
+      {/*
+        LE BANDEAU DU MESSAGE EPINGLE, au-dessus du fil et HORS de lui : dans le
+        corps defilant, il s'en irait avec le defilement — or son interet est
+        justement de rester sous les yeux.
+
+        Il ne s'affiche que si le message est CHARGE. Le fil ne garde que trente
+        messages : un epingle plus ancien n'est pas la, et le serveur ne rend ni
+        sa duree ni son nom de fichier. Afficher « [media] » a la place du
+        libelle serait moins utile que ne rien afficher — et le clic n'aurait
+        nulle part ou aller.
+      */}
+      {messageEpingle &&
+        (() => {
+          const cible = messagesById.get(messageEpingle)
+          if (!cible) return null
+          return (
+            <button
+              type="button"
+              className="bandeau-epingle"
+              onClick={() => jumpToMessage(messageEpingle)}
+              title={t("chat_pinned_banner")}
+            >
+              <span className="bandeau-epingle-icone" aria-hidden="true">
+                📌
+              </span>
+              <span className="bandeau-epingle-textes">
+                <span className="bandeau-epingle-titre">{t("chat_pinned_banner")}</span>
+                <span className="bandeau-epingle-apercu">
+                  {decrireMessageEnLigneSansIcone(cible)}
+                </span>
+              </span>
+            </button>
+          )
+        })()}
+
       <div ref={messagesBodyRef} className="room-body" onScroll={handleMessagesScroll}>
         {/* Etat du chargement de l'historique ancien, en haut du fil. Rien ne
             s'affiche quand tout est charge : un « debut de la conversation »
@@ -6139,6 +6242,8 @@ export default function ChatRoomPage() {
                     onCopy={handleCopy}
                     isGroup={chat?.isGroup}
                     nbLectures={compterLectures(msg)}
+                    estEpingle={messageEpingle === msg.id}
+                    onTogglePin={basculerEpingle}
                     senderName={resolvedName}
                     quoteAuthor={quoteAuthor}
                     onJumpToMessage={jumpToMessage}

@@ -5,6 +5,7 @@ import { getMyUserId } from "../data/session-user"
 import {
   forwardMessageOverSocket,
   publishRead,
+  publishPinMessage,
   sendDeleteMessage,
   sendMessageOverSocket,
   type WsMessagePayload,
@@ -580,5 +581,42 @@ export async function applyMessageEditToCache(
   } catch {
     // IndexedDB indisponible (navigation privee, quota) : l'etat React reste
     // juste, seul le cache est en retard. Rien a signaler a l'utilisateur.
+  }
+}
+
+/* ----------------- Message epingle ----------------- */
+
+/** Le message epingle d'une conversation, ou `null`. */
+export async function fetchPinnedMessage(
+  chatId: string
+): Promise<{ id: string; senderId: string; content: string | null; type: string } | null> {
+  const reponse = await apiRequest<{
+    pinnedMessageId: string | null
+    message: { id: string; senderId: string; content: string | null; type: string } | null
+  }>(`/api/conversations/${chatId}/pinned`)
+  return reponse.message ?? null
+}
+
+/**
+ * Epingle un message, ou detache celui qui l'est (`null`).
+ *
+ * DEUX CHEMINS, comme le mobile : la socket d'abord — c'est elle qui previent
+ * les autres — et le REST en repli. `handlePinMessage` ECHOUE EN SILENCE cote
+ * serveur (il sort sans repondre quand le message est introuvable ou qu'on n'est
+ * pas participant) : sans le repli, un epinglage rate ne laisserait aucune
+ * trace, ni erreur ni changement.
+ */
+export async function definirMessageEpingle(
+  chatId: string,
+  messageId: string | null
+): Promise<void> {
+  publishPinMessage(chatId, messageId)
+  try {
+    await apiRequest<void>(`/api/conversations/${chatId}/pin-message`, {
+      method: "POST",
+      body: JSON.stringify({ messageId }),
+    })
+  } catch {
+    // La socket a peut-etre suffi ; l'echo du serveur fera foi.
   }
 }
