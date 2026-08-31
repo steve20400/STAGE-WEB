@@ -61,6 +61,13 @@ interface BackendConversation {
     pseudo: string | null
     publicNumber: string
     role?: string
+    /**
+     * Jusqu'ou ce membre a lu. `null` = il n'a jamais ouvert la conversation.
+     *
+     * Facultatif : un backend anterieur ne l'envoie pas, et le compteur se
+     * contente alors des lectures observees en direct.
+     */
+    lastReadAt?: string | null
     /** 1 = en ligne. Masque a 0 par le backend si le pair cache sa presence. */
     isOnline?: number
     lastSeen?: string | null

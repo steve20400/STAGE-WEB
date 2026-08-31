@@ -3159,6 +3159,7 @@ function MessageBubble({
   onForward,
   onCopy,
   isGroup,
+  nbLectures,
   senderName,
   quoteAuthor,
   onJumpToMessage,
@@ -3185,6 +3186,11 @@ function MessageBubble({
   onOpenAlbum?: (index: number) => void
   /** Traduction automatique active pour cette discussion (reglage par appareil). */
   autoTraduction: boolean
+  /**
+   * Combien de membres ont lu CE message. Groupe seulement, mes messages
+   * seulement. `undefined` hors groupe : la bulle n'affiche alors rien de plus.
+   */
+  nbLectures?: number
 }) {
   // Les actions n'apparaissent pas au survol immediat : le bouton surgissait
   // dans la rangee et decalait la bulle a chaque passage de souris. Il est
@@ -4455,6 +4461,17 @@ function MessageBubble({
                     <span style={{ fontStyle: "italic" }}>{t("thr_message_modifie")}</span>
                   )}
                   {formatTime(msg.timestamp)}
+                  {/*
+                    LE COMPTEUR DE LECTURES, EN GROUPE SEULEMENT.
+                    Deux coches ne disent rien d'utile a douze : « lu » par qui ?
+                    Le nombre repond, et il ne se laisse pas bloquer par un membre
+                    qui a coupe ses accuses — il n'est simplement pas compte.
+                    Masque a zero : « 0 lu » sous chaque message fraichement
+                    envoye serait un reproche permanent.
+                  */}
+                  {isMe && isGroup && nbLectures !== undefined && nbLectures > 0 && (
+                    <span style={{ opacity: 0.9 }}>{t("chat_read_count", { n: nbLectures })}</span>
+                  )}
                   {isMe && <StatusIcon status={msg.status} />}
                 </span>
               )}
@@ -4526,7 +4543,18 @@ export default function ChatRoomPage() {
     setChatLoading(true)
     void fetchConversationById(chatId)
       .then((conv) => {
-        if (!cancelled) setBackendChat(conv)
+        if (!cancelled) {
+          setBackendChat(conv)
+          // Semence du compteur : ce que les membres avaient deja lu AVANT
+          // qu'on ouvre. Les trames `read` ne racontent que la suite.
+          const semence: Record<string, number> = {}
+          for (const m of conv?.membersInfo ?? []) {
+            const brut = (m as { lastReadAt?: string | null }).lastReadAt
+            const quand = brut ? Date.parse(brut) : NaN
+            if (Number.isFinite(quand)) semence[m.id] = quand
+          }
+          setLecturesParMembre(semence)
+        }
       })
       .catch(() => {
         if (!cancelled) setBackendChat(null)
@@ -4573,6 +4601,20 @@ export default function ChatRoomPage() {
   // presence ou que l'evenement n'est pas encore arrive.
   const [peerPresence, setPeerPresence] = useState<boolean | null>(null)
   const [lastPeerActivity, setLastPeerActivity] = useState<number | null>(null)
+  /**
+   * JUSQU'OU CHAQUE MEMBRE A LU, en millisecondes.
+   *
+   * Sert au compteur « N lu » des groupes. Le choix du compteur plutot que des
+   * deux coches bleues n'est pas cosmetique : la regle « tous ont lu » se laisse
+   * BLOQUER PAR UN SEUL membre qui a desactive ses accuses de lecture — son
+   * `lastReadAt` n'avance jamais, et les coches du groupe entier ne
+   * passeraient plus, sans que personne comprenne pourquoi. Un compteur ne se
+   * bloque pas : le discret n'est simplement pas compte.
+   *
+   * Semee par `membersInfo` a l'ouverture, puis avancee par les trames `read`.
+   * Sans la semence, le compteur repartirait de zero a chaque rechargement.
+   */
+  const [lecturesParMembre, setLecturesParMembre] = useState<Record<string, number>>({})
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
@@ -4834,6 +4876,13 @@ export default function ChatRoomPage() {
       if (cancelled) return
       if (myId && event.readBy === myId) return // c'est nous qui avons lu
       setLastPeerActivity(Date.now())
+      // Jusqu'ou CE membre a lu. C'est ce qui alimente le compteur en groupe.
+      const quand = event.at
+      if (quand !== undefined) {
+        setLecturesParMembre((prev) =>
+          (prev[event.readBy] ?? 0) >= quand ? prev : { ...prev, [event.readBy]: quand }
+        )
+      }
       setMessages((prev) =>
         prev.map((m) => (m.senderId === "me" && m.status !== "read" ? { ...m, status: "read" } : m))
       )
@@ -5689,6 +5738,28 @@ export default function ChatRoomPage() {
    * participants (suppression dure cote API, sans date de depart), alors que
    * ses messages restent. Ses bulles portaient donc le nom du groupe.
    */
+  /**
+   * COMBIEN DE MEMBRES ONT LU CE MESSAGE.
+   *
+   * Un membre l'a lu si sa derniere lecture est POSTERIEURE a l'envoi. On
+   * s'exclut soi-meme : lire son propre message ne veut rien dire.
+   *
+   * Rend `undefined` hors groupe — deux coches y suffisent, elles designent la
+   * seule personne d'en face — et quand personne n'a encore lu, pour ne pas
+   * ecrire « 0 lu » sous chaque message tout juste envoye.
+   */
+  const compterLectures = (msg: Message): number | undefined => {
+    if (!chat?.isGroup || msg.senderId !== "me") return undefined
+    const envoi = msg.timestamp.getTime()
+    const moi = getMyUserId()
+    let n = 0
+    for (const [membre, lu] of Object.entries(lecturesParMembre)) {
+      if (membre === moi) continue
+      if (lu >= envoi) n += 1
+    }
+    return n > 0 ? n : undefined
+  }
+
   const resolveSenderName = (senderId: string): string => {
     if (senderId === "me") return t("you")
 
@@ -6067,6 +6138,7 @@ export default function ChatRoomPage() {
                     onForward={setForwardMsg}
                     onCopy={handleCopy}
                     isGroup={chat?.isGroup}
+                    nbLectures={compterLectures(msg)}
                     senderName={resolvedName}
                     quoteAuthor={quoteAuthor}
                     onJumpToMessage={jumpToMessage}

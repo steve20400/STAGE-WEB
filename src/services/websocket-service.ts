@@ -545,6 +545,15 @@ export function subscribeToSessionRevoked(
 export interface StatusEvent {
   /** UUID de l'utilisateur qui a lu la conversation. */
   readBy: string
+  /**
+   * JUSQU'OU il a lu, en millisecondes.
+   *
+   * Le serveur l'envoie depuis toujours et on le jetait. Sans lui, on sait QUE
+   * quelqu'un a lu, jamais JUSQU'OU : impossible de dire combien de personnes
+   * ont lu un message donne dans un groupe. C'est cette date qui rend le
+   * compteur possible sans une seule requete de plus.
+   */
+  at?: number
 }
 
 /** S'abonne aux accuses de lecture d'une conversation (l'autre a tout lu). */
@@ -554,7 +563,13 @@ export function subscribeToStatus(
 ): () => void {
   return addListener((event) => {
     if (event.type === "read" && event.convId === conversationId) {
-      handler({ readBy: String(event.userId ?? "") })
+      const brut = event.at
+      const quand =
+        typeof brut === "number" ? brut : typeof brut === "string" ? Date.parse(brut) : NaN
+      handler({
+        readBy: String(event.userId ?? ""),
+        at: Number.isFinite(quand) ? quand : undefined,
+      })
     }
   })
 }
