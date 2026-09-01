@@ -1004,9 +1004,10 @@ export function sendMessageOverSocket(
     tempId: string
     mediaId?: string
     replyToId?: string
+    mentions?: Array<{ userId: string; libelle: string }>
   }
 ): Promise<WsMessagePayload> {
-  const { content, msgType, tempId, mediaId, replyToId } = options
+  const { content, msgType, tempId, mediaId, replyToId, mentions } = options
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       pendingAcks.delete(tempId)
@@ -1025,6 +1026,9 @@ export function sendMessageOverSocket(
       tempId,
       mediaId,
       replyToId,
+      // Les mentions voyagent avec le message : le serveur les refiltre sur les
+      // participants reels du groupe, on ne fait que declarer.
+      mentions,
       appareilId: appareilCourantId(),
     })
   })

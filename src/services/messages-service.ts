@@ -44,6 +44,15 @@ export interface BackendMessage {
    * cache IndexedDB, qui la range au meme nom.
    */
   editedAt?: string | null
+  /**
+   * Les mentions `@` du message.
+   *
+   * Facultatif : un backend anterieur ne les envoie pas, et le message
+   * s'affiche alors comme une phrase ordinaire — le texte portant deja
+   * « @Dominique » en clair. C'est tout l'interet de ne pas avoir encode les
+   * mentions DANS le texte.
+   */
+  mentions?: Array<{ userId: string; libelle: string }>
   media?: Array<{
     id: string
     url: string
@@ -138,6 +147,9 @@ export function toFrontMessage(
     content: m.content ?? "",
     type: media?.mimeType?.startsWith("video/") ? "video" : mapType(m.type),
     status: mapStatus(m.status),
+    // Les mentions accompagnent le message. Absentes d'un backend anterieur :
+    // le texte porte deja « @Dominique » en clair, la bulle reste juste.
+    mentions: (m as BackendMessage).mentions ?? undefined,
     // Le serveur ne met ce champ que dans la charge des appareils du compte
     // emetteur : le recevoir suffit a avoir le droit de l'afficher.
     nomAgent: (m as { nomAgent?: string | null }).nomAgent ?? null,
@@ -288,6 +300,8 @@ export async function markChatAsRead(chatId: string): Promise<void> {
 interface SendOptions {
   replyToId?: string
   mediaId?: string
+  /** Les comptes vises par un `@`. Le serveur les refiltre sur les membres. */
+  mentions?: Array<{ userId: string; libelle: string }>
 }
 
 interface DeliveryPayload {
@@ -296,6 +310,7 @@ interface DeliveryPayload {
   tempId: string
   mediaId?: string
   replyToId?: string
+  mentions?: Array<{ userId: string; libelle: string }>
 }
 
 /**
@@ -317,6 +332,9 @@ async function deliverMessage(
         type: payload.msgType,
         mediaId: payload.mediaId,
         replyToId: payload.replyToId,
+        // Le repli REST porte les MEMES mentions que le WebSocket : sans cela,
+        // la notification dependrait de l'etat du reseau au moment de l'envoi.
+        mentions: payload.mentions,
       },
     })
   }
@@ -393,6 +411,7 @@ export async function sendChatMessage(
       tempId,
       mediaId: options.mediaId,
       replyToId: options.replyToId,
+      mentions: options.mentions,
     })
   } catch (err) {
     /**

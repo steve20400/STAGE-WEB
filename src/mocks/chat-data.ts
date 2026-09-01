@@ -75,12 +75,35 @@ export interface ChatInfoMock {
   lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null
 }
 
+/**
+ * Une mention `@` : le compte vise, et le texte ecrit dans le message.
+ *
+ * ⚠️ `libelle` N'EST PAS LE PSEUDO COURANT, c'est ce qui a ete insere a
+ * l'envoi, fige par le serveur. C'est ce texte qu'il faut retrouver dans le
+ * message pour le mettre en evidence — un pseudo change depuis ne s'y
+ * trouverait plus — et il garde lisible la mention de quelqu'un qui a quitte le
+ * groupe.
+ */
+export interface MentionMessage {
+  userId: string
+  libelle: string
+}
+
 export interface ChatMessageMock {
   id: string
   senderId: string
   content: string
   type: MessageType
   status: MessageStatus
+  /**
+   * Les mentions `@` du message — groupes seulement.
+   *
+   * 🔴 LE TEXTE PORTE « @Dominique » EN CLAIR ; cette liste dit QUEL compte est
+   * vise. Sans elle, mettre en evidence reviendrait a chercher un pseudo dans
+   * une phrase, et notifier reviendrait a le deviner — ce qui echoue des que
+   * deux membres portent le meme nom.
+   */
+  mentions?: MentionMessage[]
   /**
    * Pseudo de l'appareil qui a envoye le message.
    *

@@ -1091,6 +1091,67 @@ function estimatePages(fileName?: string, fileSize?: string): number {
 }
 
 /** Rend le texte avec les URLs cliquables et un preview du premier lien. */
+/**
+ * Le texte d'un message, avec ses `@mentions` mises en evidence.
+ *
+ * 🔴 ON DECOUPE SUR LES LIBELLES PORTES PAR LE MESSAGE, jamais sur une
+ * expression du genre `@\w+`. Deux raisons :
+ *   - un `@` ecrit a la main, qui ne designe personne, ne doit pas se colorer
+ *     comme une vraie mention ;
+ *   - un libelle peut contenir une espace (« @Jean Dupont ») : aucune
+ *     expression sur les mots ne le retrouverait en entier.
+ *
+ * ⚠️ Les libelles les plus LONGS sont cherches d'abord : avec « @Jean » et
+ * « @Jean Dupont » dans le meme groupe, commencer par le court couperait le
+ * long en deux.
+ *
+ * Miroir de `_spansAvecMentions` cote mobile.
+ */
+function TexteAvecMentions({
+  text,
+  mentions,
+  isMe,
+}: {
+  text: string
+  mentions: Array<{ userId: string; libelle: string }>
+  isMe: boolean
+}) {
+  const libelles = [...new Set(mentions.map((m) => m.libelle))]
+    .filter((l) => l !== "")
+    .sort((a, b) => b.length - a.length)
+
+  const parts: React.ReactNode[] = []
+  let reste = text
+  let cle = 0
+
+  while (reste.length > 0) {
+    let index = -1
+    let libelle = ""
+    for (const l of libelles) {
+      const i = reste.indexOf(`@${l}`)
+      if (i < 0) continue
+      if (index < 0 || i < index) {
+        index = i
+        libelle = l
+      }
+    }
+    if (index < 0) {
+      parts.push(<RichText key={cle++} text={reste} isMe={isMe} />)
+      break
+    }
+    if (index > 0) {
+      parts.push(<RichText key={cle++} text={reste.slice(0, index)} isMe={isMe} />)
+    }
+    parts.push(
+      <span key={cle++} className="msg-mention">
+        @{libelle}
+      </span>
+    )
+    reste = reste.slice(index + libelle.length + 1)
+  }
+  return <>{parts}</>
+}
+
 function RichText({ text, isMe }: { text: string; isMe: boolean }) {
   const urls = text.match(URL_REGEX) || []
   if (urls.length === 0) return <>{text}</>
@@ -4485,7 +4546,8 @@ function MessageBubble({
                             : undefined
                       }
                     >
-                      <RichText
+                      <TexteAvecMentions
+                        mentions={msg.mentions ?? []}
                         text={(() => {
                           let cleanText = msg.content || ""
                           if (extractGpsCoords(cleanText)) cleanText = removeGpsCoordinates(cleanText)
@@ -5403,7 +5465,11 @@ export default function ChatRoomPage() {
     setSending(true)
 
     try {
-      const saved = await sendChatMessage(chatId, text, "text", { replyToId: replyToMsg?.id })
+      const saved = await sendChatMessage(chatId, text, "text", {
+        replyToId: replyToMsg?.id,
+        mentions: mentionsAEnvoyer(text),
+      })
+      setMentionsEnCours([])
       setMessages((prev) => {
         const alreadyReceived = prev.some((m) => m.id === saved.id)
         if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
@@ -5442,7 +5508,11 @@ export default function ChatRoomPage() {
     publishTyping(chatId, false)
 
     try {
-      const saved = await sendChatMessage(chatId, text, "text", { replyToId: replyTo?.id })
+      const saved = await sendChatMessage(chatId, text, "text", {
+        replyToId: replyTo?.id,
+        mentions: mentionsAEnvoyer(text),
+      })
+      setMentionsEnCours([])
       // Replace le message optimiste par celui renvoye par le backend.
       // Si le broadcast WebSocket est arrive avant (id deja present), on retire juste le tempId.
       setMessages((prev) => {
@@ -5522,12 +5592,123 @@ export default function ChatRoomPage() {
   }
 
   // Auto-resize du textarea + emission typing via WebSocket
+  /* ═══════════ MENTIONS @ — GROUPES SEULEMENT ═══════════
+   *
+   * 🔴 UNE MENTION DESIGNE UNE PERSONNE, PAS UNE CHAINE. Le texte porte
+   * « @Dominique » en clair — lisible par n'importe quel client — et cette
+   * liste retient QUI a ete choisi. Sans elle, notifier reviendrait a deviner
+   * un pseudo, ce qui echoue des que deux membres portent le meme nom.
+   *
+   * Miroir du mobile (`chat_screen.dart`) : memes regles de detection, meme
+   * filtre a l'envoi, meme mise en evidence. Les deux clients doivent produire
+   * des messages identiques.
+   */
+
+  /** Ce qui suit le `@` en cours de frappe. `null` = pas dans une mention. */
+  const [requeteMention, setRequeteMention] = useState<string | null>(null)
+  /** Position du `@` qui a ouvert la liste, pour savoir quoi remplacer. */
+  const [debutMention, setDebutMention] = useState(-1)
+  /** Les comptes choisis dans le message en cours. */
+  const [mentionsEnCours, setMentionsEnCours] = useState<
+    Array<{ userId: string; libelle: string }>
+  >([])
+
+  /**
+   * Detecte si le curseur est dans un `@…`.
+   *
+   * ⚠️ ON REMONTE DEPUIS LE CURSEUR, jamais depuis le debut du texte : un
+   * message peut porter plusieurs mentions deja posees, et repartir du debut
+   * rouvrirait la liste sur la premiere pendant qu'on ecrit a la fin.
+   *
+   * Le `@` doit ouvrir un mot — « alanya@exemple.com » n'est pas une mention —
+   * et la requete s'arrete a la premiere espace, sinon une phrase entiere
+   * serait prise pour une recherche apres un `@` isole.
+   */
+  const majRequeteMention = (valeur: string, curseur: number) => {
+    if (!chat?.isGroup) return
+    const avant = valeur.slice(0, curseur)
+    const at = avant.lastIndexOf("@")
+    if (at < 0 || (at > 0 && !/\s/.test(avant[at - 1]))) {
+      setRequeteMention(null)
+      return
+    }
+    const requete = avant.slice(at + 1)
+    if (/\s/.test(requete)) {
+      setRequeteMention(null)
+      return
+    }
+    setRequeteMention(requete)
+    setDebutMention(at)
+  }
+
+  /** Les membres proposes, filtres par ce qui suit le `@`. Sans moi. */
+  const membresProposes = (): Array<{ id: string; nom: string }> => {
+    const requete = (requeteMention ?? "").toLowerCase()
+    return (backendChat?.membersInfo ?? [])
+      .filter((m) => m.id !== getMyUserId())
+      .map((m) => ({ id: m.id, nom: (m.pseudo ?? "").trim() }))
+      .filter((m) => m.nom !== "")
+      .filter((m) => requete === "" || m.nom.toLowerCase().includes(requete))
+      .sort((a, b) => a.nom.toLowerCase().localeCompare(b.nom.toLowerCase()))
+  }
+
+  /**
+   * Remplace le `@requete` en cours par `@Nom `, et retient le compte vise.
+   *
+   * L'espace finale n'est pas cosmetique : sans elle, le curseur reste DANS la
+   * mention et la liste se rouvre aussitot sur le nom qu'on vient de choisir.
+   */
+  const insereMention = (userId: string, nom: string) => {
+    const champ = inputRef.current
+    const curseur = champ?.selectionStart ?? input.length
+    if (debutMention < 0 || debutMention > curseur) return
+    const remplacement = `@${nom} `
+    const nouveau =
+      input.slice(0, debutMention) + remplacement + input.slice(curseur)
+    setInput(nouveau.slice(0, LONGUEUR_MAX_CONTENU))
+    setRequeteMention(null)
+    setDebutMention(-1)
+    setMentionsEnCours((prev) => [
+      // Une meme personne ne figure qu'une fois : la mentionner deux fois ne
+      // doit pas la notifier deux fois.
+      ...prev.filter((m) => m.userId !== userId),
+      { userId, libelle: nom },
+    ])
+    // Le focus revient au champ, curseur apres la mention : sans cela, le
+    // clavier se ferme sur mobile et la frappe reprend au debut du texte.
+    window.requestAnimationFrame(() => {
+      const pos = debutMention + remplacement.length
+      champ?.focus()
+      champ?.setSelectionRange(pos, pos)
+    })
+  }
+
+  /**
+   * Les mentions a ENVOYER, reduites a celles encore presentes dans le texte.
+   *
+   * 🔴 SANS CE FILTRE, EFFACER « @Dominique » DU TEXTE LE NOTIFIERAIT QUAND
+   * MEME : la liste retient ce qui a ete choisi, pas ce qui reste ecrit.
+   */
+  const mentionsAEnvoyer = (texte: string) => {
+    const vues = new Set<string>()
+    const sortie: Array<{ userId: string; libelle: string }> = []
+    for (const m of mentionsEnCours) {
+      if (vues.has(m.userId)) continue
+      if (!texte.includes(`@${m.libelle}`)) continue
+      vues.add(m.userId)
+      sortie.push(m)
+    }
+    return sortie
+  }
+
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     // Coupe defensive : `maxLength` sur le textarea couvre la frappe et le
     // coller, mais pas tout (glisser-deposer de texte, certaines saisies
     // predictives). Ce qui depasse serait coupe par le serveur de toute facon —
     // autant que l'ecran montre des maintenant ce qui sera reellement envoye.
-    setInput(e.target.value.slice(0, LONGUEUR_MAX_CONTENU))
+    const valeur = e.target.value.slice(0, LONGUEUR_MAX_CONTENU)
+    setInput(valeur)
+    majRequeteMention(valeur, e.target.selectionStart ?? valeur.length)
     e.target.style.height = "auto"
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
 
@@ -6811,6 +6992,28 @@ export default function ChatRoomPage() {
               </div>
             ) : (
               <>
+                {/*
+                  LA LISTE DES MEMBRES, au-dessus du champ. Elle sort du `@`
+                  qu'on vient de taper et doit rester sous les yeux. Rien ne
+                  s'affiche si aucun membre ne correspond : un panneau vide
+                  au-dessus du clavier serait pire que pas de panneau.
+                */}
+                {requeteMention !== null && membresProposes().length > 0 && (
+                  <div className="room-mentions" role="listbox">
+                    {membresProposes().map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        role="option"
+                        aria-selected={false}
+                        className="room-mention-item"
+                        onClick={() => insereMention(m.id, m.nom)}
+                      >
+                        {m.nom}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   ref={inputRef}
                   className="room-textarea"

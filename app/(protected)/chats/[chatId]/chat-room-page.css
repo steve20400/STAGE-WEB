@@ -865,3 +865,46 @@ textarea.room-textarea::placeholder {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ═══════════ MENTIONS @ ═══════════
+ *
+ * La liste des membres, au-dessus du champ de saisie. Position absolue et non
+ * un bloc dans le flux : inseree dans le flux, elle pousserait le champ vers le
+ * bas a chaque frappe, et le texte sauterait sous les doigts.
+ */
+.room-mentions {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 20;
+}
+
+.room-mention-item {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text, inherit);
+}
+
+.room-mention-item:hover,
+.room-mention-item:focus-visible {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+}
+
+/* La mention dans une bulle : jamais une couleur en dur — le fond change avec
+ * le theme ET selon que la bulle est la mienne ou celle d'un autre. */
+.msg-mention {
+  font-weight: 700;
+}
