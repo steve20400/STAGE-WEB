@@ -1115,6 +1115,29 @@ function estimatePages(fileName?: string, fileSize?: string): number {
  *
  * Miroir de `_spansAvecMentions` cote mobile.
  */
+/**
+ * Le libelle collectif present dans le texte, quand le SERVEUR ne le marque pas.
+ *
+ * Purement defensif : un serveur a jour renvoie `mentionTousLibelle` et cette
+ * fonction n'est jamais consultee. Elle evite qu'un « @tous » redevienne du
+ * texte mort entre le deploiement du web et celui du backend.
+ *
+ * On cherche le mot des NEUF langues, plus « all » qui sert de forme commune :
+ * l'auteur a pu ecrire dans la sienne, qui n'est pas celle du lecteur.
+ */
+const MOTS_COLLECTIFS = ["tous", "all", "todos", "alle", "все", "所有人", "alla"]
+
+function libelleCollectifDansTexte(msg: Message): string | null {
+  const texte = msg.content ?? ""
+  if (texte === "") return null
+  for (const mot of MOTS_COLLECTIFS) {
+    // La frontiere apres le mot evite de prendre « @allan » pour « @all ».
+    const found = new RegExp(`@${mot}(?![\\p{L}\\p{N}])`, "iu").exec(texte)
+    if (found) return found[0].slice(1)
+  }
+  return null
+}
+
 function TexteAvecMentions({
   text,
   mentions,
@@ -4660,7 +4683,21 @@ function MessageBubble({
                     >
                       <TexteAvecMentions
                         onOuvrirMention={onOuvrirMention}
-                        libelleTous={msg.mentionTousLibelle}
+                        /*
+                         * ⚠️ REPLI SUR LE TEXTE quand le serveur ne marque pas
+                         * la mention collective.
+                         *
+                         * Le marqueur `mentionTousLibelle` vient d'une colonne
+                         * ajoutee recemment : un serveur qui n'a pas encore ete
+                         * deploye renvoie `null`, et « @tous » redevenait du
+                         * texte ordinaire — ni surligne, ni cliquable.
+                         *
+                         * On reconnait alors le mot lui-meme. Le risque est
+                         * qu'un membre s'appelle litteralement « tous » ; il est
+                         * mince, et de toute facon la mention nominative est
+                         * cherchee EN PREMIER dans la liste, donc elle gagne.
+                         */
+                        libelleTous={msg.mentionTousLibelle ?? libelleCollectifDansTexte(msg)}
                         mentions={msg.mentions ?? []}
                         text={(() => {
                           let cleanText = msg.content || ""

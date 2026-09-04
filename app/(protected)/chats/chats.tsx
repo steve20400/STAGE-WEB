@@ -223,12 +223,6 @@ export default function ChatsPage() {
    * filtrait, on revient a « Tous » : sinon la liste des discussions resterait
    * vide, sans plus aucun bouton allume pour dire pourquoi.
    */
-  useEffect(() => {
-    if (!idListeActive) return
-    if (listes.some((liste) => liste.id === idListeActive)) return
-    setFilter("all")
-  }, [listes, idListeActive])
-
   /**
    * Membres de la liste qui filtre, prets a comparer. Deux ensembles construits
    * une fois plutot qu'un parcours du tableau par conversation : la liste des
@@ -274,6 +268,58 @@ export default function ChatsPage() {
 
   const [conversations, setConversations] = useState<ConversationListItem[]>([])
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /**
+   * LES LISTES QUI MERITENT UN FILTRE — celles avec qui l'on parle vraiment.
+   *
+   * Toutes les listes s'affichaient, y compris vides. Depuis que quatre listes
+   * existent des le depart, la rangee de filtres s'ouvrait sur quatre boutons
+   * qui ne filtraient RIEN : les presser rendait une liste vide, et ils
+   * poussaient hors de vue les filtres du systeme, qui eux servent.
+   *
+   * Un filtre n'a de sens que s'il a quelque chose a montrer. Une liste
+   * apparait donc quand au moins un de ses membres a une conversation — et
+   * disparait si cette conversation s'en va.
+   *
+   * ⚠️ CALCULE SUR LES CORRESPONDANTS, une seule fois, et non liste par liste :
+   * la rangee se recalcule a chaque message recu, et croiser quatre listes avec
+   * deux cents conversations a chaque fois se paierait a l'affichage.
+   */
+  const listesAvecDiscussion = useMemo(() => {
+    const moi = getMyUserId()
+    const identifiants = new Set<string>()
+    const numeros = new Set<string>()
+    for (const c of conversations) {
+      // Un groupe n'a pas de correspondant : une liste rassemble des personnes,
+      // pas des salons. Meme regle que le filtrage lui-meme.
+      if (c.isGroup) continue
+      const pair = c.membersInfo?.find((m) => m.id !== moi)
+      if (!pair) continue
+      identifiants.add(pair.id.toLowerCase())
+      const numero = (pair.publicNumber ?? "").replace(/\D/g, "")
+      if (numero) numeros.add(numero)
+    }
+    return listes.filter((liste) =>
+      liste.membres.some(
+        (membre) =>
+          identifiants.has(membre.id.toLowerCase()) ||
+          numeros.has(membre.numero.replace(/\D/g, ""))
+      )
+    )
+  }, [listes, conversations])
+
+  /*
+   * Le filtre actif suit ce que la rangee AFFICHE.
+   *
+   * Une liste dont la derniere conversation vient de disparaitre quitte la
+   * rangee. Si c'est elle qui filtrait, on revient a « Tous » : sinon l'ecran
+   * resterait vide, sans plus aucun bouton allume pour dire pourquoi.
+   */
+  useEffect(() => {
+    if (!idListeActive) return
+    if (listesAvecDiscussion.some((liste) => liste.id === idListeActive)) return
+    setFilter("all")
+  }, [listesAvecDiscussion, idListeActive])
 
   useEffect(() => {
     let cancelled = false
@@ -507,7 +553,7 @@ export default function ChatsPage() {
 
           {/* Trait de separation : les listes commencent ici. Sans lui, une
               liste nommee « Non lues » se lirait comme un filtre du systeme. */}
-          {listes.length > 0 && (
+          {listesAvecDiscussion.length > 0 && (
             <span
               aria-hidden
               style={{
@@ -521,7 +567,7 @@ export default function ChatsPage() {
             />
           )}
 
-          {listes.map((liste) => {
+          {listesAvecDiscussion.map((liste) => {
             const cible: Filtre = `${PREFIXE_LISTE}${liste.id}`
             return (
               <button
