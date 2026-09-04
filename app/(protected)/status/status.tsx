@@ -1,5 +1,6 @@
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { compresserImage } from "../../../src/lib/image-compression"
 import { useToast } from "../../../src/components/toast"
 import { toInitials } from "../../../src/data/session-user"
 import { resolveMediaUrl,
@@ -164,8 +165,22 @@ export default function StatusPage() {
       if (nextIndex >= current.group.statuses.length) return null // fin du groupe
       return { ...current, index: nextIndex }
     })
+    avancement.current = 0
     setProgress(0)
   }, [])
+
+  /**
+   * LECTURE EN PAUSE — appui maintenu.
+   *
+   * On lit un statut en quelques secondes ; il suffit d'un nom a dechiffrer ou
+   * d'un texte un peu long pour que la barre passe avant qu'on ait fini. Toutes
+   * les messageries laissent retenir la lecture au doigt.
+   */
+  const [enPause, setEnPause] = useState(false)
+
+  // La progression s'ACCUMULE au lieu de repartir de l'heure de depart : sans
+  // cela, reprendre apres une pause relancerait le compte a zero.
+  const avancement = useRef(0)
 
   // Progression + auto-avance (les videos avancent a la fin via onEnded).
   useEffect(() => {
@@ -175,13 +190,18 @@ export default function StatusPage() {
 
     if (!viewer.isMine) void viewStatus(status.id)
 
-    setProgress(0)
     if (progressTimer.current) clearInterval(progressTimer.current)
     if (status.type === "VIDEO") return // gere par onEnded
+    if (enPause) return // l'appui est maintenu : la barre ne bouge pas
 
-    const startedAt = Date.now()
+    let dernier = Date.now()
     progressTimer.current = setInterval(() => {
-      const ratio = (Date.now() - startedAt) / STATUS_DURATION_MS
+      const maintenant = Date.now()
+      // On ajoute le TEMPS ECOULE plutot que de comparer a l'heure de depart :
+      // c'est ce qui permet de reprendre une pause la ou on l'avait laissee.
+      avancement.current += maintenant - dernier
+      dernier = maintenant
+      const ratio = avancement.current / STATUS_DURATION_MS
       if (ratio >= 1) {
         goTo(1)
       } else {
@@ -195,7 +215,7 @@ export default function StatusPage() {
         progressTimer.current = null
       }
     }
-  }, [viewer, goTo])
+  }, [viewer, goTo, enPause])
 
   // Le viewer devient null quand on depasse le dernier statut -> fermeture propre.
   useEffect(() => {
@@ -226,26 +246,75 @@ export default function StatusPage() {
     }
   }
 
-  const submitMediaStatus = async (file: File) => {
+  /**
+   * Publie PLUSIEURS medias, dans l'ordre choisi.
+   *
+   * ⚠️ SEQUENTIEL, jamais en parallele. Trois raisons, dans l'ordre
+   * d'importance :
+   *
+   *  - l'ORDRE. Les statuts se lisent dans l'ordre de publication ; lancer
+   *    trois televersements de front les ferait arriver dans l'ordre du reseau,
+   *    et une serie de photos se retrouverait melangee ;
+   *  - la MEMOIRE. Chaque image est compressee avant d'etre envoyee, et trois
+   *    bitmaps de 12 megapixels decodes ensemble retiennent pres de 150 Mo ;
+   *  - le RESEAU. Sur une connexion mobile, trois envois simultanes se
+   *    partagent la bande passante et finissent tous les trois en retard.
+   *
+   * Un echec n'arrete pas la serie : les autres partent, et le decompte final
+   * dit ce qui a reellement ete publie. Perdre trois photos parce que la
+   * deuxieme etait trop lourde serait le pire des comportements.
+   */
+  const publierPlusieurs = async (fichiers: File[]) => {
     if (posting) return
-    // La MEME borne que la messagerie et que le serveur. Elle etait ecrite en
-    // dur ici : le jour ou l'une des trois change, les deux autres mentent.
-    if (file.size > TAILLE_MEDIA_MAX_OCTETS) {
-      error(t("set_file_too_large"), t("l2_max_50_mb"))
-      return
-    }
     setPosting(true)
+    let publies = 0
+    let echecs = 0
     try {
-      await postMediaStatus(file)
-      success(t("l2_status_published"), t("status_visible_24h"))
-      setComposerOpen(false)
-      await reload()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("l2_publish_failed_detail")
-      error(t("l2_status_not_published"), message)
+      for (const fichier of fichiers) {
+        try {
+          await envoyerUnMedia(fichier)
+          publies += 1
+        } catch {
+          echecs += 1
+        }
+      }
     } finally {
       setPosting(false)
     }
+    if (publies > 0) {
+      success(t("l2_status_published"), t("status_visible_24h"))
+      await reload()
+    }
+    if (echecs > 0) {
+      error(t("l2_status_not_published"), t("l2_publish_failed_detail"))
+    }
+  }
+
+  /**
+   * Publie UN media. Ne gere ni l'etat « en cours » ni les avis : c'est
+   * `publierPlusieurs` qui les tient, une fois pour toute la serie — sinon
+   * publier cinq photos afficherait cinq confirmations.
+   *
+   * LEVE en cas d'echec, pour que la serie sache compter ce qui n'est pas passe.
+   */
+  const envoyerUnMedia = async (file: File) => {
+    // La MEME borne que la messagerie et que le serveur. Elle etait ecrite en
+    // dur ici : le jour ou l'une des trois change, les deux autres mentent.
+    if (file.size > TAILLE_MEDIA_MAX_OCTETS) {
+      throw new Error(t("l2_max_50_mb"))
+    }
+    /*
+     * COMPRESSEE COMME DANS UNE DISCUSSION. Un statut est vu par tout le
+     * repertoire : c'est le media le plus telecharge de l'application, et le
+     * seul qui l'etait encore en pleine resolution.
+     *
+     * `compresserImage` rend l'original a la moindre incertitude — format
+     * inconnu, decodage rate, gain absent.
+     */
+    const pret =
+      file.type.startsWith("image/") ? await compresserImage(file) : null
+    await postMediaStatus(pret?.fichier ?? file)
+    setComposerOpen(false)
   }
 
   const handleDeleteCurrent = async () => {
@@ -328,10 +397,14 @@ export default function StatusPage() {
               ref={fileRef}
               type="file"
               accept="image/*,video/*"
+              // PLUSIEURS A LA FOIS, photos et videos melangees. On n'en
+              // prenait qu'un : publier trois cliches d'un evenement demandait
+              // de rouvrir le selecteur trois fois.
+              multiple
               style={{ display: "none" }}
               onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) void submitMediaStatus(file)
+                const fichiers = Array.from(e.target.files ?? [])
+                if (fichiers.length > 0) void publierPlusieurs(fichiers)
                 e.target.value = ""
               }}
             />
@@ -513,7 +586,29 @@ export default function StatusPage() {
               justifyContent: "center",
               overflow: "hidden",
             }}
+            /*
+             * L'APPUI MAINTENU MET EN PAUSE, et le relachement reprend.
+             *
+             * `onPointerDown` / `onPointerUp` couvrent le doigt ET la souris —
+             * les evenements de pointeur unifient les deux, la ou `mousedown`
+             * aurait ignore le tactile.
+             *
+             * `onPointerLeave` et `onPointerCancel` sont indispensables : un
+             * doigt qui glisse hors du cadre, ou un appel entrant qui vole le
+             * pointeur, ne declenchent PAS `pointerup`. Sans eux, le statut
+             * resterait fige indefiniment.
+             */
+            onPointerDown={() => setEnPause(true)}
+            onPointerUp={() => setEnPause(false)}
+            onPointerLeave={() => setEnPause(false)}
+            onPointerCancel={() => setEnPause(false)}
           >
+            {/*
+              LES ZONES INVISIBLES restent : sur telephone, on tape a gauche ou
+              a droite de l'image, c'est le geste appris de toutes les
+              messageries. Elles ne portent AUCUN visuel — un bouton sous le
+              pouce cacherait le statut.
+            */}
             <div
               onClick={() => goTo(-1)}
               style={{
@@ -538,6 +633,36 @@ export default function StatusPage() {
                 cursor: "e-resize",
               }}
             />
+
+            {/*
+              LES FLECHES, GRAND ECRAN SEULEMENT.
+
+              A la souris, rien n'indique qu'on peut cliquer sur les cotes :
+              l'utilisateur attend la fin, ou ferme. La classe porte la bascule
+              — masquees sous 901 px, ou le doigt fait deja le travail et ou
+              elles mangeraient l'image.
+
+              Elles sont DESACTIVEES aux extremites plutot que masquees : un
+              bouton qui disparait deplace celui d'a cote, et l'on clique a cote.
+            */}
+            <button
+              type="button"
+              className="statut-fleche gauche"
+              onClick={() => goTo(-1)}
+              disabled={viewer.index === 0}
+              aria-label={t("statut_precedent")}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="statut-fleche droite"
+              onClick={() => goTo(1)}
+              disabled={viewer.index >= viewer.group.statuses.length - 1}
+              aria-label={t("statut_suivant")}
+            >
+              ›
+            </button>
 
             {currentStatus.type === "TEXT" && (
               <div

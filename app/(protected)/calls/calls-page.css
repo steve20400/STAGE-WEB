@@ -437,3 +437,53 @@
   text-transform: uppercase;
   color: var(--text-ghost);
 }
+
+/*
+ * ═══ LES FLÈCHES DU LECTEUR DE STATUTS ═══
+ *
+ * GRAND ÉCRAN SEULEMENT. À la souris, rien n'indique qu'on peut cliquer sur les
+ * côtés de l'image : l'utilisateur attend la fin, ou ferme. Au doigt, en
+ * revanche, taper à gauche ou à droite est le geste appris de toutes les
+ * messageries — et un bouton sous le pouce cacherait le statut.
+ */
+.statut-fleche {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  .statut-fleche {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 6;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: #ffffff22;
+    color: #fff;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .statut-fleche:hover:not(:disabled) {
+    background: #ffffff3a;
+  }
+  /*
+   * DÉSACTIVÉES aux extrémités, jamais masquées : un bouton qui disparaît
+   * déplace celui d'à côté, et l'on clique à côté au coup suivant.
+   */
+  .statut-fleche:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+  .statut-fleche.gauche {
+    left: 14px;
+  }
+  .statut-fleche.droite {
+    right: 14px;
+  }
+}
