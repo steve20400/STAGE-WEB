@@ -820,6 +820,14 @@ textarea.room-textarea::placeholder {
  * Hors du corps défilant, entre l'en-tête et le fil : dans le corps il s'en
  * irait avec le défilement, alors que tout son intérêt est de rester visible.
  */
+/* La zone entiere : bandeau d'une ligne, plus la liste quand elle est deroulee. */
+.bandeau-epingle-zone {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  background: var(--bg-surface);
+}
+
 .bandeau-epingle {
   display: flex;
   align-items: center;
@@ -827,20 +835,104 @@ textarea.room-textarea::placeholder {
   width: 100%;
   padding: 8px 16px;
   border: 0;
-  border-bottom: 1px solid var(--border-subtle);
-  /* Une barre d'accent à gauche, comme un bloc de citation : le lien de parenté
-     se lit sans qu'on ait à l'expliquer. */
-  border-left: 3px solid var(--accent);
-  background: var(--bg-surface);
+  /* Le filet et la barre d'accent sont portes par la ZONE : les repeter ici
+     tracerait deux traits. */
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+}
+
+/* La ligne cliquable, qui mene au plus recent epingle. */
+.bandeau-epingle-principal {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: inherit;
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s;
 }
 .bandeau-epingle:hover {
   background: var(--bg-elevated);
+}
+
+/*
+ * LE COMPTEUR. Une pastille, pas un mot : « 3 messages epingles » en neuf
+ * langues n'a pas la meme largeur, et poussait l'apercu hors du cadre en
+ * allemand. Le libelle complet reste dans l'infobulle et pour le lecteur d'ecran.
+ */
+.bandeau-epingle-compteur {
+  flex: none;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.bandeau-epingle-compteur:hover,
+.bandeau-epingle-compteur.ouvert {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/*
+ * LA LISTE DEROULEE defile dans SA PROPRE boite, plafonnee a 40 % de la hauteur.
+ * Sans ce plafond, cinquante epingles repousseraient la conversation hors de
+ * l'ecran — c'est exactement ce qu'on cherche a eviter.
+ */
+.bandeau-epingle-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--border-subtle);
+}
+.bandeau-epingle-liste li + li {
+  margin-top: 2px;
+}
+.bandeau-epingle-liste button {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bandeau-epingle-liste button:hover {
+  background: var(--bg-elevated);
+}
+.bandeau-epingle-liste-auteur {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.bandeau-epingle-liste-apercu {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .bandeau-epingle-icone {
   font-size: 14px;

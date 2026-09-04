@@ -38,7 +38,7 @@ import {
   removeMessageFromDB,
   sendChatMessage,
   toFrontMessage,
-  fetchPinnedMessage,
+  fetchPinnedMessages,
   definirMessageEpingle,
 } from "../../../../src/services/messages-service"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
@@ -4840,7 +4840,9 @@ export default function ChatRoomPage() {
    * simplement le verbe `message_pinned` — il n'apparaissait dans aucun de ses
    * fichiers. La trame arrivait pourtant bien dans le navigateur.
    */
-  const [messageEpingle, setMessageEpingle] = useState<string | null>(null)
+  const [messagesEpingles, setMessagesEpingles] = useState<string[]>([])
+  /** Liste deroulee sous le bandeau. Fermee par defaut : elle ne doit rien couvrir. */
+  const [listeEpinglesOuverte, setListeEpinglesOuverte] = useState(false)
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
@@ -5101,18 +5103,18 @@ export default function ChatRoomPage() {
 
     // Abonnement aux accuses de lecture : l'autre a ouvert la conversation,
     // tous nos messages envoyes passent en "lu".
-    // L'epingle courant, a l'ouverture. Les trames ne racontent que la suite.
-    void fetchPinnedMessage(chatId)
-      .then((m) => {
-        if (!cancelled) setMessageEpingle(m?.id ?? null)
+    // Les epingles courants, a l'ouverture. Les trames ne racontent que la suite.
+    void fetchPinnedMessages(chatId)
+      .then((liste) => {
+        if (!cancelled) setMessagesEpingles(liste.map((m) => m.id))
       })
       .catch(() => undefined)
 
     const unsubscribeEpingle = subscribeToMessagePinned(chatId, (event) => {
       if (cancelled) return
-      // `null` = detachement, une valeur VALIDE : la refuser laisserait le
-      // bandeau en place chez tous les autres.
-      setMessageEpingle(event.messageId)
+      // Une liste VIDE est une valeur valide — c'est le detachement du dernier.
+      // La refuser laisserait le bandeau en place chez tous les autres.
+      setMessagesEpingles(event.messageIds)
     })
 
     const unsubscribeStatus = subscribeToStatus(chatId, (event) => {
@@ -5147,7 +5149,7 @@ export default function ChatRoomPage() {
       // cette ligne, le bandeau resterait sur un message qui n'existe plus, et
       // le clic ne menerait nulle part. Le mobile porte ce defaut ; on ne
       // l'herite pas.
-      setMessageEpingle((actuel) => (actuel === event.messageId ? null : actuel))
+      setMessagesEpingles((actuels) => actuels.filter((id) => id !== event.messageId))
       // Supprime aussi du cache IndexedDB
       void removeMessageFromDB(event.messageId)
       setMessages((prev) => {
@@ -6199,7 +6201,11 @@ export default function ChatRoomPage() {
    */
   const basculerEpingle = useCallback(
     (messageId: string | null) => {
-      void definirMessageEpingle(chatId, messageId).catch(() => {
+      // L'intention est EXPLICITE : deux appareils qui basculent en meme temps
+      // sur le meme message s'annuleraient, la ou « epingle » / « detache »
+      // converge. `null` reste le detachement global de l'ancien contrat.
+      const epingle = messageId === null ? undefined : !messagesEpingles.includes(messageId)
+      void definirMessageEpingle(chatId, messageId, epingle).catch(() => {
         error(t("server_unreachable"))
       })
     },
@@ -6492,39 +6498,91 @@ export default function ChatRoomPage() {
       </div>
 
       {/*
-        LE BANDEAU DU MESSAGE EPINGLE, au-dessus du fil et HORS de lui : dans le
-        corps defilant, il s'en irait avec le defilement — or son interet est
-        justement de rester sous les yeux.
+        LE BANDEAU DES MESSAGES EPINGLES.
 
-        Il ne s'affiche que si le message est CHARGE. Le fil ne garde que trente
-        messages : un epingle plus ancien n'est pas la, et le serveur ne rend ni
-        sa duree ni son nom de fichier. Afficher « [media] » a la place du
-        libelle serait moins utile que ne rien afficher — et le clic n'aurait
-        nulle part ou aller.
+        Hors du corps defilant : dedans, il s'en irait avec le defilement, or
+        tout son interet est de rester sous les yeux.
+
+        ⚠️ UNE SEULE LIGNE, QUEL QUE SOIT LE NOMBRE. Empiler les epingles
+        mangerait l'ecran — a dix, il ne resterait plus de place pour la
+        conversation, qui est ce qu'on est venu lire. Le bandeau montre donc le
+        PLUS RECENT et compte les autres ; la liste complete se deroule au clic
+        sur le compteur, et se replie aussitot.
+
+        Les epingles dont le message n'est pas CHARGE sont ecartes : le fil ne
+        garde que trente messages, et un apercu vide ne menerait nulle part.
       */}
-      {messageEpingle &&
-        (() => {
-          const cible = messagesById.get(messageEpingle)
-          if (!cible) return null
-          return (
-            <button
-              type="button"
-              className="bandeau-epingle"
-              onClick={() => jumpToMessage(messageEpingle)}
-              title={t("chat_pinned_banner")}
-            >
-              <span className="bandeau-epingle-icone" aria-hidden="true">
-                📌
-              </span>
-              <span className="bandeau-epingle-textes">
-                <span className="bandeau-epingle-titre">{t("chat_pinned_banner")}</span>
-                <span className="bandeau-epingle-apercu">
-                  {decrireMessageEnLigneSansIcone(cible)}
+      {(() => {
+        const charges = messagesEpingles.filter((id) => messagesById.has(id))
+        if (charges.length === 0) return null
+        const premier = messagesById.get(charges[0])!
+        return (
+          <div className="bandeau-epingle-zone">
+            <div className="bandeau-epingle">
+              <button
+                type="button"
+                className="bandeau-epingle-principal"
+                onClick={() => jumpToMessage(charges[0])}
+                title={t("chat_pinned_banner")}
+              >
+                <span className="bandeau-epingle-icone" aria-hidden="true">
+                  📌
                 </span>
-              </span>
-            </button>
-          )
-        })()}
+                <span className="bandeau-epingle-textes">
+                  <span className="bandeau-epingle-titre">{t("chat_pinned_banner")}</span>
+                  <span className="bandeau-epingle-apercu">
+                    {decrireMessageEnLigneSansIcone(premier)}
+                  </span>
+                </span>
+              </button>
+
+              {/* Le compteur n'apparait qu'a partir de DEUX : a un seul epingle,
+                  « 1 » n'apprend rien et invite a ouvrir une liste d'une ligne. */}
+              {charges.length > 1 && (
+                <button
+                  type="button"
+                  className={`bandeau-epingle-compteur${listeEpinglesOuverte ? " ouvert" : ""}`}
+                  onClick={() => setListeEpinglesOuverte((v) => !v)}
+                  aria-expanded={listeEpinglesOuverte}
+                  aria-label={t("chat_pinned_count", { n: charges.length })}
+                  title={t("chat_pinned_count", { n: charges.length })}
+                >
+                  {charges.length}
+                </button>
+              )}
+            </div>
+
+            {/* La liste deroulee DEFILE dans sa propre boite, plafonnee a 40 %
+                de la hauteur : cinquante epingles ne repoussent pas le fil hors
+                de l'ecran. */}
+            {listeEpinglesOuverte && charges.length > 1 && (
+              <ul className="bandeau-epingle-liste">
+                {charges.map((id) => {
+                  const m = messagesById.get(id)!
+                  return (
+                    <li key={id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          jumpToMessage(id)
+                          setListeEpinglesOuverte(false)
+                        }}
+                      >
+                        <span className="bandeau-epingle-liste-auteur">
+                          {m.senderId === "me" ? t("you") : resolveSenderName(m.senderId)}
+                        </span>
+                        <span className="bandeau-epingle-liste-apercu">
+                          {decrireMessageEnLigneSansIcone(m)}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        )
+      })()}
 
       <div ref={messagesBodyRef} className="room-body" onScroll={handleMessagesScroll}>
         {/* Etat du chargement de l'historique ancien, en haut du fil. Rien ne
@@ -6657,7 +6715,7 @@ export default function ChatRoomPage() {
                     isGroup={chat?.isGroup}
                     nbLectures={compterLectures(msg)}
                     onOuvrirMention={ouvrirMention}
-                    estEpingle={messageEpingle === msg.id}
+                    estEpingle={messagesEpingles.includes(msg.id)}
                     onTogglePin={basculerEpingle}
                     senderName={resolvedName}
                     quoteAuthor={quoteAuthor}

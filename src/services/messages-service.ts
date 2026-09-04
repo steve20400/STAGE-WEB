@@ -605,15 +605,31 @@ export async function applyMessageEditToCache(
 
 /* ----------------- Message epingle ----------------- */
 
-/** Le message epingle d'une conversation, ou `null`. */
-export async function fetchPinnedMessage(
-  chatId: string
-): Promise<{ id: string; senderId: string; content: string | null; type: string } | null> {
+/** Un message epingle, tel que le serveur le decrit. */
+export interface MessageEpingle {
+  id: string
+  senderId: string
+  content: string | null
+  type: string
+  pinnedBy?: string
+  pinnedAt?: string
+}
+
+/**
+ * LES messages epingles d'une conversation, du plus recent au plus ancien.
+ *
+ * Un serveur anterieur ne rend que `message`, au singulier : on retombe alors
+ * sur une liste d'un element. Le web peut donc etre deploye avant le serveur
+ * sans rien casser — il affichera simplement un seul epingle, comme avant.
+ */
+export async function fetchPinnedMessages(chatId: string): Promise<MessageEpingle[]> {
   const reponse = await apiRequest<{
     pinnedMessageId: string | null
-    message: { id: string; senderId: string; content: string | null; type: string } | null
+    message: MessageEpingle | null
+    messages?: MessageEpingle[]
   }>(`/api/conversations/${chatId}/pinned`)
-  return reponse.message ?? null
+  if (Array.isArray(reponse.messages)) return reponse.messages
+  return reponse.message ? [reponse.message] : []
 }
 
 /**
@@ -627,13 +643,14 @@ export async function fetchPinnedMessage(
  */
 export async function definirMessageEpingle(
   chatId: string,
-  messageId: string | null
+  messageId: string | null,
+  epingle?: boolean
 ): Promise<void> {
-  publishPinMessage(chatId, messageId)
+  publishPinMessage(chatId, messageId, epingle)
   try {
     await apiRequest<void>(`/api/conversations/${chatId}/pin-message`, {
       method: "POST",
-      body: JSON.stringify({ messageId }),
+      body: JSON.stringify({ messageId, epingle }),
     })
   } catch {
     // La socket a peut-etre suffi ; l'echo du serveur fera foi.

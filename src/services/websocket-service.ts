@@ -1097,6 +1097,14 @@ export interface MessagePinnedEvent {
    * propage JAMAIS. Le bandeau resterait alors chez tous les autres.
    */
   messageId: string | null
+  /**
+   * TOUS les epingles, du plus recent au plus ancien.
+   *
+   * Un serveur anterieur ne l'envoie pas : la liste retombe alors sur
+   * `messageId` seul, et l'ecran se comporte comme avant. C'est ce qui permet
+   * de deployer le web sans attendre le serveur.
+   */
+  messageIds: string[]
 }
 
 /**
@@ -1116,16 +1124,26 @@ export function subscribeToMessagePinned(
   return addListener((event) => {
     if (event.type !== "message_pinned" || event.convId !== conversationId) return
     const brut = event.messageId
-    handler({
-      convId: conversationId,
-      messageId: typeof brut === "string" && brut.length > 0 ? brut : null,
-    })
+    const unique = typeof brut === "string" && brut.length > 0 ? brut : null
+    const liste = Array.isArray(event.messageIds)
+      ? event.messageIds.filter((x): x is string => typeof x === "string" && x.length > 0)
+      : unique
+        ? [unique]
+        : []
+    handler({ convId: conversationId, messageId: unique, messageIds: liste })
   })
 }
 
 /** Epingle un message, ou detache celui qui l'est (`null`). */
-export function publishPinMessage(conversationId: string, messageId: string | null) {
-  sendRaw({ type: "pin_message", convId: conversationId, messageId })
+export function publishPinMessage(
+  conversationId: string,
+  messageId: string | null,
+  epingle?: boolean
+) {
+  // `epingle` absent = bascule cote serveur. On l'envoie quand meme quand on le
+  // sait : deux appareils qui basculent en meme temps sur le meme message
+  // s'annuleraient, la ou une intention explicite converge.
+  sendRaw({ type: "pin_message", convId: conversationId, messageId, epingle })
 }
 
 export function subscribeToMessageEdited(
