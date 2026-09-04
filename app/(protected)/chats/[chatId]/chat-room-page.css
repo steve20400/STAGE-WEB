@@ -725,7 +725,10 @@ textarea.room-textarea::placeholder {
    sur la bulle terracotta de l'envoyeur, sans connaitre ni l'un ni l'autre. La
    premiere declaration reste le repli des navigateurs sans `color-mix`. */
 .msg-trad {
-  margin-top: 6px;
+  /* La traduction est passee AU-DESSUS de l'original : la marge doit donc
+     l'ecarter de ce qui la SUIT, pas de ce qui la precede. Laissee en
+     `margin-top`, elle collait au texte d'origine et flottait sous la citation. */
+  margin-bottom: 6px;
   padding: 6px 8px 5px;
   border-radius: 8px;
   background: rgba(127, 127, 127, 0.12);

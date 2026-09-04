@@ -4020,6 +4020,21 @@ function MessageBubble({
                 </div>
               )}
 
+              {/*
+                LA TRADUCTION AU-DESSUS, L'ORIGINAL EN DESSOUS.
+                Elle etait sous le texte d'origine : on lisait donc d'abord ce
+                qu'on ne comprend pas, et la reponse arrivait apres. L'ordre
+                inverse met en premier ce que le lecteur cherche, et laisse
+                l'original a portee pour verifier.
+
+                Le bloc n'existe que tant qu'il est ouvert — le refermer libere
+                l'affichage sans rien garder en memoire, la traduction etant
+                deja au cache.
+              */}
+              {blocTraductionVisible && texteATraduire && (
+                <MessageTranslation texte={texteATraduire} automatique={traductionAutomatique} />
+              )}
+
               {msg.isDeleted ? (
                 <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: 12 }}>
                   {t("message_deleted")}
@@ -4634,14 +4649,6 @@ function MessageBubble({
                     </span>
                   )}
                 </>
-              )}
-
-              {/* Traduction : sous le texte d'origine, dans la meme bulle. Le
-                bloc n'existe que tant qu'il est ouvert — le refermer libere
-                l'affichage sans rien garder en memoire, la traduction elle-meme
-                etant deja au cache. */}
-              {blocTraductionVisible && texteATraduire && (
-                <MessageTranslation texte={texteATraduire} automatique={traductionAutomatique} />
               )}
 
               {/* Heure + coches a l'interieur de la bulle, en bas a droite (WhatsApp).
