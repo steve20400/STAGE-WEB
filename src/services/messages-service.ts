@@ -150,6 +150,8 @@ export function toFrontMessage(
     // Les mentions accompagnent le message. Absentes d'un backend anterieur :
     // le texte porte deja « @Dominique » en clair, la bulle reste juste.
     mentions: (m as BackendMessage).mentions ?? undefined,
+    mentionTousLibelle:
+      (m as { mentionTousLibelle?: string | null }).mentionTousLibelle ?? null,
     // Le serveur ne met ce champ que dans la charge des appareils du compte
     // emetteur : le recevoir suffit a avoir le droit de l'afficher.
     nomAgent: (m as { nomAgent?: string | null }).nomAgent ?? null,
@@ -302,6 +304,13 @@ interface SendOptions {
   mediaId?: string
   /** Les comptes vises par un `@`. Le serveur les refiltre sur les membres. */
   mentions?: Array<{ userId: string; libelle: string }>
+  /**
+   * Le message mentionne TOUT le groupe : le texte tape apres le « @ ».
+   *
+   * Un libelle et non un booleen — c'est lui qui permet de surligner, et il
+   * depend de la langue de l'AUTEUR. Absent = pas de mention collective.
+   */
+  mentionTousLibelle?: string
 }
 
 interface DeliveryPayload {
@@ -311,6 +320,13 @@ interface DeliveryPayload {
   mediaId?: string
   replyToId?: string
   mentions?: Array<{ userId: string; libelle: string }>
+  /**
+   * Le message mentionne TOUT le groupe : le texte tape apres le « @ ».
+   *
+   * Un libelle et non un booleen — c'est lui qui permet de surligner, et il
+   * depend de la langue de l'AUTEUR. Absent = pas de mention collective.
+   */
+  mentionTousLibelle?: string
 }
 
 /**
@@ -335,6 +351,10 @@ async function deliverMessage(
         // Le repli REST porte les MEMES mentions que le WebSocket : sans cela,
         // la notification dependrait de l'etat du reseau au moment de l'envoi.
         mentions: payload.mentions,
+        // Le serveur decide : `mentionneTous` n'a d'effet qu'en groupe, et le
+        // libelle est indispensable au surlignage.
+        mentionneTous: payload.mentionTousLibelle ? true : undefined,
+        mentionTousLibelle: payload.mentionTousLibelle,
       },
     })
   }
@@ -412,6 +432,7 @@ export async function sendChatMessage(
       mediaId: options.mediaId,
       replyToId: options.replyToId,
       mentions: options.mentions,
+      mentionTousLibelle: options.mentionTousLibelle,
     })
   } catch (err) {
     /**

@@ -1120,14 +1120,28 @@ function TexteAvecMentions({
   mentions,
   isMe,
   onOuvrirMention,
+  libelleTous,
 }: {
   text: string
   mentions: Array<{ userId: string; libelle: string }>
   isMe: boolean
   /** Clic sur une mention. Absent = la mention reste un simple surlignage. */
   onOuvrirMention?: (userId: string, libelle: string) => void
+  /**
+   * Le libelle de la mention COLLECTIVE, si le message en porte une.
+   *
+   * `userId` vaut alors la chaine vide : c'est ce qui distingue « tout le
+   * groupe » d'une personne, sans ajouter un second mecanisme de decoupage.
+   */
+  libelleTous?: string | null
 }) {
-  const libelles = [...new Set(mentions.map((m) => m.libelle))]
+  // La mention collective entre dans le MEME decoupage que les nominatives :
+  // un second mecanisme finirait par diverger — l'un couperait ce que l'autre
+  // ne couperait pas, sur un texte portant les deux.
+  const toutes = libelleTous
+    ? [...mentions, { userId: "", libelle: libelleTous }]
+    : mentions
+  const libelles = [...new Set(toutes.map((m) => m.libelle))]
     .filter((l) => l !== "")
     .sort((a, b) => b.length - a.length)
 
@@ -1164,9 +1178,12 @@ function TexteAvecMentions({
      * d'ecran l'annonce comme actionnable, et Entree fonctionne — un `span`
      * cliquable n'offre rien de tout cela.
      */
-    const vise = mentions.find((m) => m.libelle === libelle)?.userId ?? ""
+    const vise = toutes.find((m) => m.libelle === libelle)?.userId ?? ""
+    // Chaine vide = la mention collective. Elle est cliquable elle aussi : elle
+    // ouvre la liste des membres.
+    const collectif = libelleTous !== null && libelleTous !== undefined && libelle === libelleTous
     parts.push(
-      onOuvrirMention && vise ? (
+      onOuvrirMention && (vise || collectif) ? (
         <button
           key={cle++}
           type="button"
@@ -4606,6 +4623,7 @@ function MessageBubble({
                     >
                       <TexteAvecMentions
                         onOuvrirMention={onOuvrirMention}
+                        libelleTous={msg.mentionTousLibelle}
                         mentions={msg.mentions ?? []}
                         text={(() => {
                           let cleanText = msg.content || ""
@@ -4856,6 +4874,8 @@ export default function ChatRoomPage() {
    * composant qui choisit, pas cet ecran.
    */
   const [mentionOuverte, setMentionOuverte] = useState<MembreDuGroupe | null>(null)
+  /** Clic sur la mention COLLECTIVE : le meme panneau, en mode liste. */
+  const [listeMembresOuverte, setListeMembresOuverte] = useState(false)
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
@@ -5531,8 +5551,10 @@ export default function ChatRoomPage() {
       const saved = await sendChatMessage(chatId, text, "text", {
         replyToId: replyToMsg?.id,
         mentions: mentionsAEnvoyer(text),
+        mentionTousLibelle: mentionTousAEnvoyer(text) ?? undefined,
       })
       setMentionsEnCours([])
+    setMentionTousLibelle(null)
       setMessages((prev) => {
         const alreadyReceived = prev.some((m) => m.id === saved.id)
         if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
@@ -5574,8 +5596,10 @@ export default function ChatRoomPage() {
       const saved = await sendChatMessage(chatId, text, "text", {
         replyToId: replyTo?.id,
         mentions: mentionsAEnvoyer(text),
+        mentionTousLibelle: mentionTousAEnvoyer(text) ?? undefined,
       })
       setMentionsEnCours([])
+    setMentionTousLibelle(null)
       // Replace le message optimiste par celui renvoye par le backend.
       // Si le broadcast WebSocket est arrive avant (id deja present), on retire juste le tempId.
       setMessages((prev) => {
@@ -5675,6 +5699,13 @@ export default function ChatRoomPage() {
   const [mentionsEnCours, setMentionsEnCours] = useState<
     Array<{ userId: string; libelle: string }>
   >([])
+  /**
+   * Le libelle de la mention COLLECTIVE choisie, ou `null`.
+   *
+   * Un libelle et non un booleen : c'est le texte TAPE qui permet de surligner,
+   * et il depend de la langue de l'auteur — « all », « tous », « alle ».
+   */
+  const [mentionTousLibelle, setMentionTousLibelle] = useState<string | null>(null)
 
   /**
    * Detecte si le curseur est dans un `@…`.
@@ -5704,6 +5735,24 @@ export default function ChatRoomPage() {
     setDebutMention(at)
   }
 
+  /**
+   * Le libelle de la mention collective, DANS LA LANGUE DU LECTEUR.
+   *
+   * Ce qui est ecrit part tel quel au serveur, qui le range : le destinataire
+   * verra donc le mot choisi par l'AUTEUR, pas le sien. C'est voulu — surligner
+   * suppose de retrouver le texte, et le traduire le rendrait introuvable.
+   */
+  const libelleTous = t("chat_mention_all")
+
+  /** La mention collective est-elle proposee pour ce qui suit le `@` ? */
+  const proposerTous = (): boolean => {
+    if (!chat?.isGroup || requeteMention === null) return false
+    const requete = requeteMention.toLowerCase()
+    // On accepte le mot de la langue courante, et « all » qui sert de forme
+    // commune : quelqu'un qui a appris « @all » ailleurs le retrouve ici.
+    return libelleTous.toLowerCase().startsWith(requete) || "all".startsWith(requete)
+  }
+
   /** Les membres proposes, filtres par ce qui suit le `@`. Sans moi. */
   const membresProposes = (): Array<{ id: string; nom: string }> => {
     const requete = (requeteMention ?? "").toLowerCase()
@@ -5721,6 +5770,24 @@ export default function ChatRoomPage() {
    * L'espace finale n'est pas cosmetique : sans elle, le curseur reste DANS la
    * mention et la liste se rouvre aussitot sur le nom qu'on vient de choisir.
    */
+  /** Insere la mention COLLECTIVE. Meme geste que pour une personne. */
+  const insereMentionTous = () => {
+    const champ = inputRef.current
+    const curseur = champ?.selectionStart ?? input.length
+    if (debutMention < 0 || debutMention > curseur) return
+    const nouveau =
+      input.slice(0, debutMention) + `@${libelleTous} ` + input.slice(curseur)
+    setInput(nouveau.slice(0, LONGUEUR_MAX_CONTENU))
+    setRequeteMention(null)
+    setDebutMention(-1)
+    setMentionTousLibelle(libelleTous)
+    window.requestAnimationFrame(() => {
+      champ?.focus()
+      const pos = Math.min(debutMention + libelleTous.length + 2, LONGUEUR_MAX_CONTENU)
+      champ?.setSelectionRange(pos, pos)
+    })
+  }
+
   const insereMention = (userId: string, nom: string) => {
     const champ = inputRef.current
     const curseur = champ?.selectionStart ?? input.length
@@ -5752,6 +5819,10 @@ export default function ChatRoomPage() {
    * 🔴 SANS CE FILTRE, EFFACER « @Dominique » DU TEXTE LE NOTIFIERAIT QUAND
    * MEME : la liste retient ce qui a ete choisi, pas ce qui reste ecrit.
    */
+  /** La mention collective survit-elle dans le texte ? Meme regle que les autres. */
+  const mentionTousAEnvoyer = (texte: string): string | null =>
+    mentionTousLibelle && texte.includes(`@${mentionTousLibelle}`) ? mentionTousLibelle : null
+
   const mentionsAEnvoyer = (texte: string) => {
     const vues = new Set<string>()
     const sortie: Array<{ userId: string; libelle: string }> = []
@@ -6255,6 +6326,7 @@ export default function ChatRoomPage() {
       void removeGroupMember(chatId, membre.id)
         .then(() => {
           setMentionOuverte(null)
+          setListeMembresOuverte(false)
           success(t("cinfo_remove_from_group"))
         })
         .catch(() => error(t("cinfo_remove_failed")))
@@ -6268,6 +6340,7 @@ export default function ChatRoomPage() {
       void setGroupMemberRole(chatId, membre.id, "ADMIN")
         .then(() => {
           setMentionOuverte(null)
+          setListeMembresOuverte(false)
           success(t("cinfo_make_admin"))
         })
         .catch(() => error(t("server_unreachable")))
@@ -6275,8 +6348,26 @@ export default function ChatRoomPage() {
     [chatId, success, error, t]
   )
 
+  /** Tous les membres, dans la forme que le panneau attend. */
+  const membresDuGroupe = useCallback(
+    (): MembreDuGroupe[] =>
+      (backendChat?.membersInfo ?? []).map((m) => ({
+        id: m.id,
+        nom: (m.pseudo ?? m.publicNumber) || t("chat_member_unknown"),
+        numero: m.publicNumber,
+        estAdmin: m.role === "ADMIN",
+      })),
+    [backendChat?.membersInfo, t]
+  )
+
   const ouvrirMention = useCallback(
     (userId: string) => {
+      // Chaine vide = la mention COLLECTIVE : on ouvre la liste des membres,
+      // pas une fiche. C'est le meme panneau, en mode liste.
+      if (userId === "") {
+        setListeMembresOuverte(true)
+        return
+      }
       const membre = backendChat?.membersInfo?.find((m) => m.id === userId)
       if (!membre) {
         // Ancien membre, ou cache non peuple : la fiche de la conversation
@@ -7187,8 +7278,27 @@ export default function ChatRoomPage() {
                   s'affiche si aucun membre ne correspond : un panneau vide
                   au-dessus du clavier serait pire que pas de panneau.
                 */}
-                {requeteMention !== null && membresProposes().length > 0 && (
+                {requeteMention !== null &&
+                  (proposerTous() || membresProposes().length > 0) && (
                   <div className="room-mentions" role="listbox">
+                    {/* EN TETE : c'est la mention la plus consequente — elle
+                        notifie tout le monde — et celle qu'on cherche le plus
+                        souvent quand on ouvre la liste. */}
+                    {proposerTous() && (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={false}
+                        className="room-mention-item tous"
+                        onClick={insereMentionTous}
+                        title={t("chat_mention_all_hint")}
+                      >
+                        <span className="room-mention-tous-nom">@{libelleTous}</span>
+                        <span className="room-mention-tous-aide">
+                          {t("chat_mention_all_hint")}
+                        </span>
+                      </button>
+                    )}
                     {membresProposes().map((m) => (
                       <button
                         key={m.id}
@@ -7338,6 +7448,18 @@ export default function ChatRoomPage() {
         Feuille montante sur telephone, panneau a droite sur grand ecran : la
         bascule vit dans le composant, cet ecran ne connait que « ouvert ».
       */}
+      {listeMembresOuverte && (
+        <PanneauMembre
+          membres={membresDuGroupe()}
+          titreListe={chat?.name}
+          monId={getMyUserId()}
+          jeSuisAdmin={jeSuisAdminDuGroupe}
+          onFermer={() => setListeMembresOuverte(false)}
+          onRetirer={jeSuisAdminDuGroupe ? retirerDuGroupe : undefined}
+          onNommerAdmin={jeSuisAdminDuGroupe ? nommerAdmin : undefined}
+        />
+      )}
+
       {mentionOuverte && (
         <PanneauMembre
           membre={mentionOuverte}

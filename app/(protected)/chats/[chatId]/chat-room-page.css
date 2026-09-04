@@ -1037,3 +1037,26 @@ textarea.room-textarea::placeholder {
   outline-offset: 1px;
   border-radius: 3px;
 }
+
+/*
+ * LA MENTION COLLECTIVE dans le sélecteur, en tête de liste.
+ *
+ * Deux lignes plutôt qu'une : le libellé seul — « @tous » — ne dit pas qu'il
+ * notifie TOUT LE MONDE. C'est la mention la plus conséquente de la liste, et
+ * la seule dont l'effet ne se devine pas au nom.
+ */
+.room-mention-item.tous {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.room-mention-tous-nom {
+  font-weight: 700;
+  color: var(--accent);
+}
+.room-mention-tous-aide {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}

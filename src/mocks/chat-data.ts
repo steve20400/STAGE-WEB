@@ -105,6 +105,14 @@ export interface ChatMessageMock {
    */
   mentions?: MentionMessage[]
   /**
+   * Le texte tape apres le « @ » quand le message mentionne TOUT le groupe.
+   *
+   * Un libelle et non un booleen : c'est lui qui permet de retrouver la mention
+   * dans le texte pour la surligner, et il depend de la langue de l'AUTEUR —
+   * « all », « tous », « alle ». Absent = pas de mention collective.
+   */
+  mentionTousLibelle?: string | null
+  /**
    * Pseudo de l'appareil qui a envoye le message.
    *
    * Present UNIQUEMENT si le lecteur appartient au meme compte que
