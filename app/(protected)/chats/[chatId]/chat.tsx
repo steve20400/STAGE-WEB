@@ -43,6 +43,10 @@ import {
 } from "../../../../src/services/messages-service"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
 import {
+  PanneauMembre,
+  type MembreDuGroupe,
+} from "../../../../src/components/panneau-membre"
+import {
   compresserImage,
   type ResultatCompression,
 } from "../../../../src/lib/image-compression"
@@ -59,6 +63,8 @@ import {
   fetchChatConversations,
   fetchConversationById,
   createPrivateChat,
+  removeGroupMember,
+  setGroupMemberRole,
 } from "../../../../src/services/chats-service"
 import {
   formatAudioDuration,
@@ -4843,6 +4849,13 @@ export default function ChatRoomPage() {
   const [messagesEpingles, setMessagesEpingles] = useState<string[]>([])
   /** Liste deroulee sous le bandeau. Fermee par defaut : elle ne doit rien couvrir. */
   const [listeEpinglesOuverte, setListeEpinglesOuverte] = useState(false)
+  /**
+   * La fiche ouverte depuis une mention, ou `null`.
+   *
+   * Une feuille sur telephone, un panneau a droite sur grand ecran — c'est le
+   * composant qui choisit, pas cet ecran.
+   */
+  const [mentionOuverte, setMentionOuverte] = useState<MembreDuGroupe | null>(null)
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
@@ -6226,26 +6239,59 @@ export default function ChatRoomPage() {
    *  - on ne le connait pas (ancien membre, cache non peuple) : on ouvre les
    *    informations de la conversation plutot que d'echouer en silence.
    */
+  /**
+   * SUIS-JE ADMINISTRATEUR de ce groupe ?
+   *
+   * Le role est pose a la creation et rendu par le serveur. On ne le devine
+   * PLUS a la position dans la liste : chacun designait alors un administrateur
+   * different, et aucun n'etait le createur.
+   */
+  const jeSuisAdminDuGroupe =
+    backendChat?.membersInfo?.find((m) => m.id === getMyUserId())?.role === "ADMIN"
+
+  /** Retire un membre du groupe. Reserve a l'administrateur, jamais sur soi. */
+  const retirerDuGroupe = useCallback(
+    (membre: MembreDuGroupe) => {
+      void removeGroupMember(chatId, membre.id)
+        .then(() => {
+          setMentionOuverte(null)
+          success(t("cinfo_remove_from_group"))
+        })
+        .catch(() => error(t("cinfo_remove_failed")))
+    },
+    [chatId, success, error, t]
+  )
+
+  /** Nomme un membre administrateur. */
+  const nommerAdmin = useCallback(
+    (membre: MembreDuGroupe) => {
+      void setGroupMemberRole(chatId, membre.id, "ADMIN")
+        .then(() => {
+          setMentionOuverte(null)
+          success(t("cinfo_make_admin"))
+        })
+        .catch(() => error(t("server_unreachable")))
+    },
+    [chatId, success, error, t]
+  )
+
   const ouvrirMention = useCallback(
     (userId: string) => {
-      const moi = getMyUserId()
-      const membre = chat?.membersInfo?.find((m) => m.id === userId)
-      const numero = membre?.publicNumber
-
-      if (!numero || userId === moi) {
+      const membre = backendChat?.membersInfo?.find((m) => m.id === userId)
+      if (!membre) {
+        // Ancien membre, ou cache non peuple : la fiche de la conversation
+        // reste la meilleure reponse, plutot qu'un panneau vide.
         navigate(`/chats/${chatId}/info`)
         return
       }
-
-      void createPrivateChat(numero)
-        .then((cree: { id: string }) => navigate(`/chats/${cree.id}`))
-        .catch(() => {
-          // Le tete-a-tete n'a pas pu s'ouvrir : plutot qu'un cul-de-sac, on
-          // montre la fiche de la conversation, ou la personne figure.
-          navigate(`/chats/${chatId}/info`)
-        })
+      setMentionOuverte({
+        id: membre.id,
+        nom: (membre.pseudo ?? membre.publicNumber) || t("chat_member_unknown"),
+        numero: membre.publicNumber,
+        estAdmin: membre.role === "ADMIN",
+      })
     },
-    [chat?.membersInfo, chatId, navigate]
+    [backendChat?.membersInfo, chatId, navigate]
   )
 
   const resolveSenderName = (senderId: string): string => {
@@ -7284,6 +7330,22 @@ export default function ChatRoomPage() {
               )
             )
           }
+        />
+      )}
+
+      {/*
+        LA FICHE OUVERTE DEPUIS UNE MENTION.
+        Feuille montante sur telephone, panneau a droite sur grand ecran : la
+        bascule vit dans le composant, cet ecran ne connait que « ouvert ».
+      */}
+      {mentionOuverte && (
+        <PanneauMembre
+          membre={mentionOuverte}
+          monId={getMyUserId()}
+          jeSuisAdmin={jeSuisAdminDuGroupe}
+          onFermer={() => setMentionOuverte(null)}
+          onRetirer={jeSuisAdminDuGroupe ? retirerDuGroupe : undefined}
+          onNommerAdmin={jeSuisAdminDuGroupe ? nommerAdmin : undefined}
         />
       )}
 

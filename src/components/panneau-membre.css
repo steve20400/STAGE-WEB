@@ -1,0 +1,267 @@
+/*
+ * LA FICHE D'UN MEMBRE — deux mises en page, un seul composant.
+ *
+ * Petit écran : une feuille qui monte du bas jusqu'à mi-hauteur, la
+ * conversation restant visible derrière.
+ * Grand écran : un panneau à droite, à l'emplacement des informations de
+ * discussion. Même cadre, contenu différent.
+ *
+ * La bascule est ICI et nulle part ailleurs : deux composants distincts
+ * auraient dérivé l'un de l'autre dès la première action ajoutée.
+ */
+
+/* ─────────────────────────────── Petit écran : la feuille */
+
+.pm-voile {
+  position: fixed;
+  inset: 0;
+  z-index: 9400;
+  background: var(--overlay);
+  backdrop-filter: blur(2px);
+  animation: pm-voile-entre 0.18s ease-out;
+}
+@keyframes pm-voile-entre {
+  from {
+    opacity: 0;
+  }
+}
+
+.pm-panneau {
+  position: fixed;
+  z-index: 9401;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* La MOITIÉ de l'écran, comme demandé. `max-height` et non `height` : une
+     fiche courte ne doit pas laisser un grand vide sous elle. */
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -8px 30px var(--overlay);
+  animation: pm-monte 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+  outline: none;
+}
+@keyframes pm-monte {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+/* La poignée : elle dit « ceci se tire », sans rien commander. */
+.pm-poignee {
+  width: 36px;
+  height: 4px;
+  margin: 8px auto 2px;
+  border-radius: 2px;
+  background: var(--border-default);
+  flex-shrink: 0;
+}
+
+.pm-tete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 6px;
+  flex-shrink: 0;
+}
+.pm-tete h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pm-fermer {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pm-fermer:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* Le corps DÉFILE seul : c'est lui qui rend une liste de cinquante membres
+   utilisable sans que la feuille grandisse. */
+.pm-corps {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 12px 16px;
+}
+
+/* ─────────────────────────────── La fiche d'une personne */
+
+.pm-fiche {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 0 16px;
+}
+.pm-fiche-nom {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+}
+.pm-fiche-numero {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.pm-fiche-role {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: 20px;
+  padding: 2px 9px;
+}
+
+/* ─────────────────────────────── La liste */
+
+.pm-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pm-liste > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 10px;
+}
+.pm-liste > li:hover {
+  background: var(--bg-elevated);
+}
+/* Une seule personne : ses actions se centrent sous sa fiche. */
+.pm-liste > li.pm-liste-actions {
+  justify-content: center;
+  padding-top: 0;
+}
+.pm-liste > li.pm-liste-actions:hover {
+  background: none;
+}
+
+.pm-liste-textes {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pm-liste-nom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pm-liste-num {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.pm-badge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-radius: 20px;
+  padding: 1px 7px;
+}
+
+.pm-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pm-action {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 5px 10px;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pm-action:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.pm-action.danger {
+  color: var(--danger, #b3261e);
+  border-color: color-mix(in srgb, var(--danger, #b3261e) 35%, transparent);
+}
+.pm-action.danger:hover {
+  background: color-mix(in srgb, var(--danger, #b3261e) 12%, transparent);
+}
+
+/* ─────────────────────────────── Grand écran : le panneau de droite */
+
+@media (min-width: 901px) {
+  /*
+   * PAS DE VOILE ICI. Le panneau vit À CÔTÉ de la conversation, qui reste
+   * utilisable : la couvrir d'un voile la bloquerait sans raison.
+   */
+  .pm-voile {
+    display: none;
+  }
+
+  .pm-panneau {
+    /* Ancré à droite, sur toute la hauteur — la place des informations de
+       discussion. Même cadre, contenu différent. */
+    left: auto;
+    top: 0;
+    bottom: 0;
+    width: 380px;
+    max-height: none;
+    border-radius: 0;
+    border-left: 1px solid var(--border-subtle);
+    box-shadow: -6px 0 24px var(--overlay);
+    animation: pm-glisse 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  @keyframes pm-glisse {
+    from {
+      transform: translateX(100%);
+    }
+  }
+
+  /* La poignée n'a aucun sens sans geste de glissement. */
+  .pm-poignee {
+    display: none;
+  }
+  .pm-tete {
+    padding-top: 16px;
+  }
+}
+
+/* Qui préfère moins d'animation n'en reçoit aucune. */
+@media (prefers-reduced-motion: reduce) {
+  .pm-voile,
+  .pm-panneau {
+    animation: none;
+  }
+}
