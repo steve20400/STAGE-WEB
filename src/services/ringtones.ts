@@ -30,6 +30,25 @@ export const RINGTONES: Ringtone[] = [
   { file: "notification.mp3", label: "Notification Alanya", note: "ring_note_mobile" },
   { file: "ringtone.mp3", label: "Sonnerie classique" },
   { file: "message.mp3", label: "Bip message" },
+
+  /*
+   * LES QUATRE SONNERIES DES LISTES PAR DEFAUT.
+   *
+   * ⚠️ LIVREES AVEC LE CLIENT, et non televersees en base pour chaque compte.
+   *
+   * Le champ `ringtone` d'une liste accepte les deux formes — un nom de fichier
+   * livre, ou une URL de media. Les poser en base aurait cree quatre lignes de
+   * `userRingtone` PAR UTILISATEUR, plus quatre fichiers dans le stockage, pour
+   * un contenu strictement identique chez tout le monde : le meme son duplique
+   * autant de fois qu'il y a de comptes.
+   *
+   * Livrees avec le client, elles pesent 584 Ko une seule fois, sont mises en
+   * cache par le navigateur, et n'exigent AUCUNE migration.
+   */
+  { file: "liste-bureau.mp3", label: "Bureau" },
+  { file: "liste-amis.mp3", label: "Amis" },
+  { file: "liste-confiance.mp3", label: "Confiance" },
+  { file: "liste-famille.mp3", label: "Famille" },
 ]
 
 /**

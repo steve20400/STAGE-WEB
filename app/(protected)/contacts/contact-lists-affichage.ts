@@ -18,6 +18,49 @@ import { customRingtones, RINGTONES } from "../../../src/services/ringtones"
 export const PALETTE: ContactColor[] = ["amber", "blue", "violet", "teal", "rose"]
 
 /**
+ * LA PALETTE DES LISTES — vingt teintes, l'arc-en-ciel compris.
+ *
+ * Cinq ne suffisaient pas : au-dela de cinq listes, deux d'entre elles
+ * portaient forcement la meme pastille, et la couleur cessait de distinguer
+ * quoi que ce soit. Le rouge, en particulier, manquait — c'est la teinte qu'on
+ * cherche en premier pour une liste qui compte.
+ *
+ * ⚠️ EN HEXADECIMAL, et non en jetons de theme comme les avatars. Un jeton
+ * demande deux declarations CSS par teinte — clair et sombre — soit quarante
+ * lignes a tenir pour vingt couleurs. Ces valeurs-ci sont choisies dans la
+ * bande MOYENNE : assez foncees pour se lire sur le creme du theme clair,
+ * assez claires pour se lire sur le nuit. Une seule valeur, les deux themes.
+ *
+ * Le champ est partage avec l'application mobile, qui ne connait pas les
+ * variables CSS du web : une couleur ecrite en hexadecimal y arrive telle
+ * quelle et s'affiche pareil. C'est aussi ce que `teinteCss` accepte deja.
+ */
+export const PALETTE_LISTES: string[] = [
+  // L'arc-en-ciel, dans son ordre.
+  "#e53935", // rouge
+  "#f4511e", // vermillon
+  "#fb8c00", // orange
+  "#fdd835", // jaune
+  "#c0ca33", // citron
+  "#7cb342", // vert clair
+  "#43a047", // vert
+  "#00897b", // sarcelle
+  "#00acc1", // cyan
+  "#039be5", // bleu ciel
+  "#1e88e5", // bleu
+  "#3949ab", // indigo
+  "#5e35b1", // violet
+  "#8e24aa", // pourpre
+  "#d81b60", // magenta
+  // Quelques teintes sourdes, pour les listes qu'on ne veut pas voir crier.
+  "#6d4c41", // brun
+  "#546e7a", // ardoise
+  "#795548", // terre
+  "#8d6e63", // taupe
+  "#607d8b", // gris bleu
+]
+
+/**
  * La couleur est rangee sous le NOM de sa teinte (`blue`) et non sous la
  * variable CSS qui la dessine : le champ est partage avec l'application mobile,
  * qui ne connait pas les variables du web. Une valeur venue d'ailleurs n'est

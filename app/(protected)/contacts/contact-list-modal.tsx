@@ -25,7 +25,7 @@ import {
   stopRingtonePreview,
   RINGTONES,
 } from "../../../src/services/ringtones"
-import { nomSonnerie, PALETTE } from "./contact-lists-affichage"
+import { nomSonnerie, PALETTE_LISTES } from "./contact-lists-affichage"
 
 /**
  * Fenetre de creation et de modification d'une liste de contacts : son nom, sa
@@ -537,14 +537,17 @@ export function ContactListModal({
               langues. Chaque pastille porte son rang, qui se lit dans toutes. */}
           <div className="clist-champ">
             <div className="clist-couleurs">
-              {PALETTE.map((teinte, rang) => {
+              {PALETTE_LISTES.map((teinte, rang) => {
                 const choisie = couleur === teinte
                 return (
                   <button
                     key={teinte}
                     type="button"
                     className={choisie ? "clist-couleur clist-couleur-on" : "clist-couleur"}
-                    style={{ "--clist-teinte": CONTACT_COLORS[teinte].fg } as React.CSSProperties}
+                    // La teinte EST la valeur enregistree : plus de table de
+                    // correspondance entre un nom et sa variable CSS, donc plus
+                    // d'ecart possible entre ce qu'on voit et ce qu'on garde.
+                    style={{ "--clist-teinte": teinte } as React.CSSProperties}
                     aria-pressed={choisie}
                     onClick={() => setCouleur(choisie ? null : teinte)}
                   >
