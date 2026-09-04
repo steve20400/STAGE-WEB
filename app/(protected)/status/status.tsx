@@ -167,6 +167,7 @@ export default function StatusPage() {
     })
     avancement.current = 0
     setProgress(0)
+    setMediaPret(false)
   }, [])
 
   /**
@@ -177,6 +178,19 @@ export default function StatusPage() {
    * les messageries laissent retenir la lecture au doigt.
    */
   const [enPause, setEnPause] = useState(false)
+
+  /**
+   * LE MEDIA EST-IL PRET ? Tant qu'il ne l'est pas, le compte a rebours ne
+   * demarre PAS et le cercle tourne.
+   *
+   * Sans cela, la barre de progression courait sur un ecran noir : sur une
+   * connexion lente, un statut de cinq secondes pouvait passer AVANT que
+   * l'image apparaisse. On regardait le vide, puis le suivant.
+   *
+   * Le cercle revient si le telechargement s'interrompt en cours de lecture —
+   * une video qui bufferise n'avance plus, la barre ne doit pas avancer non plus.
+   */
+  const [mediaPret, setMediaPret] = useState(false)
 
   // La progression s'ACCUMULE au lieu de repartir de l'heure de depart : sans
   // cela, reprendre apres une pause relancerait le compte a zero.
@@ -193,6 +207,9 @@ export default function StatusPage() {
     if (progressTimer.current) clearInterval(progressTimer.current)
     if (status.type === "VIDEO") return // gere par onEnded
     if (enPause) return // l'appui est maintenu : la barre ne bouge pas
+    // ⚠️ LE COMPTE A REBOURS SUIT LE TELECHARGEMENT. Un statut de cinq secondes
+    // sur une connexion lente passait avant que l'image arrive.
+    if (status.type === "IMAGE" && !mediaPret) return
 
     let dernier = Date.now()
     progressTimer.current = setInterval(() => {
@@ -215,7 +232,7 @@ export default function StatusPage() {
         progressTimer.current = null
       }
     }
-  }, [viewer, goTo, enPause])
+  }, [viewer, goTo, enPause, mediaPret])
 
   // Le viewer devient null quand on depasse le dernier statut -> fermeture propre.
   useEffect(() => {
@@ -695,8 +712,16 @@ export default function StatusPage() {
 
             {currentStatus.type === "IMAGE" && currentStatus.mediaUrl && (
               <img
+                key={currentStatus.id}
                 src={resolveMediaUrl(currentStatus.mediaUrl)}
                 alt={t("l2_status_alt")}
+                // Le compte a rebours ne part qu'ICI : tant que l'image n'est
+                // pas arrivee, la barre reste immobile et le cercle tourne.
+                onLoad={() => setMediaPret(true)}
+                // Media introuvable ou casse : on debloque quand meme, sinon le
+                // lecteur resterait fige sur un cercle eternel. Cinq secondes
+                // d'ecran vide valent mieux qu'un blocage.
+                onError={() => setMediaPret(true)}
                 style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
               />
             )}
@@ -708,6 +733,18 @@ export default function StatusPage() {
                 autoPlay
                 playsInline
                 controls={false}
+                /*
+                 * UNE VIDEO SE LIT AU FUR ET A MESURE — le navigateur le fait
+                 * deja. Ce qu'il ne fait pas, c'est le DIRE : `waiting` marque
+                 * l'interruption du telechargement, `playing` sa reprise.
+                 *
+                 * Sans ces deux-la, une video qui bufferise laissait un ecran
+                 * fige sans explication, et l'utilisateur croyait a une panne.
+                 */
+                onCanPlay={() => setMediaPret(true)}
+                onPlaying={() => setMediaPret(true)}
+                onWaiting={() => setMediaPret(false)}
+                onError={() => setMediaPret(true)}
                 onTimeUpdate={(e) => {
                   const video = e.currentTarget
                   if (Number.isFinite(video.duration) && video.duration > 0) {
@@ -717,6 +754,18 @@ export default function StatusPage() {
                 onEnded={() => goTo(1)}
                 style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
               />
+            )}
+
+            {/*
+              LE CERCLE, AU-DESSUS DU MEDIA et non a sa place : l'image deja
+              recue reste visible pendant qu'on attend la suite d'une video.
+              Il ne parait que pour les medias — un statut de TEXTE n'a rien a
+              telecharger.
+            */}
+            {currentStatus.type !== "TEXT" && !mediaPret && (
+              <div className="statut-chargement" role="status" aria-live="polite">
+                <span className="statut-cercle" aria-hidden="true" />
+              </div>
             )}
           </div>
         </div>

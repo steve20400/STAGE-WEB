@@ -487,3 +487,44 @@
     right: 14px;
   }
 }
+
+/*
+ * ═══ LE CERCLE D'ATTENTE DU LECTEUR DE STATUTS ═══
+ *
+ * AU-DESSUS du média, jamais à sa place : quand une vidéo s'interrompt pour se
+ * remplir, l'image déjà reçue doit rester visible dessous. La remplacer par un
+ * cercle donnerait l'impression que le statut a disparu.
+ */
+.statut-chargement {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.statut-cercle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid #ffffff40;
+  border-top-color: #fff;
+  animation: statut-tourne 0.8s linear infinite;
+}
+@keyframes statut-tourne {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/*
+ * Qui a demandé moins d'animation garde un repère FIXE plutôt que rien : sans
+ * rotation, un cercle uniforme ne dirait pas qu'il se passe quelque chose.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .statut-cercle {
+    animation: none;
+    border-top-color: #ffffff40;
+    border-right-color: #fff;
+  }
+}
