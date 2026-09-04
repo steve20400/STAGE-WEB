@@ -4,6 +4,12 @@ import { CONTACT_COLORS } from "../../../src/data/contacts"
 import { useContacts } from "../../../src/hooks/use-contacts"
 import { useToast } from "../../../src/components/toast"
 import { addContactByPhone } from "../../../src/services/contacts-service"
+import {
+  listerListes,
+  listesEnCache,
+  modifierListe,
+  type ListeContacts,
+} from "../../../src/services/contact-lists-service"
 import { createPrivateChat } from "../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../src/services/call-manager"
 import {
@@ -33,10 +39,32 @@ export default function ContactsPage() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { contacts, addContact, removeContact } = useContacts()
-  const { success, error } = useToast()
+  const { success, error, warning } = useToast()
 
   const [query, setQuery] = useState("")
   const [showAdd, setShowAdd] = useState(false)
+  /**
+   * La liste ou ranger le contact des sa creation, ou `null` pour aucune.
+   *
+   * Ranger a la creation vaut mieux que ranger apres : c'est au moment ou l'on
+   * enregistre quelqu'un qu'on sait a quel cercle il appartient. Une fois la
+   * fenetre fermee, il faut retrouver le contact, ouvrir la liste, l'y ajouter —
+   * trois gestes que personne ne fait.
+   */
+  const [listeChoisie, setListeChoisie] = useState<string | null>(null)
+  const [listes, setListes] = useState<ListeContacts[]>(() => listesEnCache())
+
+  useEffect(() => {
+    let annule = false
+    void listerListes()
+      .then((recues) => {
+        if (!annule) setListes(recues)
+      })
+      .catch(() => undefined)
+    return () => {
+      annule = true
+    }
+  }, [])
   const [newNumber, setNewNumber] = useState("")
   const [newAlias, setNewAlias] = useState("")
   const [saving, setSaving] = useState(false)
@@ -105,9 +133,41 @@ export default function ContactsPage() {
     try {
       const contact = await addContactByPhone(number, newAlias)
       addContact(contact)
-      success(t("contact_saved"), contact.name)
+
+      /*
+       * RANGE DANS LA LISTE CHOISIE, si l'utilisateur en a designe une.
+       *
+       * ⚠️ L'ECHEC N'ANNULE PAS L'AJOUT. Le contact est cree ; ne pas avoir pu
+       * le ranger est un demi-echec, pas une raison de le perdre. On le dit, et
+       * l'utilisateur range a la main.
+       *
+       * On envoie les membres DEJA PRESENTS plus le nouveau : le service
+       * remplace l'ensemble des membres, il ne les ajoute pas. Omettre les
+       * anciens viderait la liste.
+       */
+      if (listeChoisie) {
+        const liste = listes.find((l) => l.id === listeChoisie)
+        if (liste) {
+          try {
+            const maj = await modifierListe(liste.id, {
+              membres: {
+                identifiants: liste.membres.map((m) => m.id).filter(Boolean),
+                numeros: [...liste.membres.map((m) => m.numero), number].filter(Boolean),
+              },
+            })
+            setListes((prev) => prev.map((l) => (l.id === maj.liste.id ? maj.liste : l)))
+            success(t("contact_saved"), `${contact.name} — ${liste.nom}`)
+          } catch {
+            warning(t("contact_saved"), t("clist_liste_non_rangee"))
+          }
+        }
+      } else {
+        success(t("contact_saved"), contact.name)
+      }
+
       setNewNumber("")
       setNewAlias("")
+      setListeChoisie(null)
       setShowAdd(false)
     } catch (err) {
       const message = err instanceof Error ? err.message : t("add_failed")
@@ -205,6 +265,38 @@ export default function ContactsPage() {
               maxLength={100}
               style={{ padding: "10px 12px", width: 220, fontSize: 13 }}
             />
+            {/*
+              RANGER DANS UNE LISTE, des la creation.
+              C'est au moment ou l'on enregistre quelqu'un qu'on sait a quel
+              cercle il appartient. Apres coup, il faut retrouver le contact,
+              ouvrir la liste, l'y ajouter — trois gestes que personne ne fait.
+
+              Un `<select>` et non une rangee de pastilles : quatre listes par
+              defaut plus celles de l'utilisateur, cela depasse vite ce qu'une
+              rangee peut montrer sans defiler.
+            */}
+            {listes.length > 0 && (
+              <div style={{ display: "grid", gap: 4, minWidth: 170 }}>
+                <select
+                  className="input-base"
+                  value={listeChoisie ?? ""}
+                  onChange={(e) => setListeChoisie(e.target.value || null)}
+                  aria-label={t("clist_ranger_dans")}
+                  style={{ padding: "10px 12px", width: "100%", fontSize: 13 }}
+                >
+                  <option value="">{t("clist_aucune_liste")}</option>
+                  {listes.map((liste) => (
+                    <option key={liste.id} value={liste.id}>
+                      {liste.nom}
+                    </option>
+                  ))}
+                </select>
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                  {t("clist_ranger_dans")}
+                </span>
+              </div>
+            )}
+
             <button className="new-call-btn" type="submit" disabled={!canSave || saving}>
               {saving ? t("device_name_saving") : t("save")}
             </button>
