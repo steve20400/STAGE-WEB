@@ -47,7 +47,14 @@ export interface ConversationMock {
    */
   isSelf?: boolean
   members?: string[]
-  membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string; role?: string }>
+  membersInfo?: Array<{
+    id: string
+    pseudo?: string | null
+    publicNumber?: string
+    role?: string
+    /** Photo de profil. Absente = on retombe sur les initiales. */
+    avatarUrl?: string | null
+  }>
   isPinned?: boolean
   /**
    * Verrou pose par un appareil de MON compte, s'il y en a un.
@@ -69,7 +76,14 @@ export interface ChatInfoMock {
   online: boolean
   isGroup: boolean
   members?: string[]
-  membersInfo?: Array<{ id: string; pseudo?: string | null; publicNumber?: string; role?: string }>
+  membersInfo?: Array<{
+    id: string
+    pseudo?: string | null
+    publicNumber?: string
+    role?: string
+    /** Photo de profil. Absente = on retombe sur les initiales. */
+    avatarUrl?: string | null
+  }>
   typing?: boolean
   /** Verrou pose par un appareil de mon compte, ou null. Voir ConversationMock. */
   lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null

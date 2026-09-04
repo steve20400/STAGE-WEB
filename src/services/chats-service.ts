@@ -62,6 +62,11 @@ interface BackendConversation {
     publicNumber: string
     role?: string
     /**
+     * Photo de profil du membre. Facultatif : un backend anterieur ne l'envoie
+     * pas, et l'ecran retombe alors sur les initiales.
+     */
+    avatarUrl?: string | null
+    /**
      * Jusqu'ou ce membre a lu. `null` = il n'a jamais ouvert la conversation.
      *
      * Facultatif : un backend anterieur ne l'envoie pas, et le compteur se

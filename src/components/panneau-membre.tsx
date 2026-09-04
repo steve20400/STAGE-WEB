@@ -48,6 +48,10 @@ interface PanneauMembreProps {
   onRetirer?: (membre: MembreDuGroupe) => void
   /** Nommer administrateur. Absent = l'action n'est pas proposée. */
   onNommerAdmin?: (membre: MembreDuGroupe) => void
+  /** Ouvrir une conversation avec la personne. */
+  onEcrire?: (membre: MembreDuGroupe) => void
+  /** L'appeler, en audio ou en vidéo. */
+  onAppeler?: (membre: MembreDuGroupe, type: "audio" | "video") => void
 }
 
 export function PanneauMembre({
@@ -59,6 +63,8 @@ export function PanneauMembre({
   onFermer,
   onRetirer,
   onNommerAdmin,
+  onEcrire,
+  onAppeler,
 }: PanneauMembreProps) {
   const { t } = useTranslation()
   const cadre = useRef<HTMLDivElement>(null)
@@ -112,18 +118,63 @@ export function PanneauMembre({
         </header>
 
         <div className="pm-corps">
-          {/* UNE SEULE PERSONNE : sa fiche en grand, puis les actions. */}
+          {/*
+            UNE SEULE PERSONNE : sa fiche, puis les gestes en TOUTES LETTRES.
+            Le menu trois-points seul laissait un panneau presque vide, et
+            demandait un geste de plus pour la chose la plus courante — ecrire
+            ou appeler. Les trois actions sont donc posees a plat, en grand.
+          */}
           {!modeListe && membre && (
-            <div className="pm-fiche">
-              <AvatarCircle
-                avatar={membre.avatar}
-                initials={toInitials(membre.nom)}
-                style={{ width: 72, height: 72, fontSize: 24 }}
-              />
-              <div className="pm-fiche-nom">{membre.nom}</div>
-              {membre.numero && <div className="pm-fiche-numero">{membre.numero}</div>}
-              {membre.estAdmin && <div className="pm-fiche-role">{t("cinfo_admin")}</div>}
-            </div>
+            <>
+              <div className="pm-fiche">
+                <AvatarCircle
+                  avatar={membre.avatar}
+                  initials={toInitials(membre.nom)}
+                  style={{ width: 88, height: 88, fontSize: 30 }}
+                />
+                <div className="pm-fiche-nom">{membre.nom}</div>
+                {membre.numero && <div className="pm-fiche-numero">{membre.numero}</div>}
+                {membre.estAdmin && <div className="pm-fiche-role">{t("cinfo_admin")}</div>}
+              </div>
+
+              {membre.numero && membre.id !== monId && (
+                <div className="pm-gestes">
+                  <button
+                    type="button"
+                    className="pm-geste"
+                    onClick={() => onEcrire?.(membre)}
+                    title={t("send_message")}
+                  >
+                    <span className="pm-geste-icone" aria-hidden="true">
+                      💬
+                    </span>
+                    <span>{t("send_message")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="pm-geste"
+                    onClick={() => onAppeler?.(membre, "audio")}
+                    title={t("audio_call")}
+                  >
+                    <span className="pm-geste-icone" aria-hidden="true">
+                      📞
+                    </span>
+                    <span>{t("audio_call")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="pm-geste"
+                    onClick={() => onAppeler?.(membre, "video")}
+                    title={t("video_call")}
+                  >
+                    <span className="pm-geste-icone" aria-hidden="true">
+                      🎥
+                    </span>
+                    <span>{t("video_call")}</span>
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           <ul className="pm-liste">
@@ -152,7 +203,7 @@ export function PanneauMembre({
                     {/* Écrire, appeler en audio, appeler en vidéo : le menu que
                         toute l'application utilise déjà. On ne le réécrit pas —
                         une seconde version dériverait de la première. */}
-                    {m.numero && (
+                    {m.numero && modeListe && (
                       <MenuContact
                         userId={m.id}
                         numero={m.numero}

@@ -123,6 +123,57 @@
   font-size: 13px;
   color: var(--text-muted);
 }
+/*
+ * LES TROIS GESTES, EN TOUTES LETTRES.
+ *
+ * Le menu trois-points seul laissait un panneau presque vide, et demandait un
+ * geste de plus pour la chose la plus courante — écrire ou appeler. Trois
+ * colonnes égales : aucune n'est privilégiée, et la rangée reste lisible en
+ * allemand comme en chinois.
+ */
+.pm-gestes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0 4px 16px;
+}
+.pm-geste {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-base);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.pm-geste:hover {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pm-geste-icone {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Un filet sépare la fiche des actions d'administration, qui n'ont pas la même
+   portée : les trois gestes ci-dessus concernent la personne, celles d'en
+   dessous concernent son appartenance au groupe. */
+.pm-liste > li.pm-liste-actions {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+  margin-top: 2px;
+}
+
 .pm-fiche-role {
   font-size: 11px;
   font-weight: 700;

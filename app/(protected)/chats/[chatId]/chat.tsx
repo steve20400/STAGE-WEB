@@ -6355,17 +6355,57 @@ export default function ChatRoomPage() {
         id: m.id,
         nom: (m.pseudo ?? m.publicNumber) || t("chat_member_unknown"),
         numero: m.publicNumber,
+        avatar: m.avatarUrl ?? null,
         estAdmin: m.role === "ADMIN",
       })),
     [backendChat?.membersInfo, t]
   )
 
+  /** Ouvre — ou cree — le tete-a-tete avec ce membre. */
+  const ecrireAuMembre = useCallback(
+    (membre: MembreDuGroupe) => {
+      if (!membre.numero) return
+      setMentionOuverte(null)
+      void createPrivateChat(membre.numero)
+        .then((cree: { id: string }) => navigate(`/chats/${cree.id}`))
+        .catch(() => error(t("server_unreachable")))
+    },
+    [navigate, error, t]
+  )
+
+  /** L'appelle, en audio ou en video. */
+  const appelerMembre = useCallback(
+    (membre: MembreDuGroupe, type: "audio" | "video") => {
+      if (!membre.numero) return
+      setMentionOuverte(null)
+      /*
+       * LA CONVERSATION D'ABORD, L'APPEL ENSUITE. `startOutgoingCall` attend un
+       * identifiant de CONVERSATION, pas un numero : c'est le meme enchainement
+       * que le repertoire et que le menu trois-points, et il ne se contourne pas.
+       */
+      void createPrivateChat(membre.numero)
+        .then((cree: { id: string }) => startOutgoingCall(cree.id, type, membre.nom))
+        .catch(() => error(t("server_unreachable")))
+    },
+    [error, t]
+  )
+
   const ouvrirMention = useCallback(
     (userId: string) => {
-      // Chaine vide = la mention COLLECTIVE : on ouvre la liste des membres,
-      // pas une fiche. C'est le meme panneau, en mode liste.
+      /*
+       * MENTION COLLECTIVE : on ouvre les PARAMETRES DE LA DISCUSSION, a la
+       * hauteur de la liste des membres.
+       *
+       * Et non un panneau a part : cette liste existe deja la-bas, avec ses
+       * actions et son ordre. En recreer une seconde version aurait donne deux
+       * listes a tenir a jour — et le jour ou l'une gagne une action, l'autre
+       * ne l'a pas.
+       *
+       * L'ancre porte le defilement : le panneau s'ouvre directement au bon
+       * endroit, sans que l'utilisateur cherche.
+       */
       if (userId === "") {
-        setListeMembresOuverte(true)
+        navigate(`/chats/${chatId}/info#membres`)
         return
       }
       const membre = backendChat?.membersInfo?.find((m) => m.id === userId)
@@ -6379,6 +6419,7 @@ export default function ChatRoomPage() {
         id: membre.id,
         nom: (membre.pseudo ?? membre.publicNumber) || t("chat_member_unknown"),
         numero: membre.publicNumber,
+        avatar: membre.avatarUrl ?? null,
         estAdmin: membre.role === "ADMIN",
       })
     },
@@ -7465,6 +7506,8 @@ export default function ChatRoomPage() {
           membre={mentionOuverte}
           monId={getMyUserId()}
           jeSuisAdmin={jeSuisAdminDuGroupe}
+          onEcrire={ecrireAuMembre}
+          onAppeler={appelerMembre}
           onFermer={() => setMentionOuverte(null)}
           onRetirer={jeSuisAdminDuGroupe ? retirerDuGroupe : undefined}
           onNommerAdmin={jeSuisAdminDuGroupe ? nommerAdmin : undefined}

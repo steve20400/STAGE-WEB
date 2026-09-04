@@ -155,6 +155,32 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const conv = propInfo
 
   const [tab, setTab] = useState<"membres" | "fichiers">("membres")
+
+  /*
+   * ARRIVEE PAR UNE MENTION COLLECTIVE : « #membres » dans l'adresse.
+   *
+   * Cliquer « @tous » ouvre ces parametres A LA HAUTEUR de la liste des
+   * membres. On selectionne donc l'onglet ET on y fait defiler — arriver en
+   * haut d'une page de reglages quand on a demande la liste des membres
+   * obligerait a la chercher.
+   *
+   * L'onglet est deja « membres » par defaut ; l'ancre sert surtout au
+   * DEFILEMENT, et couvre le cas ou l'on revient sur « fichiers ».
+   */
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (window.location.hash !== "#membres") return
+    setTab("membres")
+    // Apres la peinture : la liste n'existe pas encore au moment ou l'effet
+    // s'execute, et un defilement vers un element absent ne fait rien.
+    const id = window.requestAnimationFrame(() => {
+      document.querySelector("[data-section-membres]")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [])
   /**
    * Notifications coupees pour cette conversation.
    *
@@ -788,7 +814,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           )}
 
           {(tab === "membres" || !conv.isGroup) && (
-            <div className="cip-section">
+            <div className="cip-section" data-section-membres>
               {!conv.isGroup && <div className="cip-section-title">{t("cinfo_shared_files")}</div>}
               {conv.isGroup &&
                 members.map((member) => {
