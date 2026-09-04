@@ -1,6 +1,7 @@
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { compresserImage } from "../../../src/lib/image-compression"
+import { EditeurStatut } from "../../../src/components/editeur-statut"
 import { createPrivateChat } from "../../../src/services/chats-service"
 import { sendChatMessage } from "../../../src/services/messages-service"
 import { useToast } from "../../../src/components/toast"
@@ -195,6 +196,16 @@ export default function StatusPage() {
   const [mediaPret, setMediaPret] = useState(false)
 
   /** Texte en cours de saisie dans la barre de reponse. */
+  /**
+   * LA FILE D'ATTENTE DE PUBLICATION.
+   *
+   * Une selection multiple passe par l'editeur UN FICHIER A LA FOIS : on annote
+   * la premiere photo, on publie, la suivante s'ouvre. Traiter le lot d'un bloc
+   * obligerait a choisir entre annoter toutes les photos d'avance — sans voir
+   * le resultat — ou n'en annoter aucune.
+   */
+  const [aPublier, setAPublier] = useState<File[]>([])
+
   const [reponse, setReponse] = useState("")
   const [envoiReponse, setEnvoiReponse] = useState(false)
 
@@ -324,8 +335,24 @@ export default function StatusPage() {
    * dit ce qui a reellement ete publie. Perdre trois photos parce que la
    * deuxieme etait trop lourde serait le pire des comportements.
    */
-  const publierPlusieurs = async (fichiers: File[]) => {
+  const publierPlusieurs = (fichiers: File[]) => {
     if (posting) return
+    /*
+     * LES VIDEOS PASSENT DIRECTEMENT, les images par l'editeur.
+     *
+     * Incruster du texte dans une video demande de la re-encoder, ce qu'un
+     * navigateur ne sait pas faire sans telecharger vingt-cinq megaoctets
+     * d'outillage. Les mettre dans la file de l'editeur ouvrirait un ecran
+     * d'annotation qui ne pourrait rien annoter.
+     */
+    const images = fichiers.filter((f) => f.type.startsWith("image/"))
+    const videos = fichiers.filter((f) => !f.type.startsWith("image/"))
+    if (videos.length > 0) void publierDirectement(videos)
+    if (images.length > 0) setAPublier(images)
+  }
+
+  /** Publie sans passer par l'editeur : videos, et images deja annotees. */
+  const publierDirectement = async (fichiers: File[]) => {
     setPosting(true)
     let publies = 0
     let echecs = 0
@@ -394,6 +421,26 @@ export default function StatusPage() {
 
   return (
     <div className="calls-root" style={{ padding: "20px 0" }}>
+
+      {/*
+        L'EDITEUR, UNE PHOTO A LA FOIS.
+
+        Il s'ouvre par-dessus tout le reste. « Publier » envoie l'image
+        aplatie — texte et dessin compris — et passe a la suivante ; annuler
+        ABANDONNE TOUTE LA FILE plutot que la seule photo courante : quelqu'un
+        qui ferme veut sortir, pas enchainer les quatre suivantes.
+      */}
+      {aPublier.length > 0 && (
+        <EditeurStatut
+          key={aPublier[0].name + aPublier[0].size}
+          fichier={aPublier[0]}
+          onAnnuler={() => setAPublier([])}
+          onValider={(fichier) => {
+            setAPublier((reste) => reste.slice(1))
+            void publierDirectement([fichier])
+          }}
+        />
+      )}
       <div className="calls-head" style={{ marginBottom: 18 }}>
         <div className="calls-title-row page-title-row">
           <h1 className="calls-title">{t("status")}</h1>

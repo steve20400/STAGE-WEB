@@ -1,0 +1,204 @@
+/*
+ * ÉCRIRE ET DESSINER SUR UNE PHOTO AVANT DE LA PUBLIER.
+ *
+ * Plein écran et fond noir : c'est la photo qu'on regarde, tout le reste doit
+ * s'effacer. Même parti pris que le lecteur de statuts, pour que passer de l'un
+ * à l'autre ne surprenne pas.
+ */
+
+.es-plein {
+  position: fixed;
+  inset: 0;
+  z-index: 9700;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+/* ─────────────────────────────── La barre d'outils */
+
+.es-barre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 14px 10px;
+  flex-shrink: 0;
+}
+.es-barre > button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: #ffffff1a;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.es-outils {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+.es-outils button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: #ffffff1a;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.es-outils button:hover:not(:disabled) {
+  background: #ffffff33;
+}
+/* L'outil actif se VOIT : sans marque, on dessine en croyant déplacer, ou
+   l'inverse — et le trait de trop se corrige à l'annulation. */
+.es-outils button.on {
+  background: var(--accent);
+}
+.es-outils button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ─────────────────────────────── Le cadre de l'image */
+
+.es-cadre {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* `cqh` sur les textes se mesure sur CE conteneur : sans requête de
+     conteneur, la taille du texte suivrait la fenêtre entière et ne
+     correspondrait plus à l'export. */
+  container-type: size;
+  touch-action: none;
+}
+.es-cadre.dessin {
+  cursor: crosshair;
+}
+.es-cadre img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Les tracés couvrent exactement le cadre : le repère est le même que celui des
+   textes — des fractions de 0 à 1 — donc rien à convertir entre les deux. */
+.es-traces {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.es-texte {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-family: "DM Sans", sans-serif;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: pre;
+  cursor: grab;
+  touch-action: none;
+  /* Un liseré sombre, jamais un fond opaque : un texte blanc sur ciel blanc
+     serait illisible, mais un rectangle plein masquerait la photo. Reproduit
+     tel quel à l'export. */
+  text-shadow:
+    0 0 3px rgba(0, 0, 0, 0.75),
+    0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.es-texte:active {
+  cursor: grabbing;
+}
+
+/* ─────────────────────────────── Couleurs et publication */
+
+.es-couleurs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
+}
+.es-couleurs > button:not(.es-publier) {
+  width: 26px;
+  height: 26px;
+  border: 2px solid #ffffff55;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s, border-color 0.15s;
+}
+.es-couleurs > button.on {
+  border-color: #fff;
+  transform: scale(1.2);
+}
+.es-publier {
+  margin-left: auto;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.es-publier:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ─────────────────────────────── La saisie d'un texte */
+
+.es-saisie {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  padding: 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: #000000dd;
+}
+.es-saisie input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border: 1px solid #ffffff35;
+  border-radius: 12px;
+  background: #ffffff14;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+}
+.es-saisie input:focus {
+  outline: none;
+  border-color: #ffffff70;
+}
+.es-saisie button {
+  flex: none;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
