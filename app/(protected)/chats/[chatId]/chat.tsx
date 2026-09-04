@@ -4044,6 +4044,43 @@ function MessageBubble({
               )}
 
               {/*
+                LA CITATION DU STATUT AUQUEL CE MESSAGE REPOND.
+
+                Au-dessus du texte, comme une citation de message : on lit
+                d'abord CE A QUOI l'on repond, puis la reponse. Sans elle,
+                l'auteur recevait « joli ! » sans savoir de quoi on parle — il a
+                pu publier cinq statuts dans la journee.
+
+                Le contenu est RECOPIE par le serveur : il reste lisible meme
+                apres l'expiration du statut, 24 h plus tard.
+              */}
+              {msg.statutCite && !msg.isDeleted && (
+                <div className="statut-cite">
+                  {msg.statutCite.mediaUrl ? (
+                    <img
+                      className="statut-cite-vignette"
+                      src={resolveMediaUrl(msg.statutCite.mediaUrl)}
+                      alt=""
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span
+                      className="statut-cite-vignette texte"
+                      style={{ background: msg.statutCite.bgColor ?? "var(--accent)" }}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span className="statut-cite-textes">
+                    <span className="statut-cite-titre">{t("statut_cite_titre")}</span>
+                    <span className="statut-cite-apercu">
+                      {msg.statutCite.text?.trim() ||
+                        (msg.statutCite.type === "VIDEO" ? t("video_label") : t("photo"))}
+                    </span>
+                  </span>
+                </div>
+              )}
+
+              {/*
                 LA TRADUCTION AU-DESSUS, L'ORIGINAL EN DESSOUS.
                 Elle etait sous le texte d'origine : on lisait donc d'abord ce
                 qu'on ne comprend pas, et la reponse arrivait apres. L'ordre

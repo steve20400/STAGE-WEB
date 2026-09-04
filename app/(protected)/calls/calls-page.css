@@ -528,3 +528,85 @@
     border-right-color: #fff;
   }
 }
+
+/*
+ * ═══ RÉPONDRE À UN STATUT ═══
+ *
+ * Sous le média, hors de la zone de navigation : écrire ne doit pas faire
+ * passer au statut suivant. Les emojis d'abord — c'est la réponse la plus
+ * fréquente, et elle doit tenir en un seul geste.
+ */
+.statut-reponse {
+  flex-shrink: 0;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: linear-gradient(to top, #000000cc, transparent);
+}
+
+.statut-emojis {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+.statut-emojis button {
+  flex: 1;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.15s;
+}
+.statut-emojis button:hover:not(:disabled) {
+  background: #ffffff1a;
+  /* Il grandit au survol : sur une rangée de six, rien d'autre ne dit lequel
+     est visé — ils n'ont ni bordure ni fond au repos. */
+  transform: scale(1.18);
+}
+.statut-emojis button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.statut-saisie {
+  display: flex;
+  gap: 8px;
+}
+.statut-saisie input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid #ffffff35;
+  border-radius: 22px;
+  background: #ffffff14;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+}
+.statut-saisie input::placeholder {
+  color: #ffffff80;
+}
+.statut-saisie input:focus {
+  outline: none;
+  border-color: #ffffff70;
+}
+.statut-saisie button {
+  flex: none;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.statut-saisie button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

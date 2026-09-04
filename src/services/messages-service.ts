@@ -152,6 +152,7 @@ export function toFrontMessage(
     mentions: (m as BackendMessage).mentions ?? undefined,
     mentionTousLibelle:
       (m as { mentionTousLibelle?: string | null }).mentionTousLibelle ?? null,
+    statutCite: (m as { statutCite?: ChatMessageMock["statutCite"] }).statutCite ?? null,
     // Le serveur ne met ce champ que dans la charge des appareils du compte
     // emetteur : le recevoir suffit a avoir le droit de l'afficher.
     nomAgent: (m as { nomAgent?: string | null }).nomAgent ?? null,
@@ -311,6 +312,14 @@ interface SendOptions {
    * depend de la langue de l'AUTEUR. Absent = pas de mention collective.
    */
   mentionTousLibelle?: string
+  /**
+   * Le statut auquel ce message repond.
+   *
+   * Le serveur RECOPIE le statut cite plutot que d'y pointer : un statut est
+   * purge au bout de 24 h, et une citation qui le referencerait disparaitrait
+   * avec lui. Il verifie aussi qu'on avait le droit de le voir.
+   */
+  statutCite?: string
 }
 
 interface DeliveryPayload {
@@ -327,6 +336,14 @@ interface DeliveryPayload {
    * depend de la langue de l'AUTEUR. Absent = pas de mention collective.
    */
   mentionTousLibelle?: string
+  /**
+   * Le statut auquel ce message repond.
+   *
+   * Le serveur RECOPIE le statut cite plutot que d'y pointer : un statut est
+   * purge au bout de 24 h, et une citation qui le referencerait disparaitrait
+   * avec lui. Il verifie aussi qu'on avait le droit de le voir.
+   */
+  statutCite?: string
 }
 
 /**
@@ -355,6 +372,7 @@ async function deliverMessage(
         // libelle est indispensable au surlignage.
         mentionneTous: payload.mentionTousLibelle ? true : undefined,
         mentionTousLibelle: payload.mentionTousLibelle,
+        statutCite: payload.statutCite,
       },
     })
   }
@@ -433,6 +451,7 @@ export async function sendChatMessage(
       replyToId: options.replyToId,
       mentions: options.mentions,
       mentionTousLibelle: options.mentionTousLibelle,
+      statutCite: options.statutCite,
     })
   } catch (err) {
     /**

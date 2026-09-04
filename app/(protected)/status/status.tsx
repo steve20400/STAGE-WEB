@@ -1,6 +1,8 @@
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { compresserImage } from "../../../src/lib/image-compression"
+import { createPrivateChat } from "../../../src/services/chats-service"
+import { sendChatMessage } from "../../../src/services/messages-service"
 import { useToast } from "../../../src/components/toast"
 import { toInitials } from "../../../src/data/session-user"
 import { resolveMediaUrl,
@@ -192,6 +194,10 @@ export default function StatusPage() {
    */
   const [mediaPret, setMediaPret] = useState(false)
 
+  /** Texte en cours de saisie dans la barre de reponse. */
+  const [reponse, setReponse] = useState("")
+  const [envoiReponse, setEnvoiReponse] = useState(false)
+
   // La progression s'ACCUMULE au lieu de repartir de l'heure de depart : sans
   // cela, reprendre apres une pause relancerait le compte a zero.
   const avancement = useRef(0)
@@ -242,6 +248,43 @@ export default function StatusPage() {
       void reload()
     }
   }, [viewer, reload])
+
+  /**
+   * REPONDRE A UN STATUT — par un emoji ou par un texte.
+   *
+   * Le message part dans le TETE-A-TETE avec l'auteur, jamais dans un fil
+   * dedie : repondre a un statut, c'est engager une conversation, et
+   * l'utilisateur s'attend a la retrouver la ou vivent toutes les autres.
+   *
+   * ⚠️ LA CITATION ACCOMPAGNE LE MESSAGE. Sans elle, l'auteur recevrait
+   * « joli ! » sans savoir de quoi on parle — il a pu publier cinq statuts dans
+   * la journee. Le serveur RECOPIE le statut cite plutot que d'y pointer : un
+   * statut est purge au bout de 24 h, et une citation qui le referencerait
+   * disparaitrait avec.
+   */
+  const repondreAuStatut = async (texte: string) => {
+    const contenu = texte.trim()
+    if (!contenu || envoiReponse || !viewer) return
+    const statut = viewer.group.statuses[viewer.index]
+    if (!statut) return
+
+    setEnvoiReponse(true)
+    // La lecture se met en pause le temps de l'envoi : voir le statut defiler
+    // pendant qu'on lui repond est desagreable, et le suivant volerait la
+    // reponse en cours.
+    setEnPause(true)
+    try {
+      const { id } = await createPrivateChat(viewer.group.publicNumber)
+      await sendChatMessage(id, contenu, "text", { statutCite: statut.id })
+      setReponse("")
+      success(t("statut_reponse_envoyee"))
+    } catch {
+      error(t("server_unreachable"))
+    } finally {
+      setEnvoiReponse(false)
+      setEnPause(false)
+    }
+  }
 
   /* ----------------- Composeur ----------------- */
 
@@ -768,6 +811,60 @@ export default function StatusPage() {
               </div>
             )}
           </div>
+
+          {/*
+            REPONDRE — jamais sur son propre statut : on ne s'ecrit pas a
+            soi-meme depuis un ecran de lecture, et le tete-a-tete avec soi
+            existe deja ailleurs.
+
+            Les emojis d'abord : c'est la reponse la plus frequente, et elle
+            doit tenir en UN geste. La saisie libre reste dessous pour le reste.
+          */}
+          {!viewer.isMine && (
+            <div
+              className="statut-reponse"
+              // Le clic ne doit pas atteindre les zones de navigation posees
+              // dessous : ecrire ne fait pas passer au statut suivant.
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="statut-emojis">
+                {["👍", "❤️", "😂", "😮", "😢", "🙏"].map((emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    disabled={envoiReponse}
+                    onClick={() => void repondreAuStatut(emoji)}
+                    aria-label={emoji}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <form
+                className="statut-saisie"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void repondreAuStatut(reponse)
+                }}
+              >
+                <input
+                  value={reponse}
+                  onChange={(e) => setReponse(e.target.value)}
+                  placeholder={t("statut_repondre")}
+                  aria-label={t("statut_repondre")}
+                  // La lecture s'arrete pendant qu'on ecrit : le statut ne doit
+                  // pas defiler sous la reponse en cours.
+                  onFocus={() => setEnPause(true)}
+                  onBlur={() => setEnPause(false)}
+                  disabled={envoiReponse}
+                />
+                <button type="submit" disabled={envoiReponse || reponse.trim() === ""}>
+                  {t("send")}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       )}
     </div>

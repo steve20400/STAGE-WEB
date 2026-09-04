@@ -127,6 +127,21 @@ export interface ChatMessageMock {
    */
   mentionTousLibelle?: string | null
   /**
+   * Le statut auquel ce message repond.
+   *
+   * RECOPIE par le serveur, jamais reference : un statut est purge au bout de
+   * 24 h, et une citation qui pointerait vers lui disparaitrait avec. Ce qui est
+   * ici reste donc lisible meme apres l'expiration du statut d'origine.
+   */
+  statutCite?: {
+    statusId: string
+    authorId: string
+    type: string
+    text: string | null
+    mediaUrl: string | null
+    bgColor: string | null
+  } | null
+  /**
    * Pseudo de l'appareil qui a envoye le message.
    *
    * Present UNIQUEMENT si le lecteur appartient au meme compte que
