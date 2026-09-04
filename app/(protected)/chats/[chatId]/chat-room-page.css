@@ -908,3 +908,37 @@ textarea.room-textarea::placeholder {
 .msg-mention {
   font-weight: 700;
 }
+
+/*
+ * UNE MENTION CLIQUABLE RESTE DU TEXTE.
+ *
+ * Elle vit AU MILIEU d'une phrase : lui donner un fond, une bordure ou une
+ * hauteur de bouton casserait la ligne et deplacerait les mots autour. On
+ * neutralise donc tout ce qu'un `<button>` apporte par defaut, et l'on ne garde
+ * que le curseur et le soulignement au survol — de quoi dire « ceci mene
+ * quelque part » sans rien deranger.
+ *
+ * `<button>` malgre tout, et non un `<span>` : le clavier l'atteint, Entree
+ * l'active, et un lecteur d'ecran l'annonce comme actionnable.
+ */
+.msg-mention.actionnable {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  line-height: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.msg-mention.actionnable:hover {
+  text-decoration: underline;
+}
+.msg-mention.actionnable:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+  border-radius: 3px;
+}

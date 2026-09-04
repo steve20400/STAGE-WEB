@@ -11,6 +11,7 @@ import {
   type ResultatTraduction,
 } from "../../../../src/services/traduction-service"
 import { moteurSurAppareil, nomMoteur } from "../../../../src/services/traduction-fournisseurs"
+import { oublierEchecTraduction } from "../../../../src/services/traduction-service"
 
 /**
  * Traduction d'un message, affichee DANS la bulle sous le texte d'origine.
@@ -119,7 +120,20 @@ export function MessageTranslation({
    * droit a une reponse a l'endroit ou il l'attend.
    */
   useEffect(() => {
-    if (!automatique || etat.phase !== "erreur") return
+    if (!automatique) return
+    /*
+     * UNE REUSSITE EFFACE LA PANNE.
+     *
+     * Sans cela, l'avis pose dans les parametres resterait a vie : le moteur
+     * aurait recommence a marcher, changer, ou le reseau serait revenu, et
+     * l'ecran continuerait d'annoncer une panne resolue. Un avertissement qui
+     * ne s'efface jamais devient un decor.
+     */
+    if (etat.phase === "pret") {
+      oublierEchecTraduction()
+      return
+    }
+    if (etat.phase !== "erreur") return
     try {
       window.dispatchEvent(new CustomEvent(EVENEMENT_ECHEC_AUTO, { detail: { code: etat.code } }))
     } catch {

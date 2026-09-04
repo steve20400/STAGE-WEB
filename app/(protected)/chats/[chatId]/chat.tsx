@@ -58,6 +58,7 @@ import { FicheContact } from "../../../../src/components/fiche-contact"
 import {
   fetchChatConversations,
   fetchConversationById,
+  createPrivateChat,
 } from "../../../../src/services/chats-service"
 import {
   formatAudioDuration,
@@ -93,6 +94,7 @@ import {
   detecterLangueMessage,
   libererMoteurLocal,
   moteurLocalPresent,
+  retenirEchecTraduction,
   oublierTraductionsDuTexte,
   traductionAutoActive,
 } from "../../../../src/services/traduction-service"
@@ -1111,10 +1113,13 @@ function TexteAvecMentions({
   text,
   mentions,
   isMe,
+  onOuvrirMention,
 }: {
   text: string
   mentions: Array<{ userId: string; libelle: string }>
   isMe: boolean
+  /** Clic sur une mention. Absent = la mention reste un simple surlignage. */
+  onOuvrirMention?: (userId: string, libelle: string) => void
 }) {
   const libelles = [...new Set(mentions.map((m) => m.libelle))]
     .filter((l) => l !== "")
@@ -1142,10 +1147,39 @@ function TexteAvecMentions({
     if (index > 0) {
       parts.push(<RichText key={cle++} text={reste.slice(0, index)} isMe={isMe} />)
     }
+    /*
+     * UNE MENTION EST UN RACCOURCI, pas une decoration.
+     *
+     * Elle designe quelqu'un : y toucher doit mener a lui. Sans cela,
+     * l'utilisateur lit le nom, veut ecrire a la personne, et doit ressortir
+     * chercher son nom dans l'annuaire.
+     *
+     * `<button>` et non `<span onClick>` : le clavier l'atteint, le lecteur
+     * d'ecran l'annonce comme actionnable, et Entree fonctionne — un `span`
+     * cliquable n'offre rien de tout cela.
+     */
+    const vise = mentions.find((m) => m.libelle === libelle)?.userId ?? ""
     parts.push(
-      <span key={cle++} className="msg-mention">
-        @{libelle}
-      </span>
+      onOuvrirMention && vise ? (
+        <button
+          key={cle++}
+          type="button"
+          className="msg-mention actionnable"
+          onClick={(e) => {
+            // La bulle entiere porte ses propres gestes — ouvrir un media,
+            // repondre par glissement : la mention ne doit pas les declencher.
+            e.stopPropagation()
+            onOuvrirMention(vise, libelle)
+          }}
+          title={libelle}
+        >
+          @{libelle}
+        </button>
+      ) : (
+        <span key={cle++} className="msg-mention">
+          @{libelle}
+        </span>
+      )
     )
     reste = reste.slice(index + libelle.length + 1)
   }
@@ -3314,6 +3348,7 @@ function MessageBubble({
   onCopy,
   isGroup,
   nbLectures,
+  onOuvrirMention,
   estEpingle,
   onTogglePin,
   senderName,
@@ -3347,6 +3382,8 @@ function MessageBubble({
    * seulement. `undefined` hors groupe : la bulle n'affiche alors rien de plus.
    */
   nbLectures?: number
+  /** Clic sur une mention `@` : mene a la personne designee. */
+  onOuvrirMention?: (userId: string, libelle: string) => void
   /** Ce message est celui qui est epingle dans la conversation. */
   estEpingle?: boolean
   /** Epingle (id) ou detache (`null`). Absent = l'action n'est pas proposee. */
@@ -4547,6 +4584,7 @@ function MessageBubble({
                       }
                     >
                       <TexteAvecMentions
+                        onOuvrirMention={onOuvrirMention}
                         mentions={msg.mentions ?? []}
                         text={(() => {
                           let cleanText = msg.content || ""
@@ -4864,23 +4902,26 @@ export default function ChatRoomPage() {
    * deja lisible, il n'y avait rien a traduire, et l'annoncer reviendrait a
    * signaler un probleme la ou tout va bien.
    */
-  const echecSignale = useRef<string | null>(null)
-  useEffect(() => {
-    echecSignale.current = null
-  }, [chatId])
+  /*
+   * ⚠️ PLUS AUCUN AVIS DANS LA CONVERSATION. Il en paraissait un a CHAQUE
+   * ouverture de discussion — la memoire etait remise a zero au changement de
+   * conversation, si bien que le meme moteur en panne se plaignait encore et
+   * encore, dix fois par jour, pour une chose que l'utilisateur ne peut pas
+   * corriger depuis la.
+   *
+   * Un avertissement qui revient sans cesse cesse d'etre lu, et couvre ceux qui
+   * comptent. La panne est desormais RETENUE et dite UNE FOIS, dans les
+   * parametres de traduction — la ou l'on peut changer de moteur.
+   */
   useEffect(() => {
     const surEchec = (evenement: Event) => {
       const code = (evenement as CustomEvent<{ code: keyof typeof CLE_ERREUR }>).detail?.code
       if (!code || code === "meme-langue") return
-      // Une fois par conversation et par cause : changer de moteur puis echouer
-      // autrement est un fait nouveau, que l'utilisateur a interet a connaitre.
-      if (echecSignale.current === code) return
-      echecSignale.current = code
-      info(t("thr_trad_auto_title"), t(CLE_ERREUR[code]))
+      retenirEchecTraduction(code)
     }
     window.addEventListener(EVENEMENT_ECHEC_AUTO, surEchec)
     return () => window.removeEventListener(EVENEMENT_ECHEC_AUTO, surEchec)
-  }, [chatId, info, t])
+  }, [])
   const messagesBodyRef = useRef<HTMLDivElement>(null)
 
   /**
@@ -6158,6 +6199,42 @@ export default function ChatRoomPage() {
     [chatId, error, t]
   )
 
+  /**
+   * OUVRIR LA PERSONNE MENTIONNEE.
+   *
+   * Une mention designe quelqu'un : y toucher doit mener a lui. Trois cas,
+   * dans cet ordre :
+   *
+   *  - c'est MOI : on ne s'ouvre pas une conversation avec soi-meme depuis un
+   *    groupe. On ouvre les informations de la conversation, ou l'utilisateur
+   *    se retrouve dans la liste des membres ;
+   *  - on connait son numero : on ouvre — ou on cree — le tete-a-tete. C'est
+   *    ce que l'utilisateur veut neuf fois sur dix ;
+   *  - on ne le connait pas (ancien membre, cache non peuple) : on ouvre les
+   *    informations de la conversation plutot que d'echouer en silence.
+   */
+  const ouvrirMention = useCallback(
+    (userId: string) => {
+      const moi = getMyUserId()
+      const membre = chat?.membersInfo?.find((m) => m.id === userId)
+      const numero = membre?.publicNumber
+
+      if (!numero || userId === moi) {
+        navigate(`/chats/${chatId}/info`)
+        return
+      }
+
+      void createPrivateChat(numero)
+        .then((cree: { id: string }) => navigate(`/chats/${cree.id}`))
+        .catch(() => {
+          // Le tete-a-tete n'a pas pu s'ouvrir : plutot qu'un cul-de-sac, on
+          // montre la fiche de la conversation, ou la personne figure.
+          navigate(`/chats/${chatId}/info`)
+        })
+    },
+    [chat?.membersInfo, chatId, navigate]
+  )
+
   const resolveSenderName = (senderId: string): string => {
     if (senderId === "me") return t("you")
 
@@ -6572,6 +6649,7 @@ export default function ChatRoomPage() {
                     onCopy={handleCopy}
                     isGroup={chat?.isGroup}
                     nbLectures={compterLectures(msg)}
+                    onOuvrirMention={ouvrirMention}
                     estEpingle={messageEpingle === msg.id}
                     onTogglePin={basculerEpingle}
                     senderName={resolvedName}

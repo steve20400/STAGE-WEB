@@ -83,6 +83,7 @@ import {
   sAbonnerAuMoteurTraduction,
   telechargerComposants,
   viderCacheTraductions,
+  dernierEchecTraduction,
 } from "../../../src/services/traduction-service"
 import {
   MOTEURS_CONNUS,
@@ -1431,6 +1432,22 @@ function TranslationSettings() {
     })
   }
 
+  /*
+   * Les memes libelles que la conversation utilisait, repris ici.
+   * Une cause inconnue retombe sur le message generique : mieux vaut une phrase
+   * vague qu'un ecran vide qui laisse croire que tout va bien.
+   */
+  const CLE_ERREUR_TRADUCTION: Record<string, Cle> = {
+    "local-indisponible": "trad_err_local_unavailable",
+    "moteur-indisponible": "trad_err_engine_unavailable",
+    quota: "trad_err_quota",
+    service: "trad_err_service",
+  }
+
+  // Relu a chaque montage de l'ecran : la panne a pu survenir depuis, ou etre
+  // resolue. Rien a surveiller en continu — on n'est pas sur le chemin critique.
+  const dernierEchec = useMemo(() => dernierEchecTraduction(), [])
+
   const surAppareil = moteurSurAppareil(moteur)
   const nomMoteurActif = nomMoteur(moteur, language)
   // Tous les couples sondes, et tous refuses : le moteur existe mais ne sert a
@@ -1442,6 +1459,23 @@ function TranslationSettings() {
     <>
       <div className="s-page-title">{t("settings_translation")}</div>
       <p className="s-page-sub">{t("trad_sub")}</p>
+
+      {/*
+        LA DERNIERE PANNE, DITE UNE FOIS ET AU BON ENDROIT.
+
+        Un avis paraissait a CHAQUE ouverture de discussion : le meme moteur en
+        panne se plaignait dix fois par jour, pour une chose qu'on ne peut pas
+        corriger depuis une conversation. Un avertissement qui revient sans
+        cesse cesse d'etre lu, et couvre ceux qui comptent.
+
+        Il est ici, ou l'on peut changer de moteur — et il DISPARAIT des qu'une
+        traduction reussit.
+      */}
+      {dernierEchec && (
+        <div className="trad-note" style={{ marginTop: 0, marginBottom: 14 }} role="status">
+          {t(CLE_ERREUR_TRADUCTION[dernierEchec.code] ?? "thr_trad_failed")}
+        </div>
+      )}
 
       <div className="s-card">
         <div className="s-card-title">{t("trad_engines_title")}</div>

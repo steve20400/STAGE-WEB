@@ -666,3 +666,52 @@ export async function viderCacheTraductions(): Promise<void> {
 export function libererMoteurLocal(): void {
   libererTraducteurs()
 }
+
+/* ----------------- Dernier echec de traduction ----------------- */
+
+/**
+ * LA DERNIERE PANNE DE TRADUCTION, retenue au lieu d'etre criee.
+ *
+ * ⚠️ Un avis paraissait a CHAQUE ouverture de discussion : la memoire etait
+ * remise a zero au changement de conversation, si bien que le meme moteur en
+ * panne se plaignait dix fois par jour — pour une chose que l'utilisateur ne
+ * peut pas corriger depuis une conversation.
+ *
+ * Un avertissement qui revient sans cesse cesse d'etre lu, et couvre ceux qui
+ * comptent. On le retient donc ici, et les PARAMETRES le disent une fois — la
+ * ou l'on peut changer de moteur.
+ *
+ * Range par APPAREIL et non par compte : c'est le moteur de traduction de ce
+ * navigateur qui est en panne, pas quelque chose qui appartient a l'utilisateur.
+ */
+const CLE_ECHEC_TRADUCTION = "alanya.traduction.dernier-echec"
+
+export function retenirEchecTraduction(code: string): void {
+  try {
+    localStorage.setItem(CLE_ECHEC_TRADUCTION, JSON.stringify({ code, quand: Date.now() }))
+  } catch {
+    // Stockage plein ou refuse : la traduction marche toujours, on n'a perdu
+    // qu'un diagnostic.
+  }
+}
+
+export function dernierEchecTraduction(): { code: string; quand: number } | null {
+  try {
+    const brut = localStorage.getItem(CLE_ECHEC_TRADUCTION)
+    if (!brut) return null
+    const lu = JSON.parse(brut) as { code?: unknown; quand?: unknown }
+    if (typeof lu.code !== "string" || typeof lu.quand !== "number") return null
+    return { code: lu.code, quand: lu.quand }
+  } catch {
+    return null
+  }
+}
+
+/** Efface la trace — appele quand une traduction reussit enfin. */
+export function oublierEchecTraduction(): void {
+  try {
+    localStorage.removeItem(CLE_ECHEC_TRADUCTION)
+  } catch {
+    /* sans consequence */
+  }
+}
