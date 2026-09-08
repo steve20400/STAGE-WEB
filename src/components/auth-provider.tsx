@@ -16,6 +16,7 @@ import {
 } from "../data/session-user"
 import { clearSessionToken, loadRefreshToken, loadSessionToken } from "../data/session-auth"
 import { drainOfflineOutbox } from "../services/messages-service"
+import { viderFileStatuts } from "../services/outbox-statuts"
 import {
   enregistrerAppareilCourant,
   getOrCreateWebDeviceId,
@@ -24,6 +25,7 @@ import {
   RAISON_EVICTION,
   disconnectRealtime,
   subscribeToSessionRevoked,
+  subscribeToWsConnected,
 } from "../services/websocket-service"
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
@@ -130,12 +132,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return
 
-    const drain = () => void drainOfflineOutbox()
+    // Les deux files partent ensemble : elles attendent le meme reseau.
+    const drain = () => {
+      void drainOfflineOutbox()
+      void viderFileStatuts()
+    }
 
     drain()
     window.addEventListener("online", drain)
 
-    return () => window.removeEventListener("online", drain)
+    /*
+     * ⚠️ LA RECONNEXION DU WEBSOCKET EST LE SIGNAL FIABLE, pas `online`.
+     *
+     * L'evenement `online` du navigateur dit seulement « une interface reseau
+     * est montee » — pas « le serveur repond ». Un portail captif d'hotel, un
+     * Wi-Fi sans Internet, un backend redemarre : dans ces trois cas il ne se
+     * declenche JAMAIS, et la file d'attente resterait pleine indefiniment
+     * pendant que l'ecran promet un envoi differe.
+     *
+     * Le WebSocket, lui, ne se declare connecte qu'apres avoir parle au serveur.
+     * Les deux signaux coexistent : `online` est plus rapide quand il marche,
+     * celui-ci est le seul a marcher a tous les coups.
+     */
+    const stopWs = subscribeToWsConnected(drain)
+
+    return () => {
+      window.removeEventListener("online", drain)
+      stopWs()
+    }
   }, [user])
 
   // Inscrit ce navigateur au registre des appareils du compte, et le signale

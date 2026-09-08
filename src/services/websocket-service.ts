@@ -438,11 +438,20 @@ export function disconnectRealtime() {
 /** S'abonne aux nouveaux messages d'une conversation. Le handler recoit le message serialise. */
 export function subscribeToConversation(
   conversationId: string,
-  handler: (message: WsMessagePayload) => void
+  /**
+   * ⚠️ [tempId] N'EST PRESENT QUE SUR SES PROPRES ENVOIS, et il est indispensable
+   * a un cas precis : un message ecrit HORS LIGNE puis parti tout seul au retour
+   * du reseau. Sa bulle « en attente » porte cet identifiant a l'ecran, et rien
+   * d'autre ne permet de la relier au message que le serveur confirme. Sans lui,
+   * elle resterait a tourner indefiniment A COTE de sa propre copie confirmee.
+   *
+   * Les abonnes qui n'en ont pas besoin declarent un seul parametre et l'ignorent.
+   */
+  handler: (message: WsMessagePayload, tempId?: string) => void
 ): () => void {
   return addListener((event) => {
     if (event.type === "message" && event.message?.convId === conversationId) {
-      handler(event.message)
+      handler(event.message, event.tempId)
     }
   })
 }

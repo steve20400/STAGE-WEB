@@ -15,10 +15,13 @@ import {
   cacheMessage,
   dequeueOffline,
   getOfflineQueue,
+  getOfflineQueueForConversation,
   loadCachedMessages,
+  patchOfflineQueueItem,
   removeMessageFromCache,
   enqueueOffline,
 } from "./indexeddb-cache"
+import { uploadMedia } from "./media-service"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
@@ -88,6 +91,19 @@ function mapStatus(status?: string): MessageStatus {
   const s = (status ?? "").toUpperCase()
   if (s === "DELIVERED") return "delivered"
   if (s === "READ") return "read"
+  /*
+   * 🔴 `PENDING` RETOMBAIT SUR « ENVOYE », ce qui etait un MENSONGE.
+   *
+   * C'est l'etat que le cache local pose sur un message ecrit hors ligne, qui
+   * n'a donc jamais quitte l'appareil. Apres un rechargement de page, la bulle
+   * relue depuis le cache affichait la coche simple : l'utilisateur croyait son
+   * message parti alors qu'il attendait encore le reseau — et pouvait fermer
+   * l'onglet en toute confiance.
+   *
+   * La pastille d'attente dit la verite, et c'est elle que la file d'attente
+   * remplacera par une vraie coche quand le message partira.
+   */
+  if (s === "PENDING") return "sending"
   return "sent"
 }
 
@@ -505,6 +521,128 @@ function estRefusPourBlocage(err: unknown): boolean {
   return charge?.error?.code === "BLOCKED"
 }
 
+/**
+ * L'ECHEC VIENT-IL DU RESEAU, ou le serveur a-t-il REFUSE ?
+ *
+ * 🔴 TOUTE LA DIFFERENCE EST LA. Un refus du serveur — fichier trop lourd,
+ * personne bloquee, conversation disparue — ne se repare pas en reessayant :
+ * mettre l'envoi en file le ferait echouer indefiniment, en silence, et
+ * l'utilisateur croirait son message parti. Une panne de reseau, elle, se
+ * repare toute seule des que la connexion revient : c'est le seul cas ou garder
+ * le fichier et le renvoyer plus tard est le bon comportement.
+ *
+ * ⚠️ `status === 0` EST LE DISCRIMINANT, et il est fiable : `api-client` ne pose
+ * ce zero que lorsqu'AUCUNE reponse HTTP n'est arrivee — coupure, DNS muet,
+ * delai depasse. Tout code renvoye par le serveur, meme 500, signifie qu'il a
+ * repondu, donc qu'il a decide. On ne met pas sa decision en file d'attente.
+ */
+export function estPanneReseau(err: unknown): boolean {
+  if (!navigator.onLine) return true
+  return err instanceof ApiError && err.status === 0
+}
+
+/**
+ * Met un MEDIA en file d'attente, OCTETS COMPRIS, pour l'envoyer au retour du
+ * reseau.
+ *
+ * 🔴 CE SONT LES OCTETS QUI SONT RANGES, PAS UNE REFERENCE — et c'est ce qui
+ * manquait. Un media s'envoie en DEUX TEMPS : televerser le fichier pour obtenir
+ * un identifiant, puis envoyer le message qui le cite. Hors ligne, le premier
+ * temps est impossible, donc il n'existe AUCUN identifiant a mettre en file. La
+ * file d'attente, qui n'acceptait qu'un `mediaId`, ne pouvait donc rien faire
+ * d'un envoi hors ligne : le fichier etait perdu et l'ecran annoncait un echec.
+ *
+ * IndexedDB range un `Blob` tel quel — le clonage structure le sait faire — et
+ * le fichier survit donc a la fermeture de l'onglet.
+ *
+ * ⚠️ [tempId] EST CELUI DE LA BULLE DEJA AFFICHEE. Le serveur le renvoie dans
+ * son echo, et c'est ainsi que la bulle « en cours d'envoi » devient le message
+ * confirme, au lieu d'apparaitre en double a cote de lui.
+ */
+export async function mettreMediaEnFile(
+  chatId: string,
+  media: {
+    tempId: string
+    blob: Blob
+    filename: string
+    mime: string
+    type: MessageType
+    durationMs?: number
+    caption?: string
+    replyToId?: string
+  }
+): Promise<void> {
+  const myId = getMyUserId()
+  const msgType = toBackendType(media.type)
+
+  await enqueueOffline({
+    tempId: media.tempId,
+    conversationId: chatId,
+    senderId: myId ?? undefined,
+    content: media.caption || undefined,
+    type: msgType,
+    replyToId: media.replyToId,
+    mediaBlob: media.blob,
+    mediaNom: media.filename,
+    mediaMime: media.mime,
+    mediaDureeMs: media.durationMs,
+  })
+
+  // Le message optimiste est aussi mis en cache : sans lui, recharger la page
+  // ferait disparaitre de l'ecran un envoi qui, lui, attend toujours son tour.
+  await cacheMessage({
+    id: media.tempId,
+    conversationId: chatId,
+    senderId: myId ?? "",
+    content: media.caption || null,
+    type: msgType,
+    status: "PENDING",
+    createdAt: Date.now(),
+  })
+}
+
+/**
+ * Les apercus locaux des medias qui attendent le reseau, par identifiant de
+ * bulle.
+ *
+ * 🔴 SANS CELA, RECHARGER LA PAGE CASSE L'APERCU. La bulle en attente affiche
+ * son image depuis une URL `blob:`, fabriquee en memoire au moment de l'envoi.
+ * Ces URL meurent avec la page : au rechargement, le message revient du cache
+ * avec une adresse qui ne pointe plus sur rien, et la bulle montre une image
+ * brisee — alors que le fichier, lui, est toujours la, range en base locale.
+ *
+ * On refabrique donc les URL depuis les octets de la file.
+ *
+ * ⚠️ L'APPELANT DOIT LIBERER CES URL en quittant l'ecran (`revokeObjectURL`) :
+ * chacune retient son fichier en memoire tant qu'elle vit, et une conversation
+ * qu'on ouvre et ferme dix fois en retiendrait dix copies.
+ */
+export async function apercusMediasEnAttente(
+  chatId: string
+): Promise<Map<string, { url: string; mime?: string; nom?: string; durationMs?: number }>> {
+  const apercus = new Map<
+    string,
+    { url: string; mime?: string; nom?: string; durationMs?: number }
+  >()
+  try {
+    const file = await getOfflineQueueForConversation(chatId)
+    for (const item of file) {
+      const tempId = typeof item.tempId === "string" ? item.tempId : ""
+      if (!tempId || !(item.mediaBlob instanceof Blob)) continue
+      apercus.set(tempId, {
+        url: URL.createObjectURL(item.mediaBlob),
+        mime: typeof item.mediaMime === "string" ? item.mediaMime : undefined,
+        nom: typeof item.mediaNom === "string" ? item.mediaNom : undefined,
+        durationMs: typeof item.mediaDureeMs === "number" ? item.mediaDureeMs : undefined,
+      })
+    }
+  } catch {
+    // IndexedDB indisponible : les bulles resteront sans apercu, ce qui est
+    // moins grave que de faire echouer l'ouverture de la conversation.
+  }
+  return apercus
+}
+
 /** Un seul drain a la fois : "online" et le montage peuvent se declencher ensemble. */
 let draining = false
 
@@ -534,17 +672,50 @@ export async function drainOfflineOutbox(): Promise<number> {
       }
 
       try {
+        let mediaId = typeof item.mediaId === "string" ? item.mediaId : undefined
+
+        /*
+         * LES OCTETS D'ABORD, LE MESSAGE ENSUITE.
+         *
+         * ⚠️ L'IDENTIFIANT OBTENU EST RANGE AVANT MEME QUE LE MESSAGE PARTE, et
+         * les octets sont jetes dans le meme geste. Sans cela, un envoi qui
+         * echoue APRES un televersement reussi ferait tout recommencer au
+         * passage suivant : le meme fichier partirait une seconde fois, deux
+         * lignes en base pour un seul envoi, et la donnee payee deux fois sur un
+         * forfait mobile.
+         */
+        if (!mediaId && item.mediaBlob instanceof Blob) {
+          const media = await uploadMedia(
+            item.mediaBlob,
+            typeof item.mediaNom === "string" ? item.mediaNom : "fichier",
+            typeof item.mediaDureeMs === "number" ? item.mediaDureeMs : undefined
+          )
+          mediaId = media.id
+          await patchOfflineQueueItem(tempId, { mediaId, mediaBlob: undefined })
+        }
+
         const message = await deliverMessage(chatId, {
           content: typeof item.content === "string" ? item.content : undefined,
           msgType: typeof item.type === "string" ? item.type : "TEXT",
           tempId,
-          mediaId: typeof item.mediaId === "string" ? item.mediaId : undefined,
+          mediaId,
           replyToId: typeof item.replyToId === "string" ? item.replyToId : undefined,
         })
         cacheDeliveredMessage(message)
-      } catch {
-        // Reseau encore instable : on reprendra au prochain retour en ligne.
-        break
+      } catch (err) {
+        /*
+         * ⚠️ ON NE S'ARRETE QUE SUR UNE PANNE RESEAU.
+         *
+         * Une entree que le serveur REFUSE — fichier trop lourd, conversation
+         * supprimee — bloquerait la file POUR TOUJOURS, et tout ce qui attend
+         * derriere elle avec. On la retire et on continue : perdre l'envoi qui
+         * ne pourra jamais passer vaut mieux que d'en perdre dix qui le
+         * pouvaient.
+         */
+        if (estPanneReseau(err)) break
+        await dequeueOffline(tempId)
+        await removeMessageFromCache(tempId)
+        continue
       }
 
       await dequeueOffline(tempId)

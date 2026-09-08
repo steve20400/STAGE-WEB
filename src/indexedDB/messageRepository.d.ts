@@ -24,6 +24,8 @@ export function enqueueOfflineMessage(payload: any): Promise<{ tempId: string; c
 export function getPendingQueue(): Promise<any[]>
 export function getPendingByConversation(conversationId: string): Promise<any[]>
 export function removeFromQueue(tempId: string): Promise<void>
+/** Modifie une entrée sans la retirer — voir la note dans le fichier .js. */
+export function updateQueueItem(tempId: string, patch: Record<string, unknown>): Promise<void>
 export function clearQueue(): Promise<void>
 
 // ─── Call Logs ───

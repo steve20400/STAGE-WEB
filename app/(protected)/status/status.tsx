@@ -9,6 +9,11 @@ import { toInitials } from "../../../src/data/session-user"
 import { resolveMediaUrl,
   TAILLE_MEDIA_MAX_OCTETS,
 } from "../../../src/services/media-service"
+import { estPanneReseau } from "../../../src/services/messages-service"
+import {
+  compterStatutsEnAttente,
+  mettreStatutEnFile,
+} from "../../../src/services/outbox-statuts"
 import {
   deleteStatus,
   fetchStatusFeed,
@@ -113,9 +118,25 @@ function StatusAvatar({
 
 export default function StatusPage() {
   const { t } = useTranslation()
-  const { success, error } = useToast()
+  const { success, error, info } = useToast()
   const [feed, setFeed] = useState<StatusFeed>({ me: null, others: [] })
   const [loading, setLoading] = useState(true)
+
+  /**
+   * Combien de statuts attendent le reseau.
+   *
+   * ⚠️ UN COMPTE, PAS UNE VIGNETTE FANTOME dans « Mes statuts ». Un statut en
+   * attente n'existe encore nulle part cote serveur : l'inserer dans le fil
+   * obligerait a inventer un identifiant, une date d'expiration et un compteur
+   * de vues qu'il n'a pas — et a les retirer proprement au moment de la vraie
+   * publication. Un compte visible dit la meme chose sans mentir sur ce qui
+   * existe.
+   */
+  const [enAttente, setEnAttente] = useState(0)
+
+  const rafraichirAttente = useCallback(async () => {
+    setEnAttente(await compterStatutsEnAttente())
+  }, [])
 
   // Visionneuse : groupe ouvert + index du statut affiche
   const [viewer, setViewer] = useState<{
@@ -356,12 +377,36 @@ export default function StatusPage() {
     setPosting(true)
     let publies = 0
     let echecs = 0
+    let differes = 0
     try {
       for (const fichier of fichiers) {
         try {
           await envoyerUnMedia(fichier)
           publies += 1
-        } catch {
+        } catch (err) {
+          /*
+           * 🔴 PAS DE RESEAU N'EST PAS UN ECHEC — c'est une attente.
+           *
+           * L'ecran annoncait « Statut non publie » et la photo disparaissait :
+           * il fallait la retrouver, la recadrer, la reannoter. Or publier un
+           * statut se fait en deux temps — televerser le fichier, puis declarer
+           * le statut qui le cite — et hors ligne le premier est simplement
+           * impossible. Rien n'a echoue : ce n'est pas encore parti.
+           *
+           * ⚠️ SEULEMENT POUR UNE PANNE RESEAU. Un refus du serveur ne se
+           * reparera jamais tout seul ; le mettre en file le ferait echouer en
+           * boucle et en silence. Celui-la se dit, comme avant.
+           */
+          if (estPanneReseau(err)) {
+            try {
+              await mettreStatutEnFile(fichier)
+              differes += 1
+              continue
+            } catch {
+              // IndexedDB refuse (navigation privee, quota) : on ne peut rien
+              // promettre, donc on ne promet rien.
+            }
+          }
           echecs += 1
         }
       }
@@ -371,6 +416,11 @@ export default function StatusPage() {
     if (publies > 0) {
       success(t("l2_status_published"), t("status_visible_24h"))
       await reload()
+    }
+    if (differes > 0) {
+      // Un avis NEUTRE, pas une erreur : le statut est garde et partira seul.
+      info(t("statut_attente_reseau"), t("statut_attente_detail"))
+      void rafraichirAttente()
     }
     if (echecs > 0) {
       error(t("l2_status_not_published"), t("l2_publish_failed_detail"))
@@ -417,6 +467,24 @@ export default function StatusPage() {
     }
   }
 
+  /*
+   * Le compte se rafraichit au montage et a chaque retour du reseau : c'est
+   * `AuthProvider` qui vide la file, et il ne sait pas que cet ecran existe.
+   * Le fil est recharge dans la foulee — les statuts partis viennent d'y entrer.
+   */
+  useEffect(() => {
+    void rafraichirAttente()
+    const auRetour = () => {
+      // Laisse au drain le temps de publier avant de recompter.
+      window.setTimeout(() => {
+        void rafraichirAttente()
+        void reload()
+      }, 2000)
+    }
+    window.addEventListener("online", auRetour)
+    return () => window.removeEventListener("online", auRetour)
+  }, [rafraichirAttente, reload])
+
   const currentStatus = viewer?.group.statuses[viewer.index]
 
   return (
@@ -444,6 +512,23 @@ export default function StatusPage() {
       <div className="calls-head" style={{ marginBottom: 18 }}>
         <div className="calls-title-row page-title-row">
           <h1 className="calls-title">{t("status")}</h1>
+          {/* Ce que la file contient encore. Absent quand elle est vide : un
+              compteur a zero n'apprend rien et occupe la ligne du titre. */}
+          {enAttente > 0 && (
+            <span
+              title={t("statut_attente_detail")}
+              style={{
+                fontSize: 12,
+                padding: "3px 9px",
+                borderRadius: 999,
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-muted)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              ⏳ {t("statut_en_attente_n").replace("{n}", String(enAttente))}
+            </span>
+          )}
           <button className="new-call-btn" onClick={() => setComposerOpen((v) => !v)}>
             {composerOpen ? t("close") : t("publish_status")}
           </button>

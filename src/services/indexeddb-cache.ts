@@ -22,6 +22,7 @@ import {
   getPendingQueue,
   getPendingByConversation,
   removeFromQueue,
+  updateQueueItem,
   saveCallLog,
   getAllCallLogs,
   getCallLogsByConversation,
@@ -139,6 +140,18 @@ export async function getOfflineQueueForConversation(
 /** Retire un message de la file d'attente après envoi réussi. */
 export async function dequeueOffline(tempId: string): Promise<void> {
   await removeFromQueue(tempId)
+}
+
+/**
+ * Modifie une entrée de la file sans la retirer — voir `updateQueueItem`.
+ * Sert à retenir l'identifiant d'un média déjà téléversé, pour ne pas
+ * recommencer si l'envoi du message qui le cite échoue.
+ */
+export async function patchOfflineQueueItem(
+  tempId: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  await updateQueueItem(tempId, patch)
 }
 
 /* ═════════════════════════════════════════════════

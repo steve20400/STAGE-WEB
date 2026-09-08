@@ -93,12 +93,35 @@ export const enqueueOfflineMessage = async (payload) => {
     const db = await initIndexedDB();
     const pending = {
         ...payload,
-        tempId: `outbox_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        // ⚠️ UN tempId FOURNI L'EMPORTE, et ce n'est pas un detail : la bulle
+        // affichee a l'ecran porte deja un identifiant, et c'est LUI que le
+        // serveur renverra dans son echo. En regenerer un ici ferait que la
+        // reponse ne correspondrait a aucune bulle : le media resterait
+        // eternellement « en cours d'envoi » a cote de sa copie confirmee.
+        tempId:
+            payload?.tempId ||
+            `outbox_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         createdAt: Date.now(),
         status: 'pending',
     };
     await db.put('outboxQueue', pending);
     return pending;
+};
+
+/**
+ * Modifie une entree de la file sans la retirer.
+ *
+ * 🔴 SERT A NE PAS TELEVERSER DEUX FOIS LE MEME FICHIER. Un envoi de media se
+ * fait en deux temps — televerser les octets, puis envoyer le message qui les
+ * cite. Si le second echoue, reprendre depuis le debut renverrait les octets
+ * une seconde fois : deux medias en base, deux fois la donnee payee. On range
+ * donc l'identifiant obtenu des qu'on l'a, et on jette les octets.
+ */
+export const updateQueueItem = async (tempId, patch) => {
+    const db = await initIndexedDB();
+    const item = await db.get('outboxQueue', tempId);
+    if (!item) return;
+    await db.put('outboxQueue', { ...item, ...patch });
 };
 
 export const getPendingQueue = async () => {

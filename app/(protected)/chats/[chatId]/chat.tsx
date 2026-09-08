@@ -40,6 +40,9 @@ import {
   toFrontMessage,
   fetchPinnedMessages,
   definirMessageEpingle,
+  estPanneReseau,
+  mettreMediaEnFile,
+  apercusMediasEnAttente,
 } from "../../../../src/services/messages-service"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
 import {
@@ -5130,6 +5133,59 @@ export default function ChatRoomPage() {
     )
   }, [chatId, fusionnerMessages])
 
+  /*
+   * REDONNE SON APERCU A CHAQUE MEDIA QUI ATTEND LE RESEAU.
+   *
+   * 🔴 UNE URL `blob:` NE SURVIT PAS AU RECHARGEMENT DE LA PAGE. La bulle en
+   * attente relue depuis le cache portait donc une adresse morte : image brisee,
+   * lecteur video vide — alors que le fichier, lui, est bien range en base
+   * locale et partira des le retour du reseau. On refabrique les URL a partir
+   * des octets.
+   *
+   * ⚠️ LIBEREES AU DEMONTAGE. Chacune retient son fichier en memoire tant
+   * qu'elle vit : ouvrir et fermer dix fois la meme conversation en retiendrait
+   * dix copies, et une video en pese plusieurs dizaines.
+   */
+  useEffect(() => {
+    let annule = false
+    const liberees: string[] = []
+
+    void apercusMediasEnAttente(chatId).then((apercus) => {
+      if (annule || apercus.size === 0) {
+        apercus.forEach((a) => URL.revokeObjectURL(a.url))
+        return
+      }
+      apercus.forEach((a) => liberees.push(a.url))
+      setMessages((prev) =>
+        prev.map((m) => {
+          const a = apercus.get(m.id)
+          // Ne touche qu'aux bulles SANS apercu : dans la session ou le fichier
+          // a ete choisi, l'URL d'origine est encore vivante et deja affichee.
+          // C'est apres un rechargement qu'elle manque.
+          if (!a || m.mediaUrl) return m
+          return {
+            ...m,
+            mediaUrl: a.url,
+            mediaMime: m.mediaMime ?? a.mime,
+            fileName: m.fileName ?? a.nom,
+            durationMs: m.durationMs ?? a.durationMs,
+          }
+        })
+      )
+    })
+
+    return () => {
+      annule = true
+      for (const url of liberees) {
+        try {
+          URL.revokeObjectURL(url)
+        } catch {
+          /* deja libere */
+        }
+      }
+    }
+  }, [chatId])
+
   // Evenements d'appel de cette conversation (pastilles dans le fil).
   const refreshCallEvents = useCallback(async () => {
     try {
@@ -5178,13 +5234,56 @@ export default function ChatRoomPage() {
     // l'activite reelle reste plus juste.
     if (!chat?.isGroup && chat?.online) setPeerPresence(true)
 
-    const unsubscribeMessages = subscribeToConversation(chatId, (message) => {
+    const unsubscribeMessages = subscribeToConversation(chatId, (message, tempId) => {
       if (cancelled) return
       const incoming = toFrontMessage(message, myId)
       // Persiste le message entrant en IndexedDB
       void persistIncomingWsMessage(message)
       setMessages((prev) => {
-        if (prev.some((m) => m.id === incoming.id)) return prev
+        if (prev.some((m) => m.id === incoming.id)) {
+          // Deja affiche : il reste peut-etre sa bulle d'attente a retirer.
+          return tempId ? prev.filter((m) => m.id !== tempId) : prev
+        }
+        /*
+         * 🔴 LA BULLE D'ATTENTE CEDE SA PLACE, elle ne s'ajoute pas a cote.
+         *
+         * Un media envoye hors ligne part tout seul au retour du reseau, souvent
+         * bien apres — parfois apres un rechargement de la page. Le serveur le
+         * confirme alors par cette voie, en rappelant le `tempId` de la bulle
+         * affichee. Sans ce remplacement, l'ecran montrerait DEUX FOIS le meme
+         * media : une copie confirmee, et une copie qui tourne pour toujours.
+         *
+         * ⚠️ L'HORODATAGE DE LA BULLE EST CONSERVE. Le message doit rester a sa
+         * place dans le fil — celle du moment ou on l'a ecrit — et non sauter en
+         * bas de la conversation a l'heure ou le reseau est revenu.
+         */
+        if (tempId) {
+          const attente = prev.find((m) => m.id === tempId)
+          if (attente) {
+            if (attente.mediaUrl?.startsWith("blob:") && incoming.mediaUrl) {
+              try {
+                URL.revokeObjectURL(attente.mediaUrl)
+              } catch {
+                /* deja libere */
+              }
+            }
+            return prev.map((m) =>
+              m.id === tempId
+                ? {
+                    ...incoming,
+                    timestamp: attente.timestamp,
+                    // Le serveur fait foi ; l'apercu local ne sert que s'il n'a
+                    // pas renvoye d'URL.
+                    mediaUrl: incoming.mediaUrl || attente.mediaUrl,
+                    mediaMime: incoming.mediaMime || attente.mediaMime,
+                    fileName: incoming.fileName || attente.fileName,
+                    fileSize: incoming.fileSize || attente.fileSize,
+                    durationMs: incoming.durationMs ?? attente.durationMs,
+                  }
+                : m
+            )
+          }
+        }
         return [...prev, incoming]
       })
       if (incoming.senderId !== "me") {
@@ -5997,6 +6096,47 @@ export default function ChatRoomPage() {
           }
         }
       } catch (err) {
+        /*
+         * 🔴 PAS DE RESEAU N'EST PAS UN ECHEC — c'est une attente.
+         *
+         * L'ecran retirait la bulle et annoncait « Fichier non envoye ». Le
+         * fichier etait alors PERDU : l'utilisateur devait le retrouver et
+         * recommencer, souvent sans savoir quand la connexion reviendrait. Or
+         * c'est exactement le cas ou l'application peut s'en charger seule.
+         *
+         * La bulle RESTE, avec son apercu et sa pastille d'attente ; les octets
+         * partent en file d'attente ; le retour du reseau les envoie. Aucune
+         * alerte : rien n'a echoue, l'envoi n'a pas encore eu lieu.
+         *
+         * ⚠️ SEULEMENT POUR UNE PANNE RESEAU. Un refus du serveur — fichier trop
+         * lourd, correspondant bloque — ne se reparera jamais tout seul : le
+         * mettre en file le ferait echouer en boucle et en silence, et
+         * l'utilisateur croirait son fichier parti. Celui-la se dit, comme
+         * avant.
+         */
+        if (estPanneReseau(err)) {
+          try {
+            await mettreMediaEnFile(chatId, {
+              tempId,
+              blob: file,
+              filename,
+              mime,
+              type: msgType,
+              durationMs,
+              caption,
+              replyToId: replyTo?.id,
+            })
+            setReplyTo(null)
+            // ⚠️ NE PAS LIBERER `localUrl` ICI : c'est lui qui porte l'apercu de
+            // la bulle en attente. Il sera libere quand le message confirme
+            // prendra sa place, au retour du reseau.
+            return
+          } catch {
+            // IndexedDB refuse (mode prive, quota) : on ne peut RIEN promettre,
+            // donc on ne promet rien et on retombe sur l'ancien comportement.
+          }
+        }
+
         setMessages((prev) => {
           const msg = prev.find((m) => m.id === tempId)
           if (msg?.mediaUrl && msg.mediaUrl.startsWith("blob:")) {

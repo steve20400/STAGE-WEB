@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'alanya_messaging_client_db';
-const DB_VERSION = 4; // Incrémenté pour le magasin traductions
+const DB_VERSION = 5; // Incrémenté pour le magasin des statuts en attente
 
 /**
  * Connexion unique, partagee par tout le client.
@@ -98,6 +98,23 @@ export const initIndexedDB = () => {
                 });
                 outboxStore.createIndex('conversationId', 'conversationId');
                 outboxStore.createIndex('createdAt', 'createdAt');
+            }
+
+            // ═══════════════════════════════════════════════════
+            // STORE : outboxStatuts (Statuts en attente de publication)
+            // ═══════════════════════════════════════════════════
+            //
+            // ⚠️ UN MAGASIN A PART, et non une entree de plus dans `outboxQueue`.
+            // Cette file-la est drainee en envoyant des messages DANS UNE
+            // CONVERSATION : une entree sans conversation y est traitee comme
+            // corrompue et jetee. Un statut n'appartient a aucune conversation ;
+            // l'y ranger aurait demande d'inventer un identifiant factice, que
+            // le drain aurait tot ou tard essaye d'utiliser.
+            if (!db.objectStoreNames.contains('outboxStatuts')) {
+                const statutStore = db.createObjectStore('outboxStatuts', {
+                    keyPath: 'id',
+                });
+                statutStore.createIndex('createdAt', 'createdAt');
             }
 
             // Fichiers nécessaires aux aperçus (texte/PDF) : conservés localement
