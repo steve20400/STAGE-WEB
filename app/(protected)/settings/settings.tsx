@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { RepondeurReglages } from "../../../src/components/repondeur-reglages"
 import { useAuth } from "../../../src/components/auth-provider"
 import { useToast } from "../../../src/components/toast"
 import { ThemeSelector } from "../../../src/components/theme-toggle"
@@ -3639,6 +3640,10 @@ export default function SettingsPage() {
                 {compteInterne && <PushDiagnostic />}
               </div>
 
+              {/* Le repondeur AVANT les sonneries : il decide de ce qui se
+                  passe quand on ne decroche pas, la sonnerie seulement de ce
+                  qu'on entend avant. L'ordre suit la chronologie. */}
+              <RepondeurReglages />
               <RingtonePicker />
             </>
           )}
