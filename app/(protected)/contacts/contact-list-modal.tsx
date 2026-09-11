@@ -21,6 +21,7 @@ import {
 } from "../../../src/services/contact-lists-service"
 import {
   customRingtones,
+  importRingtone,
   previewRingtone,
   stopRingtonePreview,
   RINGTONES,
@@ -187,7 +188,15 @@ export function ContactListModal({
   // L'extrait ne doit pas continuer a jouer une fois la fenetre refermee.
   useEffect(() => () => stopRingtonePreview(), [])
 
-  const importees = useMemo(() => customRingtones(), [])
+  /*
+   * ⚠️ UN ETAT ET NON UN MEMO FIGE. Il etait lu une seule fois a l'ouverture,
+   * ce qui suffisait tant qu'on ne pouvait que CHOISIR parmi les sonneries
+   * existantes. Depuis qu'on peut en importer une d'ici, la nouvelle doit
+   * apparaitre dans le menu sans refermer la fenetre.
+   */
+  const [importees, setImportees] = useState(() => customRingtones())
+  const [importEnCours, setImportEnCours] = useState(false)
+  const champFichier = useRef<HTMLInputElement>(null)
 
   /**
    * La sonnerie deja enregistree est retenue a l'ouverture : importee depuis un
@@ -208,6 +217,38 @@ export function ContactListModal({
     }
     return options
   }, [importees, sonnerieInitiale, t])
+
+  /**
+   * Importe une sonnerie depuis l'appareil et la retient aussitot.
+   *
+   * ⚠️ AUCUNE LOGIQUE NEUVE : `importRingtone` fait deja tout — il refuse ce qui
+   * n'est pas un son, borne la taille, televerse le fichier puis l'inscrit au
+   * catalogue du compte. Le reecrire ici aurait donne deux regles d'import a
+   * tenir, et c'est exactement ce que ce depot paie ailleurs.
+   *
+   * ⚠️ LA NOUVELLE SONNERIE EST CHOISIE DANS LA FOULEE. Importer sans
+   * selectionner obligerait a rouvrir le menu pour y trouver ce qu'on vient
+   * d'ajouter : personne ne televerse un son pour ne pas s'en servir.
+   */
+  const importerDepuisAppareil = async (fichier: File | undefined) => {
+    if (!fichier || importEnCours) return
+    setImportEnCours(true)
+    try {
+      const entree = await importRingtone(fichier)
+      setImportees(customRingtones())
+      setSonnerie(entree.url)
+    } catch (err) {
+      error(
+        t("set_ringtone_import_failed"),
+        err instanceof Error ? err.message : t("set_ringtone_upload_failed"),
+      )
+    } finally {
+      setImportEnCours(false)
+      // Sans cette remise a zero, reimporter le MEME fichier n'emet aucun
+      // evenement et le bouton paraitrait mort.
+      if (champFichier.current) champFichier.current.value = ""
+    }
+  }
 
   const ecouter = () => {
     if (!sonnerie) return
@@ -586,6 +627,37 @@ export function ContactListModal({
                   <path d="M8 5v14l11-7z" />
                 </svg>
                 {t("clist_preview")}
+              </button>
+              {/* Importer un son de l'appareil, sans quitter la fenetre. Le
+                  champ est cache : son apparence native n'est pas stylable et
+                  jure avec le reste du formulaire. */}
+              <input
+                ref={champFichier}
+                type="file"
+                accept="audio/*"
+                hidden
+                onChange={(evenement) =>
+                  void importerDepuisAppareil(evenement.target.files?.[0])
+                }
+              />
+              <button
+                type="button"
+                className="clist-ecouter"
+                onClick={() => champFichier.current?.click()}
+                disabled={importEnCours}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden
+                >
+                  <path d="M12 19V5" />
+                  <path d="M5 12l7-7 7 7" />
+                </svg>
+                {importEnCours ? t("set_importing") : t("set_import_ringtone")}
               </button>
             </div>
             <p className="clist-aide">{t("clist_ringtone_hint")}</p>

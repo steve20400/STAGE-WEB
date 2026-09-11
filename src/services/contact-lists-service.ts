@@ -78,6 +78,15 @@ export interface ListeContacts {
    */
   creeLe: string
   membres: MembreListe[]
+  /**
+   * Liste creee d'office (`bureau`, `amis`, `confiance`, `famille`), ou `null`.
+   *
+   * 🔴 SERT A MASQUER LE BOUTON DE SUPPRESSION. Le serveur refuse deja la
+   * requete par un 409, mais laisser le bouton reviendrait a proposer une action
+   * impossible puis a annoncer l'erreur : une commande qui ne peut pas aboutir ne
+   * doit pas etre offerte.
+   */
+  cle: string | null
 }
 
 /** Ce qu'on met dans une liste : des contacts choisis, des numeros composes, ou les deux. */
@@ -187,6 +196,9 @@ function depuisServeur(brut: unknown): ListeContacts | null {
     nom: brut.name,
     sonnerie: typeof brut.ringtone === "string" ? brut.ringtone : null,
     couleur: typeof brut.color === "string" ? brut.color : null,
+    // Absente d'un backend anterieur : la liste est alors traitee comme
+    // ordinaire, donc supprimable — le comportement d'avant, exactement.
+    cle: typeof brut.cle === "string" && brut.cle !== "" ? brut.cle : null,
     creeLe: typeof brut.createdAt === "string" ? brut.createdAt : "",
     membres,
   }

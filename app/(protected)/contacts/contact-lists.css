@@ -657,14 +657,22 @@
   gap: 8px;
 }
 
+/* 🐛 LES PASTILLES OCCUPAIENT TOUTE LA LARGEUR, UNE PAR LIGNE.
+   Elles portaient `width: 100%` avec `aspect-ratio: 1`, sous un commentaire qui
+   disait « la grille impose la largeur » — mais le conteneur est en `flex`, pas
+   en grille. Dans un flex, `width: 100%` demande la largeur ENTIERE : chaque
+   pastille passait donc a la ligne et devenait aussi haute que large. Vingt
+   enormes cercles empiles, la ou il en fallait vingt petits.
+   Une taille FIXE ne depend d'aucun conteneur et se comporte pareil a toutes
+   les largeurs : sur un telephone, sept par rangee ; sur un ecran large,
+   davantage, sans qu'aucune ne grossisse. */
 .clist-couleur {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* La grille impose la largeur ; le rapport garde la pastille ronde. */
-  width: 100%;
-  aspect-ratio: 1;
-  height: auto;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid var(--border-subtle);
   border-radius: 50%;

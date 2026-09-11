@@ -248,6 +248,15 @@ export function ContactListsSection({ contacts }: { contacts: Contact[] }) {
                       <path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z" />
                     </svg>
                   </button>
+                  {/* 🔴 PAS DE SUPPRESSION POUR LES QUATRE LISTES CREEES
+                      D'OFFICE. Le serveur la refuse deja par un 409 ; laisser le
+                      bouton reviendrait a proposer une action impossible puis a
+                      annoncer l'erreur. Une commande qui ne peut pas aboutir ne
+                      doit pas etre offerte.
+
+                      Tout le reste leur reste ouvert : renommer, recolorer,
+                      changer de sonnerie, ajouter ou retirer des membres. */}
+                  {!liste.cle && (
                   <button
                     type="button"
                     className="clist-bouton-icone clist-bouton-icone-danger"
@@ -268,6 +277,7 @@ export function ContactListsSection({ contacts }: { contacts: Contact[] }) {
                       <path d="M19 6l-1 14H6L5 6" />
                     </svg>
                   </button>
+                  )}
                 </div>
               </li>
             )
