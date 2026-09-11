@@ -398,10 +398,24 @@ interface Demande {
   source: string | null
 }
 
-async function preparer(texte: string, cible: string): Promise<Demande> {
+async function preparer(
+  texte: string,
+  cible: string,
+  /**
+   * Langue DECLAREE par l'utilisateur pour cette conversation.
+   *
+   * 🔴 QUAND ELLE EST LA, LA DETECTION N'EST MEME PAS TENTEE. C'est tout l'objet
+   * du reglage : la detection se trompait de langue source, ou renoncait sur les
+   * textes courts — « ok merci », « bonjour » — qui sont justement les plus
+   * nombreux dans une messagerie. L'utilisateur, lui, sait dans quelle langue
+   * ecrit son correspondant. On le croit, et on cesse de deviner.
+   */
+  sourceDeclaree?: string | null
+): Promise<Demande> {
   const propre = texte.trim()
   const empreinte = await empreinteTexte(propre)
-  const source = normaliserLangue(await detecterLangueMessage(propre)) || null
+  const declaree = normaliserLangue(sourceDeclaree ?? "") || null
+  const source = declaree ?? (normaliserLangue(await detecterLangueMessage(propre)) || null)
   if (source && source === normaliserLangue(cible)) throw new TraductionError("meme-langue")
   return { texte: propre, empreinte, source }
 }
@@ -434,10 +448,15 @@ async function lireEnCache(
  * enverrait la conversation entiere a un tiers en reponse a une seule
  * intention.
  */
-export async function traduireMessage(texte: string, cible: string): Promise<ResultatTraduction> {
+export async function traduireMessage(
+  texte: string,
+  cible: string,
+  /** Voir `preparer` : renseignee, elle supprime l'etape de detection. */
+  sourceDeclaree?: string | null
+): Promise<ResultatTraduction> {
   const cibleNormalisee = normaliserLangue(cible)
   const moteur = lireMoteurTraduction()
-  const demande = await preparer(texte, cibleNormalisee)
+  const demande = await preparer(texte, cibleNormalisee, sourceDeclaree)
   // Le moteur entre dans la cle de deduplication : changer de moteur puis
   // redemander la meme bulle doit relancer un vrai travail, pas rendre la
   // promesse en cours de l'ancien moteur.
@@ -452,6 +471,8 @@ export async function traduireMessage(texte: string, cible: string): Promise<Res
       // sur les textes courts — « Bonjour », « ok merci » — qui sont justement
       // les plus nombreux dans une messagerie. Sans elle, le moteur du
       // navigateur n'aurait aucun couple a ouvrir pour ces messages-la.
+      // ⚠️ `demande.source` porte deja la langue DECLAREE quand il y en a une :
+      // cette seconde detection ne s'execute donc que faute de declaration.
       const source =
         demande.source ??
         normaliserLangue((await detecterLangue(demande.texte, { souple: true })) ?? "")

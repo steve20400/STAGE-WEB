@@ -57,8 +57,22 @@ export const EVENEMENT_ECHEC_AUTO = "alanya:traduction-echec-auto"
 export function MessageTranslation({
   texte,
   automatique = false,
+  langueSource = null,
 }: {
   texte: string
+  /**
+   * Langue DECLAREE du correspondant pour cette conversation, ou `null`.
+   *
+   * 🔴 RENSEIGNEE, ELLE SUPPRIME L'ETAPE DE DETECTION. C'est tout l'objet du
+   * reglage : la detection se trompait de langue source, ou renoncait sur les
+   * textes courts — « ok merci », « bonjour » — qui sont justement les plus
+   * nombreux dans une messagerie. L'utilisateur, lui, sait dans quelle langue
+   * ecrit son correspondant ; on le croit et on cesse de deviner.
+   *
+   * ⚠️ Elle entre dans les dependances de l'effet : la changer doit RELANCER la
+   * traduction, sinon la bulle garderait celle obtenue sous l'ancienne langue.
+   */
+  langueSource?: string | null
   /**
    * Vrai quand le bloc s'ouvre de lui-meme, sans qu'on l'ait demande.
    *
@@ -89,7 +103,7 @@ export function MessageTranslation({
   useEffect(() => {
     let vivant = true
     setEtat({ phase: "chargement" })
-    traduireMessage(texte, language)
+    traduireMessage(texte, language, langueSource)
       .then((resultat) => {
         if (vivant) setEtat({ phase: "pret", resultat })
       })
@@ -105,7 +119,7 @@ export function MessageTranslation({
     return () => {
       vivant = false
     }
-  }, [texte, language, essai])
+  }, [texte, language, langueSource, essai])
 
   /**
    * En automatique, un echec ne s'ecrit PAS sous la bulle.

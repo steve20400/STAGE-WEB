@@ -44,6 +44,11 @@ import {
   mettreMediaEnFile,
   apercusMediasEnAttente,
 } from "../../../../src/services/messages-service"
+import {
+  EVENEMENT_REGLAGES_TRADUCTION,
+  langueSourceDe,
+  traduireCetteConversation,
+} from "../../../../src/services/traduction-conversation"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
 import {
   PanneauMembre,
@@ -3406,6 +3411,7 @@ function MessageBubble({
   albumMsgs,
   onOpenAlbum,
   autoTraduction,
+  langueSourceDeclaree,
 }: {
   msg: Message
   isMe: boolean
@@ -3426,6 +3432,14 @@ function MessageBubble({
   onOpenAlbum?: (index: number) => void
   /** Traduction automatique active pour cette discussion (reglage par appareil). */
   autoTraduction: boolean
+  /**
+   * Langue DECLAREE du correspondant pour cette conversation, ou `null`.
+   *
+   * Descend jusqu'ici parce que c'est la bulle qui declenche la traduction :
+   * la remonter au service par un acces global aurait fait lire `localStorage`
+   * a chaque bulle rendue, donc a chaque defilement.
+   */
+  langueSourceDeclaree: string | null
   /**
    * Combien de membres ont lu CE message. Groupe seulement, mes messages
    * seulement. `undefined` hors groupe : la bulle n'affiche alors rien de plus.
@@ -4118,7 +4132,11 @@ function MessageBubble({
                 deja au cache.
               */}
               {blocTraductionVisible && texteATraduire && (
-                <MessageTranslation texte={texteATraduire} automatique={traductionAutomatique} />
+                <MessageTranslation
+                  texte={texteATraduire}
+                  automatique={traductionAutomatique}
+                  langueSource={langueSourceDeclaree}
+                />
               )}
 
               {msg.isDeleted ? (
@@ -4960,28 +4978,62 @@ export default function ChatRoomPage() {
   const [partageContact, setPartageContact] = useState(false)
   const [infoPanelOpen, setInfoPanelOpen] = useState(false)
 
+  /*
+   * ⚠️ REMONTE ICI depuis une cinquantaine de lignes plus bas : la traduction
+   * automatique a besoin de `language` — la langue de LECTURE est la cible de
+   * la traduction, et elle entre dans la decision de traduire ou non. Un hook
+   * inconditionnel se deplace sans risque tant qu'il reste inconditionnel.
+   */
+  const { t, language } = useTranslation()
+
   /**
    * Traduction automatique de cette discussion.
    *
-   * Active par defaut, coupee discussion par discussion. L'initialisation est
-   * paresseuse : `traductionAutoActive` touche `localStorage`, et le faire a
-   * chaque rendu couterait une lecture synchrone par bulle affichee.
+   * 🔴 TROIS REGLAGES SE COMBINENT ICI, et l'ordre compte :
+   *   1. le reglage de CETTE discussion, s'il a ete pose — il prime toujours ;
+   *   2. sinon l'interrupteur general de l'application ;
+   *   3. et dans tous les cas, rien a traduire si la langue declaree du
+   *      correspondant est deja celle qu'on lit.
+   *
+   * `traduireCetteConversation` tient la regle entiere : la repartir entre
+   * l'ecran et le service les aurait fait diverger a la premiere evolution.
+   *
+   * L'initialisation reste paresseuse — la fonction touche `localStorage`, et
+   * le faire a chaque rendu couterait une lecture synchrone par bulle.
    */
-  const [autoTraduction, setAutoTraduction] = useState(() => traductionAutoActive(chatId))
-  // Changer de conversation sans remonter le composant doit relire le reglage
-  // de la NOUVELLE conversation, sinon on herite de celui de la precedente.
+  const [autoTraduction, setAutoTraduction] = useState(() =>
+    traduireCetteConversation(chatId, language)
+  )
+  /**
+   * La langue DECLAREE du correspondant, passee telle quelle au moteur.
+   *
+   * `null` = detection automatique, soit le comportement d'avant ce reglage.
+   */
+  const [langueDeclaree, setLangueDeclaree] = useState<string | null>(() =>
+    langueSourceDe(chatId)
+  )
+
+  // Changer de conversation sans remonter le composant doit relire les reglages
+  // de la NOUVELLE, sinon on herite de ceux de la precedente. La langue de
+  // lecture entre aussi dans le calcul : la changer peut relancer — ou arreter —
+  // la traduction, selon qu'elle rejoint ou quitte celle du correspondant.
   useEffect(() => {
-    setAutoTraduction(traductionAutoActive(chatId))
-  }, [chatId])
-  // Le reglage se change desormais dans les informations de la conversation, un
-  // composant qui n'est pas un ancetre de celui-ci : c'est l'evenement qui les
-  // accorde. On relit plutot que de croire le detail transporte, pour que le fil
-  // affiche toujours ce qui est REELLEMENT enregistre.
-  useEffect(() => {
-    const surChangement = () => setAutoTraduction(traductionAutoActive(chatId))
-    window.addEventListener(EVENEMENT_TRADUCTION_AUTO, surChangement)
-    return () => window.removeEventListener(EVENEMENT_TRADUCTION_AUTO, surChangement)
-  }, [chatId])
+    const relire = () => {
+      setAutoTraduction(traduireCetteConversation(chatId, language))
+      setLangueDeclaree(langueSourceDe(chatId))
+    }
+    relire()
+    // Deux evenements, deux origines : l'ancien porte l'interrupteur des
+    // informations de la conversation, le nouveau porte la langue et le reglage
+    // general. On relit dans les deux cas plutot que de croire le detail
+    // transporte, pour que le fil affiche ce qui est REELLEMENT enregistre.
+    window.addEventListener(EVENEMENT_TRADUCTION_AUTO, relire)
+    window.addEventListener(EVENEMENT_REGLAGES_TRADUCTION, relire)
+    return () => {
+      window.removeEventListener(EVENEMENT_TRADUCTION_AUTO, relire)
+      window.removeEventListener(EVENEMENT_REGLAGES_TRADUCTION, relire)
+    }
+  }, [chatId, language])
 
 
   /**
@@ -5007,7 +5059,6 @@ export default function ChatRoomPage() {
   const [recordSec, setRecordSec] = useState(0)
 
   const bottomRef = useRef<HTMLDivElement>(null)
-  const { t } = useTranslation()
 
   /**
    * Un echec de traduction automatique se dit UNE FOIS, en passant.
@@ -7045,6 +7096,7 @@ export default function ChatRoomPage() {
                       albumMsgs={lot}
                       onOpenAlbum={(index) => setGallery({ msgs: lot, index })}
                       autoTraduction={autoTraduction}
+                      langueSourceDeclaree={langueDeclaree}
                     />
                   </MessageErrorBoundary>
                 )
@@ -7113,6 +7165,7 @@ export default function ChatRoomPage() {
                     quoteAuthor={quoteAuthor}
                     onJumpToMessage={jumpToMessage}
                     autoTraduction={autoTraduction}
+                      langueSourceDeclaree={langueDeclaree}
                   />
                 </MessageErrorBoundary>
               )

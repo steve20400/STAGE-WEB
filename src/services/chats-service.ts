@@ -9,6 +9,7 @@ import {
   loadCachedConversations,
   loadCachedConversation,
 } from "./indexeddb-cache"
+import { memoriserReglages } from "./traduction-conversation"
 
 /**
  * Aggregation purement locale (localStorage + groupes crees en local).
@@ -93,6 +94,14 @@ interface BackendConversation {
    * se mettre a jour en direct chez qui la regarde.
    */
   sourdine?: boolean
+  /**
+   * Reglages de traduction de cette conversation, pour ce compte.
+   *
+   * Facultatifs : un backend anterieur ne les envoie pas, et tout se comporte
+   * alors comme avant — detection automatique, et suivi du reglage general.
+   */
+  langueSource?: string | null
+  traductionAuto?: boolean | null
   /** Verrou pose par un appareil du compte courant, ou null. */
   lock?: { appareilId: number; detenteur: string | null; expiresAt: string } | null
   updatedAt?: string
@@ -140,6 +149,23 @@ function pickColorIdx(id: string): number {
 
 function toFrontConversation(c: BackendConversation): ConversationListItem {
   const isSelf = c.isSelf === true
+
+  /*
+   * LES REGLAGES DE TRADUCTION SONT RANGES AU PASSAGE, et non demandes a part.
+   *
+   * 🔴 LE CACHE DOIT ETRE CHAUD AVANT LE PREMIER MESSAGE AFFICHE. La liste des
+   * conversations les porte deja ; les redemander par un appel dedie a
+   * l'ouverture d'une discussion ferait partir la premiere fournee de messages
+   * en detection automatique — exactement ce que ce reglage supprime — puis se
+   * retraduire une seconde plus tard sous les yeux de l'utilisateur.
+   *
+   * `memoriserReglages` ne previent que si quelque chose a change : cette
+   * fonction tourne pour chaque conversation a chaque rafraichissement.
+   */
+  memoriserReglages(c.id, {
+    langueSource: c.langueSource ?? null,
+    auto: c.traductionAuto ?? null,
+  })
 
   /*
    * LE TITRE DU « MOI » EST TRADUIT ICI, PAS PRIS TEL QUEL.
