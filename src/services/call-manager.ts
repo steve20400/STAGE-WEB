@@ -1886,6 +1886,12 @@ async function handleServerEvent(event: CallServerEvent) {
         ivrFromId: (event.ivrFromId as string | null) ?? null,
       },
       endedAt: null,
+      // 🐛 SANS CETTE REMISE A ZERO, L'ECRAN DU REPONDEUR DE L'APPEL
+      // PRECEDENT REPARAISSAIT PAR-DESSUS LE NOUVEL APPEL. Il survit
+      // volontairement au nettoyage de fin — c'est ce qui permet
+      // d'enregistrer apres avoir raccroche — mais rien ne l'effacait
+      // ensuite : il attendait le prochain appel pour se montrer.
+      repondeur: null,
       error: null,
     })
     // Le destinataire a effectivement l'application ouverte : l'appelant peut
@@ -2344,6 +2350,12 @@ export async function startOutgoingCall(
     // basculement fait pendant l'appel precedent collerait au suivant.
     audioOutput: type === "video" ? "speaker" : defaultAudioOutput(),
     endedAt: null,
+    // 🐛 SANS CETTE REMISE A ZERO, L'ECRAN DU REPONDEUR DE L'APPEL
+    // PRECEDENT REPARAISSAIT PAR-DESSUS LE NOUVEL APPEL. Il survit
+    // volontairement au nettoyage de fin — c'est ce qui permet
+    // d'enregistrer apres avoir raccroche — mais rien ne l'effacait
+    // ensuite : il attendait le prochain appel pour se montrer.
+    repondeur: null,
     error: null,
   })
 
@@ -2424,6 +2436,12 @@ export async function startCallbackCall(
     participantNames,
     audioOutput: defaultAudioOutput(),
     endedAt: null,
+    // 🐛 SANS CETTE REMISE A ZERO, L'ECRAN DU REPONDEUR DE L'APPEL
+    // PRECEDENT REPARAISSAIT PAR-DESSUS LE NOUVEL APPEL. Il survit
+    // volontairement au nettoyage de fin — c'est ce qui permet
+    // d'enregistrer apres avoir raccroche — mais rien ne l'effacait
+    // ensuite : il attendait le prochain appel pour se montrer.
+    repondeur: null,
     error: null,
   })
 
@@ -2511,6 +2529,12 @@ export async function joinMeetingRoom(
     localStream: null,
     remoteStreams: {},
     endedAt: null,
+    // 🐛 SANS CETTE REMISE A ZERO, L'ECRAN DU REPONDEUR DE L'APPEL
+    // PRECEDENT REPARAISSAIT PAR-DESSUS LE NOUVEL APPEL. Il survit
+    // volontairement au nettoyage de fin — c'est ce qui permet
+    // d'enregistrer apres avoir raccroche — mais rien ne l'effacait
+    // ensuite : il attendait le prochain appel pour se montrer.
+    repondeur: null,
     error: null,
   })
 
@@ -2810,6 +2834,12 @@ export async function acceptIncomingCall(): Promise<string | null> {
     incoming: null,
     audioOutput: incoming.callType === "video" ? "speaker" : defaultAudioOutput(),
     endedAt: null,
+    // 🐛 SANS CETTE REMISE A ZERO, L'ECRAN DU REPONDEUR DE L'APPEL
+    // PRECEDENT REPARAISSAIT PAR-DESSUS LE NOUVEL APPEL. Il survit
+    // volontairement au nettoyage de fin — c'est ce qui permet
+    // d'enregistrer apres avoir raccroche — mais rien ne l'effacait
+    // ensuite : il attendait le prochain appel pour se montrer.
+    repondeur: null,
     error: null,
   })
 

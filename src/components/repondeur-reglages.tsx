@@ -5,11 +5,12 @@ import {
   ACCUEIL_MAX_MS,
   ACCUEIL_MAX_OCTETS,
   activerRepondeur,
+  ajouterAccueil,
+  choisirAccueil,
   lireMonRepondeur,
-  poserAccueil,
   refusAccueil,
   retirerAccueil,
-  type AccueilRepondeur,
+  type Accueil,
 } from "../services/repondeur-service"
 import { resolveMediaUrl } from "../services/media-service"
 
@@ -35,7 +36,9 @@ export function RepondeurReglages() {
   const { success, error } = useToast()
 
   const [actif, setActif] = useState(false)
-  const [accueil, setAccueil] = useState<AccueilRepondeur | null>(null)
+  const [accueils, setAccueils] = useState<Accueil[]>([])
+  /** Nom donné au prochain accueil — « Congés », « Bureau ». */
+  const [libelle, setLibelle] = useState("")
   const [phase, setPhase] = useState<Phase>({ nom: "repos" })
   const [secondes, setSecondes] = useState(0)
   const [occupe, setOccupe] = useState(false)
@@ -51,7 +54,7 @@ export function RepondeurReglages() {
     void lireMonRepondeur()
       .then((etat) => {
         setActif(etat.actif)
-        setAccueil(etat.accueil)
+        setAccueils(etat.accueils)
       })
       .catch(() => undefined)
   }, [])
@@ -150,11 +153,17 @@ export function RepondeurReglages() {
     if (phase.nom !== "relit" || occupe) return
     setOccupe(true)
     try {
-      const etat = await poserAccueil(phase.blob, `accueil-${Date.now()}.webm`, phase.dureeMs)
+      const etat = await ajouterAccueil(
+        phase.blob,
+        `accueil-${Date.now()}.webm`,
+        libelle.trim() || null,
+        phase.dureeMs,
+      )
       setActif(etat.actif)
-      setAccueil(etat.accueil)
+      setAccueils(etat.accueils)
       setPhase({ nom: "repos" })
       setSecondes(0)
+      setLibelle("")
       success(t("rep_enregistre"))
     } catch {
       error(t("rep_echec"))
@@ -177,9 +186,10 @@ export function RepondeurReglages() {
     }
     setOccupe(true)
     try {
-      const etat = await poserAccueil(fichier, fichier.name)
+      const etat = await ajouterAccueil(fichier, fichier.name, libelle.trim() || null)
       setActif(etat.actif)
-      setAccueil(etat.accueil)
+      setAccueils(etat.accueils)
+      setLibelle("")
       success(t("rep_enregistre"))
     } catch {
       error(t("rep_echec"))
@@ -190,13 +200,13 @@ export function RepondeurReglages() {
     }
   }
 
-  const supprimer = async () => {
+  const supprimer = async (id: string) => {
     if (occupe) return
     setOccupe(true)
     try {
-      await retirerAccueil()
-      setAccueil(null)
-      setActif(false)
+      const etat = await retirerAccueil(id)
+      setActif(etat.actif)
+      setAccueils(etat.accueils)
     } catch {
       error(t("rep_echec"))
     } finally {
@@ -213,6 +223,20 @@ export function RepondeurReglages() {
     } catch {
       setActif(!valeur)
       error(t("rep_echec"))
+    }
+  }
+
+  const choisir = async (id: string) => {
+    if (occupe) return
+    setOccupe(true)
+    try {
+      const etat = await choisirAccueil(id)
+      setActif(etat.actif)
+      setAccueils(etat.accueils)
+    } catch {
+      error(t("rep_echec"))
+    } finally {
+      setOccupe(false)
     }
   }
 
@@ -233,6 +257,12 @@ export function RepondeurReglages() {
           font-size: 12.5px; font-weight: 600;
         }
         .rep-btn:disabled { cursor: progress; opacity: 0.6; }
+        .rep-nom {
+          width: 100%; padding: 9px 12px; border-radius: 9px;
+          border: 1px solid var(--border-subtle); background: var(--bg-surface);
+          color: var(--text-primary); font-family: 'DM Sans', sans-serif;
+          font-size: 12.5px; outline: none;
+        }
         .rep-btn-ghost {
           border: 1px dashed var(--border-default); background: var(--bg-elevated);
           color: var(--text-secondary);
@@ -260,11 +290,11 @@ export function RepondeurReglages() {
           aria-checked={actif}
           // ⚠️ INACTIVABLE SANS ACCUEIL : allumer un répondeur muet promettrait
           // à ses correspondants un message qu'ils n'entendraient jamais.
-          disabled={!accueil}
+          disabled={accueils.length === 0}
           style={{
             background: actif ? "var(--accent)" : "var(--border-default)",
-            opacity: accueil ? 1 : 0.5,
-            cursor: accueil ? "pointer" : "not-allowed",
+            opacity: accueils.length > 0 ? 1 : 0.5,
+            cursor: accueils.length > 0 ? "pointer" : "not-allowed",
           }}
           onClick={() => void basculer(!actif)}
         >
@@ -281,21 +311,115 @@ export function RepondeurReglages() {
       {/* ── L'accueil en place ───────────────────────────────────────────── */}
       {phase.nom === "repos" && (
         <div style={{ display: "grid", gap: 10 }}>
-          {accueil ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <audio
-                controls
-                preload="none"
-                src={resolveMediaUrl(accueil.url)}
-                style={{ flex: "1 1 220px", minWidth: 0, height: 36 }}
-              />
-              <button className="rep-btn rep-btn-ghost" onClick={() => void supprimer()} disabled={occupe}>
-                {t("rep_supprimer")}
-              </button>
-            </div>
+          {/* ══════════ LA BIBLIOTHEQUE D'ACCUEILS ══════════
+              🔴 UNE LISTE, ET NON UN SEUL. On garde plusieurs messages —
+              conges, bureau, week-end — et l'on choisit selon le moment. Un
+              bouton « Supprimer » seul, sans voir CE QU'ON supprime, obligeait
+              a se souvenir de ce qu'on avait enregistre.
+
+              ⚠️ CHAQUE LIGNE EST ECOUTABLE. Choisir entre cinq accueils sans
+              pouvoir les entendre revient a choisir au hasard. */}
+          {accueils.length > 0 ? (
+            <>
+              <div
+                style={{
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: "var(--text-muted)",
+                  letterSpacing: 0.2,
+                }}
+              >
+                {t("rep_mes_accueils")}
+              </div>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
+                {accueils.map((entree) => {
+                  const estActif = entree.actif === 1
+                  return (
+                    <li
+                      key={entree.id}
+                      style={{
+                        display: "grid",
+                        gap: 6,
+                        padding: 10,
+                        borderRadius: 10,
+                        // L'actif se reconnait a sa bordure : l'ecrire seulement
+                        // obligerait a lire cinq lignes pour trouver laquelle.
+                        border: `1px solid ${estActif ? "var(--accent)" : "var(--border-subtle)"}`,
+                        background: "var(--bg-elevated)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: 13,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {entree.libelle || t("rep_sans_nom")}
+                        </span>
+                        {estActif && (
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              background: "var(--accent)",
+                              color: "var(--accent-text)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {t("rep_actif_badge")}
+                          </span>
+                        )}
+                      </div>
+                      <audio
+                        controls
+                        preload="none"
+                        src={resolveMediaUrl(entree.media.url)}
+                        style={{ width: "100%", height: 34 }}
+                      />
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {!estActif && (
+                          <button
+                            className="rep-btn rep-btn-ghost"
+                            onClick={() => void choisir(entree.id)}
+                            disabled={occupe}
+                          >
+                            {t("rep_choisir")}
+                          </button>
+                        )}
+                        <button
+                          className="rep-btn rep-btn-ghost"
+                          onClick={() => void supprimer(entree.id)}
+                          disabled={occupe}
+                        >
+                          {t("rep_supprimer")}
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
           ) : (
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("rep_aucun")}</div>
           )}
+
+          {/* Le nom du PROCHAIN accueil. Facultatif : sans lui la ligne
+              s'appelle « Sans nom », ce qui reste lisible tant qu'il n'y en a
+              qu'un ou deux. */}
+          <input
+            className="rep-nom"
+            value={libelle}
+            onChange={(evenement) => setLibelle(evenement.target.value)}
+            placeholder={t("rep_nom_placeholder")}
+            maxLength={60}
+          />
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="rep-btn" onClick={() => void demarrer()} disabled={occupe}>

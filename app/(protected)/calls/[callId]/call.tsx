@@ -313,23 +313,6 @@ export default function CallRoomPage() {
   return (
     <>
       <div className="call-room-root" onMouseMove={resetHideTimer} onClick={resetHideTimer}>
-        {/* LE REPONDEUR, PAR-DESSUS TOUT LE RESTE.
-            Il ne remplace pas l'ecran d'appel : il le recouvre. L'appel est
-            termine, ses pistes sont coupees, et ce qu'il reste dessous n'a plus
-            de sens — mais le demonter pour le remonter ensuite ferait clignoter
-            la fenetre entiere entre la sonnerie et le message. */}
-        {call.repondeur && (
-          <RepondeurAppel
-            callId={call.repondeur.callId}
-            accueilUrl={call.repondeur.accueilUrl}
-            nomCorrespondant={call.peerName || t("f2_contact")}
-            onFermer={() => {
-              quitterRepondeur()
-              acknowledgeCallEnded()
-              navigate(returnTo, { replace: true })
-            }}
-          />
-        )}
         {/* Sorties audio des participants distants (aussi utilisees en appel video coupe) */}
         {remoteStreamEntries.map(([peerId, stream]) => (
           <audio
@@ -635,6 +618,23 @@ export default function CallRoomPage() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* LE REPONDEUR, AU-DESSUS DES COMMANDES ET NON A LEUR PLACE.
+              L'appel est termine, mais l'ecran reste : c'est la qu'on ecoute
+              l'accueil et qu'on enregistre. Deux boutons s'ajoutent, le reste de
+              la fenetre ne bouge pas — on vient d'appeler quelqu'un, et ca doit
+              continuer de ressembler a ca. */}
+          {call.repondeur && (
+            <RepondeurAppel
+              callId={call.repondeur.callId}
+              accueilUrl={call.repondeur.accueilUrl}
+              onFermer={() => {
+                quitterRepondeur()
+                acknowledgeCallEnded()
+                navigate(returnTo, { replace: true })
+              }}
+            />
           )}
 
           <div

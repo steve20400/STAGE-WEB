@@ -4,22 +4,25 @@ import { useToast } from "./toast"
 import { deposerMessagerie } from "../services/repondeur-service"
 
 /**
- * L'ÉCRAN DU RÉPONDEUR, chez l'APPELANT.
+ * LE RÉPONDEUR, SUR L'ÉCRAN D'APPEL DE L'APPELANT.
  *
- * 🔴 C'EST LUI QUI JOUE LE RÉPONDEUR, faute de serveur média. Les appels sont en
- * pair-à-pair : personne n'ayant décroché, aucun pair n'existe pour jouer
- * l'accueil ni pour enregistrer. L'accueil est donc téléchargé et joué ICI, et
- * le message est enregistré ICI avant d'être déposé au serveur.
+ * 🔴 C'EST LUI QUI JOUE LE RÉPONDEUR, faute de serveur média : les appels sont
+ * en pair-à-pair, et personne n'ayant décroché, aucun pair n'existe pour jouer
+ * l'accueil ni pour enregistrer.
  *
- * ⚠️ L'APPEL EST DÉJÀ TERMINÉ quand cet écran paraît. Il fallait le terminer :
- * le laisser vivre ferait sonner le téléphone d'en face pendant qu'on parle, et
- * le destinataire décrocherait sur quelqu'un en train de dicter un message.
+ * 🔴 IL NE RECOUVRE PLUS L'ÉCRAN D'APPEL — correction d'une première version qui
+ * posait un panneau plein par-dessus. On restait alors devant quelque chose qui
+ * ne ressemblait plus à un appel, et les commandes habituelles disparaissaient
+ * sans raison. Ce n'est qu'une BARRE de deux boutons qui s'ajoute aux autres :
+ * l'appel qu'on vient de passer reste à l'écran, ce qui est exactement ce qui se
+ * passe.
  *
- * Le déroulé suit celui d'un vrai répondeur, et dans cet ordre : l'accueil, le
- * bip, puis la parole.
+ * ⚠️ L'APPEL EST DÉJÀ TERMINÉ quand cette barre paraît, et il fallait qu'il le
+ * soit : le laisser vivre ferait sonner le téléphone d'en face pendant qu'on
+ * parle, et le destinataire décrocherait sur quelqu'un en train de dicter.
  */
 
-type Etape = "accueil" | "invite" | "enregistre" | "envoie" | "fini"
+type Etape = "accueil" | "enregistre" | "envoie" | "fini"
 
 /** Durée maximale d'un message laissé. Au-delà, personne n'écoute. */
 const MESSAGE_MAX_MS = 120_000
@@ -27,12 +30,10 @@ const MESSAGE_MAX_MS = 120_000
 export function RepondeurAppel({
   callId,
   accueilUrl,
-  nomCorrespondant,
   onFermer,
 }: {
   callId: string
   accueilUrl: string
-  nomCorrespondant: string
   onFermer: () => void
 }) {
   const { t } = useTranslation()
@@ -46,12 +47,14 @@ export function RepondeurAppel({
   const morceaux = useRef<Blob[]>([])
   const flux = useRef<MediaStream | null>(null)
   const minuteur = useRef<ReturnType<typeof setInterval> | null>(null)
+  /** Durée retenue à l'arrêt : `secondes` est figé dans la fermeture du `onstop`. */
+  const dureeFinale = useRef(0)
 
   /**
    * Coupe le micro, pour de bon.
    *
    * 🔴 SANS `stop()` SUR CHAQUE PISTE, LE VOYANT RESTE ALLUMÉ après avoir quitté
-   * l'écran. Le navigateur garde l'accès tant qu'une piste vit, même
+   * l'écran : le navigateur garde l'accès tant qu'une piste vit, même
    * l'enregistreur arrêté.
    */
   const couperMicro = useCallback(() => {
@@ -63,34 +66,40 @@ export function RepondeurAppel({
     flux.current = null
   }, [])
 
-  useEffect(() => couperMicro, [couperMicro])
+  // Quitter l'écran ne doit laisser ni micro ouvert ni accueil qui continue.
+  useEffect(
+    () => () => {
+      couperMicro()
+      audio.current?.pause()
+    },
+    [couperMicro],
+  )
 
   /*
-   * L'accueil se joue tout seul à l'ouverture.
+   * L'accueil se joue tout seul.
    *
    * ⚠️ UN ÉCHEC DE LECTURE NE BLOQUE PAS. Le navigateur peut refuser de jouer
-   * sans geste préalable — même si, ici, l'appel EST le geste. On passe alors
-   * directement à l'invitation : mieux vaut laisser parler sans avoir entendu
-   * l'accueil que de rester bloqué sur un écran muet.
+   * sans geste préalable ; on laisse alors simplement le bouton disponible.
+   * Mieux vaut pouvoir parler sans avoir entendu l'accueil que rester bloqué.
    */
   useEffect(() => {
     const son = new Audio(accueilUrl)
     audio.current = son
-    const suivant = () => setEtape("invite")
-    son.addEventListener("ended", suivant)
-    son.play().catch(suivant)
+    son.play().catch(() => undefined)
     return () => {
-      son.removeEventListener("ended", suivant)
       son.pause()
     }
   }, [accueilUrl])
 
-  const passerLAccueil = () => {
-    audio.current?.pause()
-    setEtape("invite")
-  }
-
+  /**
+   * Démarre l'enregistrement.
+   *
+   * 🔴 COUPE L'ACCUEIL D'ABORD. On clique « Enregistrer » parce qu'on a compris
+   * le message, souvent avant la fin : le laisser continuer ferait parler
+   * par-dessus, et la voix du correspondant se retrouverait dans le message.
+   */
   const enregistrer = async () => {
+    audio.current?.pause()
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true })
       flux.current = media
@@ -103,17 +112,16 @@ export function RepondeurAppel({
       rec.start()
       enregistreur.current = rec
       setSecondes(0)
+      dureeFinale.current = 0
       setEtape("enregistre")
 
       minuteur.current = setInterval(() => {
         setSecondes((valeur) => {
           const suivant = valeur + 1
+          dureeFinale.current = suivant
           // La coupe est dans le minuteur : refuser après coup ferait perdre le
           // message entier, au moment précis où l'on croit avoir fini.
-          if (suivant * 1000 >= MESSAGE_MAX_MS) {
-            arreter()
-            return Math.floor(MESSAGE_MAX_MS / 1000)
-          }
+          if (suivant * 1000 >= MESSAGE_MAX_MS) arreter()
           return suivant
         })
       }, 1000)
@@ -145,10 +153,9 @@ export function RepondeurAppel({
       return
     }
     try {
-      await deposerMessagerie(callId, blob, secondes * 1000)
+      await deposerMessagerie(callId, blob, dureeFinale.current * 1000)
       setEtape("fini")
       success(t("rep_depose"))
-      // On laisse une seconde pour que la confirmation se lise, puis on sort.
       window.setTimeout(onFermer, 1200)
     } catch {
       error(t("rep_depot_echec"))
@@ -159,83 +166,56 @@ export function RepondeurAppel({
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 18,
-        padding: 24,
-        textAlign: "center",
-        background: "var(--bg-base, #0B0B18)",
-        color: "#fff",
-        zIndex: 40,
-      }}
-    >
-      <div style={{ fontSize: 17, fontWeight: 600 }}>{nomCorrespondant}</div>
-
+    <div className="rep-barre">
       {etape === "accueil" && (
         <>
-          <div style={{ fontSize: 14, opacity: 0.8 }}>{t("rep_lecture_accueil")}</div>
-          {/* Passer l'accueil : on le connaît déjà quand on rappelle
-              quelqu'un pour la troisième fois. */}
-          <button className="rep-appel-btn ghost" onClick={passerLAccueil}>
-            {t("rep_passer")}
+          <span className="rep-barre-texte">{t("rep_lecture_accueil")}</span>
+          <button className="rep-barre-btn" onClick={() => void enregistrer()}>
+            ● {t("rep_enregistrer_message")}
           </button>
-        </>
-      )}
-
-      {etape === "invite" && (
-        <>
-          <div style={{ fontSize: 14, opacity: 0.8 }}>{t("rep_apres_bip")}</div>
-          <button className="rep-appel-btn" onClick={() => void enregistrer()}>
-            ● {t("rep_laisser_message")}
-          </button>
-          <button className="rep-appel-btn ghost" onClick={onFermer}>
-            {t("rep_raccrocher")}
+          <button className="rep-barre-btn ghost" onClick={onFermer}>
+            {t("rep_quitter")}
           </button>
         </>
       )}
 
       {etape === "enregistre" && (
         <>
-          <div
-            style={{
-              fontSize: 30,
-              fontVariantNumeric: "tabular-nums",
-              letterSpacing: 1,
-            }}
-          >
-            {mmss(secondes)}
-          </div>
-          <div style={{ fontSize: 12, opacity: 0.6 }}>
-            / {mmss(Math.floor(MESSAGE_MAX_MS / 1000))}
-          </div>
-          <button className="rep-appel-btn" onClick={arreter}>
+          <span className="rep-barre-texte" style={{ fontVariantNumeric: "tabular-nums" }}>
+            ● {mmss(secondes)} / {mmss(Math.floor(MESSAGE_MAX_MS / 1000))}
+          </span>
+          <button className="rep-barre-btn" onClick={arreter}>
             ■ {t("rep_envoyer")}
           </button>
         </>
       )}
 
-      {etape === "envoie" && <div style={{ fontSize: 14, opacity: 0.8 }}>{t("rep_envoi")}</div>}
-      {etape === "fini" && <div style={{ fontSize: 14 }}>{t("rep_depose")}</div>}
+      {etape === "envoie" && <span className="rep-barre-texte">{t("rep_envoi")}</span>}
+      {etape === "fini" && <span className="rep-barre-texte">{t("rep_depose")}</span>}
 
       <style>{`
-        .rep-appel-btn {
-          padding: 12px 22px; border-radius: 999px; cursor: pointer;
-          border: none; background: var(--accent, #8A4B2B); color: #fff;
-          font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
-          min-width: 180px;
+        .rep-barre {
+          display: flex; align-items: center; justify-content: center;
+          gap: 10px; flex-wrap: wrap; padding: 12px 16px;
+          border-radius: 14px; margin: 0 auto 12px; max-width: 560px;
+          background: rgba(0,0,0,.45); backdrop-filter: blur(6px);
+          color: #fff;
         }
-        .rep-appel-btn.ghost {
-          background: transparent; border: 1px solid rgba(255,255,255,.3);
+        .rep-barre-texte { font-size: 13px; opacity: .9; }
+        .rep-barre-btn {
+          padding: 9px 16px; border-radius: 999px; cursor: pointer; border: none;
+          background: var(--accent, #8A4B2B); color: #fff;
+          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
         }
-        /* Au pouce, sur un telephone : les boutons prennent la largeur. */
-        @media (max-width: 420px) {
-          .rep-appel-btn { width: 100%; min-width: 0; }
+        .rep-barre-btn.ghost {
+          background: transparent; border: 1px solid rgba(255,255,255,.35);
+        }
+        /* Au pouce : chaque bouton prend sa ligne plutot que de se serrer a
+           trois, ou aucun n'est atteignable. */
+        @media (max-width: 480px) {
+          .rep-barre { flex-direction: column; align-items: stretch; }
+          .rep-barre-btn { width: 100%; }
+          .rep-barre-texte { text-align: center; }
         }
       `}</style>
     </div>

@@ -27,15 +27,24 @@ export interface AccueilRepondeur {
   filename: string
 }
 
-export interface EtatRepondeur {
-  actif: boolean
-  accueil: AccueilRepondeur | null
+/** Un message d'accueil enregistre sur le compte. */
+export interface Accueil {
+  id: string
+  libelle: string | null
+  actif: number
+  createdAt: string
+  media: AccueilRepondeur
 }
 
-/** Mon répondeur : est-il actif, et quel accueil porte-t-il ? */
+export interface EtatRepondeur {
+  actif: boolean
+  accueils: Accueil[]
+}
+
+/** Mon répondeur : l'interrupteur, et tous mes accueils. */
 export async function lireMonRepondeur(): Promise<EtatRepondeur> {
   const reponse = await apiRequest<EtatRepondeur>("/api/repondeur")
-  return { actif: reponse.actif === true, accueil: reponse.accueil ?? null }
+  return { actif: reponse.actif === true, accueils: reponse.accueils ?? [] }
 }
 
 /**
@@ -57,22 +66,30 @@ export async function accueilDeLAppel(callId: string): Promise<AccueilRepondeur 
 }
 
 /**
- * Téléverse un fichier audio et le pose comme message d'accueil.
+ * Téléverse un fichier audio et l'ajoute à la bibliothèque d'accueils.
  *
- * ⚠️ POSER UN ACCUEIL L'ACTIVE, côté serveur, sauf refus explicite. Enregistrer
- * son message puis devoir chercher un interrupteur pour qu'il serve est
- * exactement le genre d'étape qu'on oublie — et le répondeur resterait muet sans
- * que rien ne dise pourquoi.
+ * ⚠️ LE NOUVEL ACCUEIL DEVIENT L'ACTIF, côté serveur, et allume le répondeur.
+ * Enregistrer, puis désigner, puis chercher un interrupteur fait trois étapes
+ * dont deux s'oublient — et le répondeur resterait muet sans que rien ne dise
+ * pourquoi. Garder l'ancien actif reste possible : il suffit de le redésigner.
  */
-export async function poserAccueil(
+export async function ajouterAccueil(
   fichier: File | Blob,
   nomFichier: string,
+  libelle: string | null,
   dureeMs?: number,
 ): Promise<EtatRepondeur> {
   const media = await uploadMedia(fichier, nomFichier, dureeMs)
   return apiRequest<EtatRepondeur>("/api/repondeur", {
     method: "POST",
-    body: { mediaId: media.id },
+    body: { mediaId: media.id, libelle },
+  })
+}
+
+/** Désigne l'accueil que les appelants entendront. */
+export async function choisirAccueil(id: string): Promise<EtatRepondeur> {
+  return apiRequest<EtatRepondeur>(`/api/repondeur?actif=${encodeURIComponent(id)}`, {
+    method: "POST",
   })
 }
 
@@ -85,13 +102,16 @@ export async function activerRepondeur(actif: boolean): Promise<EtatRepondeur> {
 }
 
 /**
- * Retire l'accueil, et éteint le répondeur du même geste.
+ * Retire UN accueil.
  *
- * ⚠️ LE FICHIER N'EST PAS SUPPRIMÉ : il appartient au compte et peut avoir été
- * partagé ailleurs. On détache seulement.
+ * ⚠️ RETIRER L'ACTIF ÉTEINT LE RÉPONDEUR, côté serveur. Le laisser allumé sans
+ * accueil promettrait aux appelants un message que personne n'a enregistré.
  */
-export async function retirerAccueil(): Promise<void> {
-  await apiRequest<void>("/api/repondeur", { method: "DELETE" })
+export async function retirerAccueil(id: string): Promise<EtatRepondeur> {
+  return apiRequest<EtatRepondeur>(
+    `/api/repondeur?accueil=${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  )
 }
 
 /**
