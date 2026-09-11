@@ -776,7 +776,20 @@ class PeerSession {
 
 /* ----------------- Etat global ----------------- */
 
-const RING_TIMEOUT_MS = 60_000
+/**
+ * Duree de sonnerie d'un appel sortant avant abandon.
+ *
+ * 🔴 DOIT RESTER EGALE A `DELAI_SANS_REPONSE_MS` DU SERVEUR (30 s). Elle valait
+ * 60 s quand le serveur attendait 90 : le web renoncait donc trente secondes
+ * AVANT tout le monde, et l'ecran cessait de sonner pendant que le telephone
+ * d'en face sonnait encore.
+ *
+ * ⚠️ C'EST AUSSI L'INSTANT OU LE REPONDEUR PREND LA MAIN. Les faire diverger ne
+ * decalerait donc plus seulement un affichage : le message d'accueil partirait
+ * avant que le serveur ne considere l'appel termine, ou apres qu'il l'a deja
+ * clos.
+ */
+const RING_TIMEOUT_MS = 30_000
 
 /**
  * Photo du correspondant retrouvee cote client, a partir de la conversation
