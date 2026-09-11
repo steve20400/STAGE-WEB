@@ -7,7 +7,10 @@ import { startOutgoingCall } from "../../../src/services/call-manager"
 import { createPrivateChat } from "../../../src/services/chats-service"
 import {
   chercherEntreprises,
+  entreprisesDuPays,
   entreprisesDuType,
+  listerPaysDisponibles,
+  type PaysAnnuaire,
   estVocal,
   ficheEntreprise,
   listerTypes,
@@ -77,47 +80,115 @@ export default function EntreprisesPage() {
   const [liste, setListe] = useState<Entreprise[] | null>(null)
   const [fiche, setFiche] = useState<FicheEntreprise | null>(null)
   const [requete, setRequete] = useState("")
+  /**
+   * Les pays proposes par le filtre — ceux qui ont au moins une entreprise.
+   *
+   * 🔴 VIENNENT DU SERVEUR, jamais de la table des pays : construire le menu
+   * depuis celle-ci proposerait des pays vides, et l'ecran promettrait des
+   * entreprises qui n'existent pas.
+   */
+  const [paysDispo, setPaysDispo] = useState<PaysAnnuaire[]>([])
+  /**
+   * Pays retenu, ou `null` pour celui du compte.
+   *
+   * ⚠️ `null` N'EST PAS « TOUS LES PAYS ». Le serveur n'a pas cette notion : il
+   * n'y a que « le mien » — ce qu'il applique quand on ne lui envoie rien — ou
+   * « celui-ci ». Envoyer `0` ou une chaine vide se ferait refuser.
+   */
+  const [paysChoisi, setPaysChoisi] = useState<number | null>(null)
   const [echec, setEchec] = useState(false)
   const [occupe, setOccupe] = useState(false)
 
   const chargerTypes = useCallback(async () => {
     setEchec(false)
     try {
-      setTypes(await listerTypes())
+      setTypes(await listerTypes(paysChoisi))
     } catch {
       setEchec(true)
     }
-  }, [])
+  }, [paysChoisi])
 
   useEffect(() => {
     void chargerTypes()
   }, [chargerTypes])
 
-  const ouvrirType = useCallback(async (type: TypeEntreprise) => {
-    setListe(null)
-    setVoletGauche({ niveau: "entreprises", type })
-    setDetail(null)
-    try {
-      setListe(await entreprisesDuType(type.id))
-    } catch {
-      setListe([])
-      setEchec(true)
-    }
+  // La liste des pays ne depend ni du type regarde ni du pays courant : une
+  // seule fois suffit, et la recharger a chaque changement serait du travail
+  // pour rien.
+  useEffect(() => {
+    void listerPaysDisponibles()
+      .then(setPaysDispo)
+      .catch(() => setPaysDispo([]))
   }, [])
 
+  const ouvrirType = useCallback(
+    async (type: TypeEntreprise) => {
+      setListe(null)
+      setVoletGauche({ niveau: "entreprises", type })
+      setDetail(null)
+      try {
+        setListe(await entreprisesDuType(type.id, paysChoisi))
+      } catch {
+        setListe([])
+        setEchec(true)
+      }
+    },
+    [paysChoisi],
+  )
+
+  /**
+   * La recherche répond à DEUX questions avec un seul champ.
+   *
+   * 🔴 UN NOM DE PAYS EST RECONNU AVANT TOUT. « Cameroun » veut dire « montre-moi
+   * ce qu'il y a là-bas », pas « cherche une entreprise appelée Cameroun ». Le
+   * serveur ne peut pas faire cette distinction : il fouille les raisons sociales
+   * et les mots-clés, et ne connaît pas les pays de la recherche. L'écran, lui,
+   * a déjà la liste des pays pour son filtre — elle ne coûte donc rien à
+   * consulter.
+   *
+   * ⚠️ COMPARAISON SANS ACCENTS NI CASSE. « cameroun » et « Cameroun » désignent
+   * le même pays, et personne ne tape les accents dans un champ de recherche.
+   * Sans cette normalisation, la reconnaissance ne marcherait que pour qui écrit
+   * exactement comme la base.
+   *
+   * ⚠️ LE PAYS RECONNU DEVIENT LE FILTRE. Sinon l'écran montrerait les
+   * entreprises d'un pays tout en affichant un autre dans son menu — deux
+   * affirmations contradictoires à la même seconde.
+   */
   const lancerRecherche = useCallback(async () => {
     const q = requete.trim()
     if (q === "") return
     setListe(null)
-    setVoletGauche({ niveau: "recherche" })
     setDetail(null)
+
+    const nu = (texte: string) =>
+      texte
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+
+    const cherche = nu(q)
+    // Le nom exact d'abord : « Niger » ne doit pas ouvrir « Nigeria » sous
+    // prétexte qu'il en est un préfixe.
+    const paysTrouve =
+      paysDispo.find((p) => nu(p.libelle) === cherche) ??
+      paysDispo.find((p) => nu(p.libelle).startsWith(cherche) && cherche.length >= 3)
+
     try {
-      setListe(await chercherEntreprises(q))
+      if (paysTrouve) {
+        setPaysChoisi(paysTrouve.idPays)
+        setVoletGauche({ niveau: "recherche" })
+        setListe(await entreprisesDuPays(paysTrouve.idPays))
+        return
+      }
+      setVoletGauche({ niveau: "recherche" })
+      setListe(await chercherEntreprises(q, paysChoisi))
     } catch {
       setListe([])
       setEchec(true)
     }
-  }, [requete])
+  }, [requete, paysDispo, paysChoisi])
 
   const ouvrirFiche = useCallback(async (entreprise: Entreprise) => {
     setFiche(null)
@@ -426,6 +497,53 @@ export default function EntreprisesPage() {
           ) : null}
           <h1>{titreGauche}</h1>
         </header>
+
+        {/* ══════════════ Le filtre par pays ══════════════
+            🔴 IL N'Y A PAS D'OPTION « TOUS LES PAYS », et ce n'est pas un
+            oubli : le serveur ne connaît pas cette notion. Il n'y a que « le
+            mien » — ce qu'il applique quand on ne lui envoie rien — ou
+            « celui-ci ». Proposer « tous » afficherait une promesse que la
+            route ne sait pas tenir.
+
+            Absent tant qu'aucun pays n'a d'entreprise : un menu à une seule
+            entrée ne choisit rien. */}
+        {paysDispo.length > 0 &&
+        (voletGauche.niveau === "types" || voletGauche.niveau === "recherche") ? (
+          <div className="ent-search" style={{ paddingBottom: 0 }}>
+            <select
+              value={paysChoisi ?? ""}
+              aria-label={t("company_country")}
+              onChange={(e) => {
+                const valeur = e.target.value
+                setPaysChoisi(valeur === "" ? null : Number(valeur))
+                // On revient aux types : la liste affichée appartenait à
+                // l'ancien pays, et la garder à l'écran sous un nouveau filtre
+                // afficherait des entreprises que le filtre exclut.
+                setVoletGauche({ niveau: "types" })
+                setListe(null)
+                setDetail(null)
+              }}
+              style={{
+                flex: 1,
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontSize: 13,
+                color: "var(--text-primary)",
+                fontFamily: "'DM Sans', sans-serif",
+                outline: "none",
+              }}
+            >
+              <option value="">{t("company_country_mine")}</option>
+              {paysDispo.map((pays) => (
+                <option key={pays.idPays} value={pays.idPays}>
+                  {pays.libelle}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
         {/* La recherche ne vaut que pour les listes d'ou l'on peut chercher. */}
         {voletGauche.niveau === "types" || voletGauche.niveau === "recherche" ? (
