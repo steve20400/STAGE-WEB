@@ -3,6 +3,8 @@ import { loadSessionToken } from "../data/session-auth"
 import { ApiError } from "../lib/api-client"
 import { isCustomRingtone, RINGTONES, ringtoneSource, ringtoneUrl } from "./ringtones"
 import { sonneriePourAppelant } from "./contact-lists-service"
+import { accueilDeLAppel } from "./repondeur-service"
+import { resolveMediaUrl } from "./media-service"
 import { defaultAudioOutput, type AudioOutputMode } from "./audio-output"
 import {
   demarrerEnregistrement,
@@ -216,6 +218,17 @@ export interface CallManagerState {
   role: CallRole
   /** Etat affichable sans modifier l'interface : Sonnerie, En train de sonner, Appel en cours. */
   progress: CallProgress
+  /**
+   * Le répondeur du correspondant, quand la sonnerie a expiré sans réponse et
+   * qu'il en a un.
+   *
+   * 🔴 SURVIT AU NETTOYAGE DE FIN D'APPEL, comme `endedAt`. L'appel DOIT se
+   * terminer proprement — sinon le téléphone d'en face continuerait de sonner
+   * pendant qu'on enregistre — mais l'écran, lui, doit rester pour laisser
+   * parler. Les deux besoins sont contradictoires tant qu'on ne sépare pas la
+   * fin de l'APPEL de la fin de l'ÉCRAN.
+   */
+  repondeur: { callId: string; accueilUrl: string } | null
   isGroup: boolean
   isInitiator: boolean
   /** userId -> nom affichable des participants connus. */
@@ -846,6 +859,7 @@ function initialState(): CallManagerState {
     audioOutput: defaultAudioOutput(),
     endedAt: null,
     error: null,
+    repondeur: null,
     displayMode: "full",
     transferPending: false,
     pendingRatingIdHist: null,
@@ -1302,6 +1316,44 @@ let invitationsEnVol = 0
  */
 let salleAEteHabitee = false
 /** Un depart peut en preceder une arrivee de quelques centaines de millisecondes. */
+/**
+ * LA SONNERIE A EXPIRÉ : le répondeur prend la main, s'il y en a un.
+ *
+ * 🔴 L'APPEL EST TERMINÉ DANS TOUS LES CAS, et d'abord. Le laisser vivre pendant
+ * qu'on enregistre ferait sonner le téléphone d'en face une minute de plus, et
+ * le destinataire décrocherait sur un appelant qui parle à un répondeur.
+ *
+ * ⚠️ L'ACCUEIL EST DEMANDÉ AVANT DE RACCROCHER. Le serveur ne le sert qu'à
+ * quelqu'un qui a un appel EN COURS ou récent vers cette personne ; demander
+ * après aurait marché aussi — la fenêtre est de dix minutes — mais l'ordre
+ * inverse évite d'avoir à s'en remettre à cette tolérance.
+ *
+ * ⚠️ PAS DE RÉPONDEUR, PAS D'ÉCRAN. On raccroche comme avant, sans rien
+ * annoncer : ajouter « votre correspondant n'a pas de répondeur » allongerait un
+ * appel déjà manqué d'une étape qui n'apprend rien.
+ */
+async function basculerVersRepondeur(callId: string): Promise<void> {
+  let accueil: { url: string } | null = null
+  try {
+    accueil = await accueilDeLAppel(callId)
+  } catch {
+    // Réseau ou serveur muet : on raccroche simplement, comme avant.
+  }
+  // L'appel a pu être décroché ou raccroché pendant cette requête : on ne
+  // s'impose pas dans un appel qui a repris vie.
+  if (state.activeCallId !== callId || state.role !== "outgoing") return
+
+  if (accueil) {
+    setState({ repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url) } })
+  }
+  await hangUp()
+}
+
+/** Ferme l'écran du répondeur sans rien envoyer. */
+export function quitterRepondeur(): void {
+  setState({ repondeur: null })
+}
+
 const SOLITUDE_MS = 2000
 let solitudeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -1755,6 +1807,10 @@ function clearCall(markEnded: boolean) {
     endedAt: ended ? Date.now() : null,
     error: state.error,
     pendingRatingIdHist: state.pendingRatingIdHist,
+    // ⚠️ PRÉSERVÉ, comme `endedAt` : l'appel est fini, l'écran ne l'est pas.
+    // C'est ce qui permet de raccrocher proprement — donc de faire taire le
+    // téléphone d'en face — tout en laissant l'appelant enregistrer.
+    repondeur: state.repondeur,
   }
   for (const listener of stateListeners) listener()
 }
@@ -2295,7 +2351,8 @@ export async function startOutgoingCall(
 
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {
-      void hangUp()
+      // Le répondeur remplace le raccrochage sec — et raccroche lui-même.
+      void basculerVersRepondeur(started.id)
     }
   }, RING_TIMEOUT_MS)
 
@@ -2374,7 +2431,8 @@ export async function startCallbackCall(
 
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {
-      void hangUp()
+      // Le répondeur remplace le raccrochage sec — et raccroche lui-même.
+      void basculerVersRepondeur(started.id)
     }
   }, RING_TIMEOUT_MS)
 

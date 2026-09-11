@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useCallState } from "../../../../src/hooks/use-call"
+import { RepondeurAppel } from "../../../../src/components/repondeur-appel"
 import { useHasLiveVideo } from "../../../../src/hooks/use-remote-video"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
 import { CallOptionsMenu } from "../../../../src/components/call-options-menu"
@@ -8,6 +9,7 @@ import { IvrPanel } from "../../../../src/components/ivr-panel"
 import { QueueStatusPanel } from "../../../../src/components/queue-status-panel"
 import {
   acknowledgeCallEnded,
+  quitterRepondeur,
   hangUp as hangUpCall,
   toggleCamera,
   toggleMicrophone,
@@ -153,8 +155,14 @@ export default function CallRoomPage() {
   }, [callState])
 
   // Appel termine (par nous ou a distance) : petit ecran de fin puis retour.
+  //
+  // ⚠️ SAUF SI LE REPONDEUR A PRIS LA MAIN. L'appel EST termine — il fallait
+  // qu'il le soit, sinon le telephone d'en face sonnerait pendant qu'on parle —
+  // mais l'ecran doit rester : c'est la qu'on ecoute l'accueil et qu'on
+  // enregistre. Sans cette garde, la fenetre se refermerait au bout d'une
+  // seconde et demie, en plein message.
   useEffect(() => {
-    if (callState !== "ended") return
+    if (callState !== "ended" || call.repondeur) return
     leaveTimerRef.current = window.setTimeout(() => {
       acknowledgeCallEnded()
       // `replace` : l'ecran d'appel disparait de l'historique. Sans cela, le
@@ -165,7 +173,7 @@ export default function CallRoomPage() {
     return () => {
       if (leaveTimerRef.current !== null) window.clearTimeout(leaveTimerRef.current)
     }
-  }, [callState, navigate, returnTo])
+  }, [callState, navigate, returnTo, call.repondeur])
 
   /**
    * Changer de camera echange la piste DANS le meme MediaStream : ni la
@@ -305,6 +313,23 @@ export default function CallRoomPage() {
   return (
     <>
       <div className="call-room-root" onMouseMove={resetHideTimer} onClick={resetHideTimer}>
+        {/* LE REPONDEUR, PAR-DESSUS TOUT LE RESTE.
+            Il ne remplace pas l'ecran d'appel : il le recouvre. L'appel est
+            termine, ses pistes sont coupees, et ce qu'il reste dessous n'a plus
+            de sens — mais le demonter pour le remonter ensuite ferait clignoter
+            la fenetre entiere entre la sonnerie et le message. */}
+        {call.repondeur && (
+          <RepondeurAppel
+            callId={call.repondeur.callId}
+            accueilUrl={call.repondeur.accueilUrl}
+            nomCorrespondant={call.peerName || t("f2_contact")}
+            onFermer={() => {
+              quitterRepondeur()
+              acknowledgeCallEnded()
+              navigate(returnTo, { replace: true })
+            }}
+          />
+        )}
         {/* Sorties audio des participants distants (aussi utilisees en appel video coupe) */}
         {remoteStreamEntries.map(([peerId, stream]) => (
           <audio
