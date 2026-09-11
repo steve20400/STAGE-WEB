@@ -46,11 +46,9 @@ import {
 } from "../../../../src/services/messages-service"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
-  definirTraductionGlobale,
   langueSourceDe,
   traduireCetteConversation,
   traductionGlobaleActive,
-  traductionGlobaleDejaActivee,
 } from "../../../../src/services/traduction-conversation"
 import { RowActionsMenu } from "../../../../src/components/row-actions-menu"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
@@ -114,7 +112,6 @@ import {
   moteurLocalPresent,
   retenirEchecTraduction,
   oublierTraductionsDuTexte,
-  installerPaquetsInitiaux,
 } from "../../../../src/services/traduction-service"
 import ChatInfoPage from "./chat-info"
 import { CLE_ERREUR, EVENEMENT_ECHEC_AUTO, MessageTranslation } from "./message-translation"
@@ -5031,7 +5028,6 @@ export default function ChatRoomPage() {
 
   /** L'interrupteur GENERAL, celui que porte le bouton de la barre d'en-tete. */
   const [tradGlobale, setTradGlobale] = useState(() => traductionGlobaleActive())
-  const [installEnCours, setInstallEnCours] = useState(false)
 
   /**
    * Traduction automatique de cette discussion.
@@ -6524,39 +6520,17 @@ export default function ChatRoomPage() {
   /**
    * Le bouton de traduction de la barre d'en-tete.
    *
-   * 🔴 IL COMMANDE L'APPLICATION ENTIERE, pas cette discussion. Le reglage de
-   * la discussion vit dans ses parametres, ou l'on pose une preference qu'on
-   * oublie ; la barre porte des GESTES.
+   * 🔴 IL NE FAIT QUE CONDUIRE AUX REGLAGES. Il ACTIVAIT la traduction au
+   * passage, si bien qu'il paraissait toujours allume et qu'on ne pouvait plus
+   * l'eteindre : chaque clic rallumait ce qu'on venait d'eteindre. Une commande
+   * qui ne sait que dire « oui » n'est pas un interrupteur.
    *
-   * ⚠️ LES PAQUETS S'INSTALLENT DANS LE GESTE, avant toute navigation et avant
-   * tout `await` de reseau : le navigateur refuse d'installer un composant hors
-   * d'un clic, et intercaler quoi que ce soit perdrait le geste — la demande
-   * partirait alors dans le vide, en silence.
-   *
-   * ⚠️ DEJA ACTIVE, LE CLIC NE FAIT QUE NAVIGUER. Eteindre au meme endroit
-   * qu'on allume se declenche par erreur, et cette bascule-la coupe la
-   * traduction de TOUTES les conversations d'un coup. Elle reste donc dans les
-   * Parametres, ou l'on sait ce qu'on fait.
+   * L'allumage et l'extinction vivent desormais dans la page des reglages de
+   * traduction, ou l'on voit aussi ce qu'on allume — les paquets de langues, le
+   * moteur, le cache. Ce bouton-ci n'est qu'un raccourci, et son apparence dit
+   * l'etat pour qu'on sache s'il faut y aller.
    */
-  const basculerTraductionGlobale = () => {
-    const dejaActive = tradGlobale
-    const premiereFois = !traductionGlobaleDejaActivee()
-
-    if (!dejaActive) {
-      setTradGlobale(definirTraductionGlobale(true))
-      if (premiereFois) {
-        setInstallEnCours(true)
-        info(t("trad_paquets_encours"))
-        void installerPaquetsInitiaux(language)
-          .then(({ echecs }) => {
-            // Un paquet qui n'arrive pas n'empeche RIEN : la traduction passe
-            // alors par le relais en ligne. On le dit sans alarmer.
-            if (echecs.length > 0) info(t("trad_paquets_partiel"))
-            else info(t("trad_paquets_ok"))
-          })
-          .finally(() => setInstallEnCours(false))
-      }
-    }
+  const ouvrirReglagesTraduction = () => {
     navigate("/settings?section=translation")
   }
 
@@ -6965,8 +6939,7 @@ export default function ChatRoomPage() {
                 aria-label={t("trad_globale_titre")}
                 aria-pressed={tradGlobale}
                 title={tradGlobale ? t("trad_globale_on") : t("trad_globale_off")}
-                onClick={basculerTraductionGlobale}
-                disabled={installEnCours}
+                onClick={ouvrirReglagesTraduction}
                 style={
                   tradGlobale
                     ? { background: "var(--accent)", color: "var(--accent-text)" }

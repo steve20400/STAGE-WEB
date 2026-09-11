@@ -1,6 +1,11 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { RepondeurReglages } from "../../../src/components/repondeur-reglages"
+import {
+  definirTraductionGlobale,
+  traductionGlobaleActive,
+  traductionGlobaleDejaActivee,
+} from "../../../src/services/traduction-conversation"
 import { useAuth } from "../../../src/components/auth-provider"
 import { useToast } from "../../../src/components/toast"
 import { ThemeSelector } from "../../../src/components/theme-toggle"
@@ -85,6 +90,7 @@ import {
   telechargerComposants,
   viderCacheTraductions,
   dernierEchecTraduction,
+  installerPaquetsInitiaux,
 } from "../../../src/services/traduction-service"
 import {
   MOTEURS_CONNUS,
@@ -1266,6 +1272,36 @@ function TranslationSettings() {
   const { language, t } = useTranslation()
   const { success, error: toastError, info } = useToast()
 
+  /**
+   * L'interrupteur general de traduction automatique.
+   *
+   * ⚠️ LA PREMIERE ACTIVATION INSTALLE LES TROIS LANGUES — francais, anglais,
+   * chinois — vers la langue de lecture, et DANS LE GESTE DU CLIC : le
+   * navigateur refuse d'installer un composant hors d'un geste, et intercaler
+   * le moindre aller-retour reseau perdrait le geste. La demande partirait
+   * alors dans le vide, en silence.
+   */
+  const [tradGlobale, setTradGlobale] = useState(() => traductionGlobaleActive())
+  const [installPaquets, setInstallPaquets] = useState(false)
+
+  const basculerGlobale = async () => {
+    const voulu = !tradGlobale
+    const premiereFois = !traductionGlobaleDejaActivee()
+    setTradGlobale(definirTraductionGlobale(voulu))
+    if (!voulu || !premiereFois) return
+
+    setInstallPaquets(true)
+    try {
+      const { echecs } = await installerPaquetsInitiaux(language)
+      // Un paquet qui n'arrive pas n'empeche RIEN : la traduction passe alors
+      // par le relais en ligne. On le dit sans alarmer.
+      if (echecs.length > 0) info(t("trad_paquets_partiel"))
+      else success(t("trad_paquets_ok"))
+    } finally {
+      setInstallPaquets(false)
+    }
+  }
+
   const [moteur, setMoteur] = useState<CodeMoteur>(() => lireMoteurTraduction())
   // Presence du moteur du navigateur : elle ne change pas en cours de session.
   const [moteurPresent] = useState(() => moteurLocalPresent())
@@ -1474,6 +1510,49 @@ function TranslationSettings() {
     <>
       <div className="s-page-title">{t("settings_translation")}</div>
       <p className="s-page-sub">{t("trad_sub")}</p>
+
+      {/* ══════════ L'INTERRUPTEUR GENERAL ══════════
+          🔴 IL VIT ICI, ET NON DANS LA BARRE D'UNE DISCUSSION. Le bouton de
+          l'en-tete ACTIVAIT la traduction au passage : il paraissait donc
+          toujours allume et on ne pouvait plus l'eteindre, chaque clic
+          rallumant ce qu'on venait d'eteindre. Une commande qui ne sait que
+          dire « oui » n'est pas un interrupteur.
+
+          Ici, on voit AUSSI ce qu'on allume — le moteur, les paquets de
+          langues, le cache — ce qui n'est pas un detail : activer la traduction
+          sans paquet installe fait passer chaque message par le reseau. */}
+      <div className="s-card">
+        <div className="s-card-title">{t("trad_globale_titre")}</div>
+        <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+          {t("trad_globale_aide")}
+        </div>
+        <div className="notif-row">
+          <span className="notif-label">
+            {tradGlobale ? t("trad_globale_on") : t("trad_globale_off")}
+          </span>
+          <button
+            className="tgl"
+            role="switch"
+            aria-checked={tradGlobale}
+            disabled={installPaquets}
+            style={{ background: tradGlobale ? "var(--accent)" : "var(--border-default)" }}
+            onClick={() => void basculerGlobale()}
+          >
+            <div
+              className="tgl-knob"
+              style={{
+                left: tradGlobale ? "20px" : "2.5px",
+                background: tradGlobale ? "var(--accent-text)" : "var(--text-muted)",
+              }}
+            />
+          </button>
+        </div>
+        {installPaquets && (
+          <div className="s-hint" style={{ marginBottom: 0 }}>
+            {t("trad_paquets_encours")}
+          </div>
+        )}
+      </div>
 
       {/*
         LA DERNIERE PANNE, DITE UNE FOIS ET AU BON ENDROIT.

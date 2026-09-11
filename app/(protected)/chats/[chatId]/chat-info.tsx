@@ -9,6 +9,7 @@ import {
   definirAutoConversation,
   definirLangueSource,
   reglagesDe,
+  traductionGlobaleActive,
   EVENEMENT_REGLAGES_TRADUCTION,
 } from "../../../../src/services/traduction-conversation"
 import {
@@ -224,6 +225,14 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const [langueSource, setLangueSource] = useState<string | null>(
     () => reglagesDe(conv.id).langueSource
   )
+  /**
+   * Ce que l'interrupteur MONTRE : l'etat reellement applique.
+   *
+   * `null` veut dire « suit le general » — il faut donc aller le lire pour
+   * savoir ce qui se passe vraiment dans cette discussion.
+   */
+  const tradEffective = autoTrad ?? traductionGlobaleActive()
+
   useEffect(() => {
     const relire = () => {
       const r = reglagesDe(conv.id)
@@ -727,62 +736,53 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 l'en-tete doit porter des gestes, pas des preferences. Elle
                 rejoint donc la sourdine et le blocage : le meme interrupteur,
                 dont l'etat se lit d'un coup d'oeil. */}
-            {/* 🔴 TROIS POSITIONS, PAS UN INTERRUPTEUR.
+            {/* 🔴 UN SEUL INTERRUPTEUR, MAIS TROIS ETATS DERRIERE.
 
-                Un interrupteur ne sait dire que « oui » ou « non », et
-                confondrait donc « jamais touche » avec « eteint
-                volontairement ». La difference est tout le sujet : le premier
-                doit SUIVRE le reglage general quand il change, le second doit
-                lui RESISTER. Avec deux positions, activer le general aurait
-                rallume des conversations qu'on avait expressement eteintes. */}
-            <div style={{ marginBottom: 14 }}>
-              <div className="notif-label" style={{ marginBottom: 8 }}>
-                {t("trad_conv_mode")}
-              </div>
-              <div
-                role="radiogroup"
-                aria-label={t("trad_conv_mode")}
-                style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
+                L'ecran ne propose que « oui » ou « non » — c'est ce qu'on
+                attend d'un reglage de discussion, et trois boutons demandaient
+                de comprendre une regle avant de pouvoir choisir.
+
+                ⚠️ LE MODELE, LUI, GARDE SES TROIS ETATS, et ce n'est pas une
+                complication gratuite : une discussion JAMAIS REGLEE doit suivre
+                le reglage general quand il change, alors qu'une discussion
+                eteinte doit lui RESISTER. Sans cette distinction, activer la
+                traduction generale rallumerait des conversations qu'on avait
+                expressement eteintes.
+
+                L'interrupteur montre donc l'etat EFFECTIF — le local s'il
+                existe, le general sinon — et le toucher fige un choix
+                explicite. C'est exactement ce qu'on attend : tant qu'on n'y
+                touche pas, on suit ; des qu'on y touche, on decide. */}
+            <div className="notif-row" style={{ marginBottom: 12 }}>
+              <span className="notif-label">{t("thr_trad_auto_title")}</span>
+              <button
+                className="tgl"
+                role="switch"
+                aria-checked={tradEffective}
+                title={
+                  tradEffective ? t("thr_trad_auto_hint_on") : t("thr_trad_auto_hint_off")
+                }
+                style={{
+                  background: tradEffective ? "var(--accent)" : "var(--border-default)",
+                }}
+                onClick={() => {
+                  const voulu = !tradEffective
+                  setAutoTrad(voulu)
+                  void definirAutoConversation(conv.id, voulu).catch(() => {
+                    error(t("server_unreachable"))
+                  })
+                }}
               >
-                {(
-                  [
-                    [null, t("trad_conv_suit")],
-                    [true, t("trad_conv_toujours")],
-                    [false, t("trad_conv_jamais")],
-                  ] as Array<[boolean | null, string]>
-                ).map(([valeur, libelle]) => {
-                  const choisi = autoTrad === valeur
-                  return (
-                    <button
-                      key={String(valeur)}
-                      type="button"
-                      role="radio"
-                      aria-checked={choisi}
-                      onClick={() => {
-                        // L'ecran bascule tout de suite ; le service corrige si
-                        // le serveur refuse, et previent par son evenement.
-                        setAutoTrad(valeur)
-                        void definirAutoConversation(conv.id, valeur).catch(() => {
-                          error(t("server_unreachable"))
-                        })
-                      }}
-                      style={{
-                        flex: "1 1 auto",
-                        padding: "7px 10px",
-                        fontSize: 12.5,
-                        borderRadius: 9,
-                        cursor: "pointer",
-                        border: `1px solid ${choisi ? "var(--accent)" : "var(--border-subtle)"}`,
-                        background: choisi ? "var(--accent)" : "var(--bg-surface)",
-                        color: choisi ? "var(--accent-text)" : "var(--text-primary)",
-                        fontFamily: "'DM Sans', sans-serif",
-                      }}
-                    >
-                      {libelle}
-                    </button>
-                  )
-                })}
-              </div>
+                <div
+                  className="tgl-knob"
+                  style={{
+                    left: tradEffective ? "20px" : "2.5px",
+                    background: tradEffective
+                      ? "var(--accent-text)"
+                      : "var(--text-muted)",
+                  }}
+                />
+              </button>
             </div>
 
             <div className="notif-row">

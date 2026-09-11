@@ -509,7 +509,7 @@ export default function EntreprisesPage() {
             entrée ne choisit rien. */}
         {paysDispo.length > 0 &&
         (voletGauche.niveau === "types" || voletGauche.niveau === "recherche") ? (
-          <div className="ent-search" style={{ paddingBottom: 0 }}>
+          <div className="ent-search" style={{ paddingBottom: 10 }}>
             <select
               value={paysChoisi ?? ""}
               aria-label={t("company_country")}
