@@ -246,6 +246,61 @@ export async function telechargerComposants(
   return etat === "available"
 }
 
+/**
+ * LES TROIS LANGUES INSTALLEES A LA PREMIERE ACTIVATION : francais, anglais,
+ * chinois — vers la langue de lecture.
+ *
+ * ⚠️ LE NAVIGATEUR TELECHARGE DES COUPLES, PAS DES LANGUES. « Le paquet
+ * francais » n'existe pas : ce qui s'installe, c'est `fr -> cible`. Trois
+ * langues font donc au plus trois couples, et lesquels depend de la langue de
+ * l'utilisateur — pas d'une liste fixe.
+ *
+ * ⚠️ A APPELER DANS LE GESTE DE L'UTILISATEUR, jamais apres un `await` de
+ * reseau. Le navigateur refuse d'installer un composant hors d'un clic, et un
+ * aller-retour intercale AVANT le premier telechargement perdrait le geste :
+ * la fonction ne demanderait alors rien du tout, en silence.
+ *
+ * Rend le nombre de couples REELLEMENT installes. Ne leve jamais : un paquet
+ * qui n'arrive pas laisse la traduction passer par le relais en ligne, ce qui
+ * marche — plus lentement, et sans rien casser.
+ */
+export const LANGUES_INITIALES = ["fr", "en", "zh"] as const
+
+export async function installerPaquetsInitiaux(
+  cible: string,
+  surProgression?: (langue: string, fraction: number) => void
+): Promise<{ installes: number; echecs: string[] }> {
+  const cibleNormalisee = normaliserLangue(cible)
+  let installes = 0
+  const echecs: string[] = []
+
+  for (const langue of LANGUES_INITIALES) {
+    // ⚠️ RIEN A FAIRE POUR SA PROPRE LANGUE : traduire du francais vers le
+    // francais n'a pas de couple, et le demander echouerait pour rien.
+    if (normaliserLangue(langue) === cibleNormalisee) continue
+
+    try {
+      const etat = await etatTraduction(langue, cibleNormalisee)
+      // Deja la, ou moteur en ligne : dans les deux cas il n'y a rien a
+      // installer. On ne retelecharge jamais ce qui est present.
+      if (etat === "local-actif" || etat === "en-ligne") continue
+      if (etat === "indisponible") {
+        echecs.push(langue)
+        continue
+      }
+      const ok = await telechargerComposants(langue, cibleNormalisee, (fraction) =>
+        surProgression?.(langue, fraction)
+      )
+      if (ok) installes += 1
+      else echecs.push(langue)
+    } catch {
+      echecs.push(langue)
+    }
+  }
+
+  return { installes, echecs }
+}
+
 /* ---------------------------------------------------------------- Detection */
 
 /**

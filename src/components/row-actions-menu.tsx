@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 export interface RowAction {
   label: string
@@ -19,9 +19,28 @@ export interface RowAction {
 export function RowActionsMenu({
   actions,
   ariaLabel = "Actions",
+  trigger,
+  triggerClassName,
 }: {
   actions: RowAction[]
   ariaLabel?: string
+  /**
+   * Contenu du bouton qui ouvre le menu. Les trois points par defaut.
+   *
+   * ⚠️ RENDU CONFIGURABLE PLUTOT QUE RECOPIE. La barre d'en-tete d'une
+   * discussion avait besoin du meme menu sous une icone de telephone : en
+   * refaire un aurait duplique le placement haut/bas mesure sur la hauteur
+   * reelle, la fermeture au clic exterieur, l'echappement, et la subtilite du
+   * defilement de la premiere frame — quatre comportements qui ont chacun coute
+   * un defaut avant d'etre justes.
+   */
+  trigger?: ReactNode
+  /**
+   * Classe du bouton declencheur. Fournie, elle REMPLACE le style par defaut :
+   * l'appelant qui donne sa propre apparence ne veut pas la voir melangee a
+   * celle d'une ligne de liste.
+   */
+  triggerClassName?: string
 }) {
   const [open, setOpen] = useState(false)
   const [above, setAbove] = useState(false)
@@ -104,22 +123,29 @@ export function RowActionsMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         title={ariaLabel}
-        style={{
-          background: open ? "var(--bg-surface)" : "var(--bg-elevated)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: 8,
-          padding: "7px 9px",
-          color: "var(--text-secondary)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-        }}
+        className={triggerClassName}
+        style={
+          triggerClassName
+            ? undefined
+            : {
+                background: open ? "var(--bg-surface)" : "var(--bg-elevated)",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: 8,
+                padding: "7px 9px",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+              }
+        }
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="12" cy="5" r="1.8" />
-          <circle cx="12" cy="12" r="1.8" />
-          <circle cx="12" cy="19" r="1.8" />
-        </svg>
+        {trigger ?? (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="12" cy="19" r="1.8" />
+          </svg>
+        )}
       </button>
 
       {open && (

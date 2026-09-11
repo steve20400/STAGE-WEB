@@ -46,9 +46,13 @@ import {
 } from "../../../../src/services/messages-service"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
+  definirTraductionGlobale,
   langueSourceDe,
   traduireCetteConversation,
+  traductionGlobaleActive,
+  traductionGlobaleDejaActivee,
 } from "../../../../src/services/traduction-conversation"
+import { RowActionsMenu } from "../../../../src/components/row-actions-menu"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
 import {
   PanneauMembre,
@@ -110,7 +114,7 @@ import {
   moteurLocalPresent,
   retenirEchecTraduction,
   oublierTraductionsDuTexte,
-  traductionAutoActive,
+  installerPaquetsInitiaux,
 } from "../../../../src/services/traduction-service"
 import ChatInfoPage from "./chat-info"
 import { CLE_ERREUR, EVENEMENT_ECHEC_AUTO, MessageTranslation } from "./message-translation"
@@ -4986,6 +4990,10 @@ export default function ChatRoomPage() {
    */
   const { t, language } = useTranslation()
 
+  /** L'interrupteur GENERAL, celui que porte le bouton de la barre d'en-tete. */
+  const [tradGlobale, setTradGlobale] = useState(() => traductionGlobaleActive())
+  const [installEnCours, setInstallEnCours] = useState(false)
+
   /**
    * Traduction automatique de cette discussion.
    *
@@ -5021,6 +5029,9 @@ export default function ChatRoomPage() {
     const relire = () => {
       setAutoTraduction(traduireCetteConversation(chatId, language))
       setLangueDeclaree(langueSourceDe(chatId))
+      // Le general se change aussi depuis les Parametres : le bouton de la
+      // barre doit alors changer d'apparence sans qu'on revienne ici.
+      setTradGlobale(traductionGlobaleActive())
     }
     relire()
     // Deux evenements, deux origines : l'ancien porte l'interrupteur des
@@ -6471,6 +6482,45 @@ export default function ChatRoomPage() {
     )
   }
 
+  /**
+   * Le bouton de traduction de la barre d'en-tete.
+   *
+   * 🔴 IL COMMANDE L'APPLICATION ENTIERE, pas cette discussion. Le reglage de
+   * la discussion vit dans ses parametres, ou l'on pose une preference qu'on
+   * oublie ; la barre porte des GESTES.
+   *
+   * ⚠️ LES PAQUETS S'INSTALLENT DANS LE GESTE, avant toute navigation et avant
+   * tout `await` de reseau : le navigateur refuse d'installer un composant hors
+   * d'un clic, et intercaler quoi que ce soit perdrait le geste — la demande
+   * partirait alors dans le vide, en silence.
+   *
+   * ⚠️ DEJA ACTIVE, LE CLIC NE FAIT QUE NAVIGUER. Eteindre au meme endroit
+   * qu'on allume se declenche par erreur, et cette bascule-la coupe la
+   * traduction de TOUTES les conversations d'un coup. Elle reste donc dans les
+   * Parametres, ou l'on sait ce qu'on fait.
+   */
+  const basculerTraductionGlobale = () => {
+    const dejaActive = tradGlobale
+    const premiereFois = !traductionGlobaleDejaActivee()
+
+    if (!dejaActive) {
+      setTradGlobale(definirTraductionGlobale(true))
+      if (premiereFois) {
+        setInstallEnCours(true)
+        info(t("trad_paquets_encours"))
+        void installerPaquetsInitiaux(language)
+          .then(({ echecs }) => {
+            // Un paquet qui n'arrive pas n'empeche RIEN : la traduction passe
+            // alors par le relais en ligne. On le dit sans alarmer.
+            if (echecs.length > 0) info(t("trad_paquets_partiel"))
+            else info(t("trad_paquets_ok"))
+          })
+          .finally(() => setInstallEnCours(false))
+      }
+    }
+    navigate("/settings?section=traduction")
+  }
+
   // Demarre un appel WebRTC dans cette conversation puis ouvre la salle d'appel.
   const startCallFromChat = (callType: "audio" | "video") => {
     void startOutgoingCall(chatId, callType, chat?.name ?? t("f2_contact"))
@@ -6831,46 +6881,73 @@ export default function ChatRoomPage() {
                   contact partage applique deja la meme regle. */}
               {!cestMoiMeme && (
                 <>
-              <button
-                className="action-btn"
-                aria-label={t("audio_call")}
-                title={t("audio_call")}
-                onClick={() => startCallFromChat("audio")}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                >
-                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
-                </svg>
-              </button>
-              {/* Appel video */}
-              <button
-                className="action-btn"
-                aria-label={t("video_call")}
-                title={t("video_call")}
-                onClick={() => startCallFromChat("video")}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                >
-                  <polygon points="23 7 16 12 23 17 23 7" />
-                  <rect x="1" y="5" width="15" height="14" rx="2" />
-                </svg>
-              </button>
+                  {/* 🔴 UN SEUL BOUTON D'APPEL, LE TYPE SE CHOISIT AU CLIC.
+
+                      Deux boutons cote a cote occupaient une place que la barre
+                      n'a pas, pour une distinction qu'on fait de toute facon
+                      APRES avoir decide d'appeler. Le menu reutilise
+                      `RowActionsMenu` : le placement haut/bas mesure sur la
+                      hauteur reelle, la fermeture au clic exterieur et
+                      l'echappement y sont deja justes, et les refaire ici aurait
+                      duplique quatre comportements qui ont chacun coute un
+                      defaut avant de l'etre. */}
+                  <RowActionsMenu
+                    ariaLabel={t("call")}
+                    triggerClassName="action-btn"
+                    trigger={
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      >
+                        <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
+                      </svg>
+                    }
+                    actions={[
+                      { label: t("audio_call"), onSelect: () => startCallFromChat("audio") },
+                      { label: t("video_call"), onSelect: () => startCallFromChat("video") },
+                    ]}
+                  />
                 </>
               )}
+
+              {/* La place liberee par la fusion des deux boutons d'appel.
+
+                  ⚠️ L'ETAT SE LIT D'UN COUP D'OEIL : un bouton qui commande
+                  toute l'application doit dire s'il est allume, sinon on
+                  l'actionne pour savoir — et on eteint ce qu'on voulait
+                  verifier. */}
+              <button
+                className="action-btn"
+                aria-label={t("trad_globale_titre")}
+                aria-pressed={tradGlobale}
+                title={tradGlobale ? t("trad_globale_on") : t("trad_globale_off")}
+                onClick={basculerTraductionGlobale}
+                disabled={installEnCours}
+                style={
+                  tradGlobale
+                    ? { background: "var(--accent)", color: "var(--accent-text)" }
+                    : undefined
+                }
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                >
+                  <circle cx="12" cy="12" r="9.5" />
+                  <path d="M2.5 12h19" />
+                  <path d="M12 2.5c2.5 2.6 3.8 6 3.8 9.5s-1.3 6.9-3.8 9.5c-2.5-2.6-3.8-6-3.8-9.5S9.5 5.1 12 2.5z" />
+                </svg>
+              </button>
             </>
           )}
           {/* Verrou de conversation. Absent — pas seulement desactive — quand un
