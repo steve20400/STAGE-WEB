@@ -6518,7 +6518,7 @@ export default function ChatRoomPage() {
           .finally(() => setInstallEnCours(false))
       }
     }
-    navigate("/settings?section=traduction")
+    navigate("/settings?section=translation")
   }
 
   // Demarre un appel WebRTC dans cette conversation puis ouvre la salle d'appel.

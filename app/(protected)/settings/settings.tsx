@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { useToast } from "../../../src/components/toast"
 import { ThemeSelector } from "../../../src/components/theme-toggle"
@@ -120,6 +120,20 @@ type SettingsSection =
   | "translation"
   | "appearance"
   | "about"
+
+/**
+ * Les memes valeurs, a l'execution : un type TypeScript disparait a la
+ * compilation et ne peut pas verifier ce qui vient d'une URL.
+ */
+const SECTIONS_CONNUES: SettingsSection[] = [
+  "profile",
+  "security",
+  "notifications",
+  "privacy",
+  "translation",
+  "appearance",
+  "about",
+]
 
 interface Profile {
   name: string
@@ -1778,7 +1792,26 @@ export default function SettingsPage() {
   const { deleteAccount: removeAccount, logoutEverywhere, updateUser, user } = useAuth()
   const { success, error: toastError, info, warning } = useToast()
 
-  const [section, setSection] = useState<SettingsSection>("profile")
+  /**
+   * La section ouverte, qui peut etre DESIGNEE PAR L'URL.
+   *
+   * 🐛 LA PAGE S'OUVRAIT TOUJOURS SUR LE PROFIL, quel que soit le lien suivi.
+   * Le bouton de traduction de la barre d'en-tete envoyait bien
+   * `?section=translation`, et personne ne le lisait : l'utilisateur atterrissait
+   * sur son profil apres avoir demande la traduction, sans comprendre pourquoi.
+   *
+   * ⚠️ LA VALEUR DE L'URL EST VERIFIEE, jamais posee telle quelle. Un lien
+   * errone — faute de frappe, ancienne adresse — poserait sinon une section qui
+   * n'existe pas, et la page n'afficherait RIEN du tout : ni profil, ni
+   * traduction, juste un menu sans contenu.
+   */
+  const [parametresUrl] = useSearchParams()
+  const [section, setSection] = useState<SettingsSection>(() => {
+    const demandee = parametresUrl.get("section")
+    return demandee !== null && SECTIONS_CONNUES.includes(demandee as SettingsSection)
+      ? (demandee as SettingsSection)
+      : "profile"
+  })
   const [saving, setSaving] = useState(false)
   // Appareils du compte, charges depuis l'API. `null` = chargement en cours.
   const [sessions, setSessions] = useState<SessionAffichee[] | null>(null)
