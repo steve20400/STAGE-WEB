@@ -6,9 +6,11 @@ import { loadLocalConversations } from "../../../../src/data/local-conversations
 import { findLocalGroup } from "../../../../src/data/local-groups"
 import { fetchContacts } from "../../../../src/services/contacts-service"
 import {
-  definirTraductionAuto,
-  traductionAutoActive,
-} from "../../../../src/services/traduction-service"
+  definirAutoConversation,
+  definirLangueSource,
+  reglagesDe,
+  EVENEMENT_REGLAGES_TRADUCTION,
+} from "../../../../src/services/traduction-conversation"
 import {
   fetchConversationById,
   addMembersToGroup,
@@ -21,7 +23,13 @@ import {
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { getMyUserId } from "../../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
-import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
+import {
+  LANGUAGE_CODES,
+  langueInitiale,
+  libelleLangue,
+  traduire,
+  useTranslation,
+} from "../../../../src/i18n"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import {
   bloquer,
@@ -198,12 +206,36 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
     if (propInfo?.sourdine !== undefined) setMute(propInfo.sourdine)
   }, [propInfo?.sourdine])
   /**
-   * Traduction automatique de cette conversation. Lecture paresseuse : la
-   * fonction touche `localStorage`, et ce panneau se remonte a chaque ouverture.
+   * Traduction de cette conversation, en TROIS etats.
+   *
+   * 🔴 `null` N'EST PAS `false`. Il veut dire « suit le reglage general », et
+   * c'est le troisieme etat sans lequel tout le mecanisme s'effondre : avec un
+   * simple interrupteur, l'application confondrait « jamais touche » et
+   * « eteint volontairement », et activer le general rallumerait des
+   * conversations qu'on avait expressement eteintes.
+   *
+   * Lecture paresseuse : la fonction touche `localStorage`, et ce panneau se
+   * remonte a chaque ouverture.
    */
-  const [autoTrad, setAutoTrad] = useState(() => traductionAutoActive(conv.id))
+  const [autoTrad, setAutoTrad] = useState<boolean | null>(
+    () => reglagesDe(conv.id).auto
+  )
+  /** Langue declaree du correspondant, ou `null` pour la detection. */
+  const [langueSource, setLangueSource] = useState<string | null>(
+    () => reglagesDe(conv.id).langueSource
+  )
   useEffect(() => {
-    setAutoTrad(traductionAutoActive(conv.id))
+    const relire = () => {
+      const r = reglagesDe(conv.id)
+      setAutoTrad(r.auto)
+      setLangueSource(r.langueSource)
+    }
+    relire()
+    // Le service corrige sa copie quand le serveur repond : on relit plutot que
+    // de croire ce qu'on vient d'envoyer, pour afficher ce qui est REELLEMENT
+    // enregistre.
+    window.addEventListener(EVENEMENT_REGLAGES_TRADUCTION, relire)
+    return () => window.removeEventListener(EVENEMENT_REGLAGES_TRADUCTION, relire)
   }, [conv.id])
   /**
    * Ligne de blocage visant ce correspondant, ou null. On garde la ligne et non
@@ -215,7 +247,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
    */
   const [blocage, setBlocage] = useState<PersonneBloquee | null>(null)
   const [blocageEnCours, setBlocageEnCours] = useState(false)
-  const { t } = useTranslation()
+  const { t, language: langueLecture } = useTranslation()
   const [members, setMembers] = useState<Member[]>(conv.members)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -695,24 +727,62 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 l'en-tete doit porter des gestes, pas des preferences. Elle
                 rejoint donc la sourdine et le blocage : le meme interrupteur,
                 dont l'etat se lit d'un coup d'oeil. */}
-            <div className="notif-row" style={{ marginBottom: 12 }}>
-              <span className="notif-label">{t("thr_trad_auto_title")}</span>
-              <button
-                className="tgl"
-                style={{ background: autoTrad ? "var(--accent)" : "var(--border-default)" }}
-                onClick={() => setAutoTrad(definirTraductionAuto(conv.id, !autoTrad))}
-                aria-checked={autoTrad}
-                role="switch"
-                title={autoTrad ? t("thr_trad_auto_hint_on") : t("thr_trad_auto_hint_off")}
+            {/* 🔴 TROIS POSITIONS, PAS UN INTERRUPTEUR.
+
+                Un interrupteur ne sait dire que « oui » ou « non », et
+                confondrait donc « jamais touche » avec « eteint
+                volontairement ». La difference est tout le sujet : le premier
+                doit SUIVRE le reglage general quand il change, le second doit
+                lui RESISTER. Avec deux positions, activer le general aurait
+                rallume des conversations qu'on avait expressement eteintes. */}
+            <div style={{ marginBottom: 14 }}>
+              <div className="notif-label" style={{ marginBottom: 8 }}>
+                {t("trad_conv_mode")}
+              </div>
+              <div
+                role="radiogroup"
+                aria-label={t("trad_conv_mode")}
+                style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
               >
-                <div
-                  className="tgl-knob"
-                  style={{
-                    left: autoTrad ? "20px" : "2.5px",
-                    background: autoTrad ? "var(--accent-text)" : "var(--text-muted)",
-                  }}
-                />
-              </button>
+                {(
+                  [
+                    [null, t("trad_conv_suit")],
+                    [true, t("trad_conv_toujours")],
+                    [false, t("trad_conv_jamais")],
+                  ] as Array<[boolean | null, string]>
+                ).map(([valeur, libelle]) => {
+                  const choisi = autoTrad === valeur
+                  return (
+                    <button
+                      key={String(valeur)}
+                      type="button"
+                      role="radio"
+                      aria-checked={choisi}
+                      onClick={() => {
+                        // L'ecran bascule tout de suite ; le service corrige si
+                        // le serveur refuse, et previent par son evenement.
+                        setAutoTrad(valeur)
+                        void definirAutoConversation(conv.id, valeur).catch(() => {
+                          error(t("server_unreachable"))
+                        })
+                      }}
+                      style={{
+                        flex: "1 1 auto",
+                        padding: "7px 10px",
+                        fontSize: 12.5,
+                        borderRadius: 9,
+                        cursor: "pointer",
+                        border: `1px solid ${choisi ? "var(--accent)" : "var(--border-subtle)"}`,
+                        background: choisi ? "var(--accent)" : "var(--bg-surface)",
+                        color: choisi ? "var(--accent-text)" : "var(--text-primary)",
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    >
+                      {libelle}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="notif-row">
@@ -1086,6 +1156,77 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </div>
             </div>
           </div>
+
+          {/* ══════════════════════ Langue du correspondant ══════════════════
+              🔴 SEULEMENT EN TETE-A-TETE, et c'est un choix.
+
+              Une seule langue source suppose que TOUT LE MONDE ecrit pareil, ce
+              qui est faux dans un groupe. Et un reglage faux est pire qu'une
+              detection imparfaite : la detection se trompe message par message,
+              un reglage se trompe pour toujours et ne se corrige jamais tout
+              seul. Les groupes gardent donc la detection automatique.
+
+              En bas de l'ecran : c'est un reglage qu'on pose une fois et qu'on
+              oublie, pas un geste. */}
+          {!conv.isGroup && (
+            <div className="cip-section">
+              <div className="cip-section-title">{t("trad_langue_titre")}</div>
+              <div
+                className="s-hint"
+                style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text-muted)" }}
+              >
+                {t("trad_langue_aide")}
+              </div>
+              <select
+                value={langueSource ?? ""}
+                aria-label={t("trad_langue_titre")}
+                onChange={(evenement) => {
+                  const choix = evenement.target.value || null
+                  setLangueSource(choix)
+                  void definirLangueSource(conv.id, choix).catch(() => {
+                    error(t("server_unreachable"))
+                  })
+                }}
+                style={{
+                  width: "100%",
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 10,
+                  padding: "11px 13px",
+                  fontSize: 13,
+                  color: "var(--text-primary)",
+                  fontFamily: "'DM Sans', sans-serif",
+                  outline: "none",
+                }}
+              >
+                {/* La valeur vide EST « detection automatique » : c'est le
+                    comportement d'avant ce reglage, et le retour y reste
+                    possible a tout moment. */}
+                <option value="">{t("trad_langue_auto")}</option>
+                {LANGUAGE_CODES.map((code) => (
+                  <option key={code} value={code}>
+                    {libelleLangue(code, langueLecture)}
+                  </option>
+                ))}
+              </select>
+
+              {/* ⚠️ DECLARER SA PROPRE LANGUE ETEINT LA TRADUCTION ICI, et il
+                  faut le DIRE : sans cette ligne, l'utilisateur choisirait sa
+                  langue puis se demanderait pourquoi plus rien ne se traduit. */}
+              {langueSource !== null && langueSource === langueLecture && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {t("trad_langue_meme")}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
