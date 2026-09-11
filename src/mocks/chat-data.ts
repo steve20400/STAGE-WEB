@@ -104,6 +104,11 @@ export interface MentionMessage {
 }
 
 export interface ChatMessageMock {
+  /**
+   * Appel que ce message prolonge — une messagerie vocale laissee apres un
+   * appel sans reponse. `null` pour un message ordinaire.
+   */
+  callId?: string | null
   id: string
   senderId: string
   content: string

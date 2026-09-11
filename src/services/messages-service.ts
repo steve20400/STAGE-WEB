@@ -48,6 +48,14 @@ export interface BackendMessage {
    */
   editedAt?: string | null
   /**
+   * Appel que ce message PROLONGE : renseigne, c'est une messagerie vocale
+   * laissee apres un appel sans reponse.
+   *
+   * Facultatif : un backend anterieur ne l'envoie pas, et le message s'affiche
+   * alors comme le vocal ordinaire qu'il est — ce qui reste juste.
+   */
+  callId?: string | null
+  /**
    * Les mentions `@` du message.
    *
    * Facultatif : un backend anterieur ne les envoie pas, et le message
@@ -183,6 +191,7 @@ export function toFrontMessage(
           isDeleted: m.replyTo.isDeleted,
         }
       : undefined,
+    callId: (m as BackendMessage).callId ?? null,
     mediaUrl: media?.url,
     mediaMime: media?.mimeType,
     medias: m.media,
