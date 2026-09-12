@@ -507,29 +507,6 @@
   background: #dc2626 !important;
 }
 
-/*
- * LE REPONDEUR, DANS L'ECRAN D'APPEL.
- *
- * Meme calque que « Appel termine », et jamais en meme temps que lui : c'est
- * l'un OU l'autre. Le panneau est pousse vers le bas plutot que centre — sur un
- * telephone, les deux boutons tombent ainsi sous le pouce, la ou se trouvaient
- * les commandes d'appel une seconde plus tot.
- */
-.call-room-root .repondeur-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 50;
-  background: color-mix(in srgb, var(--overlay) 90%, transparent);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 20px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
-}
-.call-room-root .repondeur-overlay > * {
-  width: 100%;
-  max-width: 440px;
-}
-
 .call-room-root .ended-overlay {
   position: absolute;
   inset: 0;

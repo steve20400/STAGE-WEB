@@ -622,6 +622,13 @@ export default function CallRoomPage() {
             </div>
           )}
 
+          {/* 🔴 LES COMMANDES CEDENT LA PLACE AU REPONDEUR, elles ne se cachent
+              pas DERRIERE lui. Une premiere version posait un panneau par-dessus
+              cette rangee, sur un voile a 45 % : Micro, Haut-parleur et
+              Raccrocher transparaissaient au travers, juste derriere les boutons
+              du repondeur. Un appel termine n'a de toute facon plus aucune
+              commande a offrir — il n'y a rien a couper ni a raccrocher. */}
+          {!call.repondeur && (
           <div
             className={`controls-bar ${!controlsVisible && isVideo && callState === "active" ? "hidden" : ""}`}
           >
@@ -858,22 +865,20 @@ export default function CallRoomPage() {
               </div>
             </div>
           </div>
-        </div>
+          )}
 
-        {/* ⚠️ « Appel termine » S'EFFACE DEVANT LE REPONDEUR, au lieu de se
-            superposer a lui : les deux se sont deja retrouves a l'ecran en meme
-            temps, et l'on lisait « Appel termine » deux fois. Ici, l'un exclut
-            l'autre par construction. */}
-        {call.repondeur && (
-          <div className="repondeur-overlay">
+          {/* La feuille du repondeur : opaque, collee au bas, exactement la ou
+              etaient les commandes. Rien ne flotte et rien ne transparait. */}
+          {call.repondeur && (
             <RepondeurAppel
               callId={call.repondeur.callId}
               accueilUrl={call.repondeur.accueilUrl}
               nom={call.repondeur.nom}
+              video={isVideo}
               onFermer={quitterRepondeur}
             />
-          </div>
-        )}
+          )}
+        </div>
 
         {callState === "ended" && !call.repondeur && (
           <div className="ended-overlay">

@@ -168,11 +168,21 @@ export async function retirerAccueil(id: string): Promise<EtatRepondeur> {
  */
 export async function deposerMessagerie(
   callId: string,
-  audio: Blob,
+  enregistrement: Blob,
   dureeMs: number,
+  /**
+   * Vidéo plutôt que voix.
+   *
+   * ⚠️ NE SERT QU'AU NOM. Le conteneur est WebM dans les deux cas — c'est ce
+   * que produit `MediaRecorder` — et c'est le type MIME du blob, transporté par
+   * l'envoi, qui dit au serveur s'il range un son ou une image. Le nom, lui,
+   * est ce qu'un humain lira dans un export ou un téléchargement : autant qu'il
+   * dise de quoi il s'agit.
+   */
+  video = false,
 ): Promise<void> {
-  const nom = `repondeur-${Date.now()}.webm`
-  const media = await uploadMedia(audio, nom, dureeMs)
+  const nom = `repondeur-${video ? "video-" : ""}${Date.now()}.webm`
+  const media = await uploadMedia(enregistrement, nom, dureeMs)
   await apiRequest(`/api/calls/${encodeURIComponent(callId)}/voicemail`, {
     method: "POST",
     body: { mediaId: media.id },

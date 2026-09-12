@@ -1,4 +1,9 @@
 import { apiRequest } from "../lib/api-client"
+import {
+  cacheCallLog,
+  loadCachedCallLogs,
+  loadCachedCallLogsForConversation,
+} from "./indexeddb-cache"
 import { createPrivateChat } from "./chats-service"
 import { loadContacts } from "../data/contacts"
 import { normalizePhoneNumber } from "../data/session-user"
@@ -157,16 +162,61 @@ function toCallRecord(c: BackendCall, avatars?: Map<string, string>): CallRecord
   }
 }
 
+/*
+ * ══════════════ LES APPELS SURVIVENT AU HORS-LIGNE ══════════════
+ *
+ * 🐛 SANS RESEAU, TOUTES LES PASTILLES D'APPEL DISPARAISSAIENT DU FIL. Les
+ * messages, eux, sont gardes sur l'appareil : on relisait donc une conversation
+ * entiere ou plus aucun appel n'avait jamais eu lieu. Le defaut se voyait
+ * surtout sur la messagerie vocale, qui perdait le bloc la reliant a son appel
+ * manque et retombait en bulle isolee — mais il les touchait tous.
+ *
+ * ⚠️ LE MAGASIN INDEXE SUR `conversationId`, ET `CallRecord` DIT `convId`. Sans
+ * ce champ en plus, la ligne s'ecrit bien mais ne ressort d'aucune recherche
+ * par conversation : elle serait ecrite pour rien. Il est ajoute a l'ecriture
+ * et retire a la lecture, pour que le reste du code ne voie qu'un `CallRecord`.
+ */
+
+/** Range les appels sur l'appareil. Ne bloque jamais l'affichage. */
+async function memoriserAppels(appels: CallRecord[]): Promise<void> {
+  await Promise.all(
+    appels.map((appel) =>
+      cacheCallLog({ ...appel, conversationId: appel.convId ?? "" }).catch(() => undefined),
+    ),
+  )
+}
+
+/** Relit ce qui a ete range. Les dates reviennent en `Date` : IndexedDB les garde. */
+function relireAppels(lignes: Record<string, unknown>[]): CallRecord[] {
+  return lignes.map((ligne) => {
+    const { conversationId: _ignore, ...appel } = ligne as Record<string, unknown> & {
+      conversationId?: string
+    }
+    const r = appel as unknown as CallRecord
+    // Une base ouverte par une version anterieure a pu ecrire la date en texte.
+    return { ...r, ts: r.ts instanceof Date ? r.ts : new Date(r.ts as unknown as string) }
+  })
+}
+
 /** GET /api/calls — historique d'appels de l'utilisateur. */
 export async function fetchCallsHistory(): Promise<CallRecord[]> {
   try {
     const response = await apiRequest<ListCallsResponse>("/api/calls")
     const avatars = avatarsParNumero()
-    return (response.calls ?? []).map((call) => toCallRecord(call, avatars))
+    const appels = (response.calls ?? []).map((call) => toCallRecord(call, avatars))
+    void memoriserAppels(appels)
+    return appels
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn("[calls] fetch a echoue", error)
-    return []
+    // ⚠️ ON REND CE QU'ON A, plutot qu'une liste vide. Un historique d'appels
+    // vide n'est pas « pas de reseau » : c'est « vous n'avez jamais appele
+    // personne », ce qui est faux et le fait croire.
+    try {
+      return relireAppels(await loadCachedCallLogs())
+    } catch {
+      return []
+    }
   }
 }
 
@@ -175,8 +225,21 @@ export async function fetchCallsHistory(): Promise<CallRecord[]> {
  * d'appel dans le fil de discussion, comme sur WhatsApp.
  */
 export async function fetchCallsForConversation(convId: string): Promise<CallRecord[]> {
-  const all = await fetchCallsHistory()
-  return all.filter((call) => call.convId === convId)
+  try {
+    const response = await apiRequest<ListCallsResponse>("/api/calls")
+    const avatars = avatarsParNumero()
+    const tous = (response.calls ?? []).map((call) => toCallRecord(call, avatars))
+    void memoriserAppels(tous)
+    return tous.filter((call) => call.convId === convId)
+  } catch {
+    // Le filtre porte quand meme : l'index rend deja la seule conversation
+    // demandee, mais une ligne ecrite avant l'ajout du champ n'en sortirait pas.
+    try {
+      return relireAppels(await loadCachedCallLogsForConversation(convId))
+    } catch {
+      return []
+    }
+  }
 }
 
 /* ----------------- Endpoints WebRTC ----------------- */

@@ -7245,7 +7245,24 @@ export default function ChatRoomPage() {
                           >
                             {t("rep_messagerie")}
                           </div>
-                          {vocal.mediaUrl ? (
+                          {vocal.mediaUrl && vocal.type === "video" ? (
+                            /* Une messagerie laissee apres un appel VIDEO est
+                               une video : on avait appele en video, et repondre
+                               par la voix seule perdrait ce qu'on montrait. */
+                            <video
+                              src={resolveMediaUrl(vocal.mediaUrl)}
+                              controls
+                              preload="metadata"
+                              playsInline
+                              style={{
+                                width: "100%",
+                                maxWidth: 240,
+                                borderRadius: 10,
+                                background: "#000",
+                                display: "block",
+                              }}
+                            />
+                          ) : vocal.mediaUrl ? (
                             <AudioPlayer
                               src={resolveMediaUrl(vocal.mediaUrl)}
                               durationMs={vocal.durationMs}
