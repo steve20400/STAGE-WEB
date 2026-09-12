@@ -32,8 +32,6 @@ export interface Accueil {
   id: string
   libelle: string | null
   actif: number
-  /** 1 = c'est celui qu'on entend pendant une absence. Au plus un par compte. */
-  absence?: number
   createdAt: string
   media: AccueilRepondeur
 }
@@ -157,15 +155,6 @@ export async function ajouterAccueil(
 export async function choisirAccueil(id: string): Promise<EtatRepondeur> {
   return normaliser(
     await apiRequest<unknown>(`/api/repondeur?actif=${encodeURIComponent(id)}`, {
-      method: "POST",
-    }),
-  )
-}
-
-/** Désigne l'accueil que les appelants entendront PENDANT UNE ABSENCE. */
-export async function choisirAccueilAbsence(id: string): Promise<EtatRepondeur> {
-  return normaliser(
-    await apiRequest<unknown>(`/api/repondeur?absence=${encodeURIComponent(id)}`, {
       method: "POST",
     }),
   )

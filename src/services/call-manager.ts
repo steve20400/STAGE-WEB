@@ -2087,6 +2087,19 @@ async function handleServerEvent(event: CallServerEvent) {
       },
       displayMode: "full",
     })
+    /*
+     * 🐛 L'APPEL RESTAIT « EN TRAIN DE SONNER » POUR TOUJOURS.
+     *
+     * Personne n'a sonné et personne ne décrochera : il n'y a plus d'appel. Mais
+     * l'état local, lui, continuait de dire le contraire — et comme on venait de
+     * couper le minuteur de sonnerie, plus rien ne devait y mettre fin. Fermer
+     * la feuille laissait donc devant un écran qui sonnait dans le vide, sans
+     * aucune sortie.
+     *
+     * ⚠️ `hangUp` NE FERME PAS LA FEUILLE : `clearCall` reporte `repondeur` tel
+     * quel, précisément pour qu'on puisse enregistrer APRÈS la fin de l'appel.
+     */
+    void hangUp()
     return
   }
 

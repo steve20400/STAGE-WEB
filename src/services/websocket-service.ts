@@ -626,6 +626,18 @@ const CALL_EVENT_TYPES = new Set([
   // montrerait RIEN — sans la moindre erreur, ni ici ni dans la console.
   "ivr_record",
   "ivr_error",
+  /*
+   * ⚠️ MODE ABSENCE (12/09/2026). LE MÊME PIÈGE, UNE FOIS DE PLUS — et cette
+   * fois le fichier prévenait trois fois juste au-dessus.
+   *
+   * Sans cette ligne, le serveur voyait bien l'absence : il ne faisait sonner
+   * personne, l'appel était marqué manqué, tout fonctionnait de son côté. Mais
+   * `repondeur_direct` s'arrêtait ICI. L'appelant restait donc sur une tonalité
+   * d'attente pour un appel que plus rien ne servait, jusqu'à ce que le minuteur
+   * raccroche — sans accueil, sans explication, et sans la moindre erreur nulle
+   * part.
+   */
+  "repondeur_direct",
   "queue_rating_available",
 ])
 

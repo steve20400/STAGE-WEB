@@ -8,7 +8,6 @@ import {
   ajouterAccueil,
   ABSENCE_MAX_MINUTES,
   choisirAccueil,
-  choisirAccueilAbsence,
   lireMonRepondeur,
   poserAbsence,
   refusAccueil,
@@ -122,13 +121,39 @@ export function RepondeurReglages() {
    */
   const dureeFinale = useRef(0)
 
-  useEffect(() => {
+  /**
+   * Relit l'état du répondeur depuis le serveur.
+   *
+   * 🐛 L'ÉCHEC ÉTAIT AVALÉ — `.catch(() => undefined)` — et c'est exactement ce
+   * qui fait croire que « les réglages ne se sauvegardent pas ». Une lecture
+   * qui échoue laisse l'écran sur ses valeurs de départ : répondeur éteint,
+   * aucune absence, aucun accueil. On voit donc une remise à zéro là où il n'y
+   * a qu'une réponse qui n'est pas arrivée, et rien ne permet de faire la
+   * différence.
+   */
+  const relire = useCallback(() => {
     void lireMonRepondeur()
-      .then((etat) => {
-        appliquerEtat(etat)
-      })
-      .catch(() => undefined)
+      .then(appliquerEtat)
+      .catch(() => error(t("rep_echec")))
+    // `error` et `t` sont stables ; les lister ferait relire à chaque rendu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    relire()
+    /*
+     * ⚠️ ET ON RELIT EN REVENANT SUR L'ONGLET. Une absence se périme toute
+     * seule : posée pour une heure, elle est finie quand on revient, et l'écran
+     * continuerait d'annoncer « actif jusqu'à 15 h 30 » une heure après. Rien
+     * ne le corrigerait, puisque rien ne se passe côté client quand une date
+     * est dépassée.
+     */
+    const surRetour = () => {
+      if (document.visibilityState === "visible") relire()
+    }
+    document.addEventListener("visibilitychange", surRetour)
+    return () => document.removeEventListener("visibilitychange", surRetour)
+  }, [relire])
 
   /**
    * Coupe tout : minuteur, enregistreur, et SURTOUT le micro.
@@ -312,18 +337,6 @@ export function RepondeurReglages() {
       // ouverts laisserait croire qu'une durée est encore en train d'être posée.
       if (minutesDemandees === 0) setModeDuree(false)
       if (minutesDemandees > 0) success(t("rep_abs_pose"))
-    } catch {
-      error(t("rep_echec"))
-    } finally {
-      setOccupe(false)
-    }
-  }
-
-  const choisirPourAbsence = async (id: string) => {
-    if (occupe) return
-    setOccupe(true)
-    try {
-      appliquerEtat(await choisirAccueilAbsence(id))
     } catch {
       error(t("rep_echec"))
     } finally {
@@ -667,21 +680,6 @@ export function RepondeurReglages() {
                         >
                           {entree.libelle || t("rep_sans_nom")}
                         </span>
-                        {entree.absence === 1 && (
-                          <span
-                            style={{
-                              fontSize: 10.5,
-                              fontWeight: 700,
-                              padding: "2px 8px",
-                              borderRadius: 999,
-                              border: "1px solid var(--accent-border, var(--accent))",
-                              color: "var(--accent)",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {t("rep_abs_badge")}
-                          </span>
-                        )}
                         {estActif && (
                           <span
                             style={{
@@ -707,18 +705,6 @@ export function RepondeurReglages() {
                             disabled={occupe}
                           >
                             {t("rep_choisir")}
-                          </button>
-                        )}
-                        {/* Le même accueil peut servir dans les deux cas : le
-                            bouton ne disparaît que s'il est DÉJÀ celui de
-                            l'absence, pas parce qu'il est l'accueil courant. */}
-                        {entree.absence !== 1 && (
-                          <button
-                            className="rep-btn rep-btn-ghost"
-                            onClick={() => void choisirPourAbsence(entree.id)}
-                            disabled={occupe}
-                          >
-                            {t("rep_abs_choisir")}
                           </button>
                         )}
                         <button

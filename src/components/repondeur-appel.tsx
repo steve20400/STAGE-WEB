@@ -299,9 +299,16 @@ export function RepondeurAppel({
           <button className="rep-btn-p" onClick={() => void enregistrer()}>
             ● {t(video ? "rep_enregistrer_video" : "rep_enregistrer_message")}
           </button>
-          {/* Ne paraît que si le navigateur a refusé de jouer. Quand l'accueil
-              démarre seul — le cas courant — ce bouton n'existe pas. */}
-          {lecture === "bloquee" && (
+          {/*
+            🔴 TOUJOURS LÀ, ET NON PLUS SEULEMENT EN CAS DE REFUS.
+            Le blocage du navigateur n'est pas toujours DÉTECTABLE : certains
+            refusent en rendant une promesse tenue, et l'on croit alors jouer un
+            son que personne n'entend. Un bouton qu'on n'utilise pas ne coûte
+            rien ; un accueil muet sans aucun recours coûte l'appel entier.
+            Il reste secondaire — enregistrer un message demeure l'action
+            principale, et c'est elle qu'on lit en premier.
+          */}
+          {lecture !== "cassee" && (
             <button className="rep-btn-s" onClick={ecouter}>
               ▶ {t("rep_ecouter")}
             </button>
