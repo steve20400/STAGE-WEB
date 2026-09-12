@@ -4,7 +4,7 @@ import { useToast } from "./toast"
 import { deposerMessagerie } from "../services/repondeur-service"
 
 /**
- * LE RÉPONDEUR, SUR L'ÉCRAN D'APPEL DE L'APPELANT.
+ * LE RÉPONDEUR DE L'APPELANT — un panneau flottant, posé sur l'application.
  *
  * 🔴 C'EST LUI QUI JOUE LE RÉPONDEUR, faute de serveur média : les appels sont
  * en pair-à-pair, et personne n'ayant décroché, aucun pair n'existe pour jouer
@@ -30,10 +30,13 @@ const MESSAGE_MAX_MS = 120_000
 export function RepondeurAppel({
   callId,
   accueilUrl,
+  nom,
   onFermer,
 }: {
   callId: string
   accueilUrl: string
+  /** Qui l'on vient d'appeler. Le panneau paraît loin de l'écran d'appel. */
+  nom: string
   onFermer: () => void
 }) {
   const { t } = useTranslation()
@@ -192,62 +195,111 @@ export function RepondeurAppel({
 
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
 
+  const initiales = nom.trim().slice(0, 2).toUpperCase() || "?"
+
   return (
-    <div className="rep-barre">
+    <div className="rep-carte" role="dialog" aria-label={t("rep_barre_titre", { nom })}>
+      <div className="rep-tete">
+        <span className="rep-pastille" aria-hidden>
+          {initiales}
+        </span>
+        <div className="rep-tete-texte">
+          {/* QUI, avant QUOI. Le panneau peut paraître pendant qu'on écrit dans
+              une tout autre discussion : sans le nom, on ne saurait pas pour qui
+              l'on s'apprête à parler. */}
+          <div className="rep-titre">{t("rep_barre_titre", { nom })}</div>
+          <div className="rep-etat">
+            {etape === "accueil" && t("rep_lecture_accueil")}
+            {etape === "enregistre" && (
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                <span className="rep-point" aria-hidden /> {mmss(secondes)} /{" "}
+                {mmss(Math.floor(MESSAGE_MAX_MS / 1000))}
+              </span>
+            )}
+            {etape === "envoie" && t("rep_envoi")}
+            {etape === "fini" && t("rep_depose")}
+          </div>
+        </div>
+      </div>
+
       {etape === "accueil" && (
-        <>
-          <span className="rep-barre-texte">{t("rep_lecture_accueil")}</span>
+        <div className="rep-actions">
+          <button className="rep-btn-p" onClick={() => void enregistrer()}>
+            ● {t("rep_enregistrer_message")}
+          </button>
+          {/* Ne paraît que si la lecture n'a pas démarré : proposer « écouter »
+              pendant que le son passe déjà serait proposer ce qui se fait. */}
           {lectureBloquee && (
-            <button className="rep-barre-btn ghost" onClick={ecouter}>
+            <button className="rep-btn-s" onClick={ecouter}>
               ▶ {t("rep_ecouter")}
             </button>
           )}
-          <button className="rep-barre-btn" onClick={() => void enregistrer()}>
-            ● {t("rep_enregistrer_message")}
-          </button>
-          <button className="rep-barre-btn ghost" onClick={onFermer}>
+          <button className="rep-btn-s" onClick={onFermer}>
             {t("rep_quitter")}
           </button>
-        </>
+        </div>
       )}
 
       {etape === "enregistre" && (
-        <>
-          <span className="rep-barre-texte" style={{ fontVariantNumeric: "tabular-nums" }}>
-            ● {mmss(secondes)} / {mmss(Math.floor(MESSAGE_MAX_MS / 1000))}
-          </span>
-          <button className="rep-barre-btn" onClick={arreter}>
+        <div className="rep-actions">
+          <button className="rep-btn-p" onClick={arreter}>
             ■ {t("rep_envoyer")}
           </button>
-        </>
+        </div>
       )}
 
-      {etape === "envoie" && <span className="rep-barre-texte">{t("rep_envoi")}</span>}
-      {etape === "fini" && <span className="rep-barre-texte">{t("rep_depose")}</span>}
-
       <style>{`
-        .rep-barre {
+        /* 🔴 CE PANNEAU NE VIT PLUS SUR L'ÉCRAN D'APPEL, et ses couleurs ont dû
+           suivre. C'était une pastille sombre translucide, juste sur le fond
+           noir d'un appel — posée sur une discussion en clair, elle devenait une
+           tache qui n'appartenait à rien. Il prend donc les surfaces de
+           l'application, et se tient par son ombre. */
+        .rep-carte {
+          display: grid; gap: 12px; padding: 14px;
+          border-radius: 16px;
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-default);
+          box-shadow: 0 4px 12px rgba(0,0,0,.10), 0 16px 40px rgba(0,0,0,.16);
+          color: var(--text-primary);
+        }
+        .rep-tete { display: flex; align-items: center; gap: 11px; }
+        .rep-pastille {
+          width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
-          gap: 10px; flex-wrap: wrap; padding: 12px 16px;
-          border-radius: 14px; margin: 0 auto 12px; max-width: 560px;
-          background: rgba(0,0,0,.45); backdrop-filter: blur(6px);
-          color: #fff;
+          background: var(--accent); color: var(--accent-text, #fff);
+          font-size: 13px; font-weight: 700; letter-spacing: .02em;
         }
-        .rep-barre-texte { font-size: 13px; opacity: .9; }
-        .rep-barre-btn {
-          padding: 9px 16px; border-radius: 999px; cursor: pointer; border: none;
-          background: var(--accent, #8A4B2B); color: #fff;
-          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+        .rep-tete-texte { flex: 1; min-width: 0; }
+        .rep-titre {
+          font-size: 14px; font-weight: 600; color: var(--text-primary);
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .rep-barre-btn.ghost {
-          background: transparent; border: 1px solid rgba(255,255,255,.35);
+        .rep-etat { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; }
+        .rep-point {
+          display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+          background: var(--danger); vertical-align: baseline;
+          animation: rep-bat 1.1s ease-in-out infinite;
         }
-        /* Au pouce : chaque bouton prend sa ligne plutot que de se serrer a
-           trois, ou aucun n'est atteignable. */
-        @media (max-width: 480px) {
-          .rep-barre { flex-direction: column; align-items: stretch; }
-          .rep-barre-btn { width: 100%; }
-          .rep-barre-texte { text-align: center; }
+        @keyframes rep-bat { 50% { opacity: .25; } }
+        /* Un point qui clignote sans fin peut gêner ; on le fige alors sans le
+           faire disparaître, l'enregistrement devant rester signalé. */
+        @media (prefers-reduced-motion: reduce) {
+          .rep-point { animation: none; }
+        }
+
+        .rep-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .rep-btn-p, .rep-btn-s {
+          flex: 1; min-width: 132px;
+          padding: 10px 16px; border-radius: 999px; cursor: pointer;
+          font-family: inherit; font-size: 13px; font-weight: 600;
+        }
+        .rep-btn-p { border: none; background: var(--accent); color: var(--accent-text, #fff); }
+        .rep-btn-s {
+          background: transparent; color: var(--text-primary);
+          border: 1px solid var(--border-default);
+        }
+        .rep-btn-p:focus-visible, .rep-btn-s:focus-visible {
+          outline: 2px solid var(--accent); outline-offset: 2px;
         }
       `}</style>
     </div>

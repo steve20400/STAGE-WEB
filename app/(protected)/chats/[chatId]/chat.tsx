@@ -6577,53 +6577,59 @@ export default function ChatRoomPage() {
   // find() par message rendu, soit un cout quadratique sur un fil charge.
   const messagesById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages])
 
+  /*
+   * ══════════ L'APPEL MANQUE ET SA MESSAGERIE NE FONT QU'UN ══════════
+   *
+   * 🔴 DEUX ENTREES SEPAREES DISAIENT LA MEME CHOSE EN DEUX FOIS : « appel
+   * manque » d'un cote, un vocal de l'autre, sans que rien ne relie les deux
+   * pour qui n'a pas suivi. Un seul bloc dit l'histoire entiere — on a appele,
+   * personne n'a repondu, voici ce qui a ete laisse.
+   *
+   * 🐛 UNE PREMIERE VERSION APPARIAIT EN PARCOURANT LE FIL, et retirait au
+   * passage l'entree d'appel deja rencontree. Elle ne l'avait JAMAIS rencontree :
+   * le fil se construit messages d'abord, appels ensuite, et n'est trie qu'apres.
+   * L'appel arrivait donc toujours trop tard pour etre retire — et se retrouvait
+   * DEUX FOIS a l'ecran, une fois dans le bloc et une fois tout seul. On decide
+   * donc des paires AVANT de construire quoi que ce soit : plus rien ne depend
+   * de l'ordre.
+   *
+   * ⚠️ LE BLOC PREND L'HORODATAGE DE L'APPEL, pas celui du message. La
+   * messagerie est deposee quelques dizaines de secondes plus tard : la dater
+   * ainsi la ferait glisser apres des messages qui l'ont precedee.
+   *
+   * ⚠️ UN VOCAL DONT L'APPEL N'EST PAS DANS LA FENETRE CHARGEE reste une bulle
+   * ordinaire — l'appel peut etre sorti des cinquante derniers, et le message
+   * doit rester ecoutable.
+   */
+  const messagerieParAppel = useMemo(() => {
+    const paires = new Map<string, Message>()
+    for (const msg of messages) {
+      if (!msg.callId) continue
+      if (callEvents.some((c) => c.id === msg.callId)) paires.set(msg.callId, msg)
+    }
+    return paires
+  }, [messages, callEvents])
+
   // Fil unifie : messages + evenements d'appel (facon WhatsApp), tries par date.
   const timeline: TimelineItem[] = groupMediaRuns(
     [
       // Un message a plusieurs medias devient directement un lot : `groupMediaRuns`
       // le laisse alors intact, puisqu'il ne fusionne que des messages voisins.
       ...messages.flatMap((msg): TimelineItem[] => {
+        // La messagerie appariee est rendue DANS le bloc de son appel : la
+        // laisser ici aussi la ferait paraitre deux fois.
+        if (msg.callId && messagerieParAppel.has(msg.callId)) return []
         const tuiles = eclaterMedias(msg)
         if (tuiles.length < 2) return [{ kind: "msg", ts: msg.timestamp, msg }]
         return [{ kind: "album", ts: msg.timestamp, msgs: tuiles }]
       }),
-      ...callEvents.map((call): TimelineItem => ({ kind: "call", ts: call.ts, call })),
-    ]
-      /*
-       * ══════════ L'APPEL MANQUE ET SA MESSAGERIE NE FONT QU'UN ══════════
-       *
-       * 🔴 DEUX ENTREES SEPAREES DISAIENT LA MEME CHOSE EN DEUX FOIS : « appel
-       * manque » d'un cote, un vocal de l'autre, sans que rien ne relie les deux
-       * pour qui n'a pas suivi. Un seul bloc dit l'histoire entiere — on a
-       * appele, personne n'a repondu, voici ce qui a ete laisse.
-       *
-       * ⚠️ LE BLOC PREND L'HORODATAGE DE L'APPEL, pas celui du message. La
-       * messagerie est deposee quelques dizaines de secondes plus tard : la
-       * dater ainsi la ferait glisser apres des messages qui l'ont precedee, et
-       * l'ensemble se lirait a l'envers.
-       *
-       * ⚠️ UN VOCAL DONT L'APPEL N'EST PAS DANS LA FENETRE CHARGEE reste une
-       * bulle ordinaire. L'appel peut etre sorti des cinquante derniers ; le
-       * message, lui, doit rester ecoutable — le taire pour cause d'appel absent
-       * serait perdre le contenu pour un defaut de contexte.
-       */
-      .reduce<TimelineItem[]>((acc, item) => {
-        if (item.kind !== "msg" || !item.msg.callId) {
-          acc.push(item)
-          return acc
-        }
-        const appel = callEvents.find((c) => c.id === item.msg.callId)
-        if (!appel) {
-          acc.push(item)
-          return acc
-        }
-        // L'entree d'appel isolee cede la place au bloc qui la contient.
-        const isole = acc.findIndex((a) => a.kind === "call" && a.call.id === appel.id)
-        if (isole >= 0) acc.splice(isole, 1)
-        acc.push({ kind: "repondeur", ts: appel.ts, call: appel, msg: item.msg })
-        return acc
-      }, [])
-      .sort((a, b) => a.ts.getTime() - b.ts.getTime())
+      ...callEvents.map((call): TimelineItem => {
+        const vocal = messagerieParAppel.get(call.id)
+        return vocal
+          ? { kind: "repondeur", ts: call.ts, call, msg: vocal }
+          : { kind: "call", ts: call.ts, call }
+      }),
+    ].sort((a, b) => a.ts.getTime() - b.ts.getTime()),
   )
 
   /** Nom affichable d'un expediteur : membre du groupe, contact, sinon debut d'UUID. */

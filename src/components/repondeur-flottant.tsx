@@ -34,6 +34,9 @@ export function RepondeurFlottant() {
         // Au-dessus de la barre de navigation du bas sur téléphone, pour ne pas
         // recouvrir ce qui sert à naviguer.
         bottom: "calc(env(safe-area-inset-bottom, 0px) + 76px)",
+        // ⚠️ Au-dessus de la zone de saisie d'une discussion, qui monte à 60 :
+        // le panneau demande une réponse, et la recouvrir serait proposer un
+        // choix qu'on ne peut pas faire.
         zIndex: 70,
         display: "flex",
         justifyContent: "center",
@@ -44,10 +47,11 @@ export function RepondeurFlottant() {
         pointerEvents: "none",
       }}
     >
-      <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 560 }}>
+      <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 460 }}>
         <RepondeurAppel
           callId={call.repondeur.callId}
           accueilUrl={call.repondeur.accueilUrl}
+          nom={call.repondeur.nom}
           onFermer={quitterRepondeur}
         />
       </div>

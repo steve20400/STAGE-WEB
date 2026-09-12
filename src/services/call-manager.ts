@@ -228,7 +228,7 @@ export interface CallManagerState {
    * parler. Les deux besoins sont contradictoires tant qu'on ne sépare pas la
    * fin de l'APPEL de la fin de l'ÉCRAN.
    */
-  repondeur: { callId: string; accueilUrl: string } | null
+  repondeur: { callId: string; accueilUrl: string; nom: string } | null
   isGroup: boolean
   isInitiator: boolean
   /** userId -> nom affichable des participants connus. */
@@ -1350,18 +1350,19 @@ async function basculerVersRepondeur(callId: string): Promise<void> {
      * Quand on ecrit pendant un appel, la fenetre se reduit en vignette. Si la
      * sonnerie expirait a ce moment-la, le repondeur prenait bien la main — mais
      * dans une fenetre de deux centimetres, ou il n'y avait la place ni pour la
-     * barre ni pour ses boutons. L'utilisateur ne voyait donc RIEN, et
-     * n'apprenait l'existence de l'ecran qu'a l'appel suivant, ou il reparaissait
-     * par-dessus.
+     * barre ni pour ses boutons. L'utilisateur ne voyait donc RIEN.
      *
-     * ⚠️ ON REVIENT EN GRAND ECRAN, et c'est le seul moment ou l'application
-     * s'autorise a agrandir sa fenetre sans qu'on le lui demande. C'est justifie :
-     * il y a quelque chose a FAIRE — ecouter, puis parler — et une vignette ne le
-     * permet pas. Le reduire ensuite reste possible, comme avant.
+     * 🔴 LA PREMIERE CORRECTION FORCAIT LE PLEIN ECRAN, ET C'ETAIT PIRE.
+     *
+     * On reduit la fenetre POUR ECRIRE. Rouvrir l'ecran d'appel par-dessus
+     * arrachait l'utilisateur a la discussion qu'il etait en train de taper, au
+     * milieu d'une phrase, sans qu'il ait rien demande — et son brouillon
+     * disparaissait de sa vue. Le repondeur est desormais monte au niveau de
+     * l'application : il parait la ou l'on est, et la fenetre reste comme elle
+     * etait. On garde sa place, et on ecoute.
      */
     setState({
-      repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url) },
-      displayMode: "full",
+      repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url), nom: state.peerName },
     })
   }
   await hangUp()
