@@ -90,6 +90,15 @@ export function RepondeurReglages() {
    * absence », point.
    */
   const [jusquA, setJusquA] = useState<string | null>(null)
+  /**
+   * Le mode « avec durée » est-il choisi ?
+   *
+   * ⚠️ DISTINCT DE `jusquA`, ET IL LE FAUT : on choisit le mode AVANT de dire
+   * combien de temps. Les confondre rendrait les champs de durée invisibles
+   * jusqu'à ce qu'une absence coure déjà — c'est-à-dire trop tard pour la
+   * saisir.
+   */
+  const [modeDuree, setModeDuree] = useState(false)
   /** Durée choisie, libre, de 1 minute à 24 heures. */
   const [heures, setHeures] = useState("1")
   const [minutes, setMinutes] = useState("0")
@@ -299,6 +308,9 @@ export function RepondeurReglages() {
     setOccupe(true)
     try {
       appliquerEtat(await poserAbsence(minutesDemandees))
+      // Lever une absence ramène au mode par défaut : laisser les champs
+      // ouverts laisserait croire qu'une durée est encore en train d'être posée.
+      if (minutesDemandees === 0) setModeDuree(false)
       if (minutesDemandees > 0) success(t("rep_abs_pose"))
     } catch {
       error(t("rep_echec"))
@@ -378,6 +390,57 @@ export function RepondeurReglages() {
         .rep-btn-ghost:hover:not(:disabled) {
           color: var(--accent); border-color: var(--accent-border);
         }
+        .rep-bascule {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 14px; width: 100%; padding: 16px 18px; border-radius: 14px;
+          margin-bottom: 16px; cursor: pointer;
+          font-family: 'DM Sans', sans-serif; font-size: 14.5px; font-weight: 600;
+          text-align: left; border: 1.5px solid var(--border-subtle);
+          background: var(--bg-elevated); color: var(--text-primary);
+          transition: background .15s, border-color .15s, color .15s;
+        }
+        .rep-bascule.on {
+          border-color: var(--accent); background: var(--accent); color: var(--accent-text);
+        }
+        .rep-bascule:disabled { cursor: not-allowed; opacity: .55; }
+        .rep-bascule-texte { flex: 1; min-width: 0; }
+        .rep-bascule-sous {
+          display: block; margin-top: 2px;
+          font-size: 12px; font-weight: 400; opacity: .8;
+        }
+        .rep-bascule-piste {
+          position: relative; flex-shrink: 0;
+          width: 52px; height: 30px; border-radius: 999px;
+          background: var(--border-default); transition: background .15s;
+        }
+        .rep-bascule.on .rep-bascule-piste { background: rgba(255,255,255,.35); }
+        .rep-bascule-bouton {
+          position: absolute; top: 3px; left: 3px;
+          width: 24px; height: 24px; border-radius: 50%;
+          background: var(--text-muted); transition: left .15s, background .15s;
+        }
+        .rep-bascule.on .rep-bascule-bouton { left: 25px; background: var(--accent-text); }
+
+        /* Les deux modes : deux cartes de même poids. Une case à cocher aurait
+           caché qu'il s'agit d'un choix entre deux comportements entiers. */
+        .rep-modes { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+        .rep-mode {
+          display: grid; gap: 3px; text-align: left; cursor: pointer;
+          padding: 11px 13px; border-radius: 11px;
+          font-family: 'DM Sans', sans-serif;
+          border: 1.5px solid var(--border-subtle); background: var(--bg-surface);
+          color: var(--text-primary);
+        }
+        .rep-mode.choisi { border-color: var(--accent); background: var(--accent-dim); }
+        .rep-mode:disabled { cursor: progress; opacity: .6; }
+        .rep-mode-n { font-size: 13px; font-weight: 700; }
+        .rep-mode-d { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; }
+        /* Au pouce, deux cartes cote a cote deviennent illisibles : elles
+           passent l'une sous l'autre plutot que de se serrer. */
+        @media (max-width: 480px) {
+          .rep-modes { grid-template-columns: 1fr; }
+        }
+
         .rep-abs {
           margin-bottom: 16px; padding: 13px 14px; border-radius: 12px;
           border: 1px solid var(--border-subtle); background: var(--bg-elevated);
@@ -422,39 +485,69 @@ export function RepondeurReglages() {
         {t("rep_sub")}
       </div>
 
-      <div className="notif-row" style={{ marginBottom: 14 }}>
-        <span className="notif-label">{t("rep_activer")}</span>
-        <button
-          className="tgl"
-          role="switch"
-          aria-checked={actif}
-          // ⚠️ INACTIVABLE SANS ACCUEIL : allumer un répondeur muet promettrait
-          // à ses correspondants un message qu'ils n'entendraient jamais.
-          disabled={accueils.length === 0}
-          style={{
-            background: actif ? "var(--accent)" : "var(--border-default)",
-            opacity: accueils.length > 0 ? 1 : 0.5,
-            cursor: accueils.length > 0 ? "pointer" : "not-allowed",
-          }}
-          onClick={() => void basculer(!actif)}
-        >
-          <div
-            className="tgl-knob"
-            style={{
-              left: actif ? "20px" : "2.5px",
-              background: actif ? "var(--accent-text)" : "var(--text-muted)",
-            }}
-          />
-        </button>
-      </div>
+      {/*
+        🔴 C'ÉTAIT UN INTERRUPTEUR MINUSCULE dans une rangée, et l'on ne savait
+        ni ce qu'il allumait ni ce qu'il changeait. C'est le même bouton que
+        celui de la traduction — pleine largeur, avec l'état écrit en toutes
+        lettres sous son titre.
+      */}
+      <button
+        className={`rep-bascule ${actif ? "on" : ""}`}
+        role="switch"
+        aria-checked={actif}
+        // ⚠️ INACTIVABLE SANS ACCUEIL : allumer un répondeur muet promettrait à
+        // ses correspondants un message qu'ils n'entendraient jamais.
+        disabled={accueils.length === 0}
+        onClick={() => void basculer(!actif)}
+      >
+        <span className="rep-bascule-texte">
+          {t("rep_activer")}
+          <span className="rep-bascule-sous">
+            {actif ? t("rep_actif_sous") : t("rep_eteint_sous")}
+          </span>
+        </span>
+        <span className="rep-bascule-piste" aria-hidden>
+          <span className="rep-bascule-bouton" />
+        </span>
+      </button>
 
       {/* ── L'absence ────────────────────────────────────────────────────
           Ne paraît que si le répondeur est allumé : proposer de s'absenter
           quand personne ne répondrait à votre place n'a pas de sens. */}
       {actif && (
         <div className="rep-abs">
-          <div className="rep-abs-titre">{t("rep_abs_titre")}</div>
-          <div className="rep-abs-sub">{t("rep_abs_sub")}</div>
+          <div className="rep-abs-titre" style={{ marginBottom: 10 }}>
+            {t("rep_mode_titre")}
+          </div>
+          {/*
+            🔴 LES DEUX MODES SE CHOISISSENT, ils ne se déduisent plus.
+            La version précédente laissait deviner : un temps saisi valait mode
+            absence, un champ vide valait mode par défaut. On ne voyait donc
+            nulle part qu'il existait DEUX façons de répondre, ni laquelle était
+            en cours. Chacune porte maintenant son nom et ce qu'elle fait.
+          */}
+          <div className="rep-modes">
+            <button
+              className={`rep-mode ${!jusquA && !modeDuree ? "choisi" : ""}`}
+              disabled={occupe}
+              // Revenir ici lève l'absence si elle courait ; sinon il n'y a que
+              // le choix à défaire, et rien à demander au serveur.
+              onClick={() => (jusquA ? void changerAbsence(0) : setModeDuree(false))}
+            >
+              <span className="rep-mode-n">{t("rep_mode_sans")}</span>
+              <span className="rep-mode-d">{t("rep_mode_sans_d")}</span>
+            </button>
+            <button
+              className={`rep-mode ${jusquA || modeDuree ? "choisi" : ""}`}
+              disabled={occupe}
+              // Choisir ce mode ne pose pas l'absence : il faut encore dire
+              // COMBIEN DE TEMPS, et c'est le bouton d'à côté qui l'engage.
+              onClick={() => setModeDuree(true)}
+            >
+              <span className="rep-mode-n">{t("rep_mode_avec")}</span>
+              <span className="rep-mode-d">{t("rep_mode_avec_d")}</span>
+            </button>
+          </div>
 
           {jusquA ? (
             <div className="rep-abs-actif">
@@ -471,8 +564,11 @@ export function RepondeurReglages() {
                 {t("rep_abs_arreter")}
               </button>
             </div>
-          ) : (
+          ) : modeDuree ? (
             <>
+              <div className="rep-abs-sub" style={{ marginTop: 12, marginBottom: 8 }}>
+                {t("rep_abs_sub")}
+              </div>
               <div className="rep-abs-duree">{t("rep_abs_duree")}</div>
               <div className="rep-abs-champs">
                 {/* Deux champs plutôt qu'une liste de durées toutes faites :
@@ -514,7 +610,7 @@ export function RepondeurReglages() {
               </div>
               <div className="rep-abs-bornes">{t("rep_abs_bornes")}</div>
             </>
-          )}
+          ) : null}
         </div>
       )}
 
