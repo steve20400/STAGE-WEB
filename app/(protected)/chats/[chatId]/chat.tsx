@@ -1468,7 +1468,14 @@ function LocationCard({ content, isMe }: { content: string | null; isMe: boolean
  * Evenement d'appel affiche dans le fil de discussion :
  * aligne a gauche (entrant) ou a droite (sortant), avec couleurs directionnelles.
  */
-function CallEventChip({ call }: { call: CallRecord }) {
+/**
+ * L'AVIS D'APPEL DANS LE FIL — et, le cas echeant, ce que l'appel a laisse.
+ *
+ * `enfant` est rendu DANS la pastille, sous la ligne d'appel. C'est ainsi que la
+ * messagerie vocale tient dans le meme cadre que l'appel manque auquel elle
+ * repond, au lieu de flotter en bulle separee juste en dessous.
+ */
+function CallEventChip({ call, enfant }: { call: CallRecord; enfant?: ReactNode }) {
   const { t } = useTranslation()
   const isOutgoing = call.direction === "out"
   const outcome =
@@ -1498,7 +1505,7 @@ function CallEventChip({ call }: { call: CallRecord }) {
       <div
         style={{
           display: "flex",
-          alignItems: "center",
+          flexDirection: "column",
           gap: 8,
           background: bgTint,
           border: `1px solid ${tint}22`,
@@ -1506,9 +1513,10 @@ function CallEventChip({ call }: { call: CallRecord }) {
           padding: "8px 14px",
           fontSize: 12,
           color: tint,
-          maxWidth: "min(70%, 340px)",
+          maxWidth: "min(78%, 360px)",
         }}
       >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span
           style={{
             width: 28,
@@ -1581,6 +1589,11 @@ function CallEventChip({ call }: { call: CallRecord }) {
             {call.duration ? ` — ${call.duration}` : ""}
           </div>
         </div>
+        </div>
+        {/* Un filet separe sans detacher : ce qui suit appartient a cet appel. */}
+        {enfant && (
+          <div style={{ borderTop: `1px solid ${tint}22`, paddingTop: 8 }}>{enfant}</div>
+        )}
       </div>
     </div>
   )
@@ -2949,7 +2962,19 @@ function MediaComposer({
  * d'utile a afficher.
  */
 function isVoiceNote(msg: Message): boolean {
-  return msg.type === "audio" && (!msg.fileName || /^vocal-\d+\./i.test(msg.fileName))
+  if (msg.type !== "audio") return false
+  /*
+   * 🐛 UNE MESSAGERIE VOCALE S'AFFICHAIT COMME UNE PIECE JOINTE : son nom de
+   * fichier — « repondeur-1757… .webm » — et sa taille s'etalaient sous la
+   * bulle, alors que c'est un message vocal comme un autre. Le test ne
+   * reconnaissait que les noms en « vocal-… », ceux de l'enregistreur du fil.
+   *
+   * `callId` suffit et vaut mieux qu'un motif de nom : c'est la PROPRIETE qui
+   * fait d'un audio une messagerie vocale, la ou un nom de fichier n'est qu'une
+   * convention qu'un autre client peut ne pas suivre.
+   */
+  if (msg.callId) return true
+  return !msg.fileName || /^vocal-\d+\./i.test(msg.fileName)
 }
 
 /** Un message cite merite une vignette des lors qu'il porte un fichier. */
@@ -3188,6 +3213,8 @@ type TimelineItem =
   | { kind: "msg"; ts: Date; msg: Message }
   | { kind: "album"; ts: Date; msgs: Message[] }
   | { kind: "call"; ts: Date; call: CallRecord }
+  /** Un appel manqué ET la messagerie qu'il a laissée, dans un seul bloc. */
+  | { kind: "repondeur"; ts: Date; call: CallRecord; msg: Message }
 
 /** Fenetre pendant laquelle des medias successifs sont consideres comme un meme envoi. */
 const ALBUM_WINDOW_MS = 60_000
@@ -6561,7 +6588,42 @@ export default function ChatRoomPage() {
         return [{ kind: "album", ts: msg.timestamp, msgs: tuiles }]
       }),
       ...callEvents.map((call): TimelineItem => ({ kind: "call", ts: call.ts, call })),
-    ].sort((a, b) => a.ts.getTime() - b.ts.getTime())
+    ]
+      /*
+       * ══════════ L'APPEL MANQUE ET SA MESSAGERIE NE FONT QU'UN ══════════
+       *
+       * 🔴 DEUX ENTREES SEPAREES DISAIENT LA MEME CHOSE EN DEUX FOIS : « appel
+       * manque » d'un cote, un vocal de l'autre, sans que rien ne relie les deux
+       * pour qui n'a pas suivi. Un seul bloc dit l'histoire entiere — on a
+       * appele, personne n'a repondu, voici ce qui a ete laisse.
+       *
+       * ⚠️ LE BLOC PREND L'HORODATAGE DE L'APPEL, pas celui du message. La
+       * messagerie est deposee quelques dizaines de secondes plus tard : la
+       * dater ainsi la ferait glisser apres des messages qui l'ont precedee, et
+       * l'ensemble se lirait a l'envers.
+       *
+       * ⚠️ UN VOCAL DONT L'APPEL N'EST PAS DANS LA FENETRE CHARGEE reste une
+       * bulle ordinaire. L'appel peut etre sorti des cinquante derniers ; le
+       * message, lui, doit rester ecoutable — le taire pour cause d'appel absent
+       * serait perdre le contenu pour un defaut de contexte.
+       */
+      .reduce<TimelineItem[]>((acc, item) => {
+        if (item.kind !== "msg" || !item.msg.callId) {
+          acc.push(item)
+          return acc
+        }
+        const appel = callEvents.find((c) => c.id === item.msg.callId)
+        if (!appel) {
+          acc.push(item)
+          return acc
+        }
+        // L'entree d'appel isolee cede la place au bloc qui la contient.
+        const isole = acc.findIndex((a) => a.kind === "call" && a.call.id === appel.id)
+        if (isole >= 0) acc.splice(isole, 1)
+        acc.push({ kind: "repondeur", ts: appel.ts, call: appel, msg: item.msg })
+        return acc
+      }, [])
+      .sort((a, b) => a.ts.getTime() - b.ts.getTime())
   )
 
   /** Nom affichable d'un expediteur : membre du groupe, contact, sinon debut d'UUID. */
@@ -7145,6 +7207,55 @@ export default function ChatRoomPage() {
             {items.map((item, indexFil) => {
               if (item.kind === "call") {
                 return <CallEventChip key={`call-${item.call.id}`} call={item.call} />
+              }
+              /*
+               * ══════ L'APPEL MANQUE ET SA MESSAGERIE, DANS UN SEUL CADRE ══════
+               *
+               * 🔴 ILS PARAISSAIENT EN DEUX FOIS : l'avis d'appel manque, puis une
+               * bulle vocale sans rapport visible. Qui n'avait pas suivi lisait
+               * deux evenements la ou il n'y en a qu'un — on a appele, personne
+               * n'a repondu, voici ce qui a ete dit.
+               *
+               * ⚠️ `isMe` VAUT TOUJOURS `false` POUR LE LECTEUR. Le fond de la
+               * pastille est clair des deux cotes ; le rendu « mes bulles »,
+               * blanc sur fond fonce, y serait illisible. Ce n'est pas une
+               * erreur de bord : c'est le fond qui commande, pas l'auteur.
+               */
+              if (item.kind === "repondeur") {
+                const vocal = item.msg
+                return (
+                  <MessageErrorBoundary key={`rep-${item.call.id}`} name={t("rep_messagerie")}>
+                    <CallEventChip
+                      call={item.call}
+                      enfant={
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              opacity: 0.8,
+                              marginBottom: 4,
+                            }}
+                          >
+                            {t("rep_messagerie")}
+                          </div>
+                          {vocal.mediaUrl ? (
+                            <AudioPlayer
+                              src={resolveMediaUrl(vocal.mediaUrl)}
+                              durationMs={vocal.durationMs}
+                              isMe={false}
+                            />
+                          ) : (
+                            /* Le media peut manquer — envoi encore en cours, ou
+                               efface. Dire qu'il y a eu un message vaut mieux
+                               qu'un lecteur qui ne jouerait rien. */
+                            <div style={{ fontSize: 11, opacity: 0.7 }}>{t("rep_envoi")}</div>
+                          )}
+                        </div>
+                      }
+                    />
+                  </MessageErrorBoundary>
+                )
               }
               if (item.kind === "album") {
                 const lot = item.msgs

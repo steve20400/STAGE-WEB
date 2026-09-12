@@ -41,6 +41,15 @@ export function RepondeurAppel({
 
   const [etape, setEtape] = useState<Etape>("accueil")
   const [secondes, setSecondes] = useState(0)
+  /**
+   * L'accueil joue-t-il vraiment ?
+   *
+   * 🔴 LE NAVIGATEUR PEUT REFUSER DE JOUER SANS GESTE RECENT, et il le fait en
+   * silence : la promesse de `play()` est simplement rejetee. On lisait alors
+   * « Message d'accueil… » devant un haut-parleur muet, sans rien pour y
+   * remedier. Un bouton parait donc des que la lecture n'a pas demarre.
+   */
+  const [lectureBloquee, setLectureBloquee] = useState(false)
 
   const audio = useRef<HTMLAudioElement | null>(null)
   const enregistreur = useRef<MediaRecorder | null>(null)
@@ -84,12 +93,30 @@ export function RepondeurAppel({
    */
   useEffect(() => {
     const son = new Audio(accueilUrl)
+    son.preload = "auto"
     audio.current = son
-    son.play().catch(() => undefined)
+    // ⚠️ L'ECHEC EST RETENU, PAS AVALE : c'est lui qui fait paraitre le bouton.
+    son.play().then(
+      () => setLectureBloquee(false),
+      () => setLectureBloquee(true),
+    )
+    // Un fichier illisible — format refuse, jeton perime — se signale ici et
+    // nulle part ailleurs : sans cet ecouteur, l'echec serait muet.
+    const surErreur = () => setLectureBloquee(true)
+    son.addEventListener("error", surErreur)
     return () => {
+      son.removeEventListener("error", surErreur)
       son.pause()
     }
   }, [accueilUrl])
+
+  /** Relance la lecture, cette fois depuis un vrai clic. */
+  const ecouter = () => {
+    audio.current?.play().then(
+      () => setLectureBloquee(false),
+      () => error(t("rep_lecture_impossible")),
+    )
+  }
 
   /**
    * Démarre l'enregistrement.
@@ -170,6 +197,11 @@ export function RepondeurAppel({
       {etape === "accueil" && (
         <>
           <span className="rep-barre-texte">{t("rep_lecture_accueil")}</span>
+          {lectureBloquee && (
+            <button className="rep-barre-btn ghost" onClick={ecouter}>
+              ▶ {t("rep_ecouter")}
+            </button>
+          )}
           <button className="rep-barre-btn" onClick={() => void enregistrer()}>
             ● {t("rep_enregistrer_message")}
           </button>

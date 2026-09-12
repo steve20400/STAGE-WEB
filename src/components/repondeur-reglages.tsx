@@ -15,6 +15,47 @@ import {
 import { resolveMediaUrl } from "../services/media-service"
 
 /**
+ * LE LECTEUR D'UN ACCUEIL — qui dit quand il n'a pas pu lire.
+ *
+ * 🐛 UNE BALISE `<audio>` ÉCHOUE EN SILENCE. Fichier introuvable, jeton périmé,
+ * format refusé : dans tous les cas le contrôle reste là, inerte, et cliquer
+ * « écouter » ne fait RIEN. C'est ainsi qu'une adresse de média erronée est
+ * passée inaperçue — la seule chose visible était l'absence de son.
+ *
+ * ⚠️ `preload="metadata"` EST DÉLIBÉRÉ : l'échec se déclare à l'affichage de la
+ * liste, avant même qu'on ait cliqué, au lieu d'attendre un geste pour ne rien
+ * faire. Le coût est faible — quelques kilo-octets d'en-tête par accueil.
+ */
+function LecteurAccueil({ src }: { src: string }) {
+  const { t } = useTranslation()
+  const [casse, setCasse] = useState(false)
+
+  // Une nouvelle source mérite une nouvelle chance : sans cela, un accueil
+  // remplacé resterait marqué en échec à cause du précédent.
+  useEffect(() => setCasse(false), [src])
+
+  return (
+    <div style={{ display: "grid", gap: 4 }}>
+      <audio
+        controls
+        preload="metadata"
+        src={src}
+        onError={() => setCasse(true)}
+        style={{ width: "100%", height: 34 }}
+      />
+      {casse && (
+        <div style={{ fontSize: 11.5, color: "var(--danger)" }}>
+          {t("rep_lecture_impossible")}{" "}
+          <a href={src} download style={{ color: "inherit", textDecoration: "underline" }}>
+            {t("download")}
+          </a>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
  * LA SECTION « RÉPONDEUR » DES RÉGLAGES.
  *
  * Un composant à part, et non quelques lignes de plus dans `settings.tsx` : ce
@@ -385,12 +426,7 @@ export function RepondeurReglages() {
                           </span>
                         )}
                       </div>
-                      <audio
-                        controls
-                        preload="none"
-                        src={resolveMediaUrl(entree.media.url)}
-                        style={{ width: "100%", height: 34 }}
-                      />
+                      <LecteurAccueil src={resolveMediaUrl(entree.media.url)} />
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         {!estActif && (
                           <button
