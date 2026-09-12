@@ -102,7 +102,30 @@ export function RepondeurReglages() {
    * aucune comparaison à refaire ici : une valeur présente veut dire « en
    * absence », point.
    */
-  const [jusquA, setJusquA] = useState<string | null>(null)
+  const [jusquA, setJusquA] = useState<string | null>(() => {
+    /*
+     * 🐛 LE BANDEAU DISPARAISSAIT EN REVENANT SUR L'ÉCRAN.
+     *
+     * Il n'existait qu'une fois la réponse du serveur arrivée. Entre le montage
+     * et cette réponse — et pour toujours si elle n'arrive pas — l'écran
+     * affichait les champs de durée, comme si AUCUNE absence ne courait. On
+     * croyait donc être joignable alors que plus aucun appel n'arrivait, et le
+     * bouton pour annuler n'était nulle part.
+     *
+     * On repart donc de ce qu'on sait déjà, et le serveur corrige ensuite s'il
+     * n'est pas d'accord. C'est la même règle que le reste de l'application :
+     * on montre ce qu'on a, puis on se met à jour.
+     */
+    try {
+      const brut = localStorage.getItem(CLE_DUREE)
+      if (!brut) return null
+      const [dateFin] = brut.split("|")
+      // Une absence terminée ne se réaffiche pas : la date fait foi.
+      return new Date(dateFin).getTime() > Date.now() ? dateFin : null
+    } catch {
+      return null
+    }
+  })
   /**
    * Le mode « avec durée » est-il choisi ?
    *
@@ -556,13 +579,20 @@ export function RepondeurReglages() {
         }
         .rep-abs-champ span { font-size: 12px; color: var(--text-muted); }
         .rep-abs-bornes { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; }
-        .rep-abs-actif { display: grid; gap: 10px; }
+        /* Le bandeau se détache de ce qui le précède : collé aux deux cartes de
+           mode, on lisait une seule masse et l'on ne voyait plus ce qui était
+           l'état en cours et ce qui était le choix. */
+        .rep-abs-actif { margin-top: 14px; }
         .rep-abs-bandeau {
-          display: flex; align-items: flex-start; gap: 10px;
-          padding: 12px 13px; border-radius: 11px;
-          border: 1px solid var(--accent); background: var(--accent-dim);
+          display: grid; gap: 12px;
+          padding: 14px; border-radius: 12px;
+          border: 1.5px solid var(--accent); background: var(--accent-dim);
         }
+        .rep-abs-ligne { display: flex; align-items: flex-start; gap: 10px; }
         .rep-abs-bandeau .rep-abs-pt { margin-top: 6px; }
+        .rep-abs-retour {
+          font-size: 11.5px; color: var(--text-muted); text-align: center;
+        }
         /* Le bouton d'annulation est PLEIN et pleine largeur : c'est la sortie
            d'un etat qui rend injoignable, pas une option parmi d'autres. */
         .rep-abs-annuler {
@@ -657,34 +687,39 @@ export function RepondeurReglages() {
           {jusquA ? (
             <div className="rep-abs-actif">
               {/*
-                🔴 CE QUI A ETE RESERVE, ET POUR COMBIEN DE TEMPS.
-                Une absence rend injoignable : ne pas la voir en revenant, c'est
-                croire qu'on est joignable alors que plus aucun appel n'arrive.
-                Elle se lit donc en entier — la duree posee, l'heure de fin, et
-                ce qu'il reste — et s'annule d'un seul bouton.
+                🔴 CE QUI A ÉTÉ RÉSERVÉ, ET LE GESTE POUR L'ANNULER — ENSEMBLE.
+
+                Une absence rend injoignable : ne pas la retrouver en revenant,
+                c'est se croire joignable alors que plus aucun appel n'arrive.
+                Elle se lit donc en entier — la durée posée, l'heure de fin, ce
+                qu'il reste — et le bouton qui l'annule vit DANS le même cadre.
+                Séparés, on lisait deux blocs sans rapport, et rien ne disait que
+                ce bouton-là annulait cette absence-là.
               */}
               <div className="rep-abs-bandeau">
-                <span className="rep-abs-pt" aria-hidden />
-                <span className="rep-abs-txt">
-                  <b>
-                    {dureePosee(jusquA)
-                      ? t("rep_abs_pour", { d: dureePosee(jusquA) as string })
-                      : t("rep_abs_jusqua", { h: heureFin(jusquA) })}
-                  </b>
-                  <span>
-                    {t("rep_abs_reste", { h: heureFin(jusquA), r: restant(jusquA) })}
+                <div className="rep-abs-ligne">
+                  <span className="rep-abs-pt" aria-hidden />
+                  <span className="rep-abs-txt">
+                    <b>
+                      {dureePosee(jusquA)
+                        ? t("rep_abs_pour", { d: dureePosee(jusquA) as string })
+                        : t("rep_abs_jusqua", { h: heureFin(jusquA) })}
+                    </b>
+                    <span>
+                      {t("rep_abs_reste", { h: heureFin(jusquA), r: restant(jusquA) })}
+                    </span>
+                    <span>{t("rep_abs_avert")}</span>
                   </span>
-                  <span>{t("rep_abs_avert")}</span>
-                </span>
+                </div>
+                <button
+                  className="rep-abs-annuler"
+                  disabled={occupe}
+                  onClick={() => void changerAbsence(0)}
+                >
+                  {t("rep_abs_annuler")}
+                </button>
+                <div className="rep-abs-retour">{t("rep_abs_retour")}</div>
               </div>
-              <button
-                className="rep-abs-annuler"
-                disabled={occupe}
-                onClick={() => void changerAbsence(0)}
-              >
-                {t("rep_abs_annuler")}
-              </button>
-              <div className="rep-abs-bornes">{t("rep_abs_retour")}</div>
             </div>
           ) : modeDuree ? (
             <>

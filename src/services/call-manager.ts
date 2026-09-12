@@ -945,6 +945,8 @@ function startOutgoingRingtone() {
  * l'accueil EN GUISE DE SONNERIE a l'appel suivant.
  */
 let accueilAudio: HTMLAudioElement | null = null
+/** Celui qui joue l'accueil en ce moment — tonalité reprise, ou élément amorcé. */
+let elementAccueil: HTMLAudioElement | null = null
 
 /** Un WAV valide de durée nulle — de quoi obtenir la permission, et rien d'autre. */
 const SILENCE =
@@ -970,10 +972,32 @@ function amorcerAccueil(): void {
  */
 export async function jouerAccueil(url: string): Promise<boolean> {
   if (typeof window === "undefined") return false
-  if (!accueilAudio) accueilAudio = new Audio()
-  accueilAudio.src = url
+
+  /*
+   * 🔴 ON REPREND L'ÉLÉMENT QUI JOUE LA TONALITÉ D'APPEL, quand il existe.
+   *
+   * C'est LUI qui a la permission la plus solide : il n'a pas seulement joué
+   * après un geste, il est en train de jouer À CET INSTANT. Changer la source
+   * d'un élément dont la lecture est en cours ne redemande aucune permission —
+   * là où un élément amorcé trente secondes plus tôt peut se voir refuser, la
+   * « sticky activation » de la page ayant expiré entre-temps.
+   *
+   * Et c'est aussi ce qui doit arriver : l'accueil REMPLACE la tonalité. Au lieu
+   * de couper un son pour en démarrer un autre — deux occasions d'être refusé —
+   * on n'en joue jamais qu'un seul, dont on change ce qu'il dit.
+   *
+   * ⚠️ `dataset.source` EST INVALIDÉ. `startOutgoingRingtone` recrée l'élément
+   * quand cette marque ne correspond plus à la sonnerie choisie. Sans cette
+   * ligne, l'appel SUIVANT rejouerait l'accueil du précédent en guise de
+   * tonalité.
+   */
+  const el = outgoingRingtoneAudio ?? accueilAudio ?? (accueilAudio = new Audio())
+  if (el === outgoingRingtoneAudio) el.dataset.source = "accueil-repondeur"
+  elementAccueil = el
+  el.loop = false
+  el.src = url
   try {
-    await accueilAudio.play()
+    await el.play()
     return true
   } catch {
     return false
@@ -982,7 +1006,7 @@ export async function jouerAccueil(url: string): Promise<boolean> {
 
 /** Coupe l'accueil — on clique « enregistrer », il ne doit plus parler dessus. */
 export function arreterAccueil(): void {
-  accueilAudio?.pause()
+  elementAccueil?.pause()
 }
 
 function stopOutgoingRingtone() {
@@ -2064,8 +2088,12 @@ async function handleServerEvent(event: CallServerEvent) {
       clearTimeout(ringTimeoutId)
       ringTimeoutId = null
     }
-    // Le bip d'attente n'a plus lieu d'être : personne ne sonne.
-    stopOutgoingRingtone()
+    /*
+     * ⚠️ ON NE COUPE PAS LA TONALITÉ ICI — c'est `jouerAccueil` qui la remplace
+     * en changeant sa source. La couper d'abord rendrait la main au navigateur
+     * entre deux sons, et c'est précisément dans cet intervalle qu'une
+     * permission de lecture se perd.
+     */
     // Ce chemin-ci a déjà servi le répondeur : le minuteur, s'il repartait,
     // n'aurait plus rien à faire.
     repondeurTente = callId

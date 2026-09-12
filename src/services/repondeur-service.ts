@@ -105,9 +105,16 @@ function normaliser(brut: unknown): EtatRepondeur {
   return { actif: r.actif === true, jusquA: null, accueils: [] }
 }
 
-/** Mon répondeur : l'interrupteur, et tous mes accueils. */
+/**
+ * Mon répondeur : l'interrupteur, l'absence en cours, et tous mes accueils.
+ *
+ * ⚠️ `no-store` N'EST PAS UNE PRÉCAUTION DE PRINCIPE. Cette lecture porte une
+ * absence qui se pose, se lève et se périme à la minute ; une réponse servie
+ * depuis le cache du navigateur afficherait « aucune absence » à quelqu'un qui
+ * vient d'en poser une — et rien à l'écran ne permettrait de s'en douter.
+ */
 export async function lireMonRepondeur(): Promise<EtatRepondeur> {
-  return normaliser(await apiRequest<unknown>("/api/repondeur"))
+  return normaliser(await apiRequest<unknown>("/api/repondeur", { cache: "no-store" }))
 }
 
 /**
