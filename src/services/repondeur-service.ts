@@ -41,10 +41,50 @@ export interface EtatRepondeur {
   accueils: Accueil[]
 }
 
+/**
+ * Met la réponse du serveur à la forme attendue, quelle que soit sa version.
+ *
+ * 🔴 LE SERVEUR A CHANGÉ DE FORME EN COURS DE ROUTE : il rendait un accueil
+ * unique (`accueil`), il rend maintenant une liste (`accueils`). Or le web et le
+ * backend ne se déploient pas à la même minute — et pendant l'écart, un client
+ * neuf face à un serveur ancien recevait une liste VIDE. L'écran annonçait alors
+ * « aucun message d'accueil » à quelqu'un qui venait d'en enregistrer un, et
+ * aucune réécoute n'était possible.
+ *
+ * ⚠️ CETTE TOLÉRANCE EST TEMPORAIRE ET DOIT LE RESTER. Elle se retire quand le
+ * backend est déployé partout ; la garder indéfiniment reviendrait à entretenir
+ * deux contrats pour toujours.
+ */
+function normaliser(brut: unknown): EtatRepondeur {
+  const r = (brut ?? {}) as {
+    actif?: unknown
+    accueils?: Accueil[]
+    accueil?: AccueilRepondeur | null
+  }
+  if (Array.isArray(r.accueils)) {
+    return { actif: r.actif === true, accueils: r.accueils }
+  }
+  // Forme ancienne : un seul accueil, qui était forcément l'actif.
+  if (r.accueil) {
+    return {
+      actif: r.actif === true,
+      accueils: [
+        {
+          id: r.accueil.id,
+          libelle: null,
+          actif: 1,
+          createdAt: new Date().toISOString(),
+          media: r.accueil,
+        },
+      ],
+    }
+  }
+  return { actif: r.actif === true, accueils: [] }
+}
+
 /** Mon répondeur : l'interrupteur, et tous mes accueils. */
 export async function lireMonRepondeur(): Promise<EtatRepondeur> {
-  const reponse = await apiRequest<EtatRepondeur>("/api/repondeur")
-  return { actif: reponse.actif === true, accueils: reponse.accueils ?? [] }
+  return normaliser(await apiRequest<unknown>("/api/repondeur"))
 }
 
 /**
@@ -80,25 +120,28 @@ export async function ajouterAccueil(
   dureeMs?: number,
 ): Promise<EtatRepondeur> {
   const media = await uploadMedia(fichier, nomFichier, dureeMs)
-  return apiRequest<EtatRepondeur>("/api/repondeur", {
-    method: "POST",
-    body: { mediaId: media.id, libelle },
-  })
+  return normaliser(
+    await apiRequest<unknown>("/api/repondeur", {
+      method: "POST",
+      body: { mediaId: media.id, libelle },
+    }),
+  )
 }
 
 /** Désigne l'accueil que les appelants entendront. */
 export async function choisirAccueil(id: string): Promise<EtatRepondeur> {
-  return apiRequest<EtatRepondeur>(`/api/repondeur?actif=${encodeURIComponent(id)}`, {
-    method: "POST",
-  })
+  return normaliser(
+    await apiRequest<unknown>(`/api/repondeur?actif=${encodeURIComponent(id)}`, {
+      method: "POST",
+    }),
+  )
 }
 
 /** Allume ou éteint le répondeur, sans toucher à l'accueil enregistré. */
 export async function activerRepondeur(actif: boolean): Promise<EtatRepondeur> {
-  return apiRequest<EtatRepondeur>("/api/repondeur", {
-    method: "POST",
-    body: { actif },
-  })
+  return normaliser(
+    await apiRequest<unknown>("/api/repondeur", { method: "POST", body: { actif } }),
+  )
 }
 
 /**
@@ -108,9 +151,10 @@ export async function activerRepondeur(actif: boolean): Promise<EtatRepondeur> {
  * accueil promettrait aux appelants un message que personne n'a enregistré.
  */
 export async function retirerAccueil(id: string): Promise<EtatRepondeur> {
-  return apiRequest<EtatRepondeur>(
-    `/api/repondeur?accueil=${encodeURIComponent(id)}`,
-    { method: "DELETE" },
+  return normaliser(
+    await apiRequest<unknown>(`/api/repondeur?accueil=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    }),
   )
 }
 

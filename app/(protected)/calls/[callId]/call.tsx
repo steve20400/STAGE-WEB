@@ -875,7 +875,17 @@ export default function CallRoomPage() {
           </div>
         </div>
 
-        {callState === "ended" && (
+        {/* 🐛 CE PANNEAU SE SUPERPOSAIT A L'ECRAN DU REPONDEUR.
+
+            Il est prevu pour paraitre une seconde et demie avant de quitter
+            l'ecran d'appel — un point final, pas un etat durable. Mais le
+            repondeur maintient desormais l'ecran en vie, et le panneau restait
+            donc affiche PAR-DESSUS tout : on lisait « Appel termine » deux fois,
+            une fois en pale sous l'avatar et une fois en gras par-dessus, avec
+            les commandes noyees dessous.
+
+            Quand le repondeur a la main, la barre dit deja ou l'on en est. */}
+        {callState === "ended" && !call.repondeur && (
           <div className="ended-overlay">
             <div className="ended-icon">
               <svg

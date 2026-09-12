@@ -49,6 +49,13 @@ export function RepondeurReglages() {
   const minuteur = useRef<ReturnType<typeof setInterval> | null>(null)
   const champFichier = useRef<HTMLInputElement>(null)
   const apercuUrl = useRef<string | null>(null)
+  /**
+   * 🐛 LA DUREE ETAIT TOUJOURS ZERO. `rec.onstop` est defini au demarrage de
+   * l'enregistrement : sa fermeture y fige `secondes` a la valeur du moment,
+   * c'est-a-dire 0. Toute duree enregistree partait donc a zero. Une reference
+   * echappe a ce figement.
+   */
+  const dureeFinale = useRef(0)
 
   useEffect(() => {
     void lireMonRepondeur()
@@ -104,7 +111,7 @@ export function RepondeurReglages() {
       }
       rec.onstop = () => {
         const blob = new Blob(morceaux.current, { type: rec.mimeType || "audio/webm" })
-        const duree = Math.min(secondes * 1000, ACCUEIL_MAX_MS)
+        const duree = Math.min(dureeFinale.current * 1000, ACCUEIL_MAX_MS)
         if (apercuUrl.current) URL.revokeObjectURL(apercuUrl.current)
         apercuUrl.current = URL.createObjectURL(blob)
         setPhase({ nom: "relit", blob, dureeMs: duree })
@@ -112,23 +119,24 @@ export function RepondeurReglages() {
       rec.start()
       enregistreur.current = rec
       setSecondes(0)
+      dureeFinale.current = 0
       setPhase({ nom: "enregistre", depuis: Date.now() })
 
+      /*
+       * ⚠️ LA COUPE AUTOMATIQUE EST DANS LE MINUTEUR, pas dans un contrôle à
+       * l'envoi. Laisser enregistrer dix minutes pour refuser ensuite ferait
+       * perdre dix minutes de parole — et le refus arriverait au pire moment,
+       * quand on croit avoir fini.
+       *
+       * ⚠️ LE COMPTE VIT DANS UNE REFERENCE, pas dans le calculateur d'etat.
+       * Appeler `arreter()` depuis un `setSecondes(valeur => …)` y glissait un
+       * effet de bord : React peut rejouer ces calculateurs, et l'arrêt serait
+       * alors déclenché deux fois.
+       */
       minuteur.current = setInterval(() => {
-        setSecondes((valeur) => {
-          const suivant = valeur + 1
-          /*
-           * ⚠️ LA COUPE AUTOMATIQUE EST DANS LE MINUTEUR, pas dans un contrôle à
-           * l'envoi. Laisser enregistrer dix minutes pour refuser ensuite ferait
-           * perdre dix minutes de parole — et le refus arriverait au pire
-           * moment, quand on croit avoir fini.
-           */
-          if (suivant * 1000 >= ACCUEIL_MAX_MS) {
-            arreter()
-            return Math.floor(ACCUEIL_MAX_MS / 1000)
-          }
-          return suivant
-        })
+        dureeFinale.current += 1
+        setSecondes(dureeFinale.current)
+        if (dureeFinale.current * 1000 >= ACCUEIL_MAX_MS) arreter()
       }, 1000)
     } catch {
       error(t("rep_micro_refuse"))

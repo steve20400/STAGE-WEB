@@ -1526,27 +1526,61 @@ function TranslationSettings() {
         <div className="s-hint" style={{ marginTop: 0, marginBottom: 12 }}>
           {t("trad_globale_aide")}
         </div>
-        <div className="notif-row">
-          <span className="notif-label">
+        {/* ⚠️ UN GRAND BOUTON, PAS UNE PETITE BASCULE DANS UN COIN.
+
+            C'est la commande principale de cette page : elle decide si
+            l'application traduit, ou non. Une bascule de vingt pixels au bout
+            d'une ligne se cherche, et ne dit pas qu'on peut cliquer AILLEURS
+            que sur elle. Ici, TOUTE la surface est cliquable et l'etat se lit
+            de loin — la couleur, le libelle et la pastille disent la meme chose
+            trois fois. */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={tradGlobale}
+          disabled={installPaquets}
+          onClick={() => void basculerGlobale()}
+          className={`trad-bascule ${tradGlobale ? "on" : ""}`}
+        >
+          <span className="trad-bascule-texte">
             {tradGlobale ? t("trad_globale_on") : t("trad_globale_off")}
           </span>
-          <button
-            className="tgl"
-            role="switch"
-            aria-checked={tradGlobale}
-            disabled={installPaquets}
-            style={{ background: tradGlobale ? "var(--accent)" : "var(--border-default)" }}
-            onClick={() => void basculerGlobale()}
-          >
-            <div
-              className="tgl-knob"
-              style={{
-                left: tradGlobale ? "20px" : "2.5px",
-                background: tradGlobale ? "var(--accent-text)" : "var(--text-muted)",
-              }}
-            />
-          </button>
-        </div>
+          <span className="trad-bascule-piste" aria-hidden>
+            <span className="trad-bascule-bouton" />
+          </span>
+        </button>
+        <style>{`
+          .trad-bascule {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 14px; width: 100%; padding: 16px 18px; border-radius: 14px;
+            cursor: pointer; font-family: 'DM Sans', sans-serif;
+            font-size: 14.5px; font-weight: 600; text-align: left;
+            border: 1.5px solid var(--border-subtle);
+            background: var(--bg-elevated); color: var(--text-primary);
+            transition: background .15s, border-color .15s, color .15s;
+          }
+          .trad-bascule.on {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--accent-text);
+          }
+          .trad-bascule:disabled { cursor: progress; opacity: .65; }
+          .trad-bascule-texte { flex: 1; min-width: 0; }
+          .trad-bascule-piste {
+            position: relative; flex-shrink: 0;
+            width: 52px; height: 30px; border-radius: 999px;
+            background: var(--border-default); transition: background .15s;
+          }
+          .trad-bascule.on .trad-bascule-piste { background: rgba(255,255,255,.35); }
+          .trad-bascule-bouton {
+            position: absolute; top: 3px; left: 3px;
+            width: 24px; height: 24px; border-radius: 50%;
+            background: var(--text-muted); transition: left .15s, background .15s;
+          }
+          .trad-bascule.on .trad-bascule-bouton {
+            left: 25px; background: var(--accent-text);
+          }
+        `}</style>
         {installPaquets && (
           <div className="s-hint" style={{ marginBottom: 0 }}>
             {t("trad_paquets_encours")}
