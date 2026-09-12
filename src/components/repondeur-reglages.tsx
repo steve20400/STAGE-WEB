@@ -70,6 +70,20 @@ function LecteurAccueil({ src }: { src: string }) {
  * pour le découvrir.
  */
 
+/** Où l'on retient le mode choisi, faute de représentation côté serveur. */
+const CLE_MODE = "repondeur_mode_duree"
+/** La durée posée, rattachée à SA date de fin — sinon elle survivrait à l'absence. */
+const CLE_DUREE = "repondeur_duree_posee"
+
+/** Durée lisible : « 5 h », « 1 h 30 », « 45 min ». */
+function dureeLisible(minutes: number, hLabel: string, minLabel: string): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m} ${minLabel}`
+  if (m === 0) return `${h} ${hLabel}`
+  return `${h} ${hLabel} ${m} ${minLabel}`
+}
+
 type Phase =
   | { nom: "repos" }
   | { nom: "enregistre"; depuis: number }
@@ -97,7 +111,34 @@ export function RepondeurReglages() {
    * jusqu'à ce qu'une absence coure déjà — c'est-à-dire trop tard pour la
    * saisir.
    */
-  const [modeDuree, setModeDuree] = useState(false)
+  const [modeDuree, setModeDuree] = useState(() => {
+    /*
+     * 🐛 LE CHOIX REPARTAIT A « NE PAS DEFINIR DE TEMPS » A CHAQUE RETOUR.
+     *
+     * Il ne vivait que dans ce composant, qui se démonte dès qu'on quitte les
+     * réglages. On revenait donc sur l'autre mode, sans rien avoir changé.
+     *
+     * ⚠️ DANS LE NAVIGATEUR, ET NON EN BASE — à dessein. Tant qu'aucune durée
+     * n'est posée, ce choix ne change RIEN pour ceux qui appellent : c'est une
+     * préférence d'affichage, pas un réglage du compte. Le serveur, lui, ne
+     * connaît que l'absence elle-même, qui est bien enregistrée.
+     */
+    try {
+      return localStorage.getItem(CLE_MODE) === "duree"
+    } catch {
+      return false
+    }
+  })
+
+  /** Le choix suit l'écran, et le retrouve. */
+  useEffect(() => {
+    try {
+      localStorage.setItem(CLE_MODE, modeDuree ? "duree" : "sans")
+    } catch {
+      // Stockage refusé (navigation privée) : le choix ne survivra pas, et
+      // c'est tout. Rien d'autre n'en dépend.
+    }
+  }, [modeDuree])
   /** Durée choisie, libre, de 1 minute à 24 heures. */
   const [heures, setHeures] = useState("1")
   const [minutes, setMinutes] = useState("0")
@@ -319,6 +360,10 @@ export function RepondeurReglages() {
     setActif(etat.actif)
     setAccueils(etat.accueils)
     setJusquA(etat.jusquA)
+    // ⚠️ UNE ABSENCE EN COURS IMPOSE SON MODE. Le serveur fait foi : afficher
+    // « ne pas définir de temps » pendant qu'une absence court dirait
+    // exactement le contraire de ce que vivent ceux qui appellent.
+    if (etat.jusquA) setModeDuree(true)
   }
 
   /** Durée saisie, ramenée aux bornes du serveur. Rend 0 si elle est vide. */
@@ -332,7 +377,20 @@ export function RepondeurReglages() {
     if (occupe) return
     setOccupe(true)
     try {
-      appliquerEtat(await poserAbsence(minutesDemandees))
+      const suite = await poserAbsence(minutesDemandees)
+      // La durée choisie n'existe nulle part côté serveur — il ne range qu'une
+      // DATE DE FIN, et c'est le bon choix. On la garde ici pour pouvoir
+      // réafficher « activé pour 5 h » plutôt que le seul horaire de fin.
+      try {
+        if (minutesDemandees > 0 && suite.jusquA) {
+          localStorage.setItem(CLE_DUREE, `${suite.jusquA}|${minutesDemandees}`)
+        } else {
+          localStorage.removeItem(CLE_DUREE)
+        }
+      } catch {
+        /* sans stockage, on retombe sur « il reste … » */
+      }
+      appliquerEtat(suite)
       // Lever une absence ramène au mode par défaut : laisser les champs
       // ouverts laisserait croire qu'une durée est encore en train d'être posée.
       if (minutesDemandees === 0) setModeDuree(false)
@@ -347,6 +405,27 @@ export function RepondeurReglages() {
   /** « 14 h 30 » — une heure de fin se vérifie sur une horloge, pas un décompte. */
   const heureFin = (iso: string) =>
     new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+
+  /** La durée posée pour CETTE absence, si on la connaît encore. */
+  const dureePosee = (iso: string): string | null => {
+    try {
+      const brut = localStorage.getItem(CLE_DUREE)
+      if (!brut) return null
+      const [dateFin, minutesTexte] = brut.split("|")
+      // ⚠️ RATTACHÉE À SA DATE DE FIN : sans cette comparaison, la durée d'une
+      // absence terminée se réafficherait sur la suivante.
+      if (dateFin !== iso) return null
+      return dureeLisible(Number(minutesTexte) || 0, t("rep_abs_h"), t("rep_abs_min"))
+    } catch {
+      return null
+    }
+  }
+
+  /** Ce qu'il reste à courir, recalculé à chaque rendu. */
+  const restant = (iso: string): string => {
+    const minutes = Math.max(0, Math.round((new Date(iso).getTime() - Date.now()) / 60_000))
+    return dureeLisible(minutes, t("rep_abs_h"), t("rep_abs_min"))
+  }
 
   const basculer = async (valeur: boolean) => {
     // L'interrupteur bascule sous le doigt ; le serveur corrige s'il refuse.
@@ -477,15 +556,28 @@ export function RepondeurReglages() {
         }
         .rep-abs-champ span { font-size: 12px; color: var(--text-muted); }
         .rep-abs-bornes { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; }
-        .rep-abs-actif {
-          display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        .rep-abs-actif { display: grid; gap: 10px; }
+        .rep-abs-bandeau {
+          display: flex; align-items: flex-start; gap: 10px;
+          padding: 12px 13px; border-radius: 11px;
+          border: 1px solid var(--accent); background: var(--accent-dim);
         }
+        .rep-abs-bandeau .rep-abs-pt { margin-top: 6px; }
+        /* Le bouton d'annulation est PLEIN et pleine largeur : c'est la sortie
+           d'un etat qui rend injoignable, pas une option parmi d'autres. */
+        .rep-abs-annuler {
+          width: 100%; padding: 12px 16px; border-radius: 10px; cursor: pointer;
+          border: none; background: var(--danger); color: #fff;
+          font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 700;
+        }
+        .rep-abs-annuler:disabled { cursor: progress; opacity: .6; }
+        .rep-abs-annuler:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
         .rep-abs-pt {
           width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
           background: var(--accent);
         }
         .rep-abs-txt { flex: 1; min-width: 140px; font-size: 13px; color: var(--text-primary); }
-        .rep-abs-txt span { display: block; font-size: 11.5px; color: var(--text-muted); }
+        .rep-abs-txt span { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
         /* Sur un telephone, les boutons prennent la ligne entiere plutot que de
            se serrer a deux ou trois par rangee, ou aucun n'est atteignable au
            pouce. */
@@ -564,18 +656,35 @@ export function RepondeurReglages() {
 
           {jusquA ? (
             <div className="rep-abs-actif">
-              <span className="rep-abs-pt" aria-hidden />
-              <span className="rep-abs-txt">
-                <b>{t("rep_abs_jusqua", { h: heureFin(jusquA) })}</b>
-                <span>{t("rep_abs_avert")}</span>
-              </span>
+              {/*
+                🔴 CE QUI A ETE RESERVE, ET POUR COMBIEN DE TEMPS.
+                Une absence rend injoignable : ne pas la voir en revenant, c'est
+                croire qu'on est joignable alors que plus aucun appel n'arrive.
+                Elle se lit donc en entier — la duree posee, l'heure de fin, et
+                ce qu'il reste — et s'annule d'un seul bouton.
+              */}
+              <div className="rep-abs-bandeau">
+                <span className="rep-abs-pt" aria-hidden />
+                <span className="rep-abs-txt">
+                  <b>
+                    {dureePosee(jusquA)
+                      ? t("rep_abs_pour", { d: dureePosee(jusquA) as string })
+                      : t("rep_abs_jusqua", { h: heureFin(jusquA) })}
+                  </b>
+                  <span>
+                    {t("rep_abs_reste", { h: heureFin(jusquA), r: restant(jusquA) })}
+                  </span>
+                  <span>{t("rep_abs_avert")}</span>
+                </span>
+              </div>
               <button
-                className="rep-btn rep-btn-ghost"
+                className="rep-abs-annuler"
                 disabled={occupe}
                 onClick={() => void changerAbsence(0)}
               >
-                {t("rep_abs_arreter")}
+                {t("rep_abs_annuler")}
               </button>
+              <div className="rep-abs-bornes">{t("rep_abs_retour")}</div>
             </div>
           ) : modeDuree ? (
             <>

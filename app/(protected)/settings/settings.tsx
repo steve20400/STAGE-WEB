@@ -7,6 +7,12 @@ import {
   traductionGlobaleDejaActivee,
 } from "../../../src/services/traduction-conversation"
 import { useAuth } from "../../../src/components/auth-provider"
+import {
+  abonnerPaquets,
+  etatPaquets,
+  installerPaquets,
+  oublierResultatPaquets,
+} from "../../../src/services/paquets-traduction"
 import { useToast } from "../../../src/components/toast"
 import { ThemeSelector } from "../../../src/components/theme-toggle"
 import { type SessionUser } from "../../../src/data/session-user"
@@ -90,7 +96,6 @@ import {
   telechargerComposants,
   viderCacheTraductions,
   dernierEchecTraduction,
-  installerPaquetsInitiaux,
 } from "../../../src/services/traduction-service"
 import {
   MOTEURS_CONNUS,
@@ -1282,24 +1287,38 @@ function TranslationSettings() {
    * alors dans le vide, en silence.
    */
   const [tradGlobale, setTradGlobale] = useState(() => traductionGlobaleActive())
-  const [installPaquets, setInstallPaquets] = useState(false)
+  /*
+   * 🔴 L'INSTALLATION NE VIT PLUS DANS CET ECRAN.
+   *
+   * Elle y vivait, dans un `useState`, et l'on croyait donc qu'elle s'arretait
+   * en quittant les reglages : le telechargement continuait bel et bien, mais
+   * TOUT CE QUI LE MONTRAIT disparaissait avec l'ecran. En revenant, on
+   * retrouvait un bouton comme si rien ne s'etait passe, et l'on relancait
+   * par-dessus une installation deja en cours.
+   *
+   * L'etat vit maintenant dans `paquets-traduction`, hors de tout composant :
+   * on peut lancer le telechargement, aller ecrire, passer un appel, revenir —
+   * il continue, et cet ecran le retrouve ou il en est.
+   */
+  const [paquets, setPaquets] = useState(etatPaquets)
+  useEffect(() => abonnerPaquets(() => setPaquets(etatPaquets())), [])
+
+  // Le resultat s'annonce ICI quand on y est, et une seule fois : un
+  // telechargement fini pendant qu'on ecrivait ailleurs ne doit pas se
+  // reannoncer a chaque retour dans les reglages.
+  useEffect(() => {
+    if (!paquets.dernier) return
+    if (paquets.dernier.echecs.length > 0) info(t("trad_paquets_partiel"))
+    else success(t("trad_paquets_ok"))
+    oublierResultatPaquets()
+  }, [paquets.dernier, info, success, t])
 
   const basculerGlobale = async () => {
     const voulu = !tradGlobale
     const premiereFois = !traductionGlobaleDejaActivee()
     setTradGlobale(definirTraductionGlobale(voulu))
     if (!voulu || !premiereFois) return
-
-    setInstallPaquets(true)
-    try {
-      const { echecs } = await installerPaquetsInitiaux(language)
-      // Un paquet qui n'arrive pas n'empeche RIEN : la traduction passe alors
-      // par le relais en ligne. On le dit sans alarmer.
-      if (echecs.length > 0) info(t("trad_paquets_partiel"))
-      else success(t("trad_paquets_ok"))
-    } finally {
-      setInstallPaquets(false)
-    }
+    void installerPaquets(language)
   }
 
   const [moteur, setMoteur] = useState<CodeMoteur>(() => lireMoteurTraduction())
@@ -1538,7 +1557,7 @@ function TranslationSettings() {
           type="button"
           role="switch"
           aria-checked={tradGlobale}
-          disabled={installPaquets}
+          disabled={paquets.encours}
           onClick={() => void basculerGlobale()}
           className={`trad-bascule ${tradGlobale ? "on" : ""}`}
         >
@@ -1581,9 +1600,14 @@ function TranslationSettings() {
             left: 25px; background: var(--accent-text);
           }
         `}</style>
-        {installPaquets && (
+        {paquets.encours && (
           <div className="s-hint" style={{ marginBottom: 0 }}>
             {t("trad_paquets_encours")}
+            {/* La progression du paquet courant : sans elle, une installation
+                de plusieurs minutes ressemble a un ecran bloque. */}
+            {paquets.langue && (
+              <> — {paquets.langue.toUpperCase()} {Math.round(paquets.fraction * 100)} %</>
+            )}
           </div>
         )}
       </div>
