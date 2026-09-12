@@ -233,6 +233,20 @@ function cacheBackendMessages(backendMessages: BackendMessage[]): void {
       // suivant : le cache-first reaffiche d'abord ce qui est range ici, et il
       // aurait rendu le bon texte sans dire qu'il avait ete modifie.
       editedAt: m.editedAt,
+      /*
+       * 🐛 SANS CETTE LIGNE, LA MESSAGERIE VOCALE PERDAIT SON APPEL HORS LIGNE.
+       *
+       * Ce cache n'ecrit PAS le message tel quel : il enumere les champs a
+       * garder, un par un. Un champ oublie ici ne disparait pas a l'ecran tout
+       * de suite — le reseau le rend a chaque fois qu'il repond — il disparait
+       * SEULEMENT quand on relit sans reseau. C'est le pire des oublis : celui
+       * qui ne se voit qu'au moment ou l'on ne peut plus rien verifier.
+       *
+       * `callId` est ce qui relie une messagerie vocale a l'appel manque
+       * qu'elle suit. Sans lui, le bloc qui les reunit ne se forme pas, et le
+       * vocal retombe en piece jointe — nom de fichier et taille compris.
+       */
+      callId: m.callId,
       media: m.media,
     }))
   )
@@ -416,6 +430,10 @@ function cacheDeliveredMessage(message: BackendMessage | WsMessagePayload): void
     replyToId: message.replyToId,
     replyTo: message.replyTo,
     deletedAt: (message as BackendMessage).deletedAt ?? null,
+    // Jumeau de `cacheBackendMessages` : sans lui, une messagerie vocale
+    // confirmee a l'instant perdrait son appel des la premiere relecture hors
+    // ligne, et se relirait en piece jointe.
+    callId: message.callId ?? null,
     media: message.media,
   })
 }
@@ -776,6 +794,9 @@ export async function persistIncomingWsMessage(message: WsMessagePayload): Promi
     createdAt: message.createdAt ? new Date(message.createdAt).getTime() : Date.now(),
     replyToId: message.replyToId,
     replyTo: message.replyTo,
+    // Une messagerie vocale arrivee en direct doit garder son appel, elle
+    // aussi : c'est ce lien qui la distingue d'un fichier audio ordinaire.
+    callId: message.callId ?? null,
     media: message.media,
   })
 }

@@ -40,6 +40,15 @@ export interface WsMessagePayload {
     content: string | null
     isDeleted: boolean
   } | null
+  /**
+   * L'appel dont ce message est la messagerie vocale.
+   *
+   * ⚠️ ABSENT SUR LA QUASI-TOTALITE DES MESSAGES, et c'est normal : seul un
+   * depot de repondeur en porte un. C'est pourtant lui qui distingue une
+   * messagerie d'un simple fichier audio — sans lui, elle se relit en piece
+   * jointe, nom de fichier et taille compris.
+   */
+  callId?: string | null
   media?: WsMediaPayload[]
 }
 
