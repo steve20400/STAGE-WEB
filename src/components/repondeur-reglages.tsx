@@ -75,6 +75,60 @@ const CLE_MODE = "repondeur_mode_duree"
 /** La durée posée, rattachée à SA date de fin — sinon elle survivrait à l'absence. */
 const CLE_DUREE = "repondeur_duree_posee"
 
+/**
+ * L'absence que CE navigateur a posée, si elle court encore.
+ *
+ * Écrite seulement APRÈS une réponse du serveur : ce n'est donc pas un souhait,
+ * c'est un fait confirmé, dont on garde la trace.
+ */
+function absenceRetenue(): string | null {
+  try {
+    const brut = localStorage.getItem(CLE_DUREE)
+    if (!brut) return null
+    const [dateFin] = brut.split("|")
+    return new Date(dateFin).getTime() > Date.now() ? dateFin : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * QUI L'EMPORTE quand le serveur et ce navigateur ne disent pas la même chose ?
+ *
+ * 🐛 LE BANDEAU DISPARAISSAIT EN REVENANT DANS LES RÉGLAGES. Le serveur faisait
+ * foi sans condition : sa réponse écrasait ce que l'on savait, et un `null` —
+ * d'où qu'il vienne — effaçait une absence pourtant en cours. On se retrouvait
+ * devant les champs de durée, croyant être joignable, sans bouton pour annuler
+ * quoi que ce soit.
+ *
+ * La règle est donc asymétrique, et c'est assumé :
+ *
+ *  • une DATE venue du serveur l'emporte toujours — c'est ainsi qu'une absence
+ *    posée ou levée depuis un autre appareil se voit ici ;
+ *  • un `null` NE FAIT PAS DISPARAÎTRE une absence que ce navigateur a posée et
+ *    dont la fin est encore devant nous. Elle ne s'efface que de deux façons :
+ *    on l'annule ici, ou sa date passe.
+ *
+ * ⚠️ LE COÛT DE SE TROMPER N'EST PAS LE MÊME DES DEUX CÔTÉS. Montrer le bandeau
+ * à tort est une gêne d'un instant — le bouton pour annuler est juste dessous.
+ * Le cacher à tort laisse quelqu'un se croire joignable alors que plus aucun
+ * appel ne lui parvient, et sans aucun moyen de s'en rendre compte.
+ */
+function arbitrerAbsence(duServeur: string | null): string | null {
+  if (duServeur) return duServeur
+  const retenue = absenceRetenue()
+  if (retenue) {
+    // Un désaccord mérite d'être dit : il signale soit une absence levée
+    // ailleurs — normal — soit une lecture qui ne rend pas ce qu'elle devrait.
+    // Sans cette trace, les deux cas se ressemblent parfaitement.
+    console.warn(
+      "[repondeur] le serveur ne rend aucune absence alors que celle posée ici court jusqu'à",
+      retenue,
+    )
+  }
+  return retenue
+}
+
 /** Durée lisible : « 5 h », « 1 h 30 », « 45 min ». */
 function dureeLisible(minutes: number, hLabel: string, minLabel: string): string {
   const h = Math.floor(minutes / 60)
@@ -116,15 +170,7 @@ export function RepondeurReglages() {
      * n'est pas d'accord. C'est la même règle que le reste de l'application :
      * on montre ce qu'on a, puis on se met à jour.
      */
-    try {
-      const brut = localStorage.getItem(CLE_DUREE)
-      if (!brut) return null
-      const [dateFin] = brut.split("|")
-      // Une absence terminée ne se réaffiche pas : la date fait foi.
-      return new Date(dateFin).getTime() > Date.now() ? dateFin : null
-    } catch {
-      return null
-    }
+    return absenceRetenue()
   })
   /**
    * Le mode « avec durée » est-il choisi ?
@@ -382,11 +428,11 @@ export function RepondeurReglages() {
   const appliquerEtat = (etat: EtatRepondeur) => {
     setActif(etat.actif)
     setAccueils(etat.accueils)
-    setJusquA(etat.jusquA)
-    // ⚠️ UNE ABSENCE EN COURS IMPOSE SON MODE. Le serveur fait foi : afficher
-    // « ne pas définir de temps » pendant qu'une absence court dirait
-    // exactement le contraire de ce que vivent ceux qui appellent.
-    if (etat.jusquA) setModeDuree(true)
+    setJusquA(arbitrerAbsence(etat.jusquA))
+    // ⚠️ UNE ABSENCE EN COURS IMPOSE SON MODE : afficher « ne pas définir de
+    // temps » pendant qu'une absence court dirait exactement le contraire de ce
+    // que vivent ceux qui appellent.
+    if (etat.jusquA || absenceRetenue()) setModeDuree(true)
   }
 
   /** Durée saisie, ramenée aux bornes du serveur. Rend 0 si elle est vide. */
@@ -400,6 +446,19 @@ export function RepondeurReglages() {
     if (occupe) return
     setOccupe(true)
     try {
+      /*
+       * ⚠️ LA TRACE S'EFFACE AVANT L'APPEL, pas après. `arbitrerAbsence` fait
+       * survivre une absence retenue localement à un `null` du serveur : la
+       * laisser en place le temps de la requête ferait ressusciter, à la
+       * réponse, l'absence que l'on vient justement d'annuler.
+       */
+      if (minutesDemandees === 0) {
+        try {
+          localStorage.removeItem(CLE_DUREE)
+        } catch {
+          /* sans stockage, il n'y avait rien à effacer */
+        }
+      }
       const suite = await poserAbsence(minutesDemandees)
       // La durée choisie n'existe nulle part côté serveur — il ne range qu'une
       // DATE DE FIN, et c'est le bon choix. On la garde ici pour pouvoir
@@ -407,8 +466,6 @@ export function RepondeurReglages() {
       try {
         if (minutesDemandees > 0 && suite.jusquA) {
           localStorage.setItem(CLE_DUREE, `${suite.jusquA}|${minutesDemandees}`)
-        } else {
-          localStorage.removeItem(CLE_DUREE)
         }
       } catch {
         /* sans stockage, on retombe sur « il reste … » */
