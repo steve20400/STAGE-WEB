@@ -156,13 +156,10 @@ export default function CallRoomPage() {
 
   // Appel termine (par nous ou a distance) : petit ecran de fin puis retour.
   //
-  // ⚠️ SAUF SI LE REPONDEUR A PRIS LA MAIN. L'appel EST termine — il fallait
-  // qu'il le soit, sinon le telephone d'en face sonnerait pendant qu'on parle —
-  // mais l'ecran doit rester : c'est la qu'on ecoute l'accueil et qu'on
-  // enregistre. Sans cette garde, la fenetre se refermerait au bout d'une
-  // seconde et demie, en plein message.
+  // Le repondeur, lui, vit au niveau de l'application (`RepondeurFlottant`) :
+  // cet ecran peut donc se fermer normalement, meme quand il a la main.
   useEffect(() => {
-    if (callState !== "ended" || call.repondeur) return
+    if (callState !== "ended") return
     leaveTimerRef.current = window.setTimeout(() => {
       acknowledgeCallEnded()
       // `replace` : l'ecran d'appel disparait de l'historique. Sans cela, le
@@ -173,7 +170,7 @@ export default function CallRoomPage() {
     return () => {
       if (leaveTimerRef.current !== null) window.clearTimeout(leaveTimerRef.current)
     }
-  }, [callState, navigate, returnTo, call.repondeur])
+  }, [callState, navigate, returnTo])
 
   /**
    * Changer de camera echange la piste DANS le meme MediaStream : ni la
@@ -620,23 +617,6 @@ export default function CallRoomPage() {
             </div>
           )}
 
-          {/* LE REPONDEUR, AU-DESSUS DES COMMANDES ET NON A LEUR PLACE.
-              L'appel est termine, mais l'ecran reste : c'est la qu'on ecoute
-              l'accueil et qu'on enregistre. Deux boutons s'ajoutent, le reste de
-              la fenetre ne bouge pas — on vient d'appeler quelqu'un, et ca doit
-              continuer de ressembler a ca. */}
-          {call.repondeur && (
-            <RepondeurAppel
-              callId={call.repondeur.callId}
-              accueilUrl={call.repondeur.accueilUrl}
-              onFermer={() => {
-                quitterRepondeur()
-                acknowledgeCallEnded()
-                navigate(returnTo, { replace: true })
-              }}
-            />
-          )}
-
           <div
             className={`controls-bar ${!controlsVisible && isVideo && callState === "active" ? "hidden" : ""}`}
           >
@@ -875,17 +855,7 @@ export default function CallRoomPage() {
           </div>
         </div>
 
-        {/* 🐛 CE PANNEAU SE SUPERPOSAIT A L'ECRAN DU REPONDEUR.
-
-            Il est prevu pour paraitre une seconde et demie avant de quitter
-            l'ecran d'appel — un point final, pas un etat durable. Mais le
-            repondeur maintient desormais l'ecran en vie, et le panneau restait
-            donc affiche PAR-DESSUS tout : on lisait « Appel termine » deux fois,
-            une fois en pale sous l'avatar et une fois en gras par-dessus, avec
-            les commandes noyees dessous.
-
-            Quand le repondeur a la main, la barre dit deja ou l'on en est. */}
-        {callState === "ended" && !call.repondeur && (
+        {callState === "ended" && (
           <div className="ended-overlay">
             <div className="ended-icon">
               <svg

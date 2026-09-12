@@ -78,9 +78,22 @@ function toInitials(name: string) {
 
 function mapStatus(c: BackendCall): CallStatus {
   if (c.status === "REJECTED") return "declined"
-  // MISSED est produit quand le destinataire laisse sonner/termine avant réponse.
-  // Côté appelant, le même événement se présente comme « Sans réponse ».
-  if (c.status === "MISSED" || c.status === "RINGING") return c.isOutgoing ? "no_answer" : "missed"
+  if (c.status === "BUSY") return "busy"
+  /*
+   * 🐛 `NO_ANSWER` MANQUAIT, ET IL S'AFFICHAIT DONC COMME UN APPEL DECROCHE.
+   *
+   * C'est pourtant le statut le plus courant d'un appel sans reponse : le
+   * serveur le pose quand la sonnerie expire, et c'est exactement celui que
+   * produit le repondeur. Il tombait dans le `return "ended"` final — un appel
+   * que personne n'a pris se presentait donc comme une conversation qui a eu
+   * lieu, juste au-dessus de la messagerie vocale qui prouvait le contraire.
+   *
+   * MISSED est produit quand le destinataire laisse sonner ou termine avant
+   * reponse. Cote appelant, le meme evenement se presente comme « Sans reponse ».
+   */
+  if (c.status === "NO_ANSWER" || c.status === "MISSED" || c.status === "RINGING") {
+    return c.isOutgoing ? "no_answer" : "missed"
+  }
   // Le backend clôt un appel annulé avant réponse en ENDED ; answeredAt permet
   // de le distinguer d'un appel réellement décroché, sans changement backend.
   if (c.status === "ENDED" && !c.answeredAt) return c.isOutgoing ? "no_answer" : "missed"
@@ -89,7 +102,19 @@ function mapStatus(c: BackendCall): CallStatus {
 
 function mapDirection(c: BackendCall): CallDirection {
   if (c.isOutgoing) return "out"
-  if (c.status === "MISSED" || c.status === "REJECTED") return "missed"
+  // ⚠️ `NO_ANSWER` ET `BUSY` MANQUAIENT ICI AUSSI : un appel entrant jamais
+  // decroche etait range parmi les appels recus, avec la fleche correspondante.
+  if (
+    c.status === "MISSED" ||
+    c.status === "NO_ANSWER" ||
+    c.status === "BUSY" ||
+    c.status === "REJECTED"
+  ) {
+    return "missed"
+  }
+  // Meme raison que dans `mapStatus` : un ENDED sans `answeredAt` n'a jamais
+  // ete decroche.
+  if (c.status === "ENDED" && !c.answeredAt) return "missed"
   return "in"
 }
 

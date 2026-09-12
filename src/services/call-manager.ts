@@ -1344,7 +1344,25 @@ async function basculerVersRepondeur(callId: string): Promise<void> {
   if (state.activeCallId !== callId || state.role !== "outgoing") return
 
   if (accueil) {
-    setState({ repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url) } })
+    /*
+     * 🐛 LA FENETRE REDUITE CACHAIT LE REPONDEUR.
+     *
+     * Quand on ecrit pendant un appel, la fenetre se reduit en vignette. Si la
+     * sonnerie expirait a ce moment-la, le repondeur prenait bien la main — mais
+     * dans une fenetre de deux centimetres, ou il n'y avait la place ni pour la
+     * barre ni pour ses boutons. L'utilisateur ne voyait donc RIEN, et
+     * n'apprenait l'existence de l'ecran qu'a l'appel suivant, ou il reparaissait
+     * par-dessus.
+     *
+     * ⚠️ ON REVIENT EN GRAND ECRAN, et c'est le seul moment ou l'application
+     * s'autorise a agrandir sa fenetre sans qu'on le lui demande. C'est justifie :
+     * il y a quelque chose a FAIRE — ecouter, puis parler — et une vignette ne le
+     * permet pas. Le reduire ensuite reste possible, comme avant.
+     */
+    setState({
+      repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url) },
+      displayMode: "full",
+    })
   }
   await hangUp()
 }
