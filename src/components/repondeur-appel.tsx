@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "../i18n"
 import { useToast } from "./toast"
 import { deposerMessagerie } from "../services/repondeur-service"
+import { arreterAccueil, jouerAccueil } from "../services/call-manager"
 
 /**
  * LE RÉPONDEUR — une feuille collée au bas de l'écran d'appel.
@@ -43,6 +44,7 @@ export function RepondeurAppel({
   accueilUrl,
   nom,
   video,
+  absence,
   onFermer,
 }: {
   callId: string
@@ -56,6 +58,14 @@ export function RepondeurAppel({
    * répondre par la voix seule perdrait ce qu'on voulait montrer.
    */
   video: boolean
+  /**
+   * L'accueil a-t-il répondu À LA PLACE de la sonnerie ?
+   *
+   * Change ce que dit l'écran, et rien d'autre : « ne peut pas répondre pour le
+   * moment » est vrai, là où « message d'accueil… » laisserait croire qu'on a
+   * attendu une sonnerie qui n'a jamais eu lieu.
+   */
+  absence: boolean
   onFermer: () => void
 }) {
   const { t } = useTranslation()
@@ -78,7 +88,6 @@ export function RepondeurAppel({
    */
   const [lecture, setLecture] = useState<"ok" | "bloquee" | "cassee">("ok")
 
-  const audio = useRef<HTMLAudioElement | null>(null)
   const enregistreur = useRef<MediaRecorder | null>(null)
   const morceaux = useRef<Blob[]>([])
   const flux = useRef<MediaStream | null>(null)
@@ -109,7 +118,7 @@ export function RepondeurAppel({
   useEffect(
     () => () => {
       couperCapture()
-      audio.current?.pause()
+      arreterAccueil()
     },
     [couperCapture],
   )
@@ -119,30 +128,30 @@ export function RepondeurAppel({
    * de l'écouter : on propose d'enregistrer un message.
    */
   useEffect(() => {
-    const son = new Audio(accueilUrl)
-    son.preload = "auto"
-    audio.current = son
-    son.play().then(
-      () => setLecture("ok"),
-      // Refus du navigateur : le son est là, il manque un geste.
-      () => setLecture((etat) => (etat === "cassee" ? etat : "bloquee")),
-    )
-    // Fichier illisible — format refusé, jeton périmé : aucun geste n'y peut
-    // rien, et cet état l'emporte sur le précédent.
-    const surErreur = () => setLecture("cassee")
-    son.addEventListener("error", surErreur)
+    let vivant = true
+    /*
+     * 🐛 UN `new Audio` CRÉÉ ICI ÉTAIT REFUSÉ, ET C'EST LE DÉFAUT SIGNALÉ :
+     * « l'accueil ne se lit pas tout seul, il faut appuyer sur un bouton ».
+     *
+     * En mode par défaut ce composant paraît TRENTE SECONDES après le dernier
+     * geste de l'utilisateur, et un élément audio créé à cet instant-là n'a pas
+     * la permission de jouer. `jouerAccueil` réutilise l'élément que
+     * `call-manager` a fait jouer — un silence de quarante-quatre octets — dans
+     * la foulée du clic sur « appeler ». Cet élément-là garde sa permission.
+     */
+    void jouerAccueil(accueilUrl).then((joue) => {
+      if (!vivant) return
+      setLecture(joue ? "ok" : "bloquee")
+    })
     return () => {
-      son.removeEventListener("error", surErreur)
-      son.pause()
+      vivant = false
+      arreterAccueil()
     }
   }, [accueilUrl])
 
   /** Relance la lecture depuis un vrai clic — le seul remède au refus. */
   const ecouter = () => {
-    audio.current?.play().then(
-      () => setLecture("ok"),
-      () => setLecture("cassee"),
-    )
+    void jouerAccueil(accueilUrl).then((joue) => setLecture(joue ? "ok" : "cassee"))
   }
 
   const arreter = useCallback(() => {
@@ -187,7 +196,7 @@ export function RepondeurAppel({
    * par-dessus, et la voix du correspondant se retrouverait dans le message.
    */
   const enregistrer = async () => {
-    audio.current?.pause()
+    arreterAccueil()
     try {
       const media = await navigator.mediaDevices.getUserMedia(
         video ? { audio: true, video: { facingMode: "user" } } : { audio: true },
@@ -243,7 +252,9 @@ export function RepondeurAppel({
         ? t("rep_lecture_impossible")
         : lecture === "bloquee"
           ? t("rep_accueil_attente")
-          : t("rep_lecture_accueil")
+          : absence
+            ? t("rep_absence_etat")
+            : t("rep_lecture_accueil")
       : etape === "enregistre"
         ? `${mmss(secondes)} / ${mmss(Math.floor(maxMs / 1000))}`
         : etape === "envoie"

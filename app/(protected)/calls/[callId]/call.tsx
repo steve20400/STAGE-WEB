@@ -874,7 +874,12 @@ export default function CallRoomPage() {
               callId={call.repondeur.callId}
               accueilUrl={call.repondeur.accueilUrl}
               nom={call.repondeur.nom}
-              video={isVideo}
+              // ⚠️ LE TYPE VIENT DU REPONDEUR, PAS DE L'ECRAN. L'appel est deja
+              // termine quand cette feuille parait : `isVideo` se lit sur un
+              // etat que `clearCall` a remis a neuf, et retomberait sur
+              // « audio » pour un appel video.
+              video={call.repondeur.type === "video"}
+              absence={call.repondeur.absence}
               onFermer={quitterRepondeur}
             />
           )}

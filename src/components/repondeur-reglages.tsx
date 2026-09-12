@@ -6,11 +6,15 @@ import {
   ACCUEIL_MAX_OCTETS,
   activerRepondeur,
   ajouterAccueil,
+  ABSENCE_MAX_MINUTES,
   choisirAccueil,
+  choisirAccueilAbsence,
   lireMonRepondeur,
+  poserAbsence,
   refusAccueil,
   retirerAccueil,
   type Accueil,
+  type EtatRepondeur,
 } from "../services/repondeur-service"
 import { resolveMediaUrl } from "../services/media-service"
 
@@ -78,6 +82,17 @@ export function RepondeurReglages() {
 
   const [actif, setActif] = useState(false)
   const [accueils, setAccueils] = useState<Accueil[]>([])
+  /**
+   * Fin du mode absence, ou `null`.
+   *
+   * ⚠️ LE SERVEUR NE LA REND QUE SI ELLE EST ENCORE DEVANT NOUS. Il n'y a donc
+   * aucune comparaison à refaire ici : une valeur présente veut dire « en
+   * absence », point.
+   */
+  const [jusquA, setJusquA] = useState<string | null>(null)
+  /** Durée choisie, libre, de 1 minute à 24 heures. */
+  const [heures, setHeures] = useState("1")
+  const [minutes, setMinutes] = useState("0")
   /** Nom donné au prochain accueil — « Congés », « Bureau ». */
   const [libelle, setLibelle] = useState("")
   const [phase, setPhase] = useState<Phase>({ nom: "repos" })
@@ -101,8 +116,7 @@ export function RepondeurReglages() {
   useEffect(() => {
     void lireMonRepondeur()
       .then((etat) => {
-        setActif(etat.actif)
-        setAccueils(etat.accueils)
+        appliquerEtat(etat)
       })
       .catch(() => undefined)
   }, [])
@@ -208,8 +222,7 @@ export function RepondeurReglages() {
         libelle.trim() || null,
         phase.dureeMs,
       )
-      setActif(etat.actif)
-      setAccueils(etat.accueils)
+      appliquerEtat(etat)
       setPhase({ nom: "repos" })
       setSecondes(0)
       setLibelle("")
@@ -236,8 +249,7 @@ export function RepondeurReglages() {
     setOccupe(true)
     try {
       const etat = await ajouterAccueil(fichier, fichier.name, libelle.trim() || null)
-      setActif(etat.actif)
-      setAccueils(etat.accueils)
+      appliquerEtat(etat)
       setLibelle("")
       success(t("rep_enregistre"))
     } catch {
@@ -254,8 +266,7 @@ export function RepondeurReglages() {
     setOccupe(true)
     try {
       const etat = await retirerAccueil(id)
-      setActif(etat.actif)
-      setAccueils(etat.accueils)
+      appliquerEtat(etat)
     } catch {
       error(t("rep_echec"))
     } finally {
@@ -263,12 +274,61 @@ export function RepondeurReglages() {
     }
   }
 
+  /**
+   * Range un état complet venu du serveur.
+   *
+   * 🔴 IL Y AVAIT SIX ENDROITS QUI LE FAISAIENT À LA MAIN, et le jour où un
+   * champ s'ajoute — celui-ci, justement — il en manque toujours un. L'écran
+   * affichait alors une absence levée comme si elle courait encore.
+   */
+  const appliquerEtat = (etat: EtatRepondeur) => {
+    setActif(etat.actif)
+    setAccueils(etat.accueils)
+    setJusquA(etat.jusquA)
+  }
+
+  /** Durée saisie, ramenée aux bornes du serveur. Rend 0 si elle est vide. */
+  const dureeMinutes = () => {
+    const h = Math.max(0, Math.min(24, Number(heures) || 0))
+    const m = Math.max(0, Math.min(59, Number(minutes) || 0))
+    return Math.min(h * 60 + m, ABSENCE_MAX_MINUTES)
+  }
+
+  const changerAbsence = async (minutesDemandees: number) => {
+    if (occupe) return
+    setOccupe(true)
+    try {
+      appliquerEtat(await poserAbsence(minutesDemandees))
+      if (minutesDemandees > 0) success(t("rep_abs_pose"))
+    } catch {
+      error(t("rep_echec"))
+    } finally {
+      setOccupe(false)
+    }
+  }
+
+  const choisirPourAbsence = async (id: string) => {
+    if (occupe) return
+    setOccupe(true)
+    try {
+      appliquerEtat(await choisirAccueilAbsence(id))
+    } catch {
+      error(t("rep_echec"))
+    } finally {
+      setOccupe(false)
+    }
+  }
+
+  /** « 14 h 30 » — une heure de fin se vérifie sur une horloge, pas un décompte. */
+  const heureFin = (iso: string) =>
+    new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+
   const basculer = async (valeur: boolean) => {
     // L'interrupteur bascule sous le doigt ; le serveur corrige s'il refuse.
     setActif(valeur)
     try {
       const etat = await activerRepondeur(valeur)
-      setActif(etat.actif)
+      appliquerEtat(etat)
     } catch {
       setActif(!valeur)
       error(t("rep_echec"))
@@ -280,8 +340,7 @@ export function RepondeurReglages() {
     setOccupe(true)
     try {
       const etat = await choisirAccueil(id)
-      setActif(etat.actif)
-      setAccueils(etat.accueils)
+      appliquerEtat(etat)
     } catch {
       error(t("rep_echec"))
     } finally {
@@ -319,6 +378,38 @@ export function RepondeurReglages() {
         .rep-btn-ghost:hover:not(:disabled) {
           color: var(--accent); border-color: var(--accent-border);
         }
+        .rep-abs {
+          margin-bottom: 16px; padding: 13px 14px; border-radius: 12px;
+          border: 1px solid var(--border-subtle); background: var(--bg-elevated);
+        }
+        .rep-abs-titre { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+        .rep-abs-sub { font-size: 12px; color: var(--text-muted); margin: 2px 0 11px; }
+        .rep-abs-duree {
+          font-size: 11px; font-weight: 700; letter-spacing: .06em;
+          text-transform: uppercase; color: var(--text-muted); margin-bottom: 7px;
+        }
+        .rep-abs-champs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .rep-abs-champ {
+          display: flex; align-items: center; gap: 5px;
+          padding: 6px 11px; border-radius: 9px;
+          border: 1px solid var(--border-subtle); background: var(--bg-surface);
+        }
+        .rep-abs-champ input {
+          width: 46px; border: none; background: transparent; outline: none;
+          color: var(--text-primary); font-family: 'DM Sans', sans-serif;
+          font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
+        }
+        .rep-abs-champ span { font-size: 12px; color: var(--text-muted); }
+        .rep-abs-bornes { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; }
+        .rep-abs-actif {
+          display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        }
+        .rep-abs-pt {
+          width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+          background: var(--accent);
+        }
+        .rep-abs-txt { flex: 1; min-width: 140px; font-size: 13px; color: var(--text-primary); }
+        .rep-abs-txt span { display: block; font-size: 11.5px; color: var(--text-muted); }
         /* Sur un telephone, les boutons prennent la ligne entiere plutot que de
            se serrer a deux ou trois par rangee, ou aucun n'est atteignable au
            pouce. */
@@ -356,6 +447,76 @@ export function RepondeurReglages() {
           />
         </button>
       </div>
+
+      {/* ── L'absence ────────────────────────────────────────────────────
+          Ne paraît que si le répondeur est allumé : proposer de s'absenter
+          quand personne ne répondrait à votre place n'a pas de sens. */}
+      {actif && (
+        <div className="rep-abs">
+          <div className="rep-abs-titre">{t("rep_abs_titre")}</div>
+          <div className="rep-abs-sub">{t("rep_abs_sub")}</div>
+
+          {jusquA ? (
+            <div className="rep-abs-actif">
+              <span className="rep-abs-pt" aria-hidden />
+              <span className="rep-abs-txt">
+                <b>{t("rep_abs_jusqua", { h: heureFin(jusquA) })}</b>
+                <span>{t("rep_abs_avert")}</span>
+              </span>
+              <button
+                className="rep-btn rep-btn-ghost"
+                disabled={occupe}
+                onClick={() => void changerAbsence(0)}
+              >
+                {t("rep_abs_arreter")}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="rep-abs-duree">{t("rep_abs_duree")}</div>
+              <div className="rep-abs-champs">
+                {/* Deux champs plutôt qu'une liste de durées toutes faites :
+                    « une heure quarante » ne se choisit dans aucune liste, et
+                    c'est pourtant une vraie durée de réunion. */}
+                <label className="rep-abs-champ">
+                  <input
+                    id="rep-abs-h"
+                    type="number"
+                    min={0}
+                    max={24}
+                    inputMode="numeric"
+                    value={heures}
+                    onChange={(e) => setHeures(e.target.value)}
+                  />
+                  <span>{t("rep_abs_h")}</span>
+                </label>
+                <label className="rep-abs-champ">
+                  <input
+                    id="rep-abs-min"
+                    type="number"
+                    min={0}
+                    max={59}
+                    inputMode="numeric"
+                    value={minutes}
+                    onChange={(e) => setMinutes(e.target.value)}
+                  />
+                  <span>{t("rep_abs_min")}</span>
+                </label>
+                <button
+                  className="rep-btn"
+                  // Une durée nulle n'est pas une absence : le bouton reste
+                  // inerte plutôt que d'envoyer un ordre qui ne fait rien.
+                  disabled={occupe || dureeMinutes() === 0}
+                  onClick={() => void changerAbsence(dureeMinutes())}
+                >
+                  {t("rep_abs_poser")}
+                </button>
+              </div>
+              <div className="rep-abs-bornes">{t("rep_abs_bornes")}</div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── L'accueil en place ───────────────────────────────────────────── */}
       {phase.nom === "repos" && (
@@ -410,6 +571,21 @@ export function RepondeurReglages() {
                         >
                           {entree.libelle || t("rep_sans_nom")}
                         </span>
+                        {entree.absence === 1 && (
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              border: "1px solid var(--accent-border, var(--accent))",
+                              color: "var(--accent)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {t("rep_abs_badge")}
+                          </span>
+                        )}
                         {estActif && (
                           <span
                             style={{
@@ -435,6 +611,18 @@ export function RepondeurReglages() {
                             disabled={occupe}
                           >
                             {t("rep_choisir")}
+                          </button>
+                        )}
+                        {/* Le même accueil peut servir dans les deux cas : le
+                            bouton ne disparaît que s'il est DÉJÀ celui de
+                            l'absence, pas parce qu'il est l'accueil courant. */}
+                        {entree.absence !== 1 && (
+                          <button
+                            className="rep-btn rep-btn-ghost"
+                            onClick={() => void choisirPourAbsence(entree.id)}
+                            disabled={occupe}
+                          >
+                            {t("rep_abs_choisir")}
                           </button>
                         )}
                         <button

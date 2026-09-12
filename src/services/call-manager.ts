@@ -228,7 +228,15 @@ export interface CallManagerState {
    * parler. Les deux besoins sont contradictoires tant qu'on ne sépare pas la
    * fin de l'APPEL de la fin de l'ÉCRAN.
    */
-  repondeur: { callId: string; accueilUrl: string; nom: string } | null
+  repondeur: {
+    callId: string
+    accueilUrl: string
+    nom: string
+    /** Vrai quand l'accueil répond À LA PLACE de la sonnerie (mode absence). */
+    absence: boolean
+    /** Type de l'appel : un appel vidéo se répond en vidéo. */
+    type: "audio" | "video"
+  } | null
   isGroup: boolean
   isInitiator: boolean
   /** userId -> nom affichable des participants connus. */
@@ -914,6 +922,69 @@ function startOutgoingRingtone() {
   })
 }
 
+/* ----------------- L'accueil du repondeur ----------------- */
+
+/**
+ * L'ELEMENT QUI JOUERA L'ACCUEIL, DEBLOQUE A L'AVANCE.
+ *
+ * 🐛 « L'ACCUEIL NE SE LIT PAS TOUT SEUL, IL FAUT APPUYER SUR UN BOUTON. »
+ *
+ * Le navigateur refuse de jouer un son sans geste recent de l'utilisateur. En
+ * mode par defaut, l'accueil part TRENTE SECONDES apres le dernier geste : un
+ * element audio cree a cet instant-la est refuse, et l'echec est silencieux.
+ *
+ * On ne peut pas creer l'element au bon moment. On le cree donc AU DEPART DE
+ * L'APPEL — c'est-a-dire dans la foulee du clic sur « appeler » — et on le fait
+ * jouer aussitot un silence de quarante-quatre octets. Cette lecture-la, elle,
+ * est autorisee : elle suit le geste. L'element garde ensuite sa permission, et
+ * lui changer sa source trente secondes plus tard ne la redemande pas.
+ *
+ * ⚠️ UN ELEMENT A PART, ET NON CELUI DE LA TONALITE. Celui de la tonalite est
+ * recree des que le choix de sonnerie change, et il porte sa source dans un
+ * `dataset` que le prochain appel relit : lui emprunter sa source ferait jouer
+ * l'accueil EN GUISE DE SONNERIE a l'appel suivant.
+ */
+let accueilAudio: HTMLAudioElement | null = null
+
+/** Un WAV valide de durée nulle — de quoi obtenir la permission, et rien d'autre. */
+const SILENCE =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
+
+/** Prend la permission de jouer, pendant qu'un geste vient d'avoir lieu. */
+function amorcerAccueil(): void {
+  if (typeof window === "undefined") return
+  if (!accueilAudio) accueilAudio = new Audio()
+  accueilAudio.src = SILENCE
+  void accueilAudio
+    .play()
+    .then(() => accueilAudio?.pause())
+    .catch(() => undefined)
+}
+
+/**
+ * Joue l'accueil du répondeur. Rend `false` si le navigateur a refusé.
+ *
+ * ⚠️ LE REFUS EST RENDU, PAS AVALÉ : c'est lui qui fait dire à l'écran que
+ * l'accueil n'a pas pu être lu, au lieu d'annoncer « Message d'accueil… »
+ * devant un haut-parleur muet.
+ */
+export async function jouerAccueil(url: string): Promise<boolean> {
+  if (typeof window === "undefined") return false
+  if (!accueilAudio) accueilAudio = new Audio()
+  accueilAudio.src = url
+  try {
+    await accueilAudio.play()
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Coupe l'accueil — on clique « enregistrer », il ne doit plus parler dessus. */
+export function arreterAccueil(): void {
+  accueilAudio?.pause()
+}
+
 function stopOutgoingRingtone() {
   if (outgoingRingtoneAudio) {
     outgoingRingtoneAudio.pause()
@@ -1386,7 +1457,13 @@ async function basculerVersRepondeur(callId: string): Promise<void> {
      * `RepondeurRetour` qui refait la navigation — un service ne navigue pas.
      */
     setState({
-      repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url), nom },
+      repondeur: {
+        callId,
+        accueilUrl: resolveMediaUrl(accueil.url),
+        nom,
+        absence: false,
+        type: state.callType,
+      },
       displayMode: "full",
     })
   }
@@ -1966,6 +2043,53 @@ async function handleServerEvent(event: CallServerEvent) {
     return
   }
 
+  /*
+   * MODE ABSENCE — le serveur répond l'accueil À LA PLACE de la sonnerie.
+   *
+   * 🔴 PERSONNE N'A SONNÉ, ET PERSONNE NE SONNERA. Le destinataire a posé une
+   * absence ; le serveur ne lui a pas envoyé l'appel et nous renvoie son message
+   * d'accueil. Il n'y a donc rien à attendre, rien à raccrocher : on passe
+   * directement au répondeur.
+   *
+   * Jumeau exact d'`ivr_menu` juste en dessous — même forme, même raison d'être :
+   * le serveur répond quelque chose au lieu de faire sonner.
+   */
+  if (event.type === "repondeur_direct") {
+    const callId = String(event.callId ?? "")
+    if (!callId || callId !== state.activeCallId) return
+
+    // ⚠️ COUPER LE MINUTEUR DE SONNERIE : armé pour trente secondes d'attente
+    // qui n'auront pas lieu, il raccrocherait en plein milieu de l'accueil.
+    if (ringTimeoutId) {
+      clearTimeout(ringTimeoutId)
+      ringTimeoutId = null
+    }
+    // Le bip d'attente n'a plus lieu d'être : personne ne sonne.
+    stopOutgoingRingtone()
+    // Ce chemin-ci a déjà servi le répondeur : le minuteur, s'il repartait,
+    // n'aurait plus rien à faire.
+    repondeurTente = callId
+
+    const accueil = (event.accueil ?? null) as { url?: string } | null
+    if (!accueil?.url) {
+      // Sans accueil il n'y a rien à jouer ni à proposer. On termine l'appel
+      // comme un appel manqué ordinaire plutôt que d'ouvrir une feuille vide.
+      void hangUp()
+      return
+    }
+    setState({
+      repondeur: {
+        callId,
+        accueilUrl: resolveMediaUrl(accueil.url),
+        nom: String(event.peerName ?? state.peerName ?? tr("call")),
+        absence: true,
+        type: event.callType === "VIDEO" ? "video" : "audio",
+      },
+      displayMode: "full",
+    })
+    return
+  }
+
   if (event.type === "ivr_menu") {
     // Le serveur repond « voici le menu » au lieu de faire sonner : ce numero
     // etait un centre d'appels. Le client ne l'avait pas demande et n'a aucun
@@ -2434,6 +2558,9 @@ export async function startOutgoingCall(
 
   // Nouvel appel, nouvelle chance : le verrou ne vaut que pour l'appel passe.
   repondeurTente = null
+  // Le geste vient d'avoir lieu : c'est MAINTENANT que l'accueil prend sa
+  // permission de jouer, pas dans trente secondes quand il en aura besoin.
+  amorcerAccueil()
 
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {
@@ -2523,6 +2650,9 @@ export async function startCallbackCall(
 
   // Nouvel appel, nouvelle chance : le verrou ne vaut que pour l'appel passe.
   repondeurTente = null
+  // Le geste vient d'avoir lieu : c'est MAINTENANT que l'accueil prend sa
+  // permission de jouer, pas dans trente secondes quand il en aura besoin.
+  amorcerAccueil()
 
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {

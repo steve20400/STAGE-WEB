@@ -32,14 +32,33 @@ export interface Accueil {
   id: string
   libelle: string | null
   actif: number
+  /** 1 = c'est celui qu'on entend pendant une absence. Au plus un par compte. */
+  absence?: number
   createdAt: string
   media: AccueilRepondeur
 }
 
 export interface EtatRepondeur {
   actif: boolean
+  /**
+   * Fin du mode absence, ou `null`.
+   *
+   * ⚠️ LE SERVEUR NE LA REND QUE SI ELLE EST ENCORE DEVANT NOUS : une date
+   * passée n'est pas une absence, et l'écran afficherait « actif jusqu'à 9 h »
+   * à midi. Le client n'a donc aucune comparaison à refaire.
+   */
+  jusquA: string | null
   accueils: Accueil[]
 }
+
+/**
+ * Durée maximale d'une absence, en minutes — la même que celle du serveur.
+ *
+ * ⚠️ SI TU LA CHANGES ICI, CHANGE-LA LÀ-BAS (`ABSENCE_MAX_MINUTES`). Deux bornes
+ * inégales font mentir l'une des deux : l'écran accepterait ce que la route
+ * refuse, et le refus arriverait après coup sans rien expliquer.
+ */
+export const ABSENCE_MAX_MINUTES = 24 * 60
 
 /**
  * Met la réponse du serveur à la forme attendue, quelle que soit sa version.
@@ -58,16 +77,22 @@ export interface EtatRepondeur {
 function normaliser(brut: unknown): EtatRepondeur {
   const r = (brut ?? {}) as {
     actif?: unknown
+    jusquA?: unknown
     accueils?: Accueil[]
     accueil?: AccueilRepondeur | null
   }
   if (Array.isArray(r.accueils)) {
-    return { actif: r.actif === true, accueils: r.accueils }
+    return {
+      actif: r.actif === true,
+      jusquA: typeof r.jusquA === "string" ? r.jusquA : null,
+      accueils: r.accueils,
+    }
   }
   // Forme ancienne : un seul accueil, qui était forcément l'actif.
   if (r.accueil) {
     return {
       actif: r.actif === true,
+      jusquA: null,
       accueils: [
         {
           id: r.accueil.id,
@@ -79,7 +104,7 @@ function normaliser(brut: unknown): EtatRepondeur {
       ],
     }
   }
-  return { actif: r.actif === true, accueils: [] }
+  return { actif: r.actif === true, jusquA: null, accueils: [] }
 }
 
 /** Mon répondeur : l'interrupteur, et tous mes accueils. */
@@ -133,6 +158,32 @@ export async function choisirAccueil(id: string): Promise<EtatRepondeur> {
   return normaliser(
     await apiRequest<unknown>(`/api/repondeur?actif=${encodeURIComponent(id)}`, {
       method: "POST",
+    }),
+  )
+}
+
+/** Désigne l'accueil que les appelants entendront PENDANT UNE ABSENCE. */
+export async function choisirAccueilAbsence(id: string): Promise<EtatRepondeur> {
+  return normaliser(
+    await apiRequest<unknown>(`/api/repondeur?absence=${encodeURIComponent(id)}`, {
+      method: "POST",
+    }),
+  )
+}
+
+/**
+ * Pose une absence de `minutes`, ou la lève avec `0`.
+ *
+ * ⚠️ ON ENVOIE UNE DURÉE, LE SERVEUR RANGE UNE DATE. C'est lui qui doit fixer
+ * l'instant de fin : l'horloge d'un navigateur peut avoir des minutes d'écart,
+ * et une absence posée « jusqu'à 15 h 00 » selon un poste mal réglé s'arrêterait
+ * au mauvais moment pour tous ceux qui appellent.
+ */
+export async function poserAbsence(minutes: number): Promise<EtatRepondeur> {
+  return normaliser(
+    await apiRequest<unknown>("/api/repondeur", {
+      method: "POST",
+      body: { absenceMinutes: Math.round(minutes) },
     }),
   )
 }
