@@ -1333,15 +1333,38 @@ let salleAEteHabitee = false
  * appel déjà manqué d'une étape qui n'apprend rien.
  */
 async function basculerVersRepondeur(callId: string): Promise<void> {
+  if (repondeurTente === callId) return
+  repondeurTente = callId
+
+  /*
+   * ⚠️ LE NOM EST LU MAINTENANT, avant toute attente : `hangUp` remet l'état à
+   * neuf, et la feuille du répondeur porte le nom de la personne appelée.
+   */
+  const nom = state.peerName
+
   let accueil: { url: string } | null = null
   try {
     accueil = await accueilDeLAppel(callId)
   } catch {
     // Réseau ou serveur muet : on raccroche simplement, comme avant.
   }
-  // L'appel a pu être décroché ou raccroché pendant cette requête : on ne
-  // s'impose pas dans un appel qui a repris vie.
-  if (state.activeCallId !== callId || state.role !== "outgoing") return
+
+  /*
+   * 🐛 ON ABANDONNAIT DÈS QUE L'APPEL N'ÉTAIT PLUS « LE NÔTRE », et c'est ce qui
+   * faisait que le répondeur ne paraissait PARFOIS PAS.
+   *
+   * Le serveur coupe lui aussi les appels sans réponse — même seuil de 30 s,
+   * balayé toutes les 10 s. Il lui arrive donc de terminer l'appel pendant que
+   * l'on demande l'accueil, et l'état local était alors déjà nettoyé :
+   * `activeCallId` valait `null`, la condition tombait, et l'on repartait sans
+   * rien dire. Le répondeur se perdait pour une poignée de millisecondes.
+   *
+   * ⚠️ RIEN N'EST PERDU À NE PLUS VÉRIFIER : c'est le SERVEUR qui décide, et il
+   * refuse déjà de servir l'accueil d'un appel qui a été décroché. Le seul cas
+   * qui reste à écarter est un AUTRE appel entre-temps — on ne pose pas une
+   * feuille de répondeur par-dessus une conversation en cours.
+   */
+  if (state.activeCallId !== null && state.activeCallId !== callId) return
 
   if (accueil) {
     /*
@@ -1363,11 +1386,13 @@ async function basculerVersRepondeur(callId: string): Promise<void> {
      * `RepondeurRetour` qui refait la navigation — un service ne navigue pas.
      */
     setState({
-      repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url), nom: state.peerName },
+      repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url), nom },
       displayMode: "full",
     })
   }
-  await hangUp()
+  // L'appel peut avoir déjà été terminé par le serveur pendant la requête :
+  // raccrocher à vide enverrait un second « fin d'appel » pour rien.
+  if (state.activeCallId === callId) await hangUp()
 }
 
 /** Ferme l'écran du répondeur sans rien envoyer. */
@@ -1416,6 +1441,15 @@ const signalBuffer = new Map<string, Map<string, WebrtcSignal[]>>()
 let localStream: MediaStream | null = null
 let iceServersCache: RTCIceServer[] | null = null
 let ringTimeoutId: ReturnType<typeof setTimeout> | null = null
+/**
+ * Appel pour lequel le répondeur a déjà été tenté.
+ *
+ * ⚠️ DEUX CHEMINS Y MÈNENT — notre minuteur de sonnerie, et la fin d'appel
+ * annoncée par le serveur — et ils se déclenchent à quelques millisecondes
+ * l'un de l'autre. Sans ce verrou, on demanderait deux fois l'accueil et l'on
+ * ouvrirait deux fois la feuille.
+ */
+let repondeurTente: string | null = null
 let eventsUnsubscribe: (() => void) | null = null
 
 function myUserId(): string | null {
@@ -2269,8 +2303,24 @@ async function handleServerEvent(event: CallServerEvent) {
         callId === state.incoming?.callId ||
         (state.activeCallId === null && state.role !== null)
       if (isOurCall) {
+        /*
+         * 🔴 LE RÉPONDEUR PEUT ARRIVER PAR ICI, et pas seulement par notre
+         * minuteur de sonnerie. Le serveur coupe les appels sans réponse au même
+         * seuil que nous, et gagne parfois la course : l'écran se fermait alors
+         * sans que rien ne soit proposé, une fois sur plusieurs et sans raison
+         * visible. C'est le défaut « des fois ça ne s'affiche pas ».
+         *
+         * ⚠️ « ended » SEULEMENT, JAMAIS « rejected ». Refuser un appel est un
+         * geste délibéré : proposer d'y laisser un message le contredirait.
+         *
+         * ⚠️ ET SEULEMENT SI ÇA SONNAIT ENCORE (`role === "outgoing"`) : une
+         * conversation qui a eu lieu n'appelle aucun répondeur.
+         */
+        const sansReponse =
+          callState === "ended" && state.role === "outgoing" && callId === state.activeCallId
         signalBuffer.delete(callId)
         clearCall(true)
+        if (sansReponse) void basculerVersRepondeur(callId)
       }
     }
   }
@@ -2382,6 +2432,9 @@ export async function startOutgoingCall(
 
   void backfillPeerAvatar(started.id, convId)
 
+  // Nouvel appel, nouvelle chance : le verrou ne vaut que pour l'appel passe.
+  repondeurTente = null
+
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {
       // Le répondeur remplace le raccrochage sec — et raccroche lui-même.
@@ -2467,6 +2520,9 @@ export async function startCallbackCall(
   })
 
   void backfillPeerAvatar(started.id, started.convId)
+
+  // Nouvel appel, nouvelle chance : le verrou ne vaut que pour l'appel passe.
+  repondeurTente = null
 
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {

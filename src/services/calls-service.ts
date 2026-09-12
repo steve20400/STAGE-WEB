@@ -1,9 +1,5 @@
 import { apiRequest } from "../lib/api-client"
-import {
-  cacheCallLog,
-  loadCachedCallLogs,
-  loadCachedCallLogsForConversation,
-} from "./indexeddb-cache"
+import { cacheCallLog, loadCachedCallLogs } from "./indexeddb-cache"
 import { createPrivateChat } from "./chats-service"
 import { loadContacts } from "../data/contacts"
 import { normalizePhoneNumber } from "../data/session-user"
@@ -232,10 +228,20 @@ export async function fetchCallsForConversation(convId: string): Promise<CallRec
     void memoriserAppels(tous)
     return tous.filter((call) => call.convId === convId)
   } catch {
-    // Le filtre porte quand meme : l'index rend deja la seule conversation
-    // demandee, mais une ligne ecrite avant l'ajout du champ n'en sortirait pas.
+    /*
+     * ⚠️ ON RELIT TOUT, ET ON FILTRE ICI — au lieu d'interroger l'index par
+     * conversation, qui serait pourtant plus direct.
+     *
+     * Deux raisons, et chacune suffit. Les lignes ecrites AVANT ce changement
+     * n'ont pas de champ `conversationId` : l'index ne les rendrait jamais, et
+     * l'historique d'un ancien utilisateur resterait vide hors ligne sans que
+     * rien ne l'explique. Et un magasin cree par une version anterieure peut
+     * ne pas porter l'index du tout — la demande leverait alors, pour finir en
+     * liste vide. Un historique d'appels tient en quelques centaines de lignes :
+     * les lire toutes ne coute rien face a ces deux pieges.
+     */
     try {
-      return relireAppels(await loadCachedCallLogsForConversation(convId))
+      return relireAppels(await loadCachedCallLogs()).filter((call) => call.convId === convId)
     } catch {
       return []
     }
