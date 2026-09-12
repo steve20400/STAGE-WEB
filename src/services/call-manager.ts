@@ -1345,24 +1345,26 @@ async function basculerVersRepondeur(callId: string): Promise<void> {
 
   if (accueil) {
     /*
-     * 🐛 LA FENETRE REDUITE CACHAIT LE REPONDEUR.
+     * 🔴 LE REPONDEUR VIT DANS L'ECRAN D'APPEL, ET RAMENE A LUI.
      *
      * Quand on ecrit pendant un appel, la fenetre se reduit en vignette. Si la
-     * sonnerie expirait a ce moment-la, le repondeur prenait bien la main — mais
-     * dans une fenetre de deux centimetres, ou il n'y avait la place ni pour la
-     * barre ni pour ses boutons. L'utilisateur ne voyait donc RIEN.
+     * sonnerie expire a ce moment-la, il n'y a dans cette vignette la place ni
+     * pour la barre ni pour ses boutons — et un panneau flottant pose sur la
+     * discussion, essaye avant celui-ci, ne ressemblait a rien : on ne savait
+     * plus qu'on etait dans un appel.
      *
-     * 🔴 LA PREMIERE CORRECTION FORCAIT LE PLEIN ECRAN, ET C'ETAIT PIRE.
+     * C'est donc l'ECRAN D'APPEL qui revient, et le repondeur s'affiche dedans.
+     * C'est la seule fois ou l'application s'autorise a agrandir sa fenetre sans
+     * qu'on le lui demande, et c'est justifie : il y a quelque chose a FAIRE —
+     * ecouter, puis parler — et une vignette ne le permet pas.
      *
-     * On reduit la fenetre POUR ECRIRE. Rouvrir l'ecran d'appel par-dessus
-     * arrachait l'utilisateur a la discussion qu'il etait en train de taper, au
-     * milieu d'une phrase, sans qu'il ait rien demande — et son brouillon
-     * disparaissait de sa vue. Le repondeur est desormais monte au niveau de
-     * l'application : il parait la ou l'on est, et la fenetre reste comme elle
-     * etait. On garde sa place, et on ecoute.
+     * ⚠️ `displayMode` NE SUFFIT PAS A REVENIR : le mode dit comment l'appel
+     * s'affiche, pas ou l'on se trouve. Si l'on a quitte l'ecran d'appel, c'est
+     * `RepondeurRetour` qui refait la navigation — un service ne navigue pas.
      */
     setState({
       repondeur: { callId, accueilUrl: resolveMediaUrl(accueil.url), nom: state.peerName },
+      displayMode: "full",
     })
   }
   await hangUp()

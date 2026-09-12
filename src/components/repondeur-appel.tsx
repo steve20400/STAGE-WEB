@@ -40,17 +40,21 @@ export function RepondeurAppel({
   onFermer: () => void
 }) {
   const { t } = useTranslation()
-  const { success, error } = useToast()
+  const { error } = useToast()
 
   const [etape, setEtape] = useState<Etape>("accueil")
   const [secondes, setSecondes] = useState(0)
   /**
    * L'accueil joue-t-il vraiment ?
    *
-   * 🔴 LE NAVIGATEUR PEUT REFUSER DE JOUER SANS GESTE RECENT, et il le fait en
-   * silence : la promesse de `play()` est simplement rejetee. On lisait alors
-   * « Message d'accueil… » devant un haut-parleur muet, sans rien pour y
-   * remedier. Un bouton parait donc des que la lecture n'a pas demarre.
+   * 🔴 ON NE PROPOSE PAS D'ECOUTER L'ACCUEIL — il se joue tout seul, comme sur
+   * un vrai repondeur. Ce qu'on propose, c'est d'enregistrer un message.
+   *
+   * ⚠️ MAIS UN ECHEC NE DOIT PAS ETRE MUET. Le navigateur peut refuser de jouer
+   * sans geste recent, et il le fait en silence : la promesse de `play()` est
+   * simplement rejetee. On lisait alors « Message d'accueil… » devant un
+   * haut-parleur muet. La ligne d'etat le dit maintenant, sans rien proposer de
+   * plus : il reste possible de parler sans avoir entendu l'accueil.
    */
   const [lectureBloquee, setLectureBloquee] = useState(false)
 
@@ -112,14 +116,6 @@ export function RepondeurAppel({
       son.pause()
     }
   }, [accueilUrl])
-
-  /** Relance la lecture, cette fois depuis un vrai clic. */
-  const ecouter = () => {
-    audio.current?.play().then(
-      () => setLectureBloquee(false),
-      () => error(t("rep_lecture_impossible")),
-    )
-  }
 
   /**
    * Démarre l'enregistrement.
@@ -185,7 +181,8 @@ export function RepondeurAppel({
     try {
       await deposerMessagerie(callId, blob, dureeFinale.current * 1000)
       setEtape("fini")
-      success(t("rep_depose"))
+      // Pas de notification : le panneau affiche « Message déposé » puis se
+      // ferme. Un bandeau par-dessus pour redire la même chose n'ajoutait rien.
       window.setTimeout(onFermer, 1200)
     } catch {
       error(t("rep_depot_echec"))
@@ -209,7 +206,8 @@ export function RepondeurAppel({
               l'on s'apprête à parler. */}
           <div className="rep-titre">{t("rep_barre_titre", { nom })}</div>
           <div className="rep-etat">
-            {etape === "accueil" && t("rep_lecture_accueil")}
+            {etape === "accueil" &&
+              (lectureBloquee ? t("rep_lecture_impossible") : t("rep_lecture_accueil"))}
             {etape === "enregistre" && (
               <span style={{ fontVariantNumeric: "tabular-nums" }}>
                 <span className="rep-point" aria-hidden /> {mmss(secondes)} /{" "}
@@ -227,13 +225,6 @@ export function RepondeurAppel({
           <button className="rep-btn-p" onClick={() => void enregistrer()}>
             ● {t("rep_enregistrer_message")}
           </button>
-          {/* Ne paraît que si la lecture n'a pas démarré : proposer « écouter »
-              pendant que le son passe déjà serait proposer ce qui se fait. */}
-          {lectureBloquee && (
-            <button className="rep-btn-s" onClick={ecouter}>
-              ▶ {t("rep_ecouter")}
-            </button>
-          )}
           <button className="rep-btn-s" onClick={onFermer}>
             {t("rep_quitter")}
           </button>

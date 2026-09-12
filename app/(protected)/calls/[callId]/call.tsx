@@ -154,12 +154,17 @@ export default function CallRoomPage() {
     }
   }, [callState])
 
-  // Appel termine (par nous ou a distance) : petit ecran de fin puis retour.
-  //
-  // Le repondeur, lui, vit au niveau de l'application (`RepondeurFlottant`) :
-  // cet ecran peut donc se fermer normalement, meme quand il a la main.
+  /*
+   * Appel termine (par nous ou a distance) : petit ecran de fin puis retour.
+   *
+   * 🔴 SAUF QUAND LE REPONDEUR A LA MAIN. L'appel est fini — il devait l'etre,
+   * sans quoi le telephone d'en face sonnerait pendant qu'on dicte — mais
+   * l'ECRAN, lui, doit rester : c'est la-dedans qu'on ecoute l'accueil et qu'on
+   * enregistre. Sans cette garde, il se fermait au bout d'une seconde et demie,
+   * avant meme qu'on ait vu ce qu'on nous proposait.
+   */
   useEffect(() => {
-    if (callState !== "ended") return
+    if (callState !== "ended" || call.repondeur) return
     leaveTimerRef.current = window.setTimeout(() => {
       acknowledgeCallEnded()
       // `replace` : l'ecran d'appel disparait de l'historique. Sans cela, le
@@ -170,7 +175,7 @@ export default function CallRoomPage() {
     return () => {
       if (leaveTimerRef.current !== null) window.clearTimeout(leaveTimerRef.current)
     }
-  }, [callState, navigate, returnTo])
+  }, [callState, call.repondeur, navigate, returnTo])
 
   /**
    * Changer de camera echange la piste DANS le meme MediaStream : ni la
@@ -855,7 +860,22 @@ export default function CallRoomPage() {
           </div>
         </div>
 
-        {callState === "ended" && (
+        {/* ⚠️ « Appel termine » S'EFFACE DEVANT LE REPONDEUR, au lieu de se
+            superposer a lui : les deux se sont deja retrouves a l'ecran en meme
+            temps, et l'on lisait « Appel termine » deux fois. Ici, l'un exclut
+            l'autre par construction. */}
+        {call.repondeur && (
+          <div className="repondeur-overlay">
+            <RepondeurAppel
+              callId={call.repondeur.callId}
+              accueilUrl={call.repondeur.accueilUrl}
+              nom={call.repondeur.nom}
+              onFermer={quitterRepondeur}
+            />
+          </div>
+        )}
+
+        {callState === "ended" && !call.repondeur && (
           <div className="ended-overlay">
             <div className="ended-icon">
               <svg

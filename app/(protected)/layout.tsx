@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../src/components/auth-provider"
 import { ThemeToggle } from "../../src/components/theme-toggle"
 import { ActiveCallFloating } from "../../src/components/active-call-floating"
-import { RepondeurFlottant } from "../../src/components/repondeur-flottant"
+import { RepondeurRetour } from "../../src/components/repondeur-retour"
 import { PseudoAppareilGate } from "../../src/components/pseudo-appareil-gate"
 import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
@@ -546,19 +546,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           session, et la demande y serait sautee. */}
       <PseudoAppareilGate />
       <ActiveCallFloating />
-      {/* 🔴 LE REPONDEUR EST MONTE ICI, ET NON DANS L'ECRAN D'APPEL.
-
-          Il y vivait, et deux defauts en decoulaient. Fenetre reduite pendant
-          qu'on ecrivait : l'ecran d'appel n'etait plus affiche, donc le
-          repondeur n'apparaissait nulle part et l'appel se terminait en
-          silence. Et quand il s'affichait, le panneau de fin d'appel se
-          superposait a lui.
-
-          Il n'a pourtant besoin de rien de tout cela : jouer un son, et
-          enregistrer. Monte au niveau de l'application, il paraît ou que l'on
-          soit — dans une discussion, dans les reglages, sur la liste des
-          appels. */}
-      <RepondeurFlottant />
+      {/* Le repondeur s'affiche DANS l'ecran d'appel. Ce composant-ci ne
+          dessine rien : il y ramene quand on l'avait quitte — fenetre reduite
+          pour ecrire un message, par exemple — car un service ne navigue pas. */}
+      <RepondeurRetour />
       <GlobalIncomingCall />
     </div>
   )
