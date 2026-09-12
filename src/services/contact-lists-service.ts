@@ -33,6 +33,10 @@ interface ListeServeur {
   id: string
   name: string
   ringtone: string | null
+  /** Son des MESSAGES. Absent d'un backend anterieur au 12/09/2026. */
+  ringtoneMessage?: string | null
+  /** Rang de priorite choisi. Absent d'un backend anterieur au 12/09/2026. */
+  ordre?: number | null
   color: string | null
   createdAt: string
   members: MembreServeur[]
@@ -77,6 +81,25 @@ export interface ListeContacts {
    * dependre pour toujours de l'ordre dans lequel la reponse est arrivee.
    */
   creeLe: string
+  /**
+   * Rang dans l'ordre de priorite choisi par l'utilisateur, ou `null` s'il n'a
+   * rien ordonne.
+   *
+   * 🔴 IL PASSE DEVANT `creeLe` DANS L'ARBITRAGE DES SONNERIES, et c'est tout
+   * son objet : l'anciennete n'etait le choix de personne, elle ne se changeait
+   * qu'en supprimant puis recreant une liste.
+   *
+   * ⚠️ `null` N'EST PAS ZERO : zero veut dire « premiere », `null` veut dire
+   * « pas de choix » — l'etat de toutes les listes avant la migration, et celui
+   * que rend un backend qui ne connait pas encore ce champ. On retombe alors sur
+   * l'anciennete, exactement comme avant.
+   */
+  ordre: number | null
+  /**
+   * Son court des MESSAGES venant de cette liste. `sonnerie` reste celui des
+   * APPELS, sous son nom d'origine.
+   */
+  sonnerieMessage: string | null
   membres: MembreListe[]
   /**
    * Liste creee d'office (`bureau`, `amis`, `confiance`, `famille`), ou `null`.
@@ -200,6 +223,11 @@ function depuisServeur(brut: unknown): ListeContacts | null {
     // ordinaire, donc supprimable — le comportement d'avant, exactement.
     cle: typeof brut.cle === "string" && brut.cle !== "" ? brut.cle : null,
     creeLe: typeof brut.createdAt === "string" ? brut.createdAt : "",
+    // Absents d'un backend anterieur : on retombe alors sur l'arbitrage par
+    // anciennete et sur un seul son, soit le comportement d'avant.
+    ordre: typeof brut.ordre === "number" ? brut.ordre : null,
+    sonnerieMessage:
+      typeof brut.ringtoneMessage === "string" ? brut.ringtoneMessage : null,
     membres,
   }
 }
@@ -422,7 +450,28 @@ function instantCreation(creeLe: string): number {
   return Number.isNaN(instant) ? Number.POSITIVE_INFINITY : instant
 }
 
-function parAnciennete(a: ListeContacts, b: ListeContacts): number {
+/**
+ * L'ordre d'arbitrage : le RANG CHOISI d'abord, l'anciennete ensuite.
+ *
+ * 🔴 CE TRI DOIT RESTER ACCORDE AVEC LE SERVEUR ET AVEC LE MOBILE. Les trois
+ * decident quelle sonnerie joue pour quelqu'un qui figure dans plusieurs listes ;
+ * s'ils divergent, le meme appel sonne differemment sur le telephone et sur le
+ * navigateur, et rien a l'ecran n'explique pourquoi. Cote serveur c'est
+ * `ORDRE_LISTES` (`ordre ASC NULLS LAST, createdAt ASC, id ASC`).
+ *
+ * ⚠️ LES NON-ORDONNEES TOMBENT EN DERNIER, jamais en tete. C'est le meme piege
+ * que `NULLS LAST` en SQL : une liste sans rang doit ceder le pas a celles que
+ * l'utilisateur a explicitement placees, pas les devancer.
+ *
+ * Tant que personne n'a rien ordonne — l'etat de tous les comptes avant la
+ * migration — `ordre` vaut `null` partout et le tri se reduit EXACTEMENT a
+ * l'anciennete d'avant.
+ */
+function parPriorite(a: ListeContacts, b: ListeContacts): number {
+  const ra = a.ordre ?? Number.POSITIVE_INFINITY
+  const rb = b.ordre ?? Number.POSITIVE_INFINITY
+  if (ra !== rb) return ra < rb ? -1 : 1
+
   const ia = instantCreation(a.creeLe)
   const ib = instantCreation(b.creeLe)
   if (ia === ib) return 0
@@ -462,7 +511,7 @@ function parAnciennete(a: ListeContacts, b: ListeContacts): number {
 export function sonneriePourAppelant(idAppelant: string): string | null {
   if (!idAppelant) return null
   const cible = idAppelant.toLowerCase()
-  for (const liste of miroirCourant().slice().sort(parAnciennete)) {
+  for (const liste of miroirCourant().slice().sort(parPriorite)) {
     if (!liste.sonnerie) continue
     if (liste.membres.some((membre) => membre.id.toLowerCase() === cible)) return liste.sonnerie
   }
