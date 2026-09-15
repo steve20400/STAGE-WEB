@@ -24,7 +24,7 @@ import {
   importRingtone,
   previewRingtone,
   stopRingtonePreview,
-  RINGTONES,
+  sonneriesPour,
 } from "../../../src/services/ringtones"
 import { nomSonnerie, PALETTE_LISTES } from "./contact-lists-affichage"
 
@@ -206,7 +206,13 @@ export function ContactListModal({
   const [sonnerieInitiale] = useState(liste?.sonnerie ?? null)
   const optionsSonnerie = useMemo(() => {
     const options = [
-      ...RINGTONES.map((entree) => ({ valeur: entree.file, libelle: entree.label })),
+      // ⚠️ LES SONNERIES D'APPEL SEULEMENT : ce champ est la sonnerie de la
+      // liste, celle qui sonne quand quelqu'un appelle. Le catalogue entier y
+      // proposait aussi les sons courts de notification.
+      ...sonneriesPour("appel").map((entree) => ({
+        valeur: entree.file,
+        libelle: entree.label,
+      })),
       ...importees.map((entree) => ({ valeur: entree.url, libelle: entree.label })),
     ]
     if (sonnerieInitiale && !options.some((option) => option.valeur === sonnerieInitiale)) {

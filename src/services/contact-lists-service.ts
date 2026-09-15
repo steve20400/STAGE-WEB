@@ -467,7 +467,7 @@ function instantCreation(creeLe: string): number {
  * migration — `ordre` vaut `null` partout et le tri se reduit EXACTEMENT a
  * l'anciennete d'avant.
  */
-function parPriorite(a: ListeContacts, b: ListeContacts): number {
+export function parPriorite(a: ListeContacts, b: ListeContacts): number {
   const ra = a.ordre ?? Number.POSITIVE_INFINITY
   const rb = b.ordre ?? Number.POSITIVE_INFINITY
   if (ra !== rb) return ra < rb ? -1 : 1

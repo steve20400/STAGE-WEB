@@ -19,6 +19,7 @@ import { listerBlocages } from "../../../src/services/blocked-service"
 import {
   listerListes,
   listesEnCache,
+  parPriorite,
   type ListeContacts,
 } from "../../../src/services/contact-lists-service"
 import { teinteCss } from "../contacts/contact-lists-affichage"
@@ -270,43 +271,30 @@ export default function ChatsPage() {
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /**
-   * LES LISTES QUI MERITENT UN FILTRE — celles avec qui l'on parle vraiment.
+   * TOUTES LES LISTES DU COMPTE, dans l'ordre de priorite choisi.
    *
-   * Toutes les listes s'affichaient, y compris vides. Depuis que quatre listes
-   * existent des le depart, la rangee de filtres s'ouvrait sur quatre boutons
-   * qui ne filtraient RIEN : les presser rendait une liste vide, et ils
-   * poussaient hors de vue les filtres du systeme, qui eux servent.
+   * 🔴 ELLES ETAIENT FILTREES SUR « a-t-elle une conversation en cours ? »,
+   * et une liste vide n'apparaissait pas. La raison etait defendable — quatre
+   * listes existent des la creation du compte, et quatre boutons qui ne filtrent
+   * rien poussaient les filtres systeme hors de vue.
    *
-   * Un filtre n'a de sens que s'il a quelque chose a montrer. Une liste
-   * apparait donc quand au moins un de ses membres a une conversation — et
-   * disparait si cette conversation s'en va.
+   * Le user a tranche l'inverse le 15/09/2026 : toutes les listes se montrent,
+   * vides comprises, celles creees d'office comprises. Une liste qu'on vient de
+   * creer est vide par construction : la faire disparaitre au moment meme ou on
+   * la cree est ce qui se comprend le moins.
    *
-   * ⚠️ CALCULE SUR LES CORRESPONDANTS, une seule fois, et non liste par liste :
-   * la rangee se recalcule a chaque message recu, et croiser quatre listes avec
-   * deux cents conversations a chaque fois se paierait a l'affichage.
+   * ⚠️ MEME DECISION QUE LE MOBILE, et c'est le point : les deux clients
+   * affichaient deja la meme rangee, ils doivent continuer.
+   *
+   * ⚠️ L'ORDRE EST CELUI DE LA PRIORITE, pas celui du miroir. Le GET rend
+   * deja cet ordre, mais le miroir local n'est pas fait que de reponses du GET —
+   * une creation ajoute en queue. C'est le meme tri que `sonneriePourAppelant`,
+   * donc la rangee et la sonnerie ne peuvent pas se contredire.
    */
-  const listesAvecDiscussion = useMemo(() => {
-    const moi = getMyUserId()
-    const identifiants = new Set<string>()
-    const numeros = new Set<string>()
-    for (const c of conversations) {
-      // Un groupe n'a pas de correspondant : une liste rassemble des personnes,
-      // pas des salons. Meme regle que le filtrage lui-meme.
-      if (c.isGroup) continue
-      const pair = c.membersInfo?.find((m) => m.id !== moi)
-      if (!pair) continue
-      identifiants.add(pair.id.toLowerCase())
-      const numero = (pair.publicNumber ?? "").replace(/\D/g, "")
-      if (numero) numeros.add(numero)
-    }
-    return listes.filter((liste) =>
-      liste.membres.some(
-        (membre) =>
-          identifiants.has(membre.id.toLowerCase()) ||
-          numeros.has(membre.numero.replace(/\D/g, ""))
-      )
-    )
-  }, [listes, conversations])
+  const listesPourFiltres = useMemo(
+    () => listes.slice().sort(parPriorite),
+    [listes]
+  )
 
   /*
    * Le filtre actif suit ce que la rangee AFFICHE.
@@ -317,9 +305,9 @@ export default function ChatsPage() {
    */
   useEffect(() => {
     if (!idListeActive) return
-    if (listesAvecDiscussion.some((liste) => liste.id === idListeActive)) return
+    if (listesPourFiltres.some((liste) => liste.id === idListeActive)) return
     setFilter("all")
-  }, [listesAvecDiscussion, idListeActive])
+  }, [listesPourFiltres, idListeActive])
 
   useEffect(() => {
     let cancelled = false
@@ -553,7 +541,7 @@ export default function ChatsPage() {
 
           {/* Trait de separation : les listes commencent ici. Sans lui, une
               liste nommee « Non lues » se lirait comme un filtre du systeme. */}
-          {listesAvecDiscussion.length > 0 && (
+          {listesPourFiltres.length > 0 && (
             <span
               aria-hidden
               style={{
@@ -567,7 +555,7 @@ export default function ChatsPage() {
             />
           )}
 
-          {listesAvecDiscussion.map((liste) => {
+          {listesPourFiltres.map((liste) => {
             const cible: Filtre = `${PREFIXE_LISTE}${liste.id}`
             return (
               <button

@@ -51,6 +51,8 @@ import {
 import {
   RINGTONES,
   RINGTONE_LABELS,
+  GENRE_PAR_EVENEMENT,
+  sonneriesPour,
   customRingtones,
   importRingtone,
   rafraichirCatalogue,
@@ -363,7 +365,13 @@ function RingtonePicker() {
                 evenement: t(RINGTONE_LABELS[event]).toLowerCase(),
               })}
             >
-              {RINGTONES.map((ringtone) => (
+              {/*
+                ⚠️ FILTRE PAR GENRE. Ce selecteur proposait le catalogue
+                ENTIER pour les trois evenements : « Bip message » comme
+                sonnerie d'appel, et « Sonnerie classique » — qui boucle —
+                a l'arrivee d'un message.
+              */}
+              {sonneriesPour(GENRE_PAR_EVENEMENT[event]).map((ringtone) => (
                 <option key={ringtone.file} value={ringtone.file}>
                   {NOM_SONNERIE[ringtone.file] ? t(NOM_SONNERIE[ringtone.file]) : ringtone.label}
                   {ringtone.note ? ` — ${t(ringtone.note)}` : ""}
