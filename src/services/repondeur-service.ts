@@ -262,3 +262,9 @@ export function refusAccueil(fichier: File): "format" | "taille" | null {
   if (fichier.size > ACCUEIL_MAX_OCTETS) return "taille"
   return null
 }
+
+export interface ProgrammeRepondeur { id: number; jour: number; heureDebut: string; heureFin: string; actif: number; expireLe: string }
+export async function listerProgrammes(): Promise<ProgrammeRepondeur[]> { const r=await apiRequest<{programmes?:ProgrammeRepondeur[]}>("/api/repondeur/programmes"); return r.programmes??[] }
+export async function ajouterProgramme(jour:number,heureDebut:string,heureFin:string):Promise<ProgrammeRepondeur>{ const r=await apiRequest<{programme:ProgrammeRepondeur}>("/api/repondeur/programmes",{method:"POST",body:{jour,heureDebut,heureFin}}); return r.programme }
+export async function supprimerProgramme(id:number):Promise<void>{await apiRequest(`/api/repondeur/programmes/${id}`,{method:"DELETE"})}
+export async function basculerProgramme(id:number,actif:boolean):Promise<void>{await apiRequest(`/api/repondeur/programmes/${id}`,{method:"PATCH",body:{actif}})}

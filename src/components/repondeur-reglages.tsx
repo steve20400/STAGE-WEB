@@ -14,6 +14,11 @@ import {
   retirerAccueil,
   type Accueil,
   type EtatRepondeur,
+  listerProgrammes,
+  ajouterProgramme,
+  supprimerProgramme,
+  basculerProgramme,
+  type ProgrammeRepondeur,
 } from "../services/repondeur-service"
 import { resolveMediaUrl } from "../services/media-service"
 
@@ -216,8 +221,17 @@ export function RepondeurReglages() {
   const [phase, setPhase] = useState<Phase>({ nom: "repos" })
   const [secondes, setSecondes] = useState(0)
   const [occupe, setOccupe] = useState(false)
+  const [programmes, setProgrammes] = useState<ProgrammeRepondeur[]>([])
+  const [jourProgramme, setJourProgramme] = useState(1)
+  const [debutProgramme, setDebutProgramme] = useState("09:00")
+  const [finProgramme, setFinProgramme] = useState("17:00")
 
   const enregistreur = useRef<MediaRecorder | null>(null)
+  useEffect(() => { void listerProgrammes().then(setProgrammes).catch(() => undefined) }, [])
+  const creerProgramme = async () => { try { const p=await ajouterProgramme(jourProgramme,debutProgramme,finProgramme); setProgrammes((x)=>[...x,p]); success("Programmation enregistrée") } catch(err){ error(err instanceof Error ? err.message : "Programmation impossible") } }
+  const retirerProgramme = async (id:number) => { try { await supprimerProgramme(id); setProgrammes((x)=>x.filter((p)=>p.id!==id)) } catch(err){ error(err instanceof Error ? err.message : "Suppression impossible") } }
+  const changerProgramme = async (p:ProgrammeRepondeur) => { try { await basculerProgramme(p.id,!p.actif); setProgrammes((x)=>x.map((q)=>q.id===p.id?{...q,actif:p.actif?0:1}:q)) } catch(err){ error(err instanceof Error ? err.message : "Modification impossible") } }
+
   const morceaux = useRef<Blob[]>([])
   const flux = useRef<MediaStream | null>(null)
   const minuteur = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -672,6 +686,12 @@ export function RepondeurReglages() {
           .rep-btn { flex: 1 1 100%; }
         }
       `}</style>
+      <section className="repondeur-programmes">
+        <h3>Programmation récurrente</h3>
+        <p>Le répondeur s’active chaque semaine dans ce créneau et expire automatiquement après 14 jours.</p>
+        <div className="rep-program-form"><select value={jourProgramme} onChange={(e) => setJourProgramme(Number(e.target.value))}>{["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"].map((j,i)=><option key={j} value={i}>{j}</option>)}</select><input type="time" value={debutProgramme} onChange={(e)=>setDebutProgramme(e.target.value)}/><span>à</span><input type="time" value={finProgramme} onChange={(e)=>setFinProgramme(e.target.value)}/><button className="rep-btn" onClick={()=>void creerProgramme()}>Ajouter</button></div>
+        {programmes.map((p)=><div className="rep-program-row" key={p.id}><span>{["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"][p.jour]} · {p.heureDebut}–{p.heureFin}</span><small>jusqu’au {new Date(p.expireLe).toLocaleDateString("fr-FR")}</small><button className="rep-btn rep-btn-ghost" onClick={()=>void changerProgramme(p)}>{p.actif ? "Actif" : "Inactif"}</button><button className="rep-btn rep-btn-ghost" onClick={()=>void retirerProgramme(p.id)}>Supprimer</button></div>)}
+      </section>
       <div className="s-card-title">{t("rep_titre")}</div>
       <div className="s-hint" style={{ marginTop: 0, marginBottom: 14 }}>
         {t("rep_sub")}
