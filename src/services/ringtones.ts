@@ -10,6 +10,20 @@ import { langueInitiale, traduire, type Cle } from "../i18n"
  */
 export type RingtoneEvent = "incoming" | "outgoing" | "message"
 
+/**
+ * A QUOI SERT UN SON : sonner un appel, ou annoncer un message.
+ *
+ * 🔴 LE CATALOGUE ETAIT UNE SEULE LISTE A PLAT, et tous les selecteurs y
+ * puisaient integralement : « Notification Alanya » et « Bip message » etaient
+ * proposes comme sonnerie d'appel, et « Sonnerie classique » — qui boucle —
+ * comme son de message. Meme defaut que le mobile, corrige le 15/09/2026.
+ *
+ * ⚠️ LE GENRE NE CHANGE RIEN A CE QUI EST STOCKE. La base ne connait que le
+ * nom du fichier : un choix pose avant ce champ continue de se lire et de se
+ * jouer. Le genre ne filtre QUE ce qu'on propose.
+ */
+export type GenreSonnerie = "appel" | "message"
+
 export interface Ringtone {
   /** Nom du fichier dans public/sounds/. */
   file: string
@@ -17,6 +31,8 @@ export interface Ringtone {
   label: string
   /** Precision affichee sous le libelle. */
   note?: Cle
+  /** Le champ auquel ce son est propose. Voir {@link GenreSonnerie}. */
+  genre: GenreSonnerie
 }
 
 /**
@@ -25,11 +41,11 @@ export interface Ringtone {
  * empreinte, donc meme son sur les deux plateformes.
  */
 export const RINGTONES: Ringtone[] = [
-  { file: "incoming_ring.mp3", label: "Sonnerie Alanya", note: "ring_note_mobile" },
-  { file: "outgoing_ring.mp3", label: "Tonalite Alanya", note: "ring_note_mobile" },
-  { file: "notification.mp3", label: "Notification Alanya", note: "ring_note_mobile" },
-  { file: "ringtone.mp3", label: "Sonnerie classique" },
-  { file: "message.mp3", label: "Bip message" },
+  { file: "incoming_ring.mp3", label: "Sonnerie Alanya", note: "ring_note_mobile", genre: "appel" },
+  { file: "outgoing_ring.mp3", label: "Tonalite Alanya", note: "ring_note_mobile", genre: "appel" },
+  { file: "notification.mp3", label: "Notification Alanya", note: "ring_note_mobile", genre: "message" },
+  { file: "ringtone.mp3", label: "Sonnerie classique", genre: "appel" },
+  { file: "message.mp3", label: "Bip message", genre: "message" },
 
   /*
    * LES QUATRE SONNERIES DES LISTES PAR DEFAUT.
@@ -45,10 +61,10 @@ export const RINGTONES: Ringtone[] = [
    * Livrees avec le client, elles pesent 584 Ko une seule fois, sont mises en
    * cache par le navigateur, et n'exigent AUCUNE migration.
    */
-  { file: "liste-bureau.mp3", label: "Bureau" },
-  { file: "liste-amis.mp3", label: "Amis" },
-  { file: "liste-confiance.mp3", label: "Confiance" },
-  { file: "liste-famille.mp3", label: "Famille" },
+  { file: "liste-bureau.mp3", label: "Bureau", genre: "appel" },
+  { file: "liste-amis.mp3", label: "Amis", genre: "appel" },
+  { file: "liste-confiance.mp3", label: "Confiance", genre: "appel" },
+  { file: "liste-famille.mp3", label: "Famille", genre: "appel" },
 ]
 
 /**
@@ -581,4 +597,32 @@ export function stopRingtonePreview() {
   previewAudio.pause()
   previewAudio.currentTime = 0
   previewAudio = null
+}
+
+/**
+ * Les sons proposes pour [genre].
+ *
+ * ⚠️ A UTILISER PARTOUT OU L'ON PROPOSE UN CHOIX, jamais `RINGTONES`
+ * directement : c'est le catalogue complet, offert a tous les champs, qui
+ * melangeait les sons de messages aux sonneries d'appel.
+ *
+ * ⚠️ `isKnownFile` et `nomSonnerie`, elles, continuent de balayer le
+ * catalogue ENTIER — et c'est voulu : elles LISENT une valeur deja stockee. Un
+ * choix pose avant ce champ, ou depuis le mobile, doit rester jouable et
+ * nommable meme s'il ne serait plus propose aujourd'hui.
+ */
+export function sonneriesPour(genre: GenreSonnerie): Ringtone[] {
+  return RINGTONES.filter((entree) => entree.genre === genre)
+}
+
+/**
+ * Le genre attendu par chacun des trois moments sonores.
+ *
+ * L'appel sortant prend des sonneries d'APPEL comme l'entrant : c'est une
+ * tonalite d'attente, pas une annonce.
+ */
+export const GENRE_PAR_EVENEMENT: Record<RingtoneEvent, GenreSonnerie> = {
+  incoming: "appel",
+  outgoing: "appel",
+  message: "message",
 }

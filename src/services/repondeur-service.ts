@@ -262,3 +262,66 @@ export function refusAccueil(fichier: File): "format" | "taille" | null {
   if (fichier.size > ACCUEIL_MAX_OCTETS) return "taille"
   return null
 }
+
+
+/* ══════════════════ LES PLAGES PROGRAMMÉES ══════════════════ */
+
+/**
+ * Une plage : un jour, une heure de début, une heure de fin.
+ *
+ * ⚠️ LES HEURES SONT DES MINUTES DEPUIS MINUIT, et non « 10:00 ». Une chaîne
+ * se compare par ordre alphabétique — « 9:30 » y passe APRÈS « 10:00 » — et
+ * deux formats finissent toujours par cohabiter. Un entier se compare comme un
+ * entier.
+ */
+export interface PlageRepondeur {
+  id: string
+  /** 0 = dimanche … 6 = samedi, la convention de `Date.getDay()`. */
+  jour: number
+  debutMin: number
+  finMin: number
+  fuseau: string
+  accueilId: string | null
+  createdAt: string
+  /** Fin de validité — deux semaines après la pose. */
+  expireLe: string
+}
+
+/** Une plage a-t-elle cessé de s'appliquer ? */
+export function plageExpiree(plage: PlageRepondeur): boolean {
+  return new Date(plage.expireLe).getTime() <= Date.now()
+}
+
+export async function listerPlages(): Promise<PlageRepondeur[]> {
+  const r = await apiRequest<{ plages?: PlageRepondeur[] }>("/api/repondeur/plages", {
+    cache: "no-store",
+  })
+  return r.plages ?? []
+}
+
+/**
+ * Pose une ou plusieurs plages d'un coup.
+ *
+ * ⚠️ LE FUSEAU PART D'ICI, et c'est le seul endroit qui le connaisse : le
+ * serveur ne peut que deviner le sien, qui n'est presque jamais celui de
+ * l'utilisateur. Un NOM de zone, jamais un décalage — un décalage figerait
+ * l'heure d'été du jour où la plage a été posée.
+ */
+export async function ajouterPlages(
+  plages: Array<{ jour: number; debutMin: number; finMin: number; accueilId?: string | null }>,
+): Promise<PlageRepondeur[]> {
+  const fuseau = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+  const r = await apiRequest<{ plages?: PlageRepondeur[] }>("/api/repondeur/plages", {
+    method: "POST",
+    body: { plages: plages.map((p) => ({ ...p, fuseau })) },
+  })
+  return r.plages ?? []
+}
+
+export async function retirerPlage(id: string): Promise<PlageRepondeur[]> {
+  const r = await apiRequest<{ plages?: PlageRepondeur[] }>(
+    `/api/repondeur/plages?id=${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  )
+  return r.plages ?? []
+}

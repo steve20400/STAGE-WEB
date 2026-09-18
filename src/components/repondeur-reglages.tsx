@@ -8,12 +8,17 @@ import {
   ajouterAccueil,
   ABSENCE_MAX_MINUTES,
   choisirAccueil,
+  ajouterPlages,
+  listerPlages,
   lireMonRepondeur,
+  plageExpiree,
   poserAbsence,
+  retirerPlage,
   refusAccueil,
   retirerAccueil,
   type Accueil,
   type EtatRepondeur,
+  type PlageRepondeur,
 } from "../services/repondeur-service"
 import { resolveMediaUrl } from "../services/media-service"
 
@@ -129,6 +134,26 @@ function arbitrerAbsence(duServeur: string | null): string | null {
   return retenue
 }
 
+/**
+ * Le nom d'un jour, dans la langue de l'écran.
+ *
+ * ⚠️ `Intl` PLUTÔT QUE SEPT CLEFS × NEUF LANGUES. Soixante-trois entrées à tenir
+ * à jour pour une information que le navigateur connaît déjà, et qu'il décline
+ * correctement — majuscules, abréviations, ordre des scripts non latins.
+ *
+ * Le 4 janvier 1970 était un DIMANCHE : ajouter le numéro du jour à cette date
+ * donne le bon jour de la semaine, sans dépendre de la date d'aujourd'hui.
+ */
+function nomDuJour(jour: number, langue: string): string {
+  const date = new Date(Date.UTC(1970, 0, 4 + jour))
+  return new Intl.DateTimeFormat(langue, { weekday: "short", timeZone: "UTC" }).format(date)
+}
+
+/** 540 → « 09:00 ». */
+function enHeure(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+}
+
 /** Durée lisible : « 5 h », « 1 h 30 », « 45 min ». */
 function dureeLisible(minutes: number, hLabel: string, minLabel: string): string {
   const h = Math.floor(minutes / 60)
@@ -144,7 +169,7 @@ type Phase =
   | { nom: "relit"; blob: Blob; dureeMs: number }
 
 export function RepondeurReglages() {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const { success, error } = useToast()
 
   const [actif, setActif] = useState(false)
@@ -208,6 +233,15 @@ export function RepondeurReglages() {
       // c'est tout. Rien d'autre n'en dépend.
     }
   }, [modeDuree])
+  /** Les plages programmées, périmées comprises. */
+  const [plages, setPlages] = useState<PlageRepondeur[]>([])
+  /** Jours cochés pour la plage qu'on est en train de composer. */
+  const [joursChoisis, setJoursChoisis] = useState<number[]>([])
+  const [debutPlage, setDebutPlage] = useState("09:00")
+  const [finPlage, setFinPlage] = useState("17:00")
+  /** Accueil de la plage à venir. Vide = celui qui sera actif ce jour-là. */
+  const [accueilPlage, setAccueilPlage] = useState("")
+
   /** Durée choisie, libre, de 1 minute à 24 heures. */
   const [heures, setHeures] = useState("1")
   const [minutes, setMinutes] = useState("0")
@@ -218,6 +252,7 @@ export function RepondeurReglages() {
   const [occupe, setOccupe] = useState(false)
 
   const enregistreur = useRef<MediaRecorder | null>(null)
+
   const morceaux = useRef<Blob[]>([])
   const flux = useRef<MediaStream | null>(null)
   const minuteur = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -241,6 +276,11 @@ export function RepondeurReglages() {
    * a qu'une réponse qui n'est pas arrivée, et rien ne permet de faire la
    * différence.
    */
+  /** Les plages se lisent à part : elles ont leur propre route. */
+  const relirePlages = useCallback(() => {
+    void listerPlages().then(setPlages).catch(() => undefined)
+  }, [])
+
   const relire = useCallback(() => {
     void lireMonRepondeur()
       .then(appliquerEtat)
@@ -251,6 +291,7 @@ export function RepondeurReglages() {
 
   useEffect(() => {
     relire()
+    relirePlages()
     /*
      * ⚠️ ET ON RELIT EN REVENANT SUR L'ONGLET. Une absence se périme toute
      * seule : posée pour une heure, elle est finie quand on revient, et l'écran
@@ -259,11 +300,15 @@ export function RepondeurReglages() {
      * est dépassée.
      */
     const surRetour = () => {
-      if (document.visibilityState === "visible") relire()
+      if (document.visibilityState !== "visible") return
+      relire()
+      // Une plage se périme toute seule : au retour, l'écran doit dire
+      // « expirée » plutôt que de continuer à la présenter comme active.
+      relirePlages()
     }
     document.addEventListener("visibilitychange", surRetour)
     return () => document.removeEventListener("visibilitychange", surRetour)
-  }, [relire])
+  }, [relire, relirePlages])
 
   /**
    * Coupe tout : minuteur, enregistreur, et SURTOUT le micro.
@@ -507,6 +552,59 @@ export function RepondeurReglages() {
     return dureeLisible(minutes, t("rep_abs_h"), t("rep_abs_min"))
   }
 
+  /** « 09:00 » → 540. Les minutes se comparent, les chaînes non. */
+  const enMinutes = (hhmm: string): number => {
+    const [h, m] = hhmm.split(":").map(Number)
+    return (h || 0) * 60 + (m || 0)
+  }
+
+  const programmer = async () => {
+    if (occupe) return
+    if (joursChoisis.length === 0) {
+      error(t("rep_prog_jour_requis"))
+      return
+    }
+    const debutMin = enMinutes(debutPlage)
+    const finMin = enMinutes(finPlage)
+    // Refusée, pas corrigée en silence : une plage qui finit avant de commencer
+    // ne s'ouvrirait jamais, et personne ne comprendrait pourquoi.
+    if (finMin <= debutMin) {
+      error(t("rep_prog_jour_requis"))
+      return
+    }
+    setOccupe(true)
+    try {
+      setPlages(
+        await ajouterPlages(
+          joursChoisis.map((jour) => ({
+            jour,
+            debutMin,
+            finMin,
+            accueilId: accueilPlage || null,
+          })),
+        ),
+      )
+      setJoursChoisis([])
+      success(t("rep_prog_ok"))
+    } catch {
+      error(t("rep_echec"))
+    } finally {
+      setOccupe(false)
+    }
+  }
+
+  const effacerPlage = async (id: string) => {
+    if (occupe) return
+    setOccupe(true)
+    try {
+      setPlages(await retirerPlage(id))
+    } catch {
+      error(t("rep_echec"))
+    } finally {
+      setOccupe(false)
+    }
+  }
+
   const basculer = async (valeur: boolean) => {
     // L'interrupteur bascule sous le doigt ; le serveur corrige s'il refuse.
     setActif(valeur)
@@ -612,6 +710,58 @@ export function RepondeurReglages() {
         @media (max-width: 480px) {
           .rep-modes { grid-template-columns: 1fr; }
         }
+
+        /* Le bloc des plages a le meme cadre que celui de l'absence : deux
+           reglages de meme nature, deux presentations identiques. */
+        .rep-prog {
+          margin-bottom: 16px; padding: 13px 14px; border-radius: 12px;
+          border: 1px solid var(--border-subtle); background: var(--bg-elevated);
+          display: grid; gap: 10px;
+        }
+        /* Les jours tiennent sur une rangee et se replient au pouce, plutot que
+           de deborder : sept boutons qui defilent horizontalement se ratent. */
+        .rep-jours { display: flex; gap: 6px; flex-wrap: wrap; }
+        .rep-jour {
+          flex: 1 1 auto; min-width: 44px;
+          padding: 8px 6px; border-radius: 9px; cursor: pointer;
+          font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+          text-transform: capitalize;
+          border: 1.5px solid var(--border-subtle);
+          background: var(--bg-surface); color: var(--text-secondary);
+        }
+        .rep-jour.coche {
+          border-color: var(--accent); background: var(--accent); color: var(--accent-text);
+        }
+        .rep-jour:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+        .rep-prog-heures { display: flex; gap: 8px; flex-wrap: wrap; }
+        .rep-prog-champ {
+          flex: 1 1 130px; display: flex; align-items: center; gap: 8px;
+          padding: 6px 11px; border-radius: 9px;
+          border: 1px solid var(--border-subtle); background: var(--bg-surface);
+        }
+        .rep-prog-champ > span { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .rep-prog-champ input, .rep-prog-champ select {
+          flex: 1; min-width: 0; border: none; background: transparent; outline: none;
+          color: var(--text-primary); font-family: 'DM Sans', sans-serif;
+          font-size: 13.5px; font-weight: 600;
+        }
+        .rep-prog-accueil { flex-basis: 100%; }
+        .rep-prog-accueil select { font-weight: 500; }
+
+        .rep-prog-vide { font-size: 12.5px; color: var(--text-muted); }
+        .rep-prog-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+        .rep-prog-ligne {
+          display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+          padding: 10px 0; border-top: 1px solid var(--border-subtle);
+        }
+        .rep-prog-quand { flex: 1; min-width: 150px; font-size: 13px; color: var(--text-primary); }
+        .rep-prog-quand b { text-transform: capitalize; }
+        .rep-prog-quand span { display: block; font-size: 11.5px; color: var(--text-muted); }
+        /* Une plage perimee reste LISIBLE mais s'efface : elle ne s'applique
+           plus, et doit se distinguer d'un coup d'oeil de celles qui courent. */
+        .rep-prog-ligne.morte .rep-prog-quand b { opacity: .55; text-decoration: line-through; }
+        .rep-prog-ligne.morte .rep-prog-quand span { color: var(--danger); }
 
         .rep-abs {
           margin-bottom: 16px; padding: 13px 14px; border-radius: 12px;
@@ -825,6 +975,132 @@ export function RepondeurReglages() {
               <div className="rep-abs-bornes">{t("rep_abs_bornes")}</div>
             </>
           ) : null}
+        </div>
+      )}
+
+      {/* ── Le répondeur programmé ───────────────────────────────────────
+          🔴 UN TROISIÈME MODE, ET NON UNE VARIANTE DE L'ABSENCE. L'absence dit
+          « à partir de maintenant, pendant trois heures ». Une plage dit « tous
+          les lundis de 10 h à 12 h » — elle revient, et n'a pas de fin tant
+          qu'on ne la retire pas. Elle vit donc dans son propre bloc.
+
+          Elle ne paraît que si le répondeur est allumé : programmer des
+          créneaux pour quelque chose d'éteint donnerait une liste qui ne fait
+          rien, et rien à l'écran ne dirait pourquoi. */}
+      {actif && phase.nom === "repos" && (
+        <div className="rep-prog">
+          <div className="rep-abs-titre">{t("rep_prog_titre")}</div>
+          <div className="rep-abs-sub">{t("rep_prog_sub")}</div>
+
+          <div className="rep-abs-duree">{t("rep_prog_jours")}</div>
+          {/* Les jours SE COCHENT, plusieurs à la fois : « du lundi au vendredi
+              de 10 h à 12 h » est le cas le plus courant, et le composer en
+              cinq gestes séparés serait absurde. La semaine commence au lundi
+              pour la lecture, même si la base garde la convention 0 = dimanche. */}
+          <div className="rep-jours">
+            {[1, 2, 3, 4, 5, 6, 0].map((jour) => {
+              const coche = joursChoisis.includes(jour)
+              return (
+                <button
+                  key={jour}
+                  type="button"
+                  className={`rep-jour ${coche ? "coche" : ""}`}
+                  aria-pressed={coche}
+                  onClick={() =>
+                    setJoursChoisis((liste) =>
+                      coche ? liste.filter((j) => j !== jour) : [...liste, jour],
+                    )
+                  }
+                >
+                  {nomDuJour(jour, language)}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="rep-prog-heures">
+            <label className="rep-prog-champ">
+              <span>{t("rep_prog_de")}</span>
+              <input
+                id="rep-prog-debut"
+                type="time"
+                value={debutPlage}
+                onChange={(e) => setDebutPlage(e.target.value)}
+              />
+            </label>
+            <label className="rep-prog-champ">
+              <span>{t("rep_prog_a")}</span>
+              <input
+                id="rep-prog-fin"
+                type="time"
+                value={finPlage}
+                onChange={(e) => setFinPlage(e.target.value)}
+              />
+            </label>
+          </div>
+
+          {/* L'accueil de la plage. Vide = celui qui sera actif ce jour-là,
+              ce qui est le cas courant : on ne veut pas choisir à chaque fois. */}
+          {accueils.length > 1 && (
+            <label className="rep-prog-champ rep-prog-accueil">
+              <span>{t("rep_prog_accueil")}</span>
+              <select
+                id="rep-prog-accueil"
+                value={accueilPlage}
+                onChange={(e) => setAccueilPlage(e.target.value)}
+              >
+                <option value="">{t("rep_actif_badge")}</option>
+                {accueils.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.libelle || t("rep_sans_nom")}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <button className="rep-btn" disabled={occupe} onClick={() => void programmer()}>
+            {t("rep_prog_ajouter")}
+          </button>
+
+          <div className="rep-abs-bornes">{t("rep_prog_validite")}</div>
+
+          {plages.length === 0 ? (
+            <div className="rep-prog-vide">{t("rep_prog_aucune")}</div>
+          ) : (
+            <ul className="rep-prog-liste">
+              {plages.map((plage) => {
+                const morte = plageExpiree(plage)
+                return (
+                  <li key={plage.id} className={`rep-prog-ligne ${morte ? "morte" : ""}`}>
+                    <span className="rep-prog-quand">
+                      <b>
+                        {nomDuJour(plage.jour, language)} · {enHeure(plage.debutMin)} –{" "}
+                        {enHeure(plage.finMin)}
+                      </b>
+                      {/* ⚠️ LA PÉREMPTION SE DIT, elle ne se cache pas : une
+                          ligne qui disparaît laisse croire qu'on ne l'a jamais
+                          posée, et l'on cherche ce qu'on ne trouvera plus. */}
+                      <span>
+                        {morte
+                          ? t("rep_prog_expiree")
+                          : t("rep_prog_expire", {
+                              d: new Date(plage.expireLe).toLocaleDateString(language),
+                            })}
+                      </span>
+                    </span>
+                    <button
+                      className="rep-btn rep-btn-ghost"
+                      disabled={occupe}
+                      onClick={() => void effacerPlage(plage.id)}
+                    >
+                      {t("rep_supprimer")}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
       )}
 
