@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { useToast } from "../../../src/components/toast"
 import { useTranslation } from "../../../src/i18n"
@@ -99,11 +99,34 @@ export default function EntreprisesPage() {
   const [echec, setEchec] = useState(false)
   const [occupe, setOccupe] = useState(false)
 
+  /**
+   * NUMÉRO DE LA DEMANDE EN COURS.
+   *
+   * 🐛 UNE RÉPONSE EN RETARD ÉCRASAIT LA PLUS RÉCENTE. On change de pays deux
+   * fois de suite — ou l'on revient sur le premier — et rien ne garantit que
+   * les réponses reviennent dans l'ordre : celle du pays ABANDONNÉ pouvait
+   * arriver en dernier et s'afficher sous le filtre du nouveau. La liste
+   * paraissait alors « ne pas suivre le filtre », de façon intermittente et
+   * impossible à reproduire à volonté.
+   *
+   * Chaque demande prend un numéro ; seule la dernière a le droit d'écrire.
+   */
+  const demande = useRef(0)
+
   const chargerTypes = useCallback(async () => {
+    const mien = ++demande.current
     setEchec(false)
     try {
-      setTypes(await listerTypes(paysChoisi))
+      const recus = await listerTypes(paysChoisi)
+      if (demande.current !== mien) return
+      setTypes(recus)
     } catch {
+      if (demande.current !== mien) return
+      // ⚠️ LA LISTE EST VIDÉE, PAS CONSERVÉE. Garder celle d'avant sous un
+      // nouveau filtre afficherait des données qui ne correspondent ni au
+      // filtre demandé ni à ce que dit la base : mieux vaut une erreur visible
+      // qu'une liste plausible et fausse.
+      setTypes([])
       setEchec(true)
     }
   }, [paysChoisi])
@@ -126,9 +149,13 @@ export default function EntreprisesPage() {
       setListe(null)
       setVoletGauche({ niveau: "entreprises", type })
       setDetail(null)
+      const mien = ++demande.current
       try {
-        setListe(await entreprisesDuType(type.id, paysChoisi))
+        const recus = await entreprisesDuType(type.id, paysChoisi)
+        if (demande.current !== mien) return
+        setListe(recus)
       } catch {
+        if (demande.current !== mien) return
         setListe([])
         setEchec(true)
       }
