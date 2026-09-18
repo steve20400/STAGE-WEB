@@ -128,6 +128,7 @@ type SettingsSection =
   | "profile"
   | "security"
   | "notifications"
+  | "repondeur"
   | "privacy"
   | "translation"
   | "appearance"
@@ -141,6 +142,7 @@ const SECTIONS_CONNUES: SettingsSection[] = [
   "profile",
   "security",
   "notifications",
+  "repondeur",
   "privacy",
   "translation",
   "appearance",
@@ -2443,6 +2445,27 @@ export default function SettingsPage() {
       ),
     },
     {
+      id: "repondeur",
+      label: t("settings_repondeur"),
+      icon: (
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        >
+          {/* Le meme dessin que dans le menu lateral : c'est le meme endroit,
+              atteint par deux chemins. */}
+          <path d="M3 15v-2a9 9 0 0118 0v2" />
+          <rect x="2" y="15" width="6" height="5" rx="1.5" />
+          <rect x="16" y="15" width="6" height="5" rx="1.5" />
+        </svg>
+      ),
+    },
+    {
       id: "privacy",
       label: t("settings_privacy"),
       icon: (
@@ -3777,11 +3800,20 @@ export default function SettingsPage() {
                 {compteInterne && <PushDiagnostic />}
               </div>
 
-              {/* Le repondeur AVANT les sonneries : il decide de ce qui se
-                  passe quand on ne decroche pas, la sonnerie seulement de ce
-                  qu'on entend avant. L'ordre suit la chronologie. */}
-              <RepondeurReglages />
+              {/* ⚠️ LE REPONDEUR N'EST PLUS ICI. Il avait sa place au milieu des
+                  notifications tant qu'il tenait en un interrupteur ; il porte
+                  maintenant trois modes, une bibliotheque d'accueils et des
+                  programmations, et il noyait la page. Il a sa propre section —
+                  et son entree dans le menu lateral de l'application. */}
               <RingtonePicker />
+            </>
+          )}
+
+          {section === "repondeur" && (
+            <>
+              <div className="s-page-title">{t("settings_repondeur")}</div>
+              <p className="s-page-sub">{t("rep_page_sub")}</p>
+              <RepondeurReglages />
             </>
           )}
 

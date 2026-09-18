@@ -26,6 +26,15 @@ interface NavItem {
   href: string
   label: string
   icon: React.ReactNode
+  /**
+   * L'entrée est-elle celle de l'écran courant ?
+   *
+   * ⚠️ NÉCESSAIRE DÈS QU'UNE ENTRÉE POINTE VERS UN PARAMÈTRE D'URL. La règle par
+   * défaut compare les CHEMINS ; « /settings?section=repondeur » a le même
+   * chemin que tous les autres réglages, et ne s'allumerait donc jamais — ou
+   * s'allumerait sur chacun d'eux.
+   */
+  match?: (pathname: string, search: string) => boolean
 }
 
 // ICONES SVG
@@ -100,6 +109,23 @@ const Icons = {
     >
       <circle cx="12" cy="12" r="10" strokeDasharray="4 3" />
       <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  Repondeur: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    >
+      {/* Un combiné posé sur sa base : le dessin d'un répondeur, et non la
+          cloche des notifications avec laquelle on le confondrait. */}
+      <path d="M3 15v-2a9 9 0 0118 0v2" />
+      <rect x="2" y="15" width="6" height="5" rx="1.5" />
+      <rect x="16" y="15" width="6" height="5" rx="1.5" />
     </svg>
   ),
   Meeting: () => (
@@ -241,6 +267,20 @@ const NAV_ITEMS: Array<Omit<NavItem, "label"> & { labelKey: Cle }> = [
   { href: "/meetings", labelKey: "meetings", icon: <Icons.Meeting /> },
   { href: "/ai", labelKey: "assistant", icon: <Icons.Sparkle /> },
   { href: "/contacts", labelKey: "contacts", icon: <Icons.Contacts /> },
+  /*
+   * LE RÉPONDEUR, À PORTÉE DE CLIC.
+   *
+   * Il vit dans les réglages — c'est sa place, on n'y touche pas dix fois par
+   * jour — mais on l'allume et on l'éteint souvent, et passer par les réglages à
+   * chaque fois pour poser une absence de vingt minutes coûtait plus cher que
+   * l'absence elle-même. Cette entrée y mène en un geste.
+   */
+  {
+    href: "/settings?section=repondeur",
+    labelKey: "rep_titre",
+    icon: <Icons.Repondeur />,
+    match: (_chemin, recherche) => new URLSearchParams(recherche).get("section") === "repondeur",
+  },
 ]
 
 const UNREAD_COUNTS: Record<string, number> = {}
@@ -328,8 +368,10 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
       <nav className="sb-nav">
         <div className="sb-nav-section">{t("nav_section_navigation")}</div>
 
-        {NAV_ITEMS.map(({ href, labelKey, icon }) => {
-          const isActive = pathname.startsWith(href)
+        {NAV_ITEMS.map(({ href, labelKey, icon, match }) => {
+          const isActive = match
+            ? match(pathname, location.search)
+            : pathname.startsWith(href)
           const unreadCount = UNREAD_COUNTS[href]
           const label = t(labelKey)
 
