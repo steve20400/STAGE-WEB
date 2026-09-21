@@ -7,6 +7,7 @@ import {
   type MessageType,
 } from "@privacyresearch/libsignal-protocol-typescript"
 import { apiRequest } from "../lib/api-client"
+import { getOrCreateWebDeviceId } from "./appareils-service"
 import { CoffreE2ee } from "./e2ee-store"
 
 /**
@@ -66,11 +67,86 @@ export function idAppareil(): number {
     const n = Number(garde)
     if (Number.isInteger(n) && n > 0) return n
   }
-  const neuf = Math.floor(Math.random() * 2_000_000_000) + 1
+
+  /*
+   * 🔴 DÉRIVÉ DE L'IDENTIFIANT D'APPAREIL DÉJÀ UTILISÉ PAR L'APPLICATION,
+   * et non tiré au sort séparément.
+   *
+   * `getOrCreateWebDeviceId()` est celui que la connexion envoie au serveur
+   * et qui rattache la session à ce navigateur. S'en servir met les deux
+   * notions d'« appareil » d'accord : se déconnecter puis se reconnecter ne
+   * crée plus une identité cryptographique de plus, là où un tirage
+   * indépendant en fabriquait une à chaque fois qu'on vidait ce seul-là.
+   *
+   * ⚠️ CELA NE SURVIT PAS À UN VIDAGE DU STOCKAGE — et RIEN ne le pourrait.
+   * Une identité EST sa clé privée : si la clé a disparu, aucune empreinte de
+   * navigateur ne la ressuscite. Reconnaître l'appareil pour lui rendre son
+   * ancienne identité PUBLIQUE sans la privée donnerait un appareil qui
+   * paraîtrait vivant et ne déchiffrerait rien — pire que le défaut qu'on
+   * corrige. La vraie parade est le ménage, côté serveur.
+   */
+  const base = getOrCreateWebDeviceId()
+
+  /*
+   * Un entier positif, dérivé de façon déterministe.
+   *
+   * ⚠️ CE N'EST PAS DE LA CRYPTOGRAPHIE : ce nombre n'est qu'une ÉTIQUETTE,
+   * publique et sans secret. Une empreinte simple suffit, et personne ne doit
+   * jamais la confondre avec une clé.
+   *
+   * ⚠️ BORNÉ À 2 000 000 000 : la colonne est un `INTEGER` PostgreSQL, qui
+   * s'arrête à 2 147 483 647. Un nombre plus grand serait refusé à
+   * l'écriture, et l'erreur ne parlerait que de dépassement.
+   */
+  let h = 2166136261
+  for (let i = 0; i < base.length; i++) {
+    h ^= base.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  const neuf = (Math.abs(h) % 2_000_000_000) + 1
+
   localStorage.setItem(CLE_DEVICE, String(neuf))
   return neuf
 }
 
+/**
+ * Retire l'identité de cet appareil — à la déconnexion.
+ *
+ * 🔴 SANS CE GESTE, L'IDENTITÉ RESTE PUBLIÉE POUR TOUJOURS. Les correspondants
+ * continuent de chiffrer pour un appareil qui ne lira plus rien : chaque
+ * message part en un exemplaire de trop, consomme une pré-clé, et laisse des
+ * enveloppes que personne ne relèvera.
+ *
+ * ⚠️ ON EFFACE AUSSI LE COFFRE LOCAL. Garder des clés privées après une
+ * déconnexion reviendrait à laisser sur l'appareil de quoi lire ce qui a été
+ * échangé — alors que se déconnecter veut précisément dire le contraire.
+ *
+ * ⚠️ NE LÈVE JAMAIS : une déconnexion ne doit pas échouer parce que le réseau
+ * est coupé. L'identité restera alors publiée, et le balayage du serveur s'en
+ * chargera au bout de trente jours de silence.
+ */
+export async function oublierCetAppareil(): Promise<void> {
+  const deviceId = idAppareil()
+  try {
+    await apiRequest(`/api/e2ee/cles?deviceId=${deviceId}`, { method: "DELETE" })
+  } catch {
+    // Voir ci-dessus : le balayage rattrapera.
+  }
+  try {
+    const aRetirer: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const cle = localStorage.key(i)
+      if (cle && (cle.startsWith("alanya.e2ee.") || cle === CLE_DEVICE)) {
+        aRetirer.push(cle)
+      }
+    }
+    // Retiré APRÈS le parcours : supprimer pendant décale les indices et fait
+    // sauter une entrée sur deux.
+    for (const cle of aRetirer) localStorage.removeItem(cle)
+  } catch {
+    /* stockage indisponible : rien de plus à faire */
+  }
+}
 /* ══════════════════ SÉRIALISATION RÉSEAU ══════════════════ */
 
 function versB64(buf: ArrayBuffer): string {

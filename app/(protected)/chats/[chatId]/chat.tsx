@@ -5079,6 +5079,38 @@ export default function ChatRoomPage() {
     ? null
     : (chat?.membersInfo?.find((m) => m.id !== getMyUserId())?.id ?? null)
 
+  /*
+   * L'ETAT DU CHIFFREMENT, LU A L'OUVERTURE DE LA CONVERSATION.
+   *
+   * 🐛 CET EFFET A D'ABORD ETE POSE A L'INTERIEUR D'UN AUTRE, et la page
+   * entiere plantait — l'ecran affichait « une partie de l'application a
+   * rencontre un probleme ».
+   *
+   * ⚠️ UN HOOK NE S'APPELLE QU'AU PREMIER NIVEAU DU COMPOSANT. Imbrique, il
+   * s'enregistre a chaque execution de l'effet parent : React compte alors
+   * plus de hooks qu'au rendu precedent et leve. TypeScript ne voit rien — un
+   * appel de fonction dans un corps de fonction est parfaitement valide.
+   *
+   * ⚠️ UNE SEULE LECTURE PAR CONVERSATION OUVERTE : l'etat ne change qu'a
+   * l'activation, qui est a sens unique.
+   */
+  useEffect(() => {
+    if (!chatId) return
+    let vivant = true
+    void lireEtatE2ee(chatId)
+      .then((r) => {
+        if (vivant) setE2ee(r)
+      })
+      .catch(() => {
+        // Serveur trop ancien, ou route indisponible : on se tait. Le fil
+        // fonctionne exactement comme avant, sans bouton.
+        if (vivant) setE2ee(null)
+      })
+    return () => {
+      vivant = false
+    }
+  }, [chatId])
+
   /**
    * Traduction automatique de cette discussion.
    *
@@ -5369,27 +5401,6 @@ export default function ChatRoomPage() {
     })
     void refreshCallEvents()
 
-    /*
-   * ⚠️ UNE SEULE LECTURE PAR CONVERSATION OUVERTE. L'état du chiffrement ne
-   * change qu'à l'activation, qui est à sens unique : le relire en boucle
-   * coûterait un appel réseau pour une réponse qui ne bougera plus.
-   */
-  useEffect(() => {
-    if (!chatId) return
-    let vivant = true
-    void lireEtatE2ee(chatId)
-      .then((r) => {
-        if (vivant) setE2ee(r)
-      })
-      .catch(() => {
-        // Serveur trop ancien, ou route indisponible : on se tait. Le fil
-        // fonctionne exactement comme avant, sans bouton.
-        if (vivant) setE2ee(null)
-      })
-    return () => {
-      vivant = false
-    }
-  }, [chatId])
 
   // Temps reel : abonnement aux nouveaux messages de la conversation
     const myId = getMyUserId()

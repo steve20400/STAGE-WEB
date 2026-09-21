@@ -29,6 +29,7 @@ import {
 } from "../services/websocket-service"
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
+import { oublierCetAppareil } from "../services/e2ee-service"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -275,6 +276,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(async () => {
+    /*
+     * 🔴 RETIRER L IDENTITE CHIFFREE AVANT TOUT LE RESTE.
+     *
+     * Sans ce geste, elle reste publiee POUR TOUJOURS : les correspondants
+     * continuent de chiffrer pour un appareil qui ne lira plus rien — un
+     * exemplaire de trop par message, une pre-cle consommee pour rien, et des
+     * enveloppes que personne ne relevera jamais.
+     *
+     * ⚠️ AVANT , QUI EFFACE LE JETON : sans jeton, la
+     * route de retrait repondrait 401 et l identite survivrait a la
+     * deconnexion.
+     *
+     * ⚠️ NE LEVE JAMAIS — une deconnexion ne doit pas echouer parce que le
+     * reseau est coupe. Le balayage du serveur rattrapera au bout de trente
+     * jours de silence.
+     */
+    await oublierCetAppareil()
     notifyServerOfDeparture(leaveSessionLocally(), revokeSession)
   }, [leaveSessionLocally, notifyServerOfDeparture])
 
