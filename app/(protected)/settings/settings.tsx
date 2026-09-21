@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { RepondeurReglages } from "../../../src/components/repondeur-reglages"
+import { ExportMedias } from "../../../src/components/export-medias"
 import {
   definirTraductionGlobale,
   traductionGlobaleActive,
@@ -131,6 +132,7 @@ type SettingsSection =
   | "security"
   | "notifications"
   | "repondeur"
+  | "export"
   | "privacy"
   | "translation"
   | "appearance"
@@ -145,6 +147,7 @@ const SECTIONS_CONNUES: SettingsSection[] = [
   "security",
   "notifications",
   "repondeur",
+  "export",
   "privacy",
   "translation",
   "appearance",
@@ -2474,6 +2477,27 @@ export default function SettingsPage() {
       ),
     },
     {
+      id: "export",
+      label: t("settings_export"),
+      icon: (
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        >
+          {/* Une boite dont le contenu descend : l'archive qu'on emporte, et
+              non la fleche de televersement avec laquelle on la confondrait. */}
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+      ),
+    },
+    {
       id: "privacy",
       label: t("settings_privacy"),
       icon: (
@@ -3822,6 +3846,14 @@ export default function SettingsPage() {
               <div className="s-page-title">{t("settings_repondeur")}</div>
               <p className="s-page-sub">{t("rep_page_sub")}</p>
               <RepondeurReglages />
+            </>
+          )}
+
+          {section === "export" && (
+            <>
+              <div className="s-page-title">{t("settings_export")}</div>
+              <p className="s-page-sub">{t("exp_sub")}</p>
+              <ExportMedias />
             </>
           )}
 
