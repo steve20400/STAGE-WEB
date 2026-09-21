@@ -22,6 +22,7 @@ import {
   enqueueOffline,
 } from "./indexeddb-cache"
 import { uploadMedia } from "./media-service"
+import { estChiffree, envoyerChiffre, releverEtDechiffrer } from "./e2ee-fil"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
@@ -264,7 +265,33 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
   cacheBackendMessages(backendMessages)
 
   // Le backend pagine en ordre descendant ; l'UI affiche en ordre chronologique.
-  return backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
+  const messages = backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
+
+  /*
+   * ══════════════ LE CONTENU CHIFFRÉ REJOINT SON MESSAGE ══════════════
+   *
+   * 🔴 LE SERVEUR REND DES LIGNES SANS TEXTE. Pour une conversation chiffrée,
+   * `content` est nul : le texte vit dans les enveloppes, qu'on relève et
+   * qu'on déchiffre ICI, puis qu'on rapproche par identifiant de message.
+   *
+   * ⚠️ LA RELÈVE RAMÈNE TOUT CE QUI ATTEND CET APPAREIL, pas seulement ce fil.
+   * C'est voulu : les enveloppes n'ont pas d'autre moment pour être lues, et
+   * les laisser en attente parce qu'on regarde ailleurs les ferait s'accumuler
+   * jusqu'à la prochaine ouverture de LA bonne conversation.
+   *
+   * ⚠️ ON NE LA FAIT QUE POUR UN FIL CHIFFRÉ. La déclencher partout ajouterait
+   * un appel réseau à chaque ouverture de conversation, pour rien dans
+   * l'immense majorité des cas.
+   */
+  if (estChiffree(chatId)) {
+    const clairs = await releverEtDechiffrer()
+    for (const m of messages) {
+      const clair = clairs.get(m.id)
+      if (clair !== undefined) m.content = clair
+    }
+  }
+
+  return messages
 }
 
 /**
@@ -453,6 +480,53 @@ export async function sendChatMessage(
   const myId = getMyUserId()
   const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const msgType = toBackendType(type)
+
+  /*
+   * ══════════════ LE CHEMIN CHIFFRÉ, ET IL S'ARRÊTE ICI ══════════════
+   *
+   * 🔴 UNE BRANCHE QUI SORT, PAS UN DÉTOUR. Tout ce qui suit — file hors
+   * ligne, affichage optimiste, remise par WebSocket, repli REST — suppose
+   * que le serveur voit le texte. Aucun de ces mécanismes ne s'applique à un
+   * message chiffré, et les adapter un par un reviendrait à mêler deux
+   * régimes dans la même fonction : c'est exactement ce qu'on a refusé de
+   * faire dans la table `message`, et pour les mêmes raisons.
+   *
+   * ⚠️ CE QU'ON PERD, ET QU'IL FAUT SAVOIR :
+   *
+   *   · LA FILE HORS LIGNE. Un message chiffré ne part pas si le réseau est
+   *     coupé — on le dit tout de suite au lieu de le mettre en attente. La
+   *     file recopierait le TEXTE EN CLAIR dans IndexedDB, ce qui reviendrait
+   *     à ranger en clair ce qu'on vient de chiffrer ;
+   *
+   *   · LA REMISE INSTANTANÉE. Le destinataire lira à sa prochaine relève.
+   *
+   * ⚠️ SEUL LE TEXTE EST COUVERT. Un média chiffré demanderait de chiffrer le
+   * fichier lui-même, ce qui est un autre chantier. On laisse donc passer les
+   * médias par le chemin ordinaire plutôt que de les refuser en silence — mais
+   * ils NE SONT PAS chiffrés, et l'écran doit finir par le dire.
+   */
+  if (estChiffree(chatId) && type === "text" && (content ?? "").trim() !== "") {
+    if (!navigator.onLine) {
+      throw new Error(
+        "Pas de réseau : un message chiffré ne peut pas être mis en attente.",
+      )
+    }
+    const cree = await envoyerChiffre(chatId, content)
+    /*
+     * ⚠️ ON NE MET PAS LE CLAIR EN CACHE. `cacheMessage` écrit dans IndexedDB,
+     * qui n'est pas chiffré : y recopier le texte annulerait le bénéfice pour
+     * l'expéditeur, dont l'appareil est justement celui qu'on protège en cas
+     * de vol. L'écran l'affiche depuis la mémoire, le temps de la session.
+     */
+    return {
+      id: cree.id,
+      senderId: "me",
+      content,
+      type,
+      status: "sent",
+      timestamp: new Date(cree.createdAt),
+    }
+  }
 
   // Hors ligne → outbox pour envoi ultérieur
   if (!navigator.onLine) {

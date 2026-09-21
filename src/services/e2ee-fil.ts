@@ -1,9 +1,9 @@
 import { apiRequest } from "../lib/api-client"
+import { getMyUserId } from "../data/session-user"
 import {
   chiffrerPour,
   dechiffrer,
   deposer,
-  idAppareil,
   ouvrirSessions,
   relever,
   acquitter,
@@ -82,28 +82,55 @@ interface MessageCree {
 }
 
 /**
+ * Qui est en face, dans une conversation à deux ?
+ *
+ * ⚠️ L'APPELANT NE LE SAIT PAS. `sendChatMessage` ne reçoit qu'un identifiant
+ * de conversation — c'est tout ce dont le fil en clair a besoin, le serveur
+ * se chargeant de la distribution. Le chiffrement, lui, doit savoir POUR QUI
+ * il chiffre : c'est la différence de fond entre les deux régimes, et elle
+ * remonte jusqu'ici.
+ */
+async function correspondant(convId: string): Promise<string> {
+  const moi = getMyUserId()
+  const r = await apiRequest<{ members: { id: string }[] }>(
+    `/api/conversations/${encodeURIComponent(convId)}/members`,
+  )
+  const autres = r.members.map((m) => m.id).filter((id) => id !== moi)
+  /*
+   * ⚠️ EXACTEMENT UN AUTRE, sans quoi on refuse. Zéro, c'est la conversation
+   * avec soi-même ; plusieurs, c'est un groupe — et le serveur a déjà refusé
+   * de chiffrer l'un comme l'autre. Deviner ici contredirait sa décision.
+   */
+  if (autres.length !== 1) {
+    throw new Error(
+      "Le chiffrement ne couvre que les conversations entre deux personnes.",
+    )
+  }
+  return autres[0]
+}
+
+/**
  * Envoie un message dans une conversation chiffrée.
  *
- * ⚠️ PAR LA ROUTE REST, ET NON PAR LE WEBSOCKET. Le chemin WebSocket transporte
- * le contenu et le fait suivre aux autres appareils ; l'adapter demanderait de
- * toucher `ws-server.mjs`, qui n'a rien à voir avec le chiffrement. Un message
- * chiffré emprunte donc le repli REST, qui est déjà éprouvé. On y perd la
- * remise instantanée — le destinataire recevra à sa prochaine relève — et c'est
- * la dette la plus visible de ce premier jet.
- *
- * @returns le message créé, pour que l'écran l'affiche comme les autres.
+ * ⚠️ PAR LA ROUTE REST, ET NON PAR LE WEBSOCKET. Le chemin WebSocket
+ * transporte le contenu et le fait suivre ; l'adapter demanderait de toucher
+ * `ws-server.mjs`, qui n'a rien à voir avec le chiffrement. Un message chiffré
+ * emprunte donc le repli REST, déjà éprouvé. On y perd la remise instantanée —
+ * le destinataire recevra à sa prochaine relève — et c'est la dette la plus
+ * visible de ce premier jet.
  */
 export async function envoyerChiffre(
   convId: string,
-  destinataireId: string,
   texte: string,
 ): Promise<MessageCree> {
+  const destinataireId = await correspondant(convId)
+
   /*
    * ⚠️ LES SESSIONS S'OUVRENT À CHAQUE ENVOI, et ce n'est pas un gaspillage :
-   * `ouvrirSessions` consomme une pré-clé du correspondant, mais la
-   * bibliothèque NE REFAIT PAS le travail si la session existe déjà. Le coût
-   * réel est un aller-retour, contre le risque d'écrire à un appareil qu'on ne
-   * connaît pas encore — celui que le correspondant vient d'ajouter.
+   * la bibliothèque ne refait pas le travail si la session existe déjà. Le
+   * coût est un aller-retour, contre le risque d'ignorer un appareil que le
+   * correspondant vient d'ajouter — auquel cas il ne lirait rien, sans que
+   * personne ne s'en doute.
    */
   const devices = await ouvrirSessions(destinataireId)
   if (devices.length === 0) {
@@ -113,10 +140,7 @@ export async function envoyerChiffre(
   // 1. La ligne du fil, SANS contenu. Le serveur la refuserait autrement.
   const message = await apiRequest<MessageCree>(
     `/api/conversations/${encodeURIComponent(convId)}/messages`,
-    {
-      method: "POST",
-      body: { type: "TEXT", chiffre: true },
-    },
+    { method: "POST", body: { type: "TEXT", chiffre: true } },
   )
 
   // 2. Les enveloppes, rattachées à cette ligne.

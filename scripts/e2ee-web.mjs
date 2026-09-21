@@ -188,11 +188,21 @@ async function main() {
     attendPrekeys: 50,
   });
 
+  /* ── LA COUTURE DU FIL, une fois les deux cotes prets ── */
+  await fetch(API + "/api/conversations/" + conv.id + "/e2ee", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + a.jeton },
+  });
+  const TEXTE_FIL = "Message parti par la couture du fil";
+  console.log("\n▸ ALICE envoie par la couture");
+  echecs += await modAlice.scenarioFil(conv.id);
+
   /* ── BOB reprend SON coffre et lit ── */
   poseCoffre(coffreBob);
   poseJeton(b.jeton);
   console.log("\n▸ BOB relève et déchiffre");
   echecs += await modBob.scenarioReception(SECRET);
+  echecs += await modBob.scenarioFilReception(conv.id, TEXTE_FIL);
 
   console.log(
     `\n════ ${echecs === 0 ? "MODULES WEB : TOUT EST VERT" : `${echecs} ÉCHEC(S)`} ════\n`,

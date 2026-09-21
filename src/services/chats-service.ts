@@ -3,6 +3,7 @@ import { loadLocalGroups, toConversationMock } from "../data/local-groups"
 import { type ConversationMock, type MessageType } from "../mocks/chat-data"
 import { getMyUserId, loadSessionUser, toInitials } from "../data/session-user"
 import { apiRequest } from "../lib/api-client"
+import { noteEtatChiffrement } from "./e2ee-fil"
 import { langueInitiale, traduire } from "../i18n"
 import {
   cacheConversations,
@@ -49,6 +50,8 @@ export interface ConversationListItem extends ConversationMock {
 interface BackendConversation {
   id: string
   isGroup: boolean
+  /** La conversation est-elle chiffree de bout en bout ? Absent = non. */
+  e2eeActif?: boolean
   title: string | null
   /**
    * Vrai pour la conversation du compte avec lui-meme (non-groupe, un seul
@@ -193,6 +196,17 @@ function toFrontConversation(c: BackendConversation): ConversationListItem {
    * au-dessus de mes propres notes. `isSelf` tranche avant d'en arriver la.
    */
   const peer = c.isGroup || isSelf ? undefined : c.members?.find((m) => m.id !== myId)
+
+  /*
+   * ⚠️ LE CACHE DU CHIFFREMENT S ALIMENTE ICI, et c est le seul endroit qui
+   * voie passer TOUTES les conversations. Sans lui, l envoi devrait demander
+   * au serveur, a chaque message, si le fil est chiffre — un aller-retour de
+   * plus pour une reponse qui ne change presque jamais.
+   *
+   * ⚠️ UN CHAMP ABSENT VAUT « EN CLAIR » : un serveur plus ancien ne l envoie
+   * pas, et le client doit alors se comporter exactement comme avant.
+   */
+  noteEtatChiffrement(c.id, c.e2eeActif === true)
 
   return {
     id: c.id,
