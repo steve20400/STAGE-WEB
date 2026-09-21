@@ -30,6 +30,18 @@ import { CoffreE2ee } from "./e2ee-store"
 
 /* ══════════════════ L'IDENTITÉ DE CET APPAREIL ══════════════════ */
 
+/**
+ * Les deux types de message du protocole, tels que CETTE bibliothèque les
+ * numérote.
+ *
+ * ⚠️ CONTRE-INTUITIF, ET VÉRIFIÉ PAR LE BANC D'ESSAI : c'est **3** qui ouvre
+ * une session, pas 1. Les noms le suggèrent dans l'autre sens, les valeurs
+ * viennent de `libsignal-protocol-javascript` (`WHISPER = 1`,
+ * `PREKEY_BUNDLE = 3`). Nommer ces deux nombres évite d'avoir à s'en
+ * souvenir à chaque relecture.
+ */
+const TYPE_PREKEY = 3
+
 const CLE_DEVICE = "alanya.e2ee.deviceId"
 
 /** Combien de pré-clés à usage unique on publie d'un coup. */
@@ -236,7 +248,7 @@ export async function chiffrerPour(
     enveloppes.push({
       destinataireId: userId,
       destinataireDevice: deviceId,
-      // 1 = PreKeyWhisperMessage (ouvre la session), 3 = WhisperMessage.
+      // 3 = PreKeyWhisperMessage (ouvre la session), 1 = WhisperMessage.
       type: chiffre.type,
       // ⚠️ `body` EST UNE CHAÎNE BINAIRE, pas de l'UTF-8 : la passer par
       // `TextEncoder` la corromprait. On la met en base64 telle quelle.
@@ -259,16 +271,27 @@ export interface EnveloppeRecue {
 /**
  * Déchiffre une enveloppe reçue.
  *
- * ⚠️ LE TYPE DÉCIDE DE LA MÉTHODE, et se tromper ne donne pas une erreur claire
- * mais un déchiffrement qui échoue : un type 1 porte le matériel d'ouverture de
- * session et passe par `decryptPreKeyWhisperMessage`, un type 3 par
- * `decryptWhisperMessage`.
+ * 🔴 3 = PRÉ-CLÉ (ouvre la session), 1 = COURANT. C'EST BIEN DANS CE SENS,
+ * et l'inverse est l'erreur qu'on fait spontanément.
+ *
+ * 🐛 Ce fichier a d'abord été écrit avec la convention inverse — « 1 ouvre,
+ * 3 continue » — reprise des noms `PreKeyWhisperMessage` / `WhisperMessage`
+ * sans vérifier les valeurs. Le banc d'essai a tranché : la bibliothèque
+ * renvoie **3** pour le tout premier message d'une session. Elle hérite de
+ * `libsignal-protocol-javascript`, où `Type.WHISPER = 1` et
+ * `Type.PREKEY_BUNDLE = 3`.
+ *
+ * ⚠️ SE TROMPER NE DONNE AUCUNE ERREUR PARLANTE : on appelle la mauvaise
+ * méthode, qui cherche une session qui n'existe pas encore, et l'on obtient
+ * « No record for device » — un message qui désigne l'appareil, donc qui
+ * envoie chercher le défaut du côté des identités. Le vrai coupable est ce
+ * nombre.
  */
 export async function dechiffrer(e: EnveloppeRecue): Promise<string> {
   const adresse = new SignalProtocolAddress(e.expediteurId, e.expediteurDevice)
   const chiffreur = new SessionCipher(coffre, adresse)
   const clair =
-    e.type === 1
+    e.type === TYPE_PREKEY
       ? await chiffreur.decryptPreKeyWhisperMessage(atob(e.corps), "binary")
       : await chiffreur.decryptWhisperMessage(atob(e.corps), "binary")
   return new TextDecoder().decode(new Uint8Array(clair))
