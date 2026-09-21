@@ -13,6 +13,7 @@
     "verify:webapp": "node scripts/verifier-webapp.mjs"
   },
   "dependencies": {
+    "@privacyresearch/libsignal-protocol-typescript": "^0.0.16",
     "caniuse-lite": "^1.0.30001787",
     "firebase": "^10.8.0",
     "idb": "^8.0.3",
