@@ -1,5 +1,6 @@
 import { apiRequest } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
+import { identitesChangees as identitesChangeesInternes } from "./e2ee-store"
 import {
   chiffrerPour,
   dechiffrer,
@@ -222,4 +223,19 @@ export function frontiereChiffrement(
 ): Frontiere {
   const premier = messages.find((m) => m.chiffre === true)
   return { premierChiffre: premier?.id ?? null }
+}
+
+/* ══════════════════ L'AVERTISSEMENT DE CLÉ ══════════════════ */
+
+export { identitesChangees, oublierAvertissement } from "./e2ee-store"
+
+/**
+ * La clé de ce correspondant a-t-elle changé depuis l'ouverture ?
+ *
+ * 🔴 LE SEUL SIGNAL QUI PUISSE RÉVÉLER UNE INTERPOSITION. Réinstallation ou
+ * interception : les deux se ressemblent, et seul l'utilisateur peut trancher
+ * — en comparant un code de sécurité hors de ce canal.
+ */
+export function cleAChange(userId: string): boolean {
+  return identitesChangeesInternes().includes(userId)
 }

@@ -30,6 +30,41 @@ import type {
 
 const PREFIXE = "alanya.e2ee."
 
+/**
+ * LES CLÉS D'IDENTITÉ QUI ONT CHANGÉ DEPUIS L'OUVERTURE DE L'APPLICATION.
+ *
+ * 🔴 C'EST LE SEUL SIGNAL QUI PUISSE RÉVÉLER UNE INTERPOSITION. Quand la clé
+ * d'identité d'un correspondant change, deux lectures sont possibles : il a
+ * réinstallé, ou quelqu'un a pris sa place entre vous. Les deux se
+ * ressemblent trait pour trait, et SEUL L'UTILISATEUR peut trancher — en
+ * comparant un code de sécurité hors de ce canal.
+ *
+ * ⚠️ LA CONSOLE NE SUFFIT PAS, et c'est pour cela que cette liste existe.
+ * Un avertissement que personne ne lit ne protège de rien : c'est l'écran qui
+ * doit le dire, à l'endroit où la conversation se tient.
+ *
+ * ⚠️ EN MÉMOIRE, PAS DANS LE COFFRE : l'avertissement porte sur CETTE session.
+ * Le ranger ferait réapparaître à chaque ouverture une alerte déjà vue et déjà
+ * jugée — et une alerte qui se répète cesse d'être lue.
+ */
+const clesChangees = new Set<string>()
+
+/** Les correspondants dont la clé a changé pendant cette session. */
+export function identitesChangees(): string[] {
+  return [...clesChangees]
+}
+
+/**
+ * L'utilisateur a pris acte : on cesse de l'avertir pour ce correspondant.
+ *
+ * ⚠️ CELA NE VALIDE RIEN. Rien ici ne dit que la nouvelle clé est la bonne :
+ * seul un code de sécurité comparé de vive voix le dirait. On note seulement
+ * que l'avertissement a été vu.
+ */
+export function oublierAvertissement(identifiant: string): void {
+  clesChangees.delete(identifiant)
+}
+
 /* ══════════════════ SÉRIALISATION ══════════════════
  *
  * La bibliothèque manipule des `ArrayBuffer`. `localStorage` ne stocke que des
@@ -150,8 +185,19 @@ export class CoffreE2ee implements StorageType {
   ): Promise<boolean> {
     const connue = lire<string>(`identite.${identifiant}`)
     if (connue === undefined) return true
-    const changee = connue !== versB64(cle)
-    if (changee) {
+    if (connue !== versB64(cle)) {
+      /*
+       * ⚠️ ON CONSIGNE, ON NE BLOQUE PAS — décision du user, 21/09/2026.
+       *
+       * Refuser figerait la conversation sans rien expliquer, et le cas le
+       * plus fréquent est parfaitement innocent : le correspondant a changé
+       * de téléphone. Prévenir laisse la décision à qui peut la prendre.
+       *
+       * ⚠️ L'ADRESSE PORTE L'APPAREIL (`user.device`). On ne garde que le
+       * compte : c'est de la personne qu'on veut parler à l'écran, pas de
+       * l'un de ses appareils, dont le numéro ne signifie rien pour elle.
+       */
+      clesChangees.add(identifiant.split(".")[0])
       console.warn(
         `[e2ee] ⚠️ la clé d'identité de ${identifiant} a CHANGÉ. ` +
           "Réinstallation du correspondant, ou interception : seul un code de " +

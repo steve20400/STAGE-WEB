@@ -1154,3 +1154,45 @@ textarea.room-textarea::placeholder {
     color: #e0cdb5;
   }
 }
+
+/* ══════════════════ L'ALERTE DE CHANGEMENT DE CLÉ ══════════════════
+ *
+ * ⚠️ ROUGE, ET C'EST LA DIFFÉRENCE AVEC LA BANNIÈRE DU CHIFFREMENT : celle-ci
+ * informe, celle-là alerte. Leur donner la même couleur reviendrait à dire que
+ * les deux se valent — or l'une annonce une protection, l'autre un doute sur
+ * cette protection.
+ */
+.e2ee-alerte {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 12px auto 4px;
+  max-width: 520px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fdecea;
+  border: 1px solid #f3c2bd;
+  color: #7a2620;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.e2ee-alerte svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  margin-top: 1px;
+  fill: none;
+  stroke: #b3261e;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .e2ee-alerte {
+    background: #2e1a18;
+    border-color: #5a2a26;
+    color: #f0c9c4;
+  }
+}

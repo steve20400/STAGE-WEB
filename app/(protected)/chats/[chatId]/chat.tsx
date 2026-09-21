@@ -44,7 +44,7 @@ import {
   mettreMediaEnFile,
   apercusMediasEnAttente,
 } from "../../../../src/services/messages-service"
-import { estChiffree } from "../../../../src/services/e2ee-fil"
+import { activerE2ee, cleAChange, estChiffree, lireEtatE2ee, type EtatE2ee } from "../../../../src/services/e2ee-fil"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
   langueSourceDe,
@@ -5057,6 +5057,28 @@ export default function ChatRoomPage() {
   /** L'interrupteur GENERAL, celui que porte le bouton de la barre d'en-tete. */
   const [tradGlobale, setTradGlobale] = useState(() => traductionGlobaleActive())
 
+  /*
+   * L'ÉTAT DU CHIFFREMENT DE CETTE CONVERSATION.
+   *
+   * ⚠️ `null` TANT QU'ON NE SAIT PAS, et le bouton reste alors inerte : un
+   * bouton qui promet d'activer avant d'avoir demandé au serveur promettrait
+   * ce qu'il ne peut pas tenir — la route refuse les groupes, les comptes
+   * professionnels et les correspondants sans clés.
+   */
+  const [e2ee, setE2ee] = useState<EtatE2ee | null>(null)
+  const [e2eeEnCours, setE2eeEnCours] = useState(false)
+
+  /*
+   * Le correspondant, pour l'avertissement de changement de clé.
+   *
+   * ⚠️ `null` EN GROUPE, et l'avertissement ne paraît alors jamais : le
+   * chiffrement ne couvre pas les groupes, il n'y a donc aucune clé à
+   * surveiller.
+   */
+  const peerIdPourCle = chat?.isGroup
+    ? null
+    : (chat?.membersInfo?.find((m) => m.id !== getMyUserId())?.id ?? null)
+
   /**
    * Traduction automatique de cette discussion.
    *
@@ -5347,7 +5369,29 @@ export default function ChatRoomPage() {
     })
     void refreshCallEvents()
 
-    // Temps reel : abonnement aux nouveaux messages de la conversation
+    /*
+   * ⚠️ UNE SEULE LECTURE PAR CONVERSATION OUVERTE. L'état du chiffrement ne
+   * change qu'à l'activation, qui est à sens unique : le relire en boucle
+   * coûterait un appel réseau pour une réponse qui ne bougera plus.
+   */
+  useEffect(() => {
+    if (!chatId) return
+    let vivant = true
+    void lireEtatE2ee(chatId)
+      .then((r) => {
+        if (vivant) setE2ee(r)
+      })
+      .catch(() => {
+        // Serveur trop ancien, ou route indisponible : on se tait. Le fil
+        // fonctionne exactement comme avant, sans bouton.
+        if (vivant) setE2ee(null)
+      })
+    return () => {
+      vivant = false
+    }
+  }, [chatId])
+
+  // Temps reel : abonnement aux nouveaux messages de la conversation
     const myId = getMyUserId()
     // Correspondant d'une conversation directe : sert a filtrer les evenements
     // de presence, qui sont diffuses toutes conversations confondues.
@@ -7015,6 +7059,70 @@ export default function ChatRoomPage() {
                   toute l'application doit dire s'il est allume, sinon on
                   l'actionne pour savoir — et on eteint ce qu'on voulait
                   verifier. */}
+              {/*
+                ══════ LE CADENAS DU CHIFFREMENT ══════
+
+                🔴 TROIS ÉTATS, ET CHACUN DOIT SE LIRE SANS CLIQUER :
+                  · chiffrée      → cadenas plein, bouton inerte (c'est à sens
+                    unique, il n'y a rien à défaire) ;
+                  · activable     → cadenas ouvert, on peut appuyer ;
+                  · impossible    → cadenas barré, et le TITRE dit pourquoi.
+
+                ⚠️ LE MOTIF VIENT DU SERVEUR. Un bouton grisé sans explication
+                fait ouvrir un ticket ; « les groupes ne sont pas couverts »
+                clôt la question sur place.
+              */}
+              {e2ee !== null && (
+                <button
+                  className="action-btn"
+                  aria-label={t("e2ee_bouton")}
+                  aria-pressed={e2ee.e2eeActif}
+                  disabled={e2eeEnCours || (!e2ee.e2eeActif && !e2ee.activable)}
+                  title={
+                    e2ee.e2eeActif
+                      ? t("e2ee_actif")
+                      : e2ee.motif === "HORS_PERIMETRE"
+                        ? t("e2ee_hors_perimetre")
+                        : e2ee.motif === "GROUPE_NON_SUPPORTE"
+                          ? t("e2ee_groupe")
+                          : e2ee.motif === "CLES_MANQUANTES"
+                            ? t("e2ee_cles_manquantes")
+                            : t("e2ee_activer")
+                  }
+                  onClick={() => {
+                    if (e2ee.e2eeActif || !e2ee.activable) return
+                    setE2eeEnCours(true)
+                    void activerE2ee(chatId)
+                      .then(() => setE2ee({ ...e2ee, e2eeActif: true }))
+                      .catch(() => undefined)
+                      .finally(() => setE2eeEnCours(false))
+                  }}
+                  style={
+                    e2ee.e2eeActif
+                      ? { background: "var(--accent)", color: "var(--accent-text)" }
+                      : undefined
+                  }
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="4" y="10.5" width="16" height="10.5" rx="2" />
+                    {e2ee.e2eeActif ? (
+                      <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+                    ) : (
+                      <path d="M8 10.5V7a4 4 0 0 1 7.5-2" />
+                    )}
+                  </svg>
+                </button>
+              )}
+
               <button
                 className="action-btn"
                 aria-label={t("trad_globale_titre")}
@@ -7212,6 +7320,38 @@ export default function ChatRoomPage() {
             <button className="older-retry" onClick={() => void loadOlderMessages()}>
               {t("retry")}
             </button>
+          </div>
+        )}
+
+        {/*
+          ══════ LA CLÉ DU CORRESPONDANT A CHANGÉ ══════
+
+          🔴 C'EST LE SEUL SIGNAL QUI PUISSE RÉVÉLER UNE INTERPOSITION. Deux
+          lectures sont possibles, et elles se ressemblent trait pour trait :
+          le correspondant a réinstallé, ou quelqu'un a pris sa place entre
+          vous. Seul l'utilisateur peut trancher, en vérifiant hors de ce
+          canal.
+
+          ⚠️ ON PRÉVIENT SANS BLOQUER — décision du user, 21/09/2026. Refuser
+          figerait la conversation sans rien expliquer, alors que le cas le
+          plus fréquent est parfaitement innocent : un changement de téléphone.
+
+          ⚠️ EN TÊTE DU FIL, PAS DANS UNE NOTIFICATION QUI PASSE. Un
+          avertissement de sécurité qui disparaît au bout de trois secondes
+          n'avertit personne.
+
+          ⚠️ FOND ROUGE, ICI, ET C'EST LA DIFFÉRENCE AVEC LA BANNIÈRE DU
+          CHIFFREMENT : celle-ci informe, celle-là alerte. Leur donner la même
+          couleur reviendrait à dire que les deux se valent.
+        */}
+        {e2ee?.e2eeActif && peerIdPourCle !== null && cleAChange(peerIdPourCle) && (
+          <div className="e2ee-alerte">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3.5 2.8 19.5h18.4L12 3.5Z" />
+              <path d="M12 10v4" />
+              <path d="M12 17h.01" />
+            </svg>
+            <span>{t("e2ee_cle_changee")}</span>
           </div>
         )}
 
