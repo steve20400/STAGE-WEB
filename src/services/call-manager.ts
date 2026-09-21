@@ -994,8 +994,34 @@ export async function jouerAccueil(url: string): Promise<boolean> {
   const el = outgoingRingtoneAudio ?? accueilAudio ?? (accueilAudio = new Audio())
   if (el === outgoingRingtoneAudio) el.dataset.source = "accueil-repondeur"
   elementAccueil = el
+
+  /*
+   * 🐛 « RIEN NE SE JOUE TANT QU'ON N'A PAS MIS EN PAUSE PUIS RELANCÉ. »
+   *
+   * On posait la nouvelle source sur un élément EN TRAIN DE JOUER — c'est même
+   * tout l'intérêt de le reprendre, voir plus haut. Mais changer `src` pendant
+   * la lecture interrompt la sélection de ressource en cours : l'élément retombe
+   * en `readyState` 0 pendant que l'ancienne lecture s'annule, et le `play()`
+   * qui suit immédiatement se pose sur cet entre-deux. Le navigateur dit alors
+   * que l'élément joue — `paused` vaut faux, la promesse est tenue — et AUCUN
+   * son ne sort. Une pause suivie d'une relance repart d'un état propre, d'où
+   * le geste que les utilisateurs avaient trouvé tout seuls.
+   *
+   * ⚠️ METTRE EN PAUSE NE FAIT PAS PERDRE LA PERMISSION, et c'est la crainte qui
+   * avait fait écrire ce code ainsi. L'autorisation de jouer est attachée à
+   * l'ÉLÉMENT une fois qu'il a démarré sur un geste, pas à son état de lecture
+   * à l'instant T — c'est exactement ce qui fait marcher le déverrouillage par
+   * un silence, que ce fichier pratique déjà. On garde donc l'élément, on le
+   * met simplement dans un état où il peut repartir.
+   *
+   * `load()` est explicite plutôt que laissé au navigateur : il abandonne
+   * proprement l'ancienne ressource au lieu de laisser deux sélections se
+   * chevaucher.
+   */
+  el.pause()
   el.loop = false
   el.src = url
+  el.load()
   try {
     await el.play()
     return true
