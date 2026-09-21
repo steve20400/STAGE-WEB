@@ -4,6 +4,12 @@ import { ApiError } from "../lib/api-client"
 import { isCustomRingtone, RINGTONES, ringtoneSource, ringtoneUrl } from "./ringtones"
 import { sonneriePourAppelant } from "./contact-lists-service"
 import { accueilDeLAppel } from "./repondeur-service"
+import {
+  annulerPrechargement,
+  attendreAccueil,
+  demarrerPrechargement,
+  libererAccueilAdopte,
+} from "./prechargement-accueil"
 import { resolveMediaUrl } from "./media-service"
 import { defaultAudioOutput, type AudioOutputMode } from "./audio-output"
 import {
@@ -1463,11 +1469,27 @@ async function basculerVersRepondeur(callId: string): Promise<void> {
    */
   const nom = state.peerName
 
+  /*
+   * 🔴 L'ACCUEIL EST DÉJÀ LÀ — il s'est téléchargé pendant les trente secondes
+   * de sonnerie. On récupère une adresse LOCALE (`blob:`), ce qui change tout au
+   * moment de jouer : aucune requête, aucune latence, aucun jeton, donc aucun
+   * refus possible. C'est ce qui permet à l'accueil de se lancer TOUT SEUL au
+   * lieu d'attendre un clic sur « Écouter l'accueil ».
+   *
+   * ⚠️ ON N'ATTEND QUE TRÈS PEU ICI : le fichier est normalement arrivé depuis
+   * longtemps. Ce court délai ne couvre que le cas où le serveur a répondu au
+   * ralenti — au-delà, on retombe sur l'adresse réseau, comme avant.
+   */
   let accueil: { url: string } | null = null
-  try {
-    accueil = await accueilDeLAppel(callId)
-  } catch {
-    // Réseau ou serveur muet : on raccroche simplement, comme avant.
+  const precharge = await attendreAccueil(callId, ATTENTE_ACCUEIL_COURTE_MS)
+  if (precharge) {
+    accueil = { url: precharge }
+  } else {
+    try {
+      accueil = await accueilDeLAppel(callId)
+    } catch {
+      // Réseau ou serveur muet : on raccroche simplement, comme avant.
+    }
   }
 
   /*
@@ -1508,8 +1530,12 @@ async function basculerVersRepondeur(callId: string): Promise<void> {
      */
     setState({
       repondeur: {
+        // ⚠️ UNE ADRESSE `blob:` NE PASSE PAS PAR `resolveMediaUrl` : elle est
+        // déjà absolue et locale, et lui accoler un jeton la rendrait illisible.
         callId,
-        accueilUrl: resolveMediaUrl(accueil.url),
+        accueilUrl: accueil.url.startsWith("blob:")
+          ? accueil.url
+          : resolveMediaUrl(accueil.url),
         nom,
         absence: false,
         type: state.callType,
@@ -1524,6 +1550,8 @@ async function basculerVersRepondeur(callId: string): Promise<void> {
 
 /** Ferme l'écran du répondeur sans rien envoyer. */
 export function quitterRepondeur(): void {
+  // Quelques mégaoctets par appel manqué, sinon retenus pour la vie de l'onglet.
+  libererAccueilAdopte()
   setState({ repondeur: null })
 }
 
@@ -1577,6 +1605,33 @@ let ringTimeoutId: ReturnType<typeof setTimeout> | null = null
  * ouvrirait deux fois la feuille.
  */
 let repondeurTente: string | null = null
+
+/**
+ * Combien de temps on accepte d'attendre l'accueil préchargé.
+ *
+ * ⚠️ DEUX VALEURS, POUR DEUX SITUATIONS QUI N'ONT RIEN À VOIR.
+ *
+ * Après trente secondes de sonnerie, le fichier est arrivé depuis longtemps :
+ * ce court délai ne couvre qu'un serveur qui a répondu au ralenti.
+ *
+ * En mode absence, on vient de lancer l'appel : le téléchargement commence à
+ * l'instant, et c'est la tonalité qui fait patienter. On accepte d'attendre
+ * plus — mais pas indéfiniment, sinon un réseau lent ferait sonner une minute
+ * dans le vide.
+ */
+const ATTENTE_ACCUEIL_COURTE_MS = 1_500
+const ATTENTE_ACCUEIL_LONGUE_MS = 9_000
+
+/**
+ * Le temps minimal de tonalité avant que le répondeur ne prenne, en absence.
+ *
+ * 🔴 SANS LUI, L'APPEL PARAÎT CASSÉ. En mode absence le serveur répond
+ * instantanément : on appuie sur « appeler » et la feuille du répondeur
+ * surgit dans la seconde, sans qu'aucune sonnerie n'ait eu lieu. On ne
+ * comprend pas qu'un appel a été lancé — on croit à un bug. Une seconde et
+ * demie de tonalité suffit à dire « on a essayé de joindre quelqu'un ».
+ */
+const TONALITE_MINIMALE_MS = 1_500
 let eventsUnsubscribe: (() => void) | null = null
 
 function myUserId(): string | null {
@@ -1949,6 +2004,14 @@ function stopMesh() {
 }
 
 function clearCall(markEnded: boolean) {
+  /*
+   * ⚠️ LE PRÉCHARGEMENT S'ARRÊTE ICI, et c'est sans danger pour la feuille du
+   * répondeur : `attendreAccueil` lui a déjà transféré l'adresse, qui ne dépend
+   * plus de ce téléchargement. Ce qu'on annule, c'est un fichier que plus
+   * personne n'entendra — on décroche, on raccroche — et qu'on paierait pour
+   * rien sur un forfait mobile.
+   */
+  annulerPrechargement()
   if (ringTimeoutId) {
     clearTimeout(ringTimeoutId)
     ringTimeoutId = null
@@ -2131,29 +2194,67 @@ async function handleServerEvent(event: CallServerEvent) {
       void hangUp()
       return
     }
-    setState({
-      repondeur: {
-        callId,
-        accueilUrl: resolveMediaUrl(accueil.url),
-        nom: String(event.peerName ?? state.peerName ?? tr("call")),
-        absence: true,
-        type: event.callType === "VIDEO" ? "video" : "audio",
-      },
-      displayMode: "full",
-    })
+
     /*
-     * 🐛 L'APPEL RESTAIT « EN TRAIN DE SONNER » POUR TOUJOURS.
+     * 🔴 LA TONALITÉ JOUE D'ABORD, ET LE RÉPONDEUR PREND ENSUITE.
      *
-     * Personne n'a sonné et personne ne décrochera : il n'y a plus d'appel. Mais
-     * l'état local, lui, continuait de dire le contraire — et comme on venait de
-     * couper le minuteur de sonnerie, plus rien ne devait y mettre fin. Fermer
-     * la feuille laissait donc devant un écran qui sonnait dans le vide, sans
-     * aucune sortie.
+     * En mode absence — durée fixe ou plage programmée — le serveur répond
+     * INSTANTANÉMENT : sans ce délai, on appuyait sur « appeler » et la feuille
+     * du répondeur surgissait dans la seconde, sans qu'aucune sonnerie n'ait eu
+     * lieu. On ne comprenait pas qu'un appel avait été lancé ; on croyait à un
+     * défaut de l'application.
      *
-     * ⚠️ `hangUp` NE FERME PAS LA FEUILLE : `clearCall` reporte `repondeur` tel
-     * quel, précisément pour qu'on puisse enregistrer APRÈS la fin de l'appel.
+     * Le téléphone d'en face reste silencieux — c'est ce que la personne a
+     * demandé — mais l'APPELANT, lui, entend ce qu'il entend toujours quand il
+     * appelle. Et pendant qu'il l'entend, L'ACCUEIL SE TÉLÉCHARGE : quand la
+     * tonalité s'arrête, le fichier est là, et il se joue TOUT SEUL.
+     *
+     * ⚠️ DEUX BORNES, ET CHACUNE A SA RAISON. Un plancher, sinon la tonalité
+     * clignote et l'on n'a rien entendu. Un plafond, sinon un réseau lent
+     * ferait sonner une minute dans le vide pour un appel qui n'aboutira pas.
      */
-    void hangUp()
+    demarrerPrechargement(callId, accueil.url)
+
+    const nomAffiche = String(event.peerName ?? state.peerName ?? tr("call"))
+    const typeAppel = event.callType === "VIDEO" ? "video" : "audio"
+    const urlReseau = accueil.url
+    const depart = Date.now()
+
+    void (async () => {
+      const local = await attendreAccueil(callId, ATTENTE_ACCUEIL_LONGUE_MS)
+      const reste = TONALITE_MINIMALE_MS - (Date.now() - depart)
+      if (reste > 0) await new Promise((r) => setTimeout(r, reste))
+
+      // L'appel a pu être raccroché pendant la tonalité : on ne pose pas une
+      // feuille de répondeur sur un écran qu'on vient de quitter.
+      if (state.activeCallId !== null && state.activeCallId !== callId) return
+
+      setState({
+        repondeur: {
+          callId,
+          // ⚠️ UNE ADRESSE `blob:` EST DÉJÀ ABSOLUE ET LOCALE : lui accoler un
+          // jeton la rendrait illisible. Sans préchargement, on retombe sur
+          // l'adresse réseau, exactement comme avant.
+          accueilUrl: local ?? resolveMediaUrl(urlReseau),
+          nom: nomAffiche,
+          absence: true,
+          type: typeAppel,
+        },
+        displayMode: "full",
+      })
+      /*
+       * 🐛 L'APPEL RESTAIT « EN TRAIN DE SONNER » POUR TOUJOURS.
+       *
+       * Personne n'a sonné et personne ne décrochera : il n'y a plus d'appel.
+       * Mais l'état local continuait de dire le contraire — et le minuteur
+       * venant d'être coupé, plus rien ne devait y mettre fin. Fermer la feuille
+       * laissait devant un écran qui sonnait dans le vide, sans aucune sortie.
+       *
+       * ⚠️ `hangUp` NE FERME PAS LA FEUILLE : `clearCall` reporte `repondeur`
+       * tel quel, pour qu'on puisse enregistrer APRÈS la fin de l'appel.
+       */
+      void hangUp()
+    })()
     return
   }
 
@@ -2625,9 +2726,25 @@ export async function startOutgoingCall(
 
   // Nouvel appel, nouvelle chance : le verrou ne vaut que pour l'appel passe.
   repondeurTente = null
+  // L'accueil du répondeur précédent n'a plus de raison d'occuper la mémoire.
+  libererAccueilAdopte()
   // Le geste vient d'avoir lieu : c'est MAINTENANT que l'accueil prend sa
   // permission de jouer, pas dans trente secondes quand il en aura besoin.
   amorcerAccueil()
+
+  /*
+   * 🔴 L'ACCUEIL SE TÉLÉCHARGE PENDANT QUE ÇA SONNE.
+   *
+   * Trente secondes d'attente qu'on ne peut pas raccourcir, et un fichier qu'il
+   * faudra jouer au bout : les faire l'un après l'autre était du temps perdu, et
+   * c'est ce qui obligeait à cliquer sur « Écouter l'accueil ». Menés ensemble,
+   * le fichier est là AVANT qu'on en ait besoin.
+   *
+   * ⚠️ IL S'ANNULE DÈS QUE L'APPEL ABOUTIT OU QU'ON RACCROCHE — voir
+   * `annulerPrechargement`. Sans cela on paierait les données d'un accueil que
+   * personne n'entendra, à chaque appel décroché.
+   */
+  demarrerPrechargement(started.id)
 
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {
@@ -2717,9 +2834,25 @@ export async function startCallbackCall(
 
   // Nouvel appel, nouvelle chance : le verrou ne vaut que pour l'appel passe.
   repondeurTente = null
+  // L'accueil du répondeur précédent n'a plus de raison d'occuper la mémoire.
+  libererAccueilAdopte()
   // Le geste vient d'avoir lieu : c'est MAINTENANT que l'accueil prend sa
   // permission de jouer, pas dans trente secondes quand il en aura besoin.
   amorcerAccueil()
+
+  /*
+   * 🔴 L'ACCUEIL SE TÉLÉCHARGE PENDANT QUE ÇA SONNE.
+   *
+   * Trente secondes d'attente qu'on ne peut pas raccourcir, et un fichier qu'il
+   * faudra jouer au bout : les faire l'un après l'autre était du temps perdu, et
+   * c'est ce qui obligeait à cliquer sur « Écouter l'accueil ». Menés ensemble,
+   * le fichier est là AVANT qu'on en ait besoin.
+   *
+   * ⚠️ IL S'ANNULE DÈS QUE L'APPEL ABOUTIT OU QU'ON RACCROCHE — voir
+   * `annulerPrechargement`. Sans cela on paierait les données d'un accueil que
+   * personne n'entendra, à chaque appel décroché.
+   */
+  demarrerPrechargement(started.id)
 
   ringTimeoutId = setTimeout(() => {
     if (state.role === "outgoing" && state.activeCallId === started.id) {
