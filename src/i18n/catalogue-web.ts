@@ -13,6 +13,8 @@ import type { LanguageCode } from "./catalogue"
  * portent leur typographie d'origine — accents, alphabets, apostrophes.
  */
 export const WEB_TRANSLATION_KEYS = [
+  // La banniere « a partir d ici, chiffre » du fil de discussion.
+  "e2ee_banner",
   "call_ringing",
   "call_ongoing",
   "call_ended",
@@ -1335,6 +1337,7 @@ export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    e2ee_banner: "Les messages envoyés à partir d'ici sont chiffrés de bout en bout. Les précédents restent lisibles.",
     company_no_type: "Aucun type d'entreprise n'est disponible.",
     company_count_none: "Aucune dans votre pays",
     company_count_one: "1 entreprise",
@@ -2671,6 +2674,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Impossible de charger vos contacts.",
   },
   en: {
+    e2ee_banner: "Messages sent from here are end-to-end encrypted. Earlier ones remain readable.",
     company_no_type: "No company type is available.",
     company_count_none: "None in your country",
     company_count_one: "1 company",
@@ -3993,6 +3997,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Your contacts could not be loaded.",
   },
   es: {
+    e2ee_banner: "Los mensajes enviados a partir de aquí están cifrados de extremo a extremo. Los anteriores siguen siendo legibles.",
     company_no_type: "No hay ningún tipo de empresa disponible.",
     company_count_none: "Ninguna en su país",
     company_count_one: "1 empresa",
@@ -5322,6 +5327,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "No se han podido cargar tus contactos.",
   },
   de: {
+    e2ee_banner: "Ab hier gesendete Nachrichten sind Ende-zu-Ende-verschlüsselt. Frühere bleiben lesbar.",
     company_no_type: "Es ist keine Unternehmensart verfügbar.",
     company_count_none: "Keines in Ihrem Land",
     company_count_one: "1 Unternehmen",
@@ -6664,6 +6670,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Deine Kontakte konnten nicht geladen werden.",
   },
   pt: {
+    e2ee_banner: "As mensagens enviadas a partir daqui são cifradas de ponta a ponta. As anteriores continuam legíveis.",
     company_no_type: "Nenhum tipo de empresa disponível.",
     company_count_none: "Nenhuma no seu país",
     company_count_one: "1 empresa",
@@ -7993,6 +8000,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Não foi possível carregar os seus contactos.",
   },
   ru: {
+    e2ee_banner: "Сообщения, отправленные начиная отсюда, защищены сквозным шифрованием. Предыдущие остаются читаемыми.",
     company_no_type: "Нет доступных типов компаний.",
     company_count_none: "Нет в вашей стране",
     company_count_one: "1 компания",
@@ -9315,6 +9323,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Не удалось загрузить ваши контакты.",
   },
   zh: {
+    e2ee_banner: "从这里开始发送的消息已端到端加密。此前的消息仍可读。",
     company_no_type: "暂无可用的企业类型。",
     company_count_none: "您所在国家没有",
     company_count_one: "1 家企业",
@@ -10595,6 +10604,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "无法加载您的联系人。",
   },
   sv: {
+    e2ee_banner: "Meddelanden som skickas härifrån är totalsträckskrypterade. Tidigare meddelanden förblir läsbara.",
     company_no_type: "Ingen företagstyp är tillgänglig.",
     company_count_none: "Inget i ert land",
     company_count_one: "1 företag",
@@ -11919,6 +11929,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Dina kontakter kunde inte laddas.",
   },
   no: {
+    e2ee_banner: "Meldinger som sendes herfra er ende-til-ende-kryptert. Tidligere meldinger forblir lesbare.",
     company_no_type: "Ingen selskapstype er tilgjengelig.",
     company_count_none: "Ingen i landet deres",
     company_count_one: "1 selskap",

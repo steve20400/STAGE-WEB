@@ -44,6 +44,7 @@ import {
   mettreMediaEnFile,
   apercusMediasEnAttente,
 } from "../../../../src/services/messages-service"
+import { estChiffree } from "../../../../src/services/e2ee-fil"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
   langueSourceDe,
@@ -6864,6 +6865,18 @@ export default function ChatRoomPage() {
     window.setTimeout(() => target.classList.remove("msg-highlight"), MSG_FLASH_MS)
   }
 
+  /*
+   * LA FRONTIERE DU CHIFFREMENT — le premier message chiffre du fil ENTIER.
+   *
+   * ⚠️ CALCULEE SUR TOUTE LA LISTE, PAS PAR JOUR. Cherchee dans chaque groupe
+   * de date, la banniere reparaitrait tous les jours — et une indication qui
+   * se repete cesse d etre lue. Une fois le fil passe au chiffre, il l est
+   * pour de bon : la frontiere est unique.
+   */
+  const premierChiffreId = timeline.find(
+    (it) => it.kind === "msg" && it.msg.chiffre === true,
+  )
+
   // Grouper par date
   const grouped = timeline.reduce<{ date: string; items: TimelineItem[] }[]>((acc, item) => {
     const dateStr = formatDateSeparator(item.ts)
@@ -7210,7 +7223,29 @@ export default function ChatRoomPage() {
               <div className="date-sep-line" />
             </div>
 
-            {items.map((item, indexFil) => {
+            {(() => {
+              /*
+               * ══════ « À PARTIR D'ICI, CHIFFRÉ » ══════
+               *
+               * 🔴 LES ANCIENS MESSAGES RESTENT LISIBLES, et c'est une
+               * décision, pas un oubli : le serveur ne peut pas les chiffrer
+               * rétroactivement — il faudrait qu'un client les relise, les
+               * chiffre et les repose, ce qui suppose qu'il les ait TOUS et
+               * que personne n'ait changé d'appareil depuis.
+               *
+               * ⚠️ IL FAUT DONC LE DIRE. Un fil dont la moitié est protégée et
+               * l'autre non, sans rien qui marque la frontière, laisse croire
+               * que TOUT l'est. Cette ligne est la seule chose qui empêche ce
+               * malentendu — et sur du chiffrement, un malentendu fait prendre
+               * des risques qu'on croyait écartés.
+               *
+               * ⚠️ ON ENVELOPPE LA BOUCLE AU LIEU D'Y TOUCHER. Elle rend des
+               * formes différentes selon le type d'entrée — appel, répondeur,
+               * message — et y insérer une branche de plus aurait demandé de
+               * modifier chacun de ses retours. Poser la bannière APRÈS coup,
+               * dans le tableau rendu, ne touche à aucun d'eux.
+               */
+              const rendus = items.map((item, indexFil) => {
               if (item.kind === "call") {
                 return <CallEventChip key={`call-${item.call.id}`} call={item.call} />
               }
@@ -7392,7 +7427,32 @@ export default function ChatRoomPage() {
                   />
                 </MessageErrorBoundary>
               )
-            })}
+            })
+              /*
+               * ⚠️ LE PREMIER MESSAGE CHIFFRE DU JOUR AFFICHE, et la garde
+               * ci-dessous evite qu elle reparaisse a chaque separateur de date :
+               * une fois le fil passe au chiffre, TOUS les jours suivants le sont.
+               * Sans cela, la banniere se repeterait tous les jours, et une
+               * indication qui se repete cesse d etre lue.
+               */
+              const place = items.findIndex(
+                (it) => it === premierChiffreId,
+              )
+              if (place >= 0) {
+                rendus.splice(
+                  place,
+                  0,
+                  <div className="e2ee-banniere" key="e2ee-banniere">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="5" y="10.5" width="14" height="9" rx="2" />
+                      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+                    </svg>
+                    <span>{t("e2ee_banner")}</span>
+                  </div>,
+                )
+              }
+              return rendus
+            })()}
           </div>
         ))}
 

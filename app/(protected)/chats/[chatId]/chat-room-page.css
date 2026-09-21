@@ -1110,3 +1110,47 @@ textarea.room-textarea::placeholder {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ══════════════════ LA BANNIÈRE DU CHIFFREMENT ══════════════════
+ *
+ * 🔴 ELLE DOIT SE LIRE, PAS SE FONDRE. C'est la seule chose qui distingue la
+ * partie protégée du fil de celle qui ne l'est pas ; la rendre discrète au
+ * point qu'on la saute reviendrait à ne rien indiquer du tout.
+ *
+ * ⚠️ MAIS PAS UNE ALERTE NON PLUS : le fond ambré dit « information », là où du
+ * rouge dirait « problème ». Il n'y a pas de problème — c'est même l'inverse.
+ */
+.e2ee-banniere {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px auto;
+  max-width: 480px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: #fff4e5;
+  border: 1px solid #f0d5b8;
+  color: #6b4b2a;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.e2ee-banniere svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: #b85c38;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .e2ee-banniere {
+    background: #2a2118;
+    border-color: #4a3a28;
+    color: #e0cdb5;
+  }
+}

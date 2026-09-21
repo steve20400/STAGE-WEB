@@ -26,6 +26,8 @@ import { estChiffree, envoyerChiffre, releverEtDechiffrer } from "./e2ee-fil"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
+  /** Le serveur le deduit de l existence d une enveloppe chiffree. */
+  chiffre?: boolean
   id: string
   convId: string
   senderId: string // UUID de l'expediteur
@@ -172,6 +174,9 @@ export function toFrontMessage(
     content: m.content ?? "",
     type: media?.mimeType?.startsWith("video/") ? "video" : mapType(m.type),
     status: mapStatus(m.status),
+    // Ce message est chiffre : le serveur le deduit de l existence d une
+    // enveloppe. Sert a placer la banniere du fil.
+    chiffre: (m as BackendMessage).chiffre === true,
     // Les mentions accompagnent le message. Absentes d'un backend anterieur :
     // le texte porte deja « @Dominique » en clair, la bulle reste juste.
     mentions: (m as BackendMessage).mentions ?? undefined,
@@ -287,7 +292,26 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
     const clairs = await releverEtDechiffrer()
     for (const m of messages) {
       const clair = clairs.get(m.id)
-      if (clair !== undefined) m.content = clair
+      if (clair === undefined) continue
+      m.content = clair
+      /*
+       * 🔴 LE DÉCHIFFRÉ EST MIS EN CACHE, ET IL LE FAUT — voir la décision du
+       * 21/09/2026, côté envoi.
+       *
+       * ⚠️ ICI, CE N'EST MÊME PAS UN CONFORT : l'enveloppe vient d'être
+       * ACQUITTÉE, donc retirée du serveur. Si le clair n'était pas rangé, ce
+       * message serait DÉFINITIVEMENT perdu au prochain rechargement —
+       * personne ne peut le reconstituer, pas même le serveur.
+       */
+      void cacheMessage({
+        id: m.id,
+        conversationId: chatId,
+        senderId: m.senderId === "me" ? (myId ?? "") : m.senderId,
+        content: clair,
+        type: toBackendType(m.type),
+        status: "SENT",
+        createdAt: m.timestamp.getTime(),
+      })
     }
   }
 
@@ -512,12 +536,36 @@ export async function sendChatMessage(
       )
     }
     const cree = await envoyerChiffre(chatId, content)
+
     /*
-     * ⚠️ ON NE MET PAS LE CLAIR EN CACHE. `cacheMessage` écrit dans IndexedDB,
-     * qui n'est pas chiffré : y recopier le texte annulerait le bénéfice pour
-     * l'expéditeur, dont l'appareil est justement celui qu'on protège en cas
-     * de vol. L'écran l'affiche depuis la mémoire, le temps de la session.
+     * 🔴 LE CLAIR EST MIS EN CACHE, COMME N'IMPORTE QUEL MESSAGE — décision du
+     * user, 21/09/2026, après que la question a été posée.
+     *
+     * ⚠️ CE QUE CELA COÛTE, ET QU'IL FAUT ASSUMER : `cacheMessage` écrit dans
+     * IndexedDB, qui n'est PAS chiffré. Le texte d'une conversation chiffrée
+     * est donc lisible par qui obtient l'appareil ou exécute un script sur
+     * cette origine. Le chiffrement protège le TRANSPORT et le SERVEUR ; il ne
+     * protège plus l'appareil.
+     *
+     * ⚠️ CE QUE CELA APPORTE, ET POURQUOI C'EST DÉFENDABLE : sans cache, un fil
+     * chiffré redeviendrait vide à chaque rechargement — les enveloppes ayant
+     * été acquittées, PERSONNE ne peut les relire, pas même le serveur. On
+     * échangerait une protection contre le vol d'appareil contre une perte
+     * d'historique à la première actualisation.
+     *
+     * Le jour où le coffre passera à IndexedDB chiffré (dette du chapitre 1),
+     * ce cache-ci devra le rejoindre — et la question cessera de se poser.
      */
+    void cacheMessage({
+      id: cree.id,
+      conversationId: chatId,
+      senderId: myId ?? "",
+      content,
+      type: msgType,
+      status: "SENT",
+      createdAt: new Date(cree.createdAt).getTime(),
+    })
+
     return {
       id: cree.id,
       senderId: "me",
