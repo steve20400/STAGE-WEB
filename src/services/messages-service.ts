@@ -22,7 +22,12 @@ import {
   enqueueOffline,
 } from "./indexeddb-cache"
 import { uploadMedia } from "./media-service"
-import { estChiffree, envoyerChiffre, releverEtDechiffrer } from "./e2ee-fil"
+import {
+  estChiffree,
+  envoyerChiffre,
+  noteEtatChiffrement,
+  releverEtDechiffrer,
+} from "./e2ee-fil"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
@@ -290,8 +295,39 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
    */
   if (estChiffree(chatId)) {
     const clairs = await releverEtDechiffrer()
+
+    /*
+     * 🐛 LES MESSAGES QUE J'AI ÉCRITS REVENAIENT VIDES.
+     *
+     * Le serveur rend `content: null` pour tout message chiffré, et les
+     * enveloppes ne sont adressées qu'au DESTINATAIRE : l'expéditeur n'en
+     * reçoit aucune. À la relecture du fil, ses propres messages
+     * s'affichaient donc en bulles vides — il voyait disparaître ce qu'il
+     * venait d'écrire.
+     *
+     * ⚠️ LE CACHE EST LA SEULE SOURCE POUR SES PROPRES MESSAGES, et c'est
+     * pour cela qu'on l'y range à l'envoi. On le relit ici pour tout message
+     * chiffré qu'aucune enveloppe n'a éclairé.
+     *
+     * ⚠️ NE JAMAIS ÉCRASER UN TEXTE CONNU PAR DU VIDE. C'est la règle de fond :
+     * une lecture fraîche du serveur est plus à jour sur les métadonnées, mais
+     * pour le CONTENU d'un message chiffré elle ne sait rien. La laisser
+     * gagner ferait perdre le message à chaque rafraîchissement.
+     */
+    const enCache = new Map<string, string>()
+    try {
+      const caches = await loadCachedMessages(chatId, INITIAL_PAGE_SIZE)
+      for (const c of caches) {
+        const texte = (c as { id: string; content?: string | null }).content
+        if (texte) enCache.set((c as { id: string }).id, texte)
+      }
+    } catch {
+      // Cache indisponible : on fera sans, et les messages non déchiffrés
+      // resteront vides plutôt que de faire échouer tout le fil.
+    }
+
     for (const m of messages) {
-      const clair = clairs.get(m.id)
+      const clair = clairs.get(m.id) ?? (m.chiffre ? enCache.get(m.id) : undefined)
       if (clair === undefined) continue
       m.content = clair
       /*
@@ -631,6 +667,49 @@ export async function sendChatMessage(
      * l'ecran de discussion. Le message n'est PAS mis en file d'attente : la
      * file reessaie au retour du reseau, et il repartirait indefiniment.
      */
+    /*
+     * 🐛 « UN MESSAGE D'ERREUR S'AFFICHE À L'ENVOI ».
+     *
+     * Le client ne sait qu'une conversation est chiffrée qu'après avoir lu
+     * son état — ce qui prend un aller-retour. Deux situations lui font
+     * prendre le chemin du CLAIR sur un fil qui ne l'accepte plus :
+     *
+     *   · on écrit dans la seconde qui suit l'ouverture, avant la réponse ;
+     *   · le CORRESPONDANT vient d'activer le chiffrement, et rien ne nous
+     *     l'a encore dit.
+     *
+     * Le serveur refuse alors, à juste titre — il ne peut pas ranger du clair
+     * dans un fil chiffré. Mais afficher cette erreur à quelqu'un qui n'a
+     * rien fait de mal, et dont le message EST envoyable, serait absurde.
+     *
+     * ⚠️ ON REJOUE PAR LE CHEMIN CHIFFRÉ AU LIEU D'ÉCHOUER. C'est le serveur
+     * qui vient de nous apprendre l'état réel : on le note, et on recommence.
+     *
+     * ⚠️ UNE SEULE FOIS. Si le second essai échoue aussi, c'est autre chose —
+     * pas de clés, correspondant hors périmètre — et il faut le dire.
+     */
+    if (estRefusChiffrement(err) && type === "text" && (content ?? "").trim() !== "") {
+      noteEtatChiffrement(chatId, true)
+      const cree = await envoyerChiffre(chatId, content)
+      void cacheMessage({
+        id: cree.id,
+        conversationId: chatId,
+        senderId: myId ?? "",
+        content,
+        type: msgType,
+        status: "SENT",
+        createdAt: new Date(cree.createdAt).getTime(),
+      })
+      return {
+        id: cree.id,
+        senderId: "me",
+        content,
+        type,
+        status: "sent",
+        timestamp: new Date(cree.createdAt),
+      }
+    }
+
     if (estRefusPourBlocage(err)) {
       await cacheMessage({
         id: tempId,
@@ -663,6 +742,19 @@ export async function sendChatMessage(
  * client bascule quand le WebSocket n'acquitte pas — ce qui est precisement ce
  * qui se passe entre deux personnes bloquees.
  */
+/**
+ * Le serveur refuse-t-il parce que la conversation est CHIFFRÉE ?
+ *
+ * ⚠️ DISTINCT DU BLOCAGE, ET IL FAUT QUE ÇA LE RESTE : « cette personne vous
+ * a bloqué » et « ce fil est chiffré » appellent des conduites opposées — se
+ * taire dans un cas, recommencer autrement dans l'autre.
+ */
+function estRefusChiffrement(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false
+  const charge = err.payload as { error?: { code?: unknown } } | undefined
+  return charge?.error?.code === "CONVERSATION_CHIFFREE"
+}
+
 function estRefusPourBlocage(err: unknown): boolean {
   if (!(err instanceof ApiError) || err.status !== 403) return false
   // Le code voyage dans la charge : { error: { message, code } }.

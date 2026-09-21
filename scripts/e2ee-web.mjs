@@ -145,12 +145,36 @@ async function main() {
   await prisma.e2eeIdentite.deleteMany({
     where: { userId: { in: [a.user.id, b.user.id] } },
   });
-  const conv = await prisma.conversation.create({
-    data: {
+  /*
+   * 🐛 CE BANC CRÉAIT UNE CONVERSATION NEUVE À CHAQUE EXÉCUTION.
+   *
+   * Après huit essais, les comptes de test se retrouvaient avec huit fils
+   * distincts vers la MÊME personne — ce que le user a vu en ouvrant
+   * l'application, et qui ressemblait à un défaut du produit alors que
+   * c'était le banc qui salissait sa propre base.
+   *
+   * ⚠️ UN BANC NE DOIT PAS LAISSER DE TRACES QUI RESSEMBLENT À DES BOGUES.
+   * On réutilise donc le fil existant, et on n'en crée un que la première
+   * fois.
+   */
+  let conv = await prisma.conversation.findFirst({
+    where: {
       isGroup: false,
-      participants: { create: [{ userId: a.user.id }, { userId: b.user.id }] },
+      AND: [
+        { participants: { some: { userId: a.user.id } } },
+        { participants: { some: { userId: b.user.id } } },
+      ],
     },
+    orderBy: { createdAt: "asc" },
   });
+  if (!conv) {
+    conv = await prisma.conversation.create({
+      data: {
+        isGroup: false,
+        participants: { create: [{ userId: a.user.id }, { userId: b.user.id }] },
+      },
+    });
+  }
 
   const SECRET = "Message écrit par le VRAI module du navigateur";
   let echecs = 0;
