@@ -20,6 +20,7 @@ import {
   type EtatRepondeur,
   type PlageRepondeur,
 } from "../services/repondeur-service"
+import { ApiError } from "../lib/api-client"
 import { resolveMediaUrl } from "../services/media-service"
 
 /**
@@ -168,6 +169,28 @@ type Phase =
   | { nom: "enregistre"; depuis: number }
   | { nom: "relit"; blob: Blob; dureeMs: number }
 
+/**
+ * Le message QUE LE SERVEUR A ÉCRIT quand il refuse, le repli générique sinon.
+ *
+ * 🔴 NEUF SITES AFFICHAIENT « rep_echec » POUR TOUT. Le backend rédige pourtant
+ * des refus qui disent quoi faire — « Enregistrez d'abord un message d'accueil :
+ * sans lui, les appels sonneraient comme d'habitude. », « Pas plus de 40 plages
+ * par compte ». Aucun n'arrivait à l'écran : l'utilisateur voyait « échec » et
+ * n'avait aucun moyen de savoir ce qu'on attendait de lui. Le mobile, lui,
+ * affichait ces messages depuis le début.
+ *
+ * ⚠️ SEULEMENT LES 4xx, ET C'EST LA RAISON D'ÊTRE DE CE FILTRE. Un 5xx porte un
+ * texte écrit pour des journaux, pas pour un humain — « Internal Server
+ * Error » n'aide personne — et une panne réseau n'a pas de message du tout. Ces
+ * cas-là gardent le repli traduit, qui au moins parle la langue de la personne.
+ */
+function messageRefus(e: unknown, repli: string): string {
+  if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+    const dit = e.message.trim()
+    if (dit !== "") return dit
+  }
+  return repli
+}
 export function RepondeurReglages() {
   const { t, language } = useTranslation()
   const { success, error } = useToast()
@@ -416,8 +439,8 @@ export function RepondeurReglages() {
       setSecondes(0)
       setLibelle("")
       success(t("rep_enregistre"))
-    } catch {
-      error(t("rep_echec"))
+    } catch (e) {
+      error(messageRefus(e, t("rep_echec")))
     } finally {
       setOccupe(false)
     }
@@ -441,8 +464,8 @@ export function RepondeurReglages() {
       appliquerEtat(etat)
       setLibelle("")
       success(t("rep_enregistre"))
-    } catch {
-      error(t("rep_echec"))
+    } catch (e) {
+      error(messageRefus(e, t("rep_echec")))
     } finally {
       setOccupe(false)
       // Sans remise à zéro, réimporter le MÊME fichier n'émet aucun événement.
@@ -456,8 +479,8 @@ export function RepondeurReglages() {
     try {
       const etat = await retirerAccueil(id)
       appliquerEtat(etat)
-    } catch {
-      error(t("rep_echec"))
+    } catch (e) {
+      error(messageRefus(e, t("rep_echec")))
     } finally {
       setOccupe(false)
     }
@@ -520,8 +543,8 @@ export function RepondeurReglages() {
       // ouverts laisserait croire qu'une durée est encore en train d'être posée.
       if (minutesDemandees === 0) setModeDuree(false)
       if (minutesDemandees > 0) success(t("rep_abs_pose"))
-    } catch {
-      error(t("rep_echec"))
+    } catch (e) {
+      error(messageRefus(e, t("rep_echec")))
     } finally {
       setOccupe(false)
     }
@@ -586,8 +609,8 @@ export function RepondeurReglages() {
       )
       setJoursChoisis([])
       success(t("rep_prog_ok"))
-    } catch {
-      error(t("rep_echec"))
+    } catch (e) {
+      error(messageRefus(e, t("rep_echec")))
     } finally {
       setOccupe(false)
     }
@@ -598,8 +621,8 @@ export function RepondeurReglages() {
     setOccupe(true)
     try {
       setPlages(await retirerPlage(id))
-    } catch {
-      error(t("rep_echec"))
+    } catch (e) {
+      error(messageRefus(e, t("rep_echec")))
     } finally {
       setOccupe(false)
     }
@@ -611,9 +634,9 @@ export function RepondeurReglages() {
     try {
       const etat = await activerRepondeur(valeur)
       appliquerEtat(etat)
-    } catch {
+    } catch (e) {
       setActif(!valeur)
-      error(t("rep_echec"))
+      error(messageRefus(e, t("rep_echec")))
     }
   }
 
@@ -623,8 +646,8 @@ export function RepondeurReglages() {
     try {
       const etat = await choisirAccueil(id)
       appliquerEtat(etat)
-    } catch {
-      error(t("rep_echec"))
+    } catch (e) {
+      error(messageRefus(e, t("rep_echec")))
     } finally {
       setOccupe(false)
     }
