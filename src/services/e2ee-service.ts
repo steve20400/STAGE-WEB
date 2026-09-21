@@ -260,6 +260,8 @@ export async function chiffrerPour(
 
 export interface EnveloppeRecue {
   id: string
+  /** La ligne du fil que ce contenu complète, quand il y en a une. */
+  messageId: string | null
   convId: string
   expediteurId: string
   expediteurDevice: number
@@ -299,13 +301,23 @@ export async function dechiffrer(e: EnveloppeRecue): Promise<string> {
 
 /* ══════════════════ TRANSPORT ══════════════════ */
 
+/**
+ * Dépose les enveloppes d un message.
+ *
+ * @param messageId la ligne du fil à laquelle ce contenu appartient.
+ *
+ * ⚠️ FACULTATIF, ET C EST VOULU : le banc d essai dépose des enveloppes sans
+ * message, et un futur échange de clés hors fil en fera autant. L exiger
+ * interdirait ces usages sans rien protéger de plus.
+ */
 export async function deposer(
   convId: string,
   enveloppes: EnveloppeSortante[],
+  messageId?: string,
 ): Promise<number> {
   const r = await apiRequest<{ deposees: number }>("/api/e2ee/enveloppes", {
     method: "POST",
-    body: { convId, deviceId: idAppareil(), enveloppes },
+    body: { convId, deviceId: idAppareil(), enveloppes, messageId },
   })
   return r.deposees
 }
