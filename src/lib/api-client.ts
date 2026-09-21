@@ -6,7 +6,7 @@ import {
   saveRefreshToken,
   saveSessionToken,
 } from "../data/session-auth"
-import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
+import { MESSAGE_EVICTION, MESSAGE_REJEU, poseMessageDeconnexion } from "../data/session-message"
 import { langueInitiale, traduire } from "../i18n"
 
 export class ApiError extends Error {
@@ -130,18 +130,51 @@ export async function tryRefreshTokens(): Promise<ResultatRafraichissement> {
            * un simple réessai après une réponse perdue afficherait « votre
            * compte a été ouvert ailleurs », ce qui serait faux.
            */
+          let code: string | undefined
           try {
             const corps = (await response.json()) as { error?: { code?: string } }
-            if (corps?.error?.code === "SESSION_EVINCEE") {
-              poseMessageDeconnexion(MESSAGE_EVICTION)
-            }
+            code = corps?.error?.code
+            if (code === "SESSION_EVINCEE") poseMessageDeconnexion(MESSAGE_EVICTION)
+            if (code === "JETON_REJOUE") poseMessageDeconnexion(MESSAGE_REJEU)
           } catch {
             // Corps illisible : on reste sur un échec sans explication.
           }
-          // 4xx : le serveur a juge le jeton. 5xx : il est en panne, et le
-          // jeton n y est pour rien — un 502 de Nginx pendant un redeploiement
-          // ne doit pas deconnecter tout le monde.
-          return response.status >= 500 ? "injoignable" : "refuse"
+
+          /*
+           * 🔴 CE N'EST PLUS LE STATUT QUI DECIDE, MAIS LE CODE NOMME.
+           *
+           * L'ancienne regle — « 4xx = le serveur a juge le jeton » — etait
+           * beaucoup trop large, et c'est la cause des deconnexions alors que
+           * rien n'avait expire. Le serveur fait TOURNER le jeton de
+           * rafraichissement : chaque appel revoque l'ancien. Un rejeu du meme
+           * jeton — reponse perdue, onglet duplique, deux appels concurrents —
+           * recevait 401 `BAD_REFRESH`, qui tombait du cote « refuse », et la
+           * session etait detruite.
+           *
+           * `BAD_REFRESH` veut desormais dire « reessaie », pas « c'est fini ».
+           * Seuls ces quatre codes ferment une session, et ce sont quatre
+           * DECISIONS que le serveur prend et nomme.
+           *
+           * ⚠️ MEME LISTE QUE `codesSessionFermee` DANS L'APPLICATION MOBILE
+           * (`auth_controller.dart`). Les deux clients parlent au meme serveur :
+           * une divergence ici se paierait en deconnexions d'un seul cote, la
+           * classe de panne la plus difficile a relier a sa cause.
+           */
+          const CODES_SESSION_FERMEE = [
+            "SESSION_EVINCEE",
+            "JETON_REJOUE",
+            "SESSION_REVOQUEE",
+            "SESSION_EXPIREE",
+          ]
+          if (code && CODES_SESSION_FERMEE.includes(code)) return "refuse"
+
+          /*
+           * ⚠️ EN CAS DE DOUTE, ON GARDE — y compris sur un 4xx sans code, et y
+           * compris quand le corps etait illisible. Une session gardee a tort
+           * se corrige au rafraichissement suivant ; une session detruite a
+           * tort oblige a retaper son mot de passe.
+           */
+          return "injoignable"
         }
         const pair = (await response.json()) as TokenPair
         // Reponse 200 mais illisible : on ne sait pas quoi croire, et detruire

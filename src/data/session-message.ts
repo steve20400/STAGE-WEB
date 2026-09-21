@@ -18,6 +18,15 @@ const CLE = "alanya-message-deconnexion"
 
 export const MESSAGE_EVICTION = "Votre compte a été ouvert sur un autre appareil."
 
+/**
+ * Un jeton copié a circulé : la chaîne de cet appareil a été coupée.
+ *
+ * ⚠️ ON NE DIT PAS « ouvert sur un autre appareil » : ce n'est pas ce qui s'est
+ * passé, et présenter un incident de sécurité comme une seconde connexion
+ * ordinaire priverait l'utilisateur de la seule information qui compte.
+ */
+export const MESSAGE_REJEU = "Session fermée par sécurité. Reconnectez-vous."
+
 export function poseMessageDeconnexion(message: string): void {
   try {
     sessionStorage.setItem(CLE, message)
