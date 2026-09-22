@@ -44,7 +44,14 @@ import {
   mettreMediaEnFile,
   apercusMediasEnAttente,
 } from "../../../../src/services/messages-service"
-import { activerE2ee, cleAChange, estChiffree, lireEtatE2ee, type EtatE2ee } from "../../../../src/services/e2ee-fil"
+import {
+  activerE2ee,
+  cleAChange,
+  estChiffree,
+  lireEtatE2ee,
+  releverEtDechiffrer,
+  type EtatE2ee,
+} from "../../../../src/services/e2ee-fil"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
   langueSourceDe,
@@ -94,6 +101,7 @@ import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
 import {
   publishTyping,
   subscribeToConversation,
+  subscribeToE2eeArrivee,
   subscribeToMessageDeleted,
   subscribeToMessageEdited,
   subscribeToPresence,
@@ -5297,7 +5305,30 @@ export default function ChatRoomPage() {
     for (const entrant of entrants) {
       const existant = parId.get(entrant.id)
       // Un message deja connu est mis a jour (statut, suppression), pas duplique.
-      parId.set(entrant.id, existant ? { ...existant, ...entrant } : entrant)
+      if (!existant) {
+        parId.set(entrant.id, entrant)
+        continue
+      }
+      /*
+       * 🐛 UN TEXTE CONNU NE DOIT JAMAIS ETRE REMPLACE PAR DU VIDE.
+       *
+       * Le serveur rend `content: null` pour tout message CHIFFRE — il ne
+       * peut pas faire autrement, il ne le lit pas. La fusion recopiait ce
+       * vide par-dessus le texte deja dechiffre, et le message disparaissait
+       * de l'ecran a la premiere trame temps reel.
+       *
+       * C'est exactement ce que le user a decrit : « quand Bob envoie, le
+       * message d'Alice devient vide chez Alice ». Le message de Bob arrivait
+       * par le temps reel, la fusion s'executait, et emportait au passage le
+       * contenu de tous les messages chiffres deja affiches.
+       *
+       * ⚠️ LA REGLE EST GENERALE, pas propre au chiffrement : une mise a jour
+       * apporte des metadonnees plus fraiches — statut, suppression — mais
+       * elle n'a aucune raison de faire OUBLIER un contenu.
+       */
+      const fusionne = { ...existant, ...entrant }
+      if (!entrant.content && existant.content) fusionne.content = existant.content
+      parId.set(entrant.id, fusionne)
     }
     return [...parId.values()].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }, [])
@@ -5414,11 +5445,62 @@ export default function ChatRoomPage() {
     // l'activite reelle reste plus juste.
     if (!chat?.isGroup && chat?.online) setPeerPresence(true)
 
+    /*
+     * LA SONNETTE DES FILS CHIFFRES.
+     *
+     * 🔴 ON RELIT LE FIL AU LIEU DE FABRIQUER LA BULLE. La trame ne porte ni
+     * la ligne du message ni son texte — elle ne porte RIEN, exprès. Il faut
+     * donc aller chercher les deux, et `refreshMessages` fait deja exactement
+     * ça : il relit le fil ET releve les enveloppes en passant.
+     *
+     * ⚠️ C'EST LE MEME CHEMIN QUE CELUI QUI MARCHAIT DEJA. Avant ce correctif,
+     * le message finissait par apparaitre — quand le destinataire ecrivait a
+     * son tour, ce qui rafraichissait le fil. On ne change donc pas la façon
+     * dont le message arrive, seulement le MOMENT : maintenant, au lieu de
+     * quand la personne veut bien agir.
+     */
+    const unsubscribeSonnette = subscribeToE2eeArrivee(chatId, () => {
+      if (cancelled) return
+      void refreshMessages().catch(() => {
+        // Le reseau a bronche : les enveloppes attendent, la prochaine
+        // ouverture du fil les relevera. Rien n'est perdu.
+      })
+    })
+
     const unsubscribeMessages = subscribeToConversation(chatId, (message, tempId) => {
       if (cancelled) return
       const incoming = toFrontMessage(message, myId)
       // Persiste le message entrant en IndexedDB
       void persistIncomingWsMessage(message)
+
+      /*
+       * 🐛 « LE MESSAGE N'ARRIVE PAS INSTANTANEMENT ».
+       *
+       * Le temps reel transporte la LIGNE du message, pas son contenu — qui
+       * pour un fil chiffre vit dans une enveloppe, relevee separement. Le
+       * destinataire voyait donc arriver une bulle VIDE, et n'en decouvrait le
+       * texte qu'au prochain rafraichissement du fil, c'est-a-dire quand il
+       * ecrivait lui-meme.
+       *
+       * ⚠️ LA TRAME SERT DE SONNETTE. On ne change rien a `ws-server.mjs` — il
+       * n'a pas a connaitre le chiffrement : on se contente de relever quand
+       * il nous previent que quelque chose est arrive.
+       *
+       * ⚠️ SEULEMENT SUR UN FIL CHIFFRE, et seulement quand le contenu manque :
+       * partout ailleurs la trame porte deja le texte, et relever serait un
+       * aller-retour pour rien.
+       */
+      if (!incoming.content && estChiffree(chatId)) {
+        void releverEtDechiffrer().then((clairs) => {
+          if (cancelled || clairs.size === 0) return
+          setMessages((prev) =>
+            prev.map((m) => {
+              const clair = clairs.get(m.id)
+              return clair === undefined ? m : { ...m, content: clair }
+            }),
+          )
+        })
+      }
       setMessages((prev) => {
         if (prev.some((m) => m.id === incoming.id)) {
           // Deja affiche : il reste peut-etre sa bulle d'attente a retirer.
@@ -5617,6 +5699,7 @@ export default function ChatRoomPage() {
     return () => {
       cancelled = true
       unsubscribeMessages()
+      unsubscribeSonnette()
       unsubscribeTyping()
       unsubscribeStatus()
       unsubscribeEpingle()

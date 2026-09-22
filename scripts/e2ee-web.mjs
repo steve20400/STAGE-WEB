@@ -228,6 +228,38 @@ async function main() {
   echecs += await modBob.scenarioReception(SECRET);
   echecs += await modBob.scenarioFilReception(conv.id, TEXTE_FIL);
 
+  /*
+   * 🐛 LE BANC LAISSAIT SES IDENTITÉS DERRIÈRE LUI.
+   *
+   * Il nettoyait au DÉBUT, jamais à la fin. Les identités qu'il venait de
+   * publier restaient donc en base, muettes à jamais — un vrai navigateur qui
+   * se connectait ensuite sur le même compte se retrouvait avec DEUX
+   * identités, et chaque message partait en deux exemplaires dont un que
+   * personne ne lirait.
+   *
+   * ⚠️ C'EST LE PROBLÈME DES IDENTITÉS MORTES, provoqué par l'outil censé le
+   * tester. Le balayage des trente jours ne les écarte pas : elles sont trop
+   * récentes.
+   *
+   * ⚠️ ON RETIRE AUSSI LEURS ENVELOPPES EN ATTENTE : elles ne pointent vers
+   * aucun appareil vivant, et resteraient à compter dans les relevés sans que
+   * personne ne puisse jamais les lire.
+   */
+  const identites = await prisma.e2eeIdentite.findMany({
+    where: { userId: { in: [a.user.id, b.user.id] } },
+    select: { deviceId: true },
+  });
+  await prisma.e2eeEnveloppe.deleteMany({
+    where: {
+      remisLe: null,
+      destinataireDevice: { in: identites.map((i) => i.deviceId) },
+    },
+  });
+  await prisma.e2eeIdentite.deleteMany({
+    where: { userId: { in: [a.user.id, b.user.id] } },
+  });
+  console.log(`\n🧹 ${identites.length} identité(s) de banc retirée(s) — rien ne traîne.`);
+
   console.log(
     `\n════ ${echecs === 0 ? "MODULES WEB : TOUT EST VERT" : `${echecs} ÉCHEC(S)`} ════\n`,
   );

@@ -466,6 +466,32 @@ export function subscribeToConversation(
 }
 
 /**
+ * S'abonne a la SONNETTE d'un fil chiffre.
+ *
+ * 🔴 CETTE TRAME NE PORTE AUCUN CONTENU, et c'est voulu : elle dit « quelque
+ * chose vous attend », rien de plus. Le texte d'un message chiffre ne
+ * traverse jamais le serveur temps reel — il vit dans une enveloppe, relevee
+ * par une route a part. Faire passer autre chose ici reviendrait a defaire le
+ * chiffrement par la porte de service.
+ *
+ * POURQUOI ELLE EXISTE. Un message ordinaire arrive tout seul : le serveur
+ * temps reel l'ecrit et le diffuse d'un seul geste. Un message chiffre part
+ * en REST, que le serveur temps reel ne voit pas passer. Sans cette sonnette,
+ * le destinataire ne decouvrait le message qu'en ecrivant lui-meme.
+ *
+ * ⚠️ MANQUER LA SONNETTE NE PERD RIEN : les enveloppes attendent en base
+ * jusqu'a la prochaine releve. C'est une ACCELERATION, jamais la seule voie.
+ */
+export function subscribeToE2eeArrivee(
+  conversationId: string,
+  handler: () => void,
+): () => void {
+  return addListener((event) => {
+    if (event.type === "e2ee_arrivee" && event.convId === conversationId) handler()
+  })
+}
+
+/**
  * S'abonne a TOUS les nouveaux messages (toutes conversations).
  * Utilise par la liste des conversations et le dashboard pour se rafraichir en direct.
  */
