@@ -124,6 +124,8 @@ import {
 } from "../../../../src/services/traduction-service"
 import ChatInfoPage from "./chat-info"
 import { CLE_ERREUR, EVENEMENT_ECHEC_AUTO, MessageTranslation } from "./message-translation"
+import { E2eeVerification } from "./e2ee-verification"
+import { estVerifie } from "../../../../src/services/e2ee-empreinte"
 import { PartagerContact } from "./partager-contact"
 import "./chat-room-page.css"
 
@@ -5096,6 +5098,9 @@ export default function ChatRoomPage() {
     ? null
     : (chat?.membersInfo?.find((m) => m.id !== getMyUserId())?.id ?? null)
 
+  /** L'ecran de comparaison des codes de securite est-il ouvert ? */
+  const [verifOuverte, setVerifOuverte] = useState(false)
+
   /*
    * L'ETAT DU CHIFFREMENT, LU A L'OUVERTURE DE LA CONVERSATION.
    *
@@ -7183,7 +7188,9 @@ export default function ChatRoomPage() {
                   disabled={e2eeEnCours || (!e2ee.e2eeActif && !e2ee.activable)}
                   title={
                     e2ee.e2eeActif
-                      ? t("e2ee_actif")
+                      ? peerIdPourCle !== null
+                        ? t("e2ee_verif_ouvrir")
+                        : t("e2ee_actif")
                       : e2ee.motif === "HORS_PERIMETRE"
                         ? t("e2ee_hors_perimetre")
                         : e2ee.motif === "GROUPE_NON_SUPPORTE"
@@ -7193,7 +7200,25 @@ export default function ChatRoomPage() {
                             : t("e2ee_activer")
                   }
                   onClick={() => {
-                    if (e2ee.e2eeActif || !e2ee.activable) return
+                    /*
+                     * ⚠️ UNE FOIS CHIFFRE, LE CADENAS MENE A LA VERIFICATION.
+                     *
+                     * Il etait inerte — le chiffrement ne se defait pas, il
+                     * n'y avait rien a faire. Mais un bouton mort a l'endroit
+                     * exact ou l'on va chercher « l'etat du chiffrement » est
+                     * une place gachee : c'est LA que l'utilisateur regarde,
+                     * et c'est donc la que doit vivre la seule action qui lui
+                     * reste — comparer le code hors de ce canal.
+                     *
+                     * ⚠️ PAS EN GROUPE : il n'y a pas d'identite unique a
+                     * comparer, et proposer l'ecran laisserait croire le
+                     * contraire.
+                     */
+                    if (e2ee.e2eeActif) {
+                      if (peerIdPourCle !== null) setVerifOuverte(true)
+                      return
+                    }
+                    if (!e2ee.activable) return
                     setE2eeEnCours(true)
                     void activerE2ee(chatId)
                       .then(() => setE2ee({ ...e2ee, e2eeActif: true }))
@@ -7455,6 +7480,21 @@ export default function ChatRoomPage() {
               <path d="M12 17h.01" />
             </svg>
             <span>{t("e2ee_cle_changee")}</span>
+            {/*
+              🔴 L'ALERTE MENE A L'ACTION, ELLE N'INFORME PLUS SEULEMENT.
+
+              Dire « la cle a change » a quelqu'un qui n'a aucun moyen de
+              trancher, c'est l'inquieter sans l'aider — et lui apprendre a
+              ignorer la prochaine. Le bouton mene a la seule chose qui
+              reponde a la question : comparer le code hors de ce canal.
+            */}
+            <button
+              type="button"
+              className="e2ee-alerte-action"
+              onClick={() => setVerifOuverte(true)}
+            >
+              {t("e2ee_verif_ouvrir")}
+            </button>
           </div>
         )}
 
@@ -7693,6 +7733,26 @@ export default function ChatRoomPage() {
                       <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
                     </svg>
                     <span>{t("e2ee_banner")}</span>
+                    {/*
+                      LE BADGE « VERIFIE », DANS LA BANNIERE ET NULLE PART AILLEURS.
+
+                      🔴 IL NE DIT PAS « C'EST SUR ». Il dit « VOUS avez compare
+                      ce code ». Le produit n'en sait rien de plus que ce que
+                      l'utilisateur a declare — et la nuance est tout le sujet.
+
+                      ⚠️ IL DISPARAIT TOUT SEUL si la cle change, parce que la
+                      verification est rangee AVEC la cle comparee. Un badge qui
+                      survivrait a un changement de cle affirmerait le contraire
+                      de la verite au moment exact ou ca compte.
+                    */}
+                    {peerIdPourCle !== null && estVerifie(peerIdPourCle) && (
+                      <span className="e2ee-badge-verifie">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                        {t("e2ee_verif_fait")}
+                      </span>
+                    )}
                   </div>,
                 )
               }
@@ -8334,6 +8394,21 @@ export default function ChatRoomPage() {
           onFermer={() => setMentionOuverte(null)}
           onRetirer={jeSuisAdminDuGroupe ? retirerDuGroupe : undefined}
           onNommerAdmin={jeSuisAdminDuGroupe ? nommerAdmin : undefined}
+        />
+      )}
+
+      {/*
+        L'ECRAN DE COMPARAISON DES CODES DE SECURITE.
+
+        ⚠️ SEULEMENT SUR UN FIL CHIFFRE ET EN TETE-A-TETE. En groupe il n'y a
+        pas d'identite unique a comparer — le chiffrement des groupes est hors
+        perimetre, et proposer l'ecran laisserait croire le contraire.
+      */}
+      {verifOuverte && peerIdPourCle !== null && (
+        <E2eeVerification
+          peerUserId={peerIdPourCle}
+          peerName={chat?.name ?? ""}
+          onClose={() => setVerifOuverte(false)}
         />
       )}
 

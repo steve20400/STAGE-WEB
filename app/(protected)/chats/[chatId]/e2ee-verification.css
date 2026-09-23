@@ -1,0 +1,263 @@
+/* ══════════════════ L'ÉCRAN DE COMPARAISON DES CODES ══════════════════
+ *
+ * 🔴 LE CODE EST FAIT POUR ÊTRE LU À HAUTE VOIX, souvent au téléphone, souvent
+ * par quelqu'un qui n'a pas l'habitude. Toute la mise en forme découle de là :
+ * une police à chasse fixe pour que les chiffres s'alignent, des groupes bien
+ * séparés pour ne pas perdre sa ligne, et deux rangées de six plutôt qu'une
+ * bande de douze.
+ */
+
+.e2ee-verif-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.e2ee-verif {
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 18px 20px 20px;
+  border-radius: 16px;
+  background: #fff;
+  color: #1c1c1e;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.e2ee-verif header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.e2ee-verif h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.e2ee-verif header button {
+  display: flex;
+  padding: 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+
+.e2ee-verif header button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.e2ee-verif-mode-emploi {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #55555a;
+}
+
+.e2ee-verif-calcul,
+.e2ee-verif-vide {
+  margin: 20px 0;
+  font-size: 13px;
+  text-align: center;
+  color: #77777c;
+}
+
+.e2ee-verif-appareil {
+  margin-bottom: 18px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f6f6f8;
+}
+
+.e2ee-verif-appareil-nom {
+  margin-bottom: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #77777c;
+}
+
+/*
+ * ⚠️ SIX COLONNES, DEUX RANGÉES — pas douze d'affilée. Une bande de soixante
+ * chiffres se lit de travers : on saute une ligne, on reprend au mauvais
+ * endroit, et deux personnes concluent à une différence là où il n'y en a pas.
+ */
+.e2ee-verif-code {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 10px;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: #1c1c1e;
+}
+
+@media (min-width: 380px) {
+  .e2ee-verif-code {
+    grid-template-columns: repeat(6, 1fr);
+    font-size: 15px;
+  }
+}
+
+.e2ee-verif-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border: 1px solid #d5d5da;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: #1c1c1e;
+  cursor: pointer;
+}
+
+.e2ee-verif-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/*
+ * ⚠️ VERT, ET SEULEMENT UNE FOIS COMPARÉ. C'est le seul endroit du chiffrement
+ * où le vert est mérité : il ne dit pas « c'est sûr », il dit « VOUS avez
+ * vérifié ». La nuance est tout le sujet — le produit n'en sait rien de plus
+ * que ce que l'utilisateur vient de déclarer.
+ */
+.e2ee-verif-btn.verifie {
+  border-color: #b7ddb9;
+  background: #eef7ef;
+  color: #2c6b34;
+}
+
+.e2ee-verif-limite {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #8a8a90;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .e2ee-verif {
+    background: #1b1b22;
+    color: #ececf1;
+  }
+
+  :root:not([data-theme="light"]) .e2ee-verif-mode-emploi {
+    color: #a9a9b4;
+  }
+
+  :root:not([data-theme="light"]) .e2ee-verif-appareil {
+    background: #24242c;
+  }
+
+  :root:not([data-theme="light"]) .e2ee-verif-code {
+    color: #ececf1;
+  }
+
+  :root:not([data-theme="light"]) .e2ee-verif-btn {
+    border-color: #3a3a44;
+    background: #24242c;
+    color: #ececf1;
+  }
+
+  :root:not([data-theme="light"]) .e2ee-verif-btn.verifie {
+    border-color: #35603a;
+    background: #1e2a20;
+    color: #9fd3a6;
+  }
+
+  :root:not([data-theme="light"]) .e2ee-verif-limite,
+  :root:not([data-theme="light"]) .e2ee-verif-calcul,
+  :root:not([data-theme="light"]) .e2ee-verif-vide {
+    color: #86868f;
+  }
+}
+
+/* ── Le lien depuis l'alerte de changement de clé ── */
+
+/*
+ * 🔴 L'ALERTE DOIT MENER À L'ACTION, PAS SEULEMENT INFORMER. Dire « la clé a
+ * changé » à quelqu'un qui n'a aucun moyen de trancher, c'est l'inquiéter sans
+ * l'aider — et lui apprendre à ignorer l'alerte suivante.
+ */
+.e2ee-alerte-action {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/*
+ * Le badge « vérifié », dans la bannière du chiffrement.
+ *
+ * ⚠️ DISCRET, PAS TRIOMPHAL. Il constate une action de l'utilisateur ; il ne
+ * décerne pas un certificat. Une pastille verte tape-à-l'œil ferait lire
+ * « conversation garantie sûre », ce que personne ne peut promettre.
+ */
+.e2ee-badge-verifie {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef7ef;
+  border: 1px solid #b7ddb9;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2c6b34;
+  white-space: nowrap;
+}
+
+.e2ee-badge-verifie svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .e2ee-badge-verifie {
+    background: #1e2a20;
+    border-color: #35603a;
+    color: #9fd3a6;
+  }
+}
