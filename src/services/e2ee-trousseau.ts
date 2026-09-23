@@ -53,7 +53,11 @@ const SEL_PRF = new TextEncoder().encode("alanya-archive-e2ee-v1")
 export interface Capacites {
   disponible: boolean
   /** Ce qu'on dit à l'utilisateur quand ça ne l'est pas. */
-  raison?: "pas-de-webauthn" | "pas-de-prf" | "hors-contexte-sur"
+  raison?:
+    | "pas-de-webauthn"
+    | "pas-de-prf"
+    | "hors-contexte-sur"
+    | "pas-de-verrouillage"
 }
 
 /**
@@ -95,6 +99,28 @@ export async function capacites(): Promise<Capacites> {
     } catch {
       // Indisponible : on tente quand même.
     }
+  }
+
+  /*
+   * 🐛 CE CONTRÔLE MANQUAIT, ET C'ÉTAIT LE PLUS IMPORTANT.
+   *
+   * Un navigateur peut très bien SAVOIR faire PRF sans qu'il existe le moindre
+   * moyen de vérifier l'utilisateur : un poste sans Windows Hello, sans Touch
+   * ID, sans code de verrouillage. C'est le cas du poste de développement, et
+   * il annonçait pourtant « disponible ».
+   *
+   * ⚠️ NOUS DEMANDONS `authenticatorAttachment: "platform"`. Sans
+   * authentificateur de plateforme, la création échoue APRÈS que l'utilisateur
+   * a cliqué — exactement ce que la règle « ne proposez pas ce que vous ne
+   * pouvez pas tenir » cherchait à éviter. La règle était écrite ; le code ne
+   * la tenait pas.
+   */
+  try {
+    if (!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())) {
+      return { disponible: false, raison: "pas-de-verrouillage" }
+    }
+  } catch {
+    return { disponible: false, raison: "pas-de-verrouillage" }
   }
 
   return { disponible: true }
