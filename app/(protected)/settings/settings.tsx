@@ -125,6 +125,7 @@ import { type EtatCacheTraductions } from "../../../src/services/traduction-cach
 import { sendSessionRevoked } from "../../../src/services/websocket-service"
 import { avatarDisplaySrc, fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
+import { E2eeSauvegardePanneau } from "./e2ee-sauvegarde-panneau"
 
 type SettingsSection =
   | "profile"
@@ -3190,6 +3191,21 @@ export default function SettingsPage() {
             <>
               <div className="s-page-title">{t("settings_security")}</div>
               <p className="s-page-sub">{t("security_sub")}</p>
+
+              {/*
+                LA SAUVEGARDE CHIFFRÉE.
+
+                ⚠️ DANS « SÉCURITÉ » ET NON DANS UNE SECTION À ELLE. C'est là
+                qu'on va chercher ce qui touche à ses clés et à son compte ;
+                une section de plus se serait ajoutée à une navigation déjà
+                longue, pour un réglage qu'on fait une fois.
+
+                ⚠️ EN TÊTE, AVANT LE CHANGEMENT DE MOT DE PASSE. L'ordre n'est
+                pas neutre : changer son mot de passe sans savoir qu'il ouvre
+                une sauvegarde est exactement le geste qui fait perdre son
+                historique.
+              */}
+              <E2eeSauvegardePanneau />
 
               <div className="s-card">
                 <div className="s-card-title">{t("change_password")}</div>
