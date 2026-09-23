@@ -196,18 +196,6 @@
 
 /* ── LE RESTE ── */
 
-/*
- * ⚠️ LA LIMITE DE LA SERRURE « MOT DE PASSE » EST ÉCRITE, PAS CACHÉE. Petite,
- * mais lisible et sous le champ concerné : c'est une information qui change le
- * choix qu'on fait, pas une mention légale.
- */
-.sauv-limite {
-  margin: -4px 0 14px;
-  font-size: 11.5px;
-  line-height: 1.45;
-  color: var(--txt-3, #8a8a90);
-}
-
 .sauv-resultat {
   margin: 12px 0 0;
   font-size: 13px;

@@ -210,12 +210,15 @@ export function E2eeSauvegardePanneau() {
             />
           </label>
           {/*
-            ⚠️ CE QUE CETTE SERRURE NE PROTÈGE PAS, écrit ici et pas ailleurs.
-            Notre serveur reçoit le mot de passe en clair à chaque connexion :
-            il POURRAIT dériver cette clé s'il était compromis. Le taire
-            laisserait croire à une garantie qui n'existe pas.
+            ⚠️ LA LIMITE DE CETTE SERRURE N'EST PLUS DITE ICI — décision du
+            user, 23/09/2026 : elle ira dans la politique de confidentialité.
+
+            Elle reste VRAIE et reste écrite dans le code : notre serveur
+            reçoit le mot de passe à chaque connexion, donc cette serrure
+            protège l'archive au repos et non contre nous. Voir l'en-tête de
+            `e2ee-serrures.ts`. Ce commentaire s'adresse à qui écrit le code,
+            pas à qui règle son compte — et ce n'est pas la même chose.
           */}
-          <p className="sauv-limite">{t("e2ee_sauv_limite_mdp")}</p>
           <button
             type="button"
             className="sauv-btn primaire"
