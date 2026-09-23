@@ -1,5 +1,6 @@
 import { apiRequest, ApiError } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
+import { estChiffree } from "./e2ee-fil"
 import { ecrireSecret, effacerSecret, lireSecret, ouvrirCoffre } from "./coffre-chiffre"
 import { deposerBloc, restaurer, type MessageArchive } from "./e2ee-archive"
 import {
@@ -213,6 +214,21 @@ export async function activerSauvegarde(opts: {
 
   maitresse = neuve
   await ranger(matiere)
+
+  /*
+   * 🔴 ON SAUVEGARDE CE QUI EXISTE DÉJÀ, PAS SEULEMENT CE QUI SUIVRA.
+   *
+   * 🐛 Sans ce rattrapage, activer la sauvegarde aujourd'hui n'aurait protégé
+   * que les messages de DEMAIN. Tout l'historique déjà échangé serait resté
+   * dans le seul cache local — c'est-à-dire exactement ce qu'on cherche à ne
+   * plus perdre. Et personne ne s'en serait aperçu avant de changer
+   * d'appareil.
+   *
+   * ⚠️ LE CACHE LOCAL EST LA SEULE SOURCE POSSIBLE : le serveur ne détient
+   * plus ces textes, les enveloppes ayant été acquittées. Ce qui n'est pas
+   * dans ce cache est déjà perdu, et aucune activation ne le ramènera.
+   */
+  await rattraperLExistant()
   if (!ecouteurPose) {
     surEffacement()
     ecouteurPose = true
@@ -251,6 +267,46 @@ export async function ajouterUneSerrure(
   const posee = await ajouterSerrure(secretConnu, connue, nouveauType, secret)
   await poserSerrure(posee)
   return { cleRecuperation }
+}
+
+/**
+ * Verse dans l'archive ce que le cache local contient déjà.
+ *
+ * ⚠️ PAR LOTS, ET SANS LEVER. Un compte bavard peut avoir des milliers de
+ * messages en cache : un bloc unique dépasserait le plafond du serveur, et un
+ * échec au milieu ne doit pas annuler ce qui est passé.
+ */
+async function rattraperLExistant(): Promise<number> {
+  try {
+    const { loadCachedConversations, loadCachedMessages } = await import(
+      "./indexeddb-cache"
+    )
+    const convs = await loadCachedConversations()
+    let n = 0
+    for (const conv of convs) {
+      if (!estChiffree(conv.id)) continue
+      const messages = await loadCachedMessages(conv.id, 5000)
+      for (const m of messages) {
+        const texte = (m as { content?: string | null }).content
+        if (!texte) continue
+        archiver({
+          id: String(m.id),
+          convId: conv.id,
+          expediteurId: String((m as { senderId?: string }).senderId ?? ""),
+          texte,
+          quand: Number((m as { createdAt?: number }).createdAt ?? Date.now()),
+        })
+        n++
+        // Le tampon dépose tout seul au-delà du seuil ; on l'aide à la fin.
+      }
+    }
+    await vider()
+    if (n > 0) console.info(`[e2ee] ${n} message(s) déjà connus versés dans l'archive.`)
+    return n
+  } catch (e) {
+    console.warn("[e2ee] rattrapage de l'historique existant incomplet :", e)
+    return 0
+  }
 }
 
 /* ══════════════════ OUVRIR ══════════════════ */
@@ -409,6 +465,50 @@ export async function restaurerTout(): Promise<{
   const cle = await laCle()
   if (!cle) throw new Error("L'archive n'est pas ouverte.")
   return restaurer(cle)
+}
+
+/* ══════════════════ LE CHANGEMENT DE MOT DE PASSE ══════════════════ */
+
+/**
+ * Ré-enveloppe la serrure « mot de passe » avec le nouveau.
+ *
+ * 🐛 SANS CECI, CHANGER DE MOT DE PASSE CASSE LA SAUVEGARDE EN SILENCE. La
+ * serrure garde l'ANCIEN : la restauration automatique échoue à la connexion
+ * suivante, et l'utilisateur découvre au pire moment — en changeant
+ * d'appareil — que son historique ne revient pas.
+ *
+ * ⚠️ RIEN N'EST RECHIFFRÉ : on ré-enveloppe 32 octets. Une archive de cent
+ * mégaoctets change de mot de passe en quelques millisecondes.
+ *
+ * ⚠️ IL FAUT L'ANCIEN MOT DE PASSE, et l'écran de changement l'a — il le
+ * demande déjà pour se prouver. C'est la seule occasion : après coup, la
+ * serrure ne s'ouvrirait plus.
+ *
+ * ⚠️ NE LÈVE JAMAIS. Le mot de passe du compte a déjà changé quand on arrive
+ * ici ; échouer bruyamment laisserait croire que le changement n'a pas eu
+ * lieu. On prévient dans la console, et les autres serrures restent.
+ */
+export async function suivreChangementMotDePasse(
+  ancien: string,
+  nouveau: string,
+): Promise<boolean> {
+  try {
+    const serrures = await lireSerrures()
+    const ancienne = serrures.find((s) => s.type === "motdepasse")
+    if (!ancienne) return false
+
+    const posee = await ajouterSerrure(ancien, ancienne, "motdepasse", nouveau)
+    await poserSerrure(posee)
+    console.info("[e2ee] la sauvegarde suit le nouveau mot de passe.")
+    return true
+  } catch (e) {
+    console.error(
+      "[e2ee] la serrure « mot de passe » n'a PAS suivi le changement — " +
+        "la sauvegarde s'ouvre encore avec l'ancien.",
+      e,
+    )
+    return false
+  }
 }
 
 /* ══════════════════ LA RESTAURATION AUTOMATIQUE ══════════════════ */

@@ -18,6 +18,7 @@ import {
   ouvrir,
   refermer,
   restaurerTout,
+  suivreChangementMotDePasse,
   toutEffacer,
   vider,
 } from "../src/services/e2ee-sauvegarde"
@@ -185,8 +186,38 @@ export async function scenario() {
     "c'est tout l'intérêt de la clé maîtresse tirée au sort",
   )
 
-  /* ── ⑥ TOUT EFFACER ──────────────────────────────────────────────── */
-  titre("⑥ Tout effacer")
+  /* ── ⑥ LE CHANGEMENT DE MOT DE PASSE ─────────────────────────────── */
+  titre("⑥ Changer de mot de passe n'enferme pas dehors")
+
+  const NOUVEAU_MDP = "Le nouveau mot de passe du compte"
+  const suivi = await suivreChangementMotDePasse(MDP, NOUVEAU_MDP)
+  verifie("la serrure a suivi", suivi === true)
+
+  refermer()
+  verifie(
+    "le NOUVEAU mot de passe ouvre",
+    await ouvrir("motdepasse", NOUVEAU_MDP),
+    "la sauvegarde serait devenue inaccessible en silence",
+  )
+  verifie(
+    "et rend bien les messages",
+    (await restaurerTout()).messages.length === 20,
+  )
+
+  /*
+   * 🔴 LE CONTRÔLE QUI DONNE SON SENS AU PRÉCÉDENT. Si l'ANCIEN mot de passe
+   * ouvrait encore, changer de mot de passe n'aurait rien changé — quelqu'un
+   * qui le connaissait garderait accès à toute l'archive.
+   */
+  refermer()
+  verifie(
+    "et l'ANCIEN n'ouvre PLUS",
+    (await ouvrir("motdepasse", MDP)) === false,
+    "l'ancien mot de passe ouvre encore — le changement n'a rien changé",
+  )
+
+  /* ── ⑦ TOUT EFFACER ──────────────────────────────────────────────── */
+  titre("⑦ Tout effacer")
 
   await toutEffacer()
   verifie("plus aucune serrure", (await lireSerrures()).length === 0)
