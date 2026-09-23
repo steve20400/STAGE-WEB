@@ -30,6 +30,7 @@ import {
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
 import { oublierCetAppareil, preparerCetAppareil } from "../services/e2ee-service"
+import { refermer as refermerSauvegarde, vider as viderSauvegarde } from "../services/e2ee-sauvegarde"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -327,6 +328,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * reseau est coupe. Le balayage du serveur rattrapera au bout de trente
      * jours de silence.
      */
+    /*
+     * ⚠️ ON DÉPOSE CE QUI ATTEND AVANT DE REFERMER, et l'ordre compte.
+     *
+     * Le tampon garde jusqu'à dix messages en mémoire. Refermer sans vider
+     * les perdrait pour l'archive — et ce sont les DERNIERS échangés, donc
+     * ceux dont on se souvient le mieux et dont l'absence se remarquerait.
+     *
+     * ⚠️ NE DOIT PAS EMPÊCHER LA DÉCONNEXION : `vider` ne lève jamais, et si
+     * le réseau est coupé on referme quand même. Rester connecté parce qu'une
+     * sauvegarde a échoué serait le pire des deux maux.
+     */
+    await viderSauvegarde().catch(() => undefined)
+    refermerSauvegarde()
     await oublierCetAppareil()
     notifyServerOfDeparture(leaveSessionLocally(), revokeSession)
   }, [leaveSessionLocally, notifyServerOfDeparture])

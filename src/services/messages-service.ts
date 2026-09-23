@@ -28,6 +28,7 @@ import {
   noteEtatChiffrement,
   releverEtDechiffrer,
 } from "./e2ee-fil"
+import { archiver } from "./e2ee-sauvegarde"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
@@ -348,6 +349,20 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
         status: "SENT",
         createdAt: m.timestamp.getTime(),
       })
+
+      /*
+       * ⚠️ ARCHIVÉ ICI AUSSI, ET C'EST LE CAS QUI COMPTE LE PLUS : l'enveloppe
+       * vient d'être ACQUITTÉE, donc retirée du serveur. Si ce texte n'entre
+       * pas dans l'archive maintenant, il n'existera plus que dans le cache de
+       * CET appareil — et disparaîtra avec lui.
+       */
+      archiver({
+        id: m.id,
+        convId: chatId,
+        expediteurId: m.senderId === "me" ? (myId ?? "") : m.senderId,
+        texte: clair,
+        quand: m.timestamp.getTime(),
+      })
     }
   }
 
@@ -602,6 +617,25 @@ export async function sendChatMessage(
       createdAt: new Date(cree.createdAt).getTime(),
     })
 
+    /*
+     * 🔴 ARCHIVÉ AU MÊME ENDROIT QUE MIS EN CACHE, et jamais ailleurs.
+     *
+     * Ce qui est affiché à l'utilisateur doit être ce qui est sauvegardé.
+     * Deux chemins distincts finiraient par diverger, et la divergence ne se
+     * verrait qu'au moment de restaurer — c'est-à-dire trop tard, quand
+     * l'appareil d'origine n'existe plus.
+     *
+     * ⚠️ SANS EFFET SI LA SAUVEGARDE N'EST PAS ACTIVE : `archiver` sort
+     * aussitôt. Aucun clair ne s'accumule pour une archive qui n'existe pas.
+     */
+    archiver({
+      id: cree.id,
+      convId: chatId,
+      expediteurId: myId ?? "",
+      texte: content,
+      quand: new Date(cree.createdAt).getTime(),
+    })
+
     return {
       id: cree.id,
       senderId: "me",
@@ -699,6 +733,22 @@ export async function sendChatMessage(
         type: msgType,
         status: "SENT",
         createdAt: new Date(cree.createdAt).getTime(),
+      })
+      /*
+       * ⚠️ ARCHIVÉ ICI AUSSI — c'est le TROISIÈME chemin par lequel un message
+       * chiffré part, et il est facile à oublier : on n'y arrive qu'après un
+       * refus du serveur, donc jamais pendant un essai ordinaire.
+       *
+       * La règle qui l'attrape est simple et vaut d'être suivie partout :
+       * PARTOUT OÙ L'ON MET EN CACHE, ON ARCHIVE. Un `cacheMessage` sans
+       * `archiver` à côté est un message que la restauration ne rendra pas.
+       */
+      archiver({
+        id: cree.id,
+        convId: chatId,
+        expediteurId: myId ?? "",
+        texte: content,
+        quand: new Date(cree.createdAt).getTime(),
       })
       return {
         id: cree.id,
