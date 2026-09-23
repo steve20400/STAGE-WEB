@@ -48,6 +48,23 @@ export function noteEtatChiffrement(convId: string, actif: boolean): void {
   chiffrees.set(convId, actif)
 }
 
+/**
+ * Combien de conversations de ce compte sont chiffrées ?
+ *
+ * ⚠️ SERT À DÉCIDER S'IL Y A QUELQUE CHOSE À PERDRE avant une déconnexion.
+ * Zéro conversation chiffrée, et il n'y a rien à avertir : tout le reste est
+ * sur le serveur et reviendra à la prochaine connexion.
+ *
+ * ⚠️ LIT LE CACHE, PAS LE SERVEUR. Il est alimenté par la liste des
+ * conversations à chaque chargement — demander au serveur ferait attendre
+ * quelqu'un qui veut justement partir vite.
+ */
+export function conversationsChiffrees(): number {
+  let n = 0
+  for (const actif of chiffrees.values()) if (actif) n++
+  return n
+}
+
 export function estChiffree(convId: string): boolean {
   return chiffrees.get(convId) === true
 }

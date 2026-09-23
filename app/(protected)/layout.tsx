@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../src/components/auth-provider"
+import { lireSerrures } from "../../src/services/e2ee-sauvegarde"
+import { conversationsChiffrees } from "../../src/services/e2ee-fil"
 import { ThemeToggle } from "../../src/components/theme-toggle"
 import { ActiveCallFloating } from "../../src/components/active-call-floating"
 import { RepondeurRetour } from "../../src/components/repondeur-retour"
@@ -321,7 +323,31 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
     status: t("online"),
   }
 
+  /**
+   * 🐛 SE DÉCONNECTER DÉTRUISAIT L'HISTORIQUE CHIFFRÉ, EN SILENCE.
+   *
+   * Signalé le 23/09/2026 : « je me déconnecte, je me reconnecte, tous les
+   * messages sont vides ». Trois décisions correctes s'additionnaient — le
+   * coffre est effacé, le cache est purgé, les enveloppes sont acquittées —
+   * et personne ne prévenait.
+   *
+   * ⚠️ ON AVERTIT, ON N'EMPÊCHE PAS. La déconnexion est un geste de sécurité :
+   * quelqu'un qui veut quitter un poste partagé doit pouvoir le faire tout de
+   * suite. On donne l'information et le choix, pas un refus.
+   *
+   * ⚠️ SEULEMENT S'IL Y A QUELQUE CHOSE À PERDRE : pas de conversation
+   * chiffrée, ou une sauvegarde déjà en place, et on ne dit rien. Un
+   * avertissement qui s'affiche à tout le monde à chaque fois cesse d'être lu.
+   */
   async function handleLogout() {
+    const chiffrees = conversationsChiffrees()
+    if (chiffrees > 0) {
+      const serrures = await lireSerrures().catch(() => [])
+      if (serrures.length === 0) {
+        const continuer = window.confirm(t("e2ee_sauv_avert_deconnexion"))
+        if (!continuer) return
+      }
+    }
     await logout()
     navigate("/login", { replace: true })
   }

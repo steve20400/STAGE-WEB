@@ -62,7 +62,7 @@ export async function scenario() {
     avecCleRecuperation: true,
   })
 
-  verifie("l'archive est ouverte", estOuverte())
+  verifie("l'archive est ouverte", await estOuverte())
   verifie("une clé de récupération est rendue", typeof cleRecuperation === "string")
   verifie("douze mots", cleRecuperation?.split(" ").length === 12, cleRecuperation)
   console.log(`      ${cleRecuperation}`)
@@ -119,7 +119,7 @@ export async function scenario() {
    * compte : il ne connaît que le mot de passe.
    */
   refermer()
-  verifie("l'archive est refermée", !estOuverte())
+  verifie("l'archive est refermée", !(await estOuverte()))
 
   let perdu = null
   try {
@@ -135,7 +135,7 @@ export async function scenario() {
 
   const mauvais = await ouvrir("motdepasse", "ce n'est pas le bon")
   verifie("un mauvais mot de passe est refusé", mauvais === false)
-  verifie("et l'archive reste fermée", !estOuverte())
+  verifie("et l'archive reste fermée", !(await estOuverte()))
 
   const bon = await ouvrir("motdepasse", MDP)
   verifie("le bon mot de passe ouvre", bon === true)
@@ -190,7 +190,7 @@ export async function scenario() {
 
   await toutEffacer()
   verifie("plus aucune serrure", (await lireSerrures()).length === 0)
-  verifie("et l'archive est refermée", !estOuverte())
+  verifie("et l'archive est refermée", !(await estOuverte()))
 
   console.log(
     `\n\x1b[1m════ ${echecs === 0 ? "\x1b[32mTOUT EST VERT" : `\x1b[31m${echecs} ÉCHEC(S)`}\x1b[0m\x1b[1m ════\x1b[0m\n`,

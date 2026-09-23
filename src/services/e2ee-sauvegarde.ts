@@ -1,11 +1,13 @@
 import { apiRequest, ApiError } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
+import { ecrireSecret, effacerSecret, lireSecret, ouvrirCoffre } from "./coffre-chiffre"
 import { deposerBloc, restaurer, type MessageArchive } from "./e2ee-archive"
 import {
   ajouterSerrure,
+  cleDepuisMatiere,
   creerArchive,
   normaliserCleRecuperation,
-  ouvrirArchive,
+  ouvrirArchiveBrute,
   tirerCleRecuperation,
   type Serrure,
   type TypeSerrure,
@@ -32,6 +34,91 @@ import {
 /* ══════════════════ L'ÉTAT ══════════════════ */
 
 let maitresse: CryptoKey | null = null
+
+/** Où la clé maîtresse se range, dans le coffre local chiffré. */
+const CLE_COFFRE = "archive.maitresse"
+
+/**
+ * Range la clé maîtresse dans le coffre local.
+ *
+ * 🐛 POURQUOI ELLE NE PEUT PAS RESTER EN MÉMOIRE, constaté le 23/09/2026 :
+ * la navigation qui suit la connexion RECHARGE la page. Le module repart à
+ * zéro, la clé disparaît, et l'archive se referme aussitôt après s'être
+ * ouverte. J'avais écrit ici « elle reste en mémoire, pas sur le disque » —
+ * c'était une prudence qui rendait la fonctionnalité inutilisable.
+ *
+ * ⚠️ CE QUE CELA COÛTE, ET IL FAUT L'ASSUMER. Le coffre local contient déjà
+ * les clés privées Signal et le cache en clair : qui l'ouvre lit déjà tout ce
+ * que CET appareil a vu. Mais l'archive va plus loin — elle porte l'historique
+ * d'AVANT cet appareil. Y ranger la clé élargit donc ce qu'une compromission
+ * du navigateur rapporte, de « ce que cet appareil a vu » à « toute
+ * l'archive ».
+ *
+ * ⚠️ CE QUI LE REND ACCEPTABLE : le coffre est chiffré par une clé NON
+ * EXTRACTIBLE, et la déconnexion le vide entièrement — la clé maîtresse part
+ * avec. L'alternative était de redemander le mot de passe à chaque
+ * rechargement de page, c'est-à-dire de ne pas livrer la fonctionnalité.
+ */
+async function ranger(matiere: ArrayBuffer): Promise<void> {
+  try {
+    await ouvrirCoffre()
+    ecrireSecret(CLE_COFFRE, versB64Local(matiere))
+  } catch (e) {
+    // Le coffre peut être indisponible : on garde la clé en mémoire pour
+    // cette session, et la restauration redemandera au prochain démarrage.
+    console.warn("[e2ee] clé d'archive non rangée :", e)
+  }
+}
+
+/**
+ * Relit la clé maîtresse du coffre local.
+ *
+ * ⚠️ RENDUE NON EXTRACTIBLE. Elle a dû l'être pour être rangée ; elle n'a plus
+ * à l'être pour servir. Chaque relecture resserre donc ce qu'on peut en faire.
+ */
+async function relire(): Promise<CryptoKey | null> {
+  try {
+    await ouvrirCoffre()
+    const b64 = lireSecret<string>(CLE_COFFRE)
+    if (!b64) return null
+    return await crypto.subtle.importKey(
+      "raw",
+      depuisB64Local(b64),
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"],
+    )
+  } catch {
+    return null
+  }
+}
+
+function versB64Local(buf: ArrayBuffer): string {
+  const o = new Uint8Array(buf)
+  let t = ""
+  for (let i = 0; i < o.length; i++) t += String.fromCharCode(o[i])
+  return btoa(t)
+}
+
+function depuisB64Local(b64: string): ArrayBuffer {
+  const t = atob(b64)
+  const o = new Uint8Array(t.length)
+  for (let i = 0; i < t.length; i++) o[i] = t.charCodeAt(i)
+  return o.buffer
+}
+
+/**
+ * La clé maîtresse de cette session — de la mémoire, ou du coffre.
+ *
+ * ⚠️ TOUT CE QUI A BESOIN DE LA CLÉ PASSE PAR ICI. Lire `maitresse`
+ * directement marcherait tant que la page n'a pas été rechargée, et cesserait
+ * de marcher ensuite — le défaut se verrait chez l'utilisateur, pas au test.
+ */
+async function laCle(): Promise<CryptoKey | null> {
+  if (maitresse) return maitresse
+  maitresse = await relire()
+  return maitresse
+}
 let tampon: MessageArchive[] = []
 let minuteur: ReturnType<typeof setTimeout> | null = null
 
@@ -121,10 +208,11 @@ export async function activerSauvegarde(opts: {
     throw new Error("Il faut au moins une serrure : sans elle, rien ne se rouvre.")
   }
 
-  const { maitresse: neuve, serrures } = await creerArchive(secrets)
+  const { maitresse: neuve, matiere, serrures } = await creerArchive(secrets)
   for (const s of serrures) await poserSerrure(s)
 
   maitresse = neuve
+  await ranger(matiere)
   if (!ecouteurPose) {
     surEffacement()
     ecouteurPose = true
@@ -181,7 +269,15 @@ export async function ouvrir(type: TypeSerrure, secret: string): Promise<boolean
 
   const propre = type === "recuperation" ? normaliserCleRecuperation(secret) : secret
   try {
-    maitresse = await ouvrirArchive(propre, serrure)
+    /*
+     * ⚠️ LA MATIÈRE D'ABORD, LA CLÉ ENSUITE, ET DANS CET ORDRE. On range les
+     * octets pour que l'archive survive au prochain rechargement, puis on
+     * réimporte une clé NON extractible pour s'en servir. La forme exportable
+     * ne vit que le temps de ces deux lignes.
+     */
+    const matiere = await ouvrirArchiveBrute(propre, serrure)
+    await ranger(matiere)
+    maitresse = await cleDepuisMatiere(matiere)
     if (!ecouteurPose) {
       surEffacement()
       ecouteurPose = true
@@ -198,14 +294,26 @@ export async function ouvrir(type: TypeSerrure, secret: string): Promise<boolean
   }
 }
 
-/** La sauvegarde est-elle ouverte dans cette session ? */
-export function estOuverte(): boolean {
-  return maitresse !== null
+/**
+ * La sauvegarde est-elle ouverte ?
+ *
+ * ⚠️ ASYNCHRONE, ET C'EST NÉCESSAIRE : après un rechargement de page, la clé
+ * n'est plus en mémoire — elle est dans le coffre, qu'il faut ouvrir pour la
+ * lire. Une version synchrone répondrait « non » à chaque premier appel.
+ */
+export async function estOuverte(): Promise<boolean> {
+  return (await laCle()) !== null
 }
 
 /** Referme — déconnexion, ou changement de compte. */
 export function refermer(): void {
   maitresse = null
+  /*
+   * ⚠️ ON RETIRE AUSSI LA COPIE DU COFFRE. L'oublier laisserait la clé sur
+   * l'appareil après une déconnexion — exactement ce que `oublierCetAppareil`
+   * s'emploie à empêcher pour les clés Signal.
+   */
+  effacerSecret(CLE_COFFRE)
   tampon = []
   if (minuteur) {
     clearTimeout(minuteur)
@@ -230,7 +338,11 @@ export function refermer(): void {
  * en mémoire pour une sauvegarde qui n'existe pas serait le garder pour rien.
  */
 export function archiver(message: MessageArchive): void {
-  if (!maitresse) return
+  /*
+   * ⚠️ SYNCHRONE À DESSEIN : appelée depuis le fil de discussion, à chaque
+   * message. On accumule sans savoir encore si la clé est là ; `vider` la
+   * demandera. Un tampon rempli sans archive se jette sans dommage.
+   */
   if (!message.texte) return
 
   tampon.push(message)
@@ -256,12 +368,17 @@ export async function vider(): Promise<void> {
     clearTimeout(minuteur)
     minuteur = null
   }
-  if (!maitresse || tampon.length === 0) return
+  const cle = await laCle()
+  if (!cle || tampon.length === 0) {
+    // Pas d'archive : le tampon n'a pas à grossir indéfiniment.
+    if (!cle) tampon = []
+    return
+  }
 
   const lot = tampon
   tampon = []
 
-  const depose = await deposerBloc(maitresse, lot)
+  const depose = await deposerBloc(cle, lot)
   if (!depose) {
     /*
      * ⚠️ ON REMET LE LOT EN TÊTE, on ne le jette pas. Le réseau revient presque
@@ -289,8 +406,82 @@ export async function restaurerTout(): Promise<{
   messages: MessageArchive[]
   blocsIllisibles: number
 }> {
-  if (!maitresse) throw new Error("L'archive n'est pas ouverte.")
-  return restaurer(maitresse)
+  const cle = await laCle()
+  if (!cle) throw new Error("L'archive n'est pas ouverte.")
+  return restaurer(cle)
+}
+
+/* ══════════════════ LA RESTAURATION AUTOMATIQUE ══════════════════ */
+
+/**
+ * Rouvre l'archive à la connexion, avec le mot de passe qu'on vient de saisir.
+ *
+ * 🐛 LE DÉFAUT QUE CECI CORRIGE, SIGNALÉ LE 23/09/2026 : « je me déconnecte,
+ * je me reconnecte, et tous les messages sont vides ».
+ *
+ * Ce n'était PAS un bogue, et c'est ce qui le rendait difficile à voir : trois
+ * décisions correctes s'additionnaient.
+ *
+ *   ① la déconnexion efface le coffre — garder les clés privées après une
+ *      déconnexion reviendrait à laisser de quoi lire sur l'appareil ;
+ *   ② elle purge le cache local — sans quoi le compte suivant verrait les
+ *      messages du précédent ;
+ *   ③ les enveloppes sont acquittées, donc le serveur ne les ressert pas.
+ *
+ * Chacune est juste. Ensemble, elles font disparaître l'historique — et RIEN
+ * ne prévenait.
+ *
+ * 🔴 LE MOT DE PASSE EST DÉJÀ LÀ, ET C'EST TOUT L'INTÉRÊT. L'utilisateur
+ * vient de le taper pour se connecter : on ouvre l'archive avec, on restaure,
+ * et on l'oublie. Rien à redemander, rien à retenir.
+ *
+ * ⚠️ IL NE DOIT ÊTRE GARDÉ NULLE PART. Il traverse cette fonction et en sort.
+ * Le ranger, même en mémoire pour « plus tard », reviendrait à poser une
+ * serrure que personne n'a choisie.
+ *
+ * ⚠️ NE LÈVE JAMAIS ET NE BLOQUE PAS LA CONNEXION. Pas d'archive, mauvais
+ * secret, réseau coupé : on se connecte quand même. Empêcher quelqu'un
+ * d'entrer parce qu'une restauration a échoué serait bien pire que l'absence
+ * d'historique.
+ */
+export async function restaurerALaConnexion(
+  motDePasse: string,
+  ranger: (m: MessageArchive) => Promise<void>,
+): Promise<number> {
+  try {
+    const serrures = await lireSerrures()
+    if (!serrures.some((s) => s.type === "motdepasse")) {
+      console.info("[e2ee] pas de sauvegarde par mot de passe sur ce compte.")
+      return 0
+    }
+
+    if (!(await ouvrir("motdepasse", motDePasse))) {
+      /*
+       * ⚠️ CE CAS DOIT SE VOIR. Le mot de passe du COMPTE et celui de la
+       * SAUVEGARDE peuvent différer — quelqu'un a changé son mot de passe
+       * après avoir créé sa sauvegarde, et la serrure porte encore l'ancien.
+       * Sans cette ligne, l'historique ne revient pas et rien ne dit pourquoi.
+       */
+      console.warn(
+        "[e2ee] la sauvegarde ne s'ouvre pas avec ce mot de passe — " +
+          "il a probablement changé depuis sa création.",
+      )
+      return 0
+    }
+
+    const { messages } = await restaurerTout()
+    for (const m of messages) await ranger(m)
+    console.info(`[e2ee] ${messages.length} message(s) restauré(s) depuis la sauvegarde.`)
+    return messages.length
+  } catch (e) {
+    /*
+     * 🔴 ON JOURNALISE, ON N'AVALE PAS. Un `catch` muet ici transforme un
+     * défaut en « l'historique ne revient pas », sans piste — et c'est
+     * exactement ce que j'avais écrit au premier jet.
+     */
+    console.error("[e2ee] restauration à la connexion impossible :", e)
+    return 0
+  }
 }
 
 /* ══════════════════ TOUT EFFACER ══════════════════ */

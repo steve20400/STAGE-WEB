@@ -193,7 +193,7 @@ async function deriverKek(
  */
 export async function creerArchive(
   secrets: Partial<Record<TypeSerrure, string>>,
-): Promise<{ maitresse: CryptoKey; serrures: Serrure[] }> {
+): Promise<{ maitresse: CryptoKey; matiere: ArrayBuffer; serrures: Serrure[] }> {
   const types = Object.keys(secrets) as TypeSerrure[]
   if (types.length === 0) {
     throw new Error("Une archive sans serrure ne se rouvrirait jamais.")
@@ -210,7 +210,13 @@ export async function creerArchive(
     serrures.push(await envelopper(type, secrets[type]!, maitresse))
   }
 
-  return { maitresse, serrures }
+  /*
+   * ⚠️ LA MATIÈRE EST RENDUE AVEC LA CLÉ, pendant que c'est encore possible :
+   * `maitresse` est extractible ici par nécessité (`wrapKey` l'exige), et ce
+   * sera la seule occasion de la ranger sans rouvrir une serrure.
+   */
+  const matiere = await crypto.subtle.exportKey("raw", maitresse)
+  return { maitresse, matiere, serrures }
 }
 
 /** Enveloppe une clé maîtresse pour un secret donné. */
@@ -283,6 +289,41 @@ async function desenvelopper(
     extractible,
     ["encrypt", "decrypt"],
   )
+}
+
+/**
+ * Ouvre l'archive et rend la MATIÈRE de la clé maîtresse.
+ *
+ * 🔴 POURQUOI CETTE PORTE EXISTE, ET POURQUOI ELLE EST ÉTROITE. La clé rendue
+ * par `ouvrirArchive` est non extractible — c'est bien — mais elle disparaît
+ * au premier rechargement de page, et l'archive se referme aussitôt après
+ * s'être ouverte. Pour qu'elle survive, il faut pouvoir la RANGER, donc
+ * l'exporter, donc l'avoir demandée extractible.
+ *
+ * ⚠️ LA FENÊTRE D'EXTRACTIBILITÉ VIT ICI, ET NULLE PART AILLEURS. L'appelant
+ * reçoit des octets, les range, et réimporte une clé NON extractible pour
+ * s'en servir. Exposer `desenvelopper(…, true)` aurait laissé n'importe quel
+ * appelant garder une clé exportable sans y penser.
+ */
+export async function ouvrirArchiveBrute(
+  secret: string,
+  serrure: Serrure,
+): Promise<ArrayBuffer> {
+  const cle = await desenvelopper(secret, serrure, true)
+  return crypto.subtle.exportKey("raw", cle)
+}
+
+/**
+ * Refait une clé d'archive à partir de sa matière, NON extractible.
+ *
+ * ⚠️ NON EXTRACTIBLE, ET C'EST LE POINT : ce qui a été rangé une fois n'a plus
+ * à pouvoir ressortir. Chaque relecture resserre ce qu'on peut faire de la clé.
+ */
+export async function cleDepuisMatiere(brut: ArrayBuffer): Promise<CryptoKey> {
+  return crypto.subtle.importKey("raw", brut, { name: "AES-GCM", length: 256 }, false, [
+    "encrypt",
+    "decrypt",
+  ])
 }
 
 /* ══════════════════ AJOUTER UNE SERRURE PLUS TARD ══════════════════ */
