@@ -16,6 +16,7 @@
     "@privacyresearch/libsignal-protocol-typescript": "^0.0.16",
     "caniuse-lite": "^1.0.30001787",
     "firebase": "^10.8.0",
+    "hash-wasm": "^4.12.0",
     "idb": "^8.0.3",
     "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
