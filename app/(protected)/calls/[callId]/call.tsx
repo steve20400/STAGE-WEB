@@ -299,9 +299,15 @@ export default function CallRoomPage() {
         ? t("call_ringing")
         : t("call_connecting"),
     active:
-      call.progress === "ongoing"
-        ? `${t("call_ongoing")} — ${formatElapsed(elapsed)}`
-        : formatElapsed(elapsed),
+      // « Reconnexion… » passe devant le chronometre, et le chronometre n'est
+      // pas remis a zero pour autant : l'appel n'a pas recommence, il traverse
+      // un trou. C'est aussi ce qui le distingue de « Connexion… », qui decrit
+      // un appel qui n'a jamais abouti.
+      call.reconnexion
+        ? t("call_reconnecting")
+        : call.progress === "ongoing"
+          ? `${t("call_ongoing")} — ${formatElapsed(elapsed)}`
+          : formatElapsed(elapsed),
     ended: t("call_ended"),
   }
 

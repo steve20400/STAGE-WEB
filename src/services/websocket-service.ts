@@ -816,6 +816,17 @@ export function sendCallRing(callId: string) {
   sendRaw({ type: "call_ring", callId })
 }
 
+/**
+ * « Je suis toujours dans cet appel », envoye des que la socket se rouvre.
+ *
+ * IDEMPOTENT COTE SERVEUR, comme `meeting_join` : l'envoyer alors que rien
+ * n'etait tombe ne fait rien. On ne cherche donc pas a distinguer une premiere
+ * ouverture d'une reprise, ce qui demanderait un etat de plus pour aucun gain.
+ */
+export function sendCallRejoin(callId: string) {
+  sendRaw({ type: "call_rejoin", callId })
+}
+
 /** Relaie un signal WebRTC (offer / answer / ICE) a un participant precis. */
 export function sendCallSignal(callId: string, toUserId: string, signal: object) {
   sendRaw({ type: "call_signal", callId, toUserId, signal })

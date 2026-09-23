@@ -37,6 +37,7 @@ import {
   sendIvrDtmf,
   sendIvrBack,
   subscribeToCallEvents,
+  sendCallRejoin,
   subscribeToMeetingEvents,
   sendMeetingSignal,
   subscribeToWsConnected,
@@ -225,6 +226,15 @@ export interface CallManagerState {
   /** Etat affichable sans modifier l'interface : Sonnerie, En train de sonner, Appel en cours. */
   progress: CallProgress
   /**
+   * Au moins un correspondant est en cours de reprise.
+   *
+   * Deux sources l'alimentent, et elles ne voient pas la meme chose : le MEDIA
+   * (la session WebRTC repare son chemin) et le SERVEUR (`call_state:
+   * "reconnecting"`, quand c'est la socket du pair qui est tombee). L'une peut
+   * survenir sans l'autre.
+   */
+  reconnexion: boolean
+  /**
    * Le répondeur du correspondant, quand la sonnerie a expiré sans réponse et
    * qu'il en a un.
    *
@@ -336,6 +346,25 @@ interface WebrtcSignal {
   candidate?: { candidate?: string; sdpMid?: string; sdpMLineIndex?: number }
 }
 
+/*
+ * ON REPARE LE CHEMIN, ON N'ABANDONNE PLUS (chantier du 23/09/2026).
+ *
+ * `failed` n'affichait qu'un message d'erreur, `disconnected` n'etait meme pas
+ * regarde : aucune tentative de reparation nulle part — alors que c'est
+ * precisement ce que WebRTC sait faire. Une offre marquee « ice restart »
+ * refait la collecte de candidats et retrouve un chemin, sans toucher aux
+ * pistes ni au son deja negocies.
+ *
+ * Memes valeurs que le mobile, et ce n'est pas un hasard : les deux bouts d'un
+ * meme appel doivent renoncer ensemble, sinon l'un tient un ecran d'appel
+ * devant quelqu'un qui a deja raccroche. Le plafond est celui du sursis du
+ * serveur (45 s) : au-dela, il cloture de son cote.
+ */
+const ESSAIS_REPRISE_MS = [2000, 4000, 8000]
+const PLAFOND_REPRISE_MS = 45000
+/** Ce qu'on laisse a un `disconnected` pour se reparer tout seul. */
+const SURSIS_DISCONNECTED_MS = 3000
+
 /* ----------------- Session WebRTC vers UN pair ----------------- */
 
 class PeerSession {
@@ -348,6 +377,12 @@ class PeerSession {
   private poli = false
   private pendingSignals: WebrtcSignal[] = []
   private iceQueue: RTCIceCandidateInit[] = []
+  /** Minuteurs et compteurs de la reprise du chemin reseau. */
+  private sursisTimer: ReturnType<typeof setTimeout> | null = null
+  private repriseTimer: ReturnType<typeof setTimeout> | null = null
+  private enReprise = false
+  private tentativesReprise = 0
+  private repriseDepuis = 0
   remoteStream: MediaStream | null = null
 
   constructor(
@@ -368,7 +403,11 @@ class PeerSession {
     private localStream: MediaStream | null,
     private readonly iceServers: RTCIceServer[],
     private readonly onSendSignal: (signal: WebrtcSignal) => void,
-    private readonly onUpdated: () => void
+    private readonly onUpdated: () => void,
+    /** Le chemin vacille et la reprise commence : de quoi afficher l'etat. */
+    private readonly onReconnecting: () => void = () => {},
+    /** Le media est revenu, ou la reprise a renonce. */
+    private readonly onReconnected: () => void = () => {}
   ) {}
 
   async start() {
@@ -444,16 +483,25 @@ class PeerSession {
     pc.oniceconnectionstatechange = () => {
       // eslint-disable-next-line no-console
       console.info(`[webrtc] ICE ${this.peerId.slice(0, 8)}… : ${pc.iceConnectionState}`)
-      // Aucun chemin reseau trouve (NAT stricts sans relais TURN) : on prefere
-      // un message clair a deux participants qui ne se voient jamais.
+      if (pc.iceConnectionState === "disconnected") {
+        // Peut se reparer tout seul — un Wi-Fi qui bascule vers la 4G repasse
+        // souvent par la. On laisse un court sursis avant de payer une
+        // negociation.
+        if (this.sursisTimer) clearTimeout(this.sursisTimer)
+        this.sursisTimer = setTimeout(() => this.demarreLaReprise(), SURSIS_DISCONNECTED_MS)
+        return
+      }
       if (pc.iceConnectionState === "failed") {
-        const hasTurn = this.iceServers.some((server) => {
-          const urls = Array.isArray(server.urls) ? server.urls : [server.urls]
-          return urls.some((url) => typeof url === "string" && url.startsWith("turn"))
-        })
-        setState({
-          error: hasTurn ? tr("call_turn_blocked") : tr("call_turn_missing"),
-        })
+        // `failed` ne revient jamais seul : on tente sans attendre.
+        if (this.sursisTimer) clearTimeout(this.sursisTimer)
+        this.sursisTimer = null
+        this.demarreLaReprise(true)
+        return
+      }
+      if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+        if (this.sursisTimer) clearTimeout(this.sursisTimer)
+        this.sursisTimer = null
+        this.finDeReprise()
       }
     }
 
@@ -610,6 +658,98 @@ class PeerSession {
    * On n'offre que depuis un etat « stable » : une negociation deja en vol se
    * conclura d'elle-meme avec la piste, qui est deja attachee a la connexion.
    */
+  /**
+   * Ouvre la procedure de reprise, et ne previent qu'une fois.
+   *
+   * [immediat] saute l'attente du premier essai : sur `failed`, patienter ne
+   * sert a rien puisque l'etat ne se repare pas de lui-meme.
+   */
+  private demarreLaReprise(immediat = false) {
+    if (!this.pc) return
+    if (!this.enReprise) {
+      this.enReprise = true
+      this.tentativesReprise = 0
+      this.repriseDepuis = Date.now()
+      this.onReconnecting()
+    }
+    this.planifieUnEssai(immediat)
+  }
+
+  private planifieUnEssai(immediat = false) {
+    if (this.repriseTimer) clearTimeout(this.repriseTimer)
+    if (Date.now() - this.repriseDepuis >= PLAFOND_REPRISE_MS) {
+      this.abandonneLaReprise()
+      return
+    }
+    if (this.tentativesReprise >= ESSAIS_REPRISE_MS.length) {
+      this.abandonneLaReprise()
+      return
+    }
+    const attente = immediat ? 0 : ESSAIS_REPRISE_MS[this.tentativesReprise]
+    this.tentativesReprise++
+    this.repriseTimer = setTimeout(() => void this.tenteUneReprise(), attente)
+  }
+
+  private async tenteUneReprise() {
+    const pc = this.pc
+    if (!pc || !this.enReprise) return
+
+    // Celui qui n'offre pas ne relance pas : il le DEMANDE. Deux offres
+    // croisees se disputeraient, et le rattrapage « poli » coute une
+    // renegociation de plus pour rien.
+    if (!this.isOfferer) {
+      this.onSendSignal({ kind: "ice_restart_request" })
+      this.planifieUnEssai()
+      return
+    }
+
+    try {
+      // `restartIce()` marque la connexion : la PROCHAINE offre portera de
+      // nouveaux `ice-ufrag`/`ice-pwd`, donc une collecte de candidats neuve.
+      // `renegocier()` s'occupe du reste, y compris de differer proprement si
+      // une negociation est deja en vol.
+      pc.restartIce()
+      await this.renegocier()
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[webrtc] reprise impossible avec ${this.peerId}`, err)
+    }
+    this.planifieUnEssai()
+  }
+
+  /** Le media est revenu : on efface tout et on le dit. */
+  private finDeReprise() {
+    if (this.repriseTimer) clearTimeout(this.repriseTimer)
+    this.repriseTimer = null
+    if (!this.enReprise) return
+    this.enReprise = false
+    this.tentativesReprise = 0
+    this.repriseDepuis = 0
+    this.onReconnected()
+  }
+
+  /**
+   * Toutes les tentatives ont echoue.
+   *
+   * On retrouve ici le message d'origine — c'est le moment ou il devient vrai :
+   * aucun chemin n'a ete trouve, meme apres reprise. L'appel n'est PAS
+   * raccroche pour autant : cette decision appartient au serveur, qui tient son
+   * propre sursis, et le laisser trancher evite que les deux bouts se ferment
+   * sur des minuteurs qui ne tombent pas ensemble.
+   */
+  private abandonneLaReprise() {
+    if (this.repriseTimer) clearTimeout(this.repriseTimer)
+    this.repriseTimer = null
+    this.enReprise = false
+    this.repriseDepuis = 0
+    this.onReconnected()
+    const hasTurn = this.iceServers.some((server) => {
+      const urls = Array.isArray(server.urls) ? server.urls : [server.urls]
+      return urls.some((url) => typeof url === "string" && url.startsWith("turn"))
+    })
+    setState({ error: hasTurn ? tr("call_turn_blocked") : tr("call_turn_missing") })
+  }
+
   async renegocier() {
     const pc = this.pc
     if (!pc) return
@@ -665,6 +805,11 @@ class PeerSession {
         await pc.setRemoteDescription({ type: "answer", sdp: signal.sdp })
         this.remoteReady = true
         await this.flushIceQueue()
+      } else if (signal.kind === "ice_restart_request") {
+        // Le pair ne peut pas relancer lui-meme — il n'est pas offreur. On le
+        // fait pour lui, meme si de notre cote l'etat ICE n'a rien signale :
+        // une coupure n'est pas toujours vue des deux bouts en meme temps.
+        if (this.isOfferer) this.demarreLaReprise(true)
       } else if (signal.kind === "ice" && signal.candidate?.candidate) {
         const candidate: RTCIceCandidateInit = {
           candidate: signal.candidate.candidate,
@@ -792,6 +937,11 @@ class PeerSession {
 
   close() {
     this.remoteStream = null
+    if (this.sursisTimer) clearTimeout(this.sursisTimer)
+    if (this.repriseTimer) clearTimeout(this.repriseTimer)
+    this.sursisTimer = null
+    this.repriseTimer = null
+    this.enReprise = false
     this.pc?.close()
     this.pc = null
     this.started = false
@@ -863,6 +1013,7 @@ function initialState(): CallManagerState {
     callType: "audio",
     role: null,
     progress: null,
+    reconnexion: false,
     isGroup: false,
     isInitiator: false,
     participantNames: {},
@@ -1416,6 +1567,22 @@ export function sendIvrBackToMenu() {
 
 const peers = new Map<string, PeerSession>()
 
+/*
+ * Un ensemble et non un booleen : en groupe, un pair qui vacille ne doit pas
+ * effacer l'etat d'un autre qui vacille encore.
+ */
+const pairsEnReconnexion = new Set<string>()
+
+function marquerReconnexion(peerId: string, actif: boolean) {
+  // Les reunions ont leur propre affichage : cet etat ne decrit que les appels.
+  if (salleReunion !== null) return
+  const avant = pairsEnReconnexion.size
+  if (actif) pairsEnReconnexion.add(peerId)
+  else pairsEnReconnexion.delete(peerId)
+  if (pairsEnReconnexion.size === avant) return
+  setState({ reconnexion: pairsEnReconnexion.size > 0 })
+}
+
 /**
  * Occupation de la salle, au-dela des connexions WebRTC.
  *
@@ -1698,6 +1865,21 @@ function myDisplayName(): string {
 function ensureEventSubscription() {
   if (eventsUnsubscribe) return
   eventsUnsubscribe = subscribeToCallEvents(handleServerEvent)
+  /*
+   * LA SOCKET REVENUE SE REANNONCE DANS L'APPEL.
+   *
+   * Le serveur tient l'appel ouvert 45 s apres la chute d'une socket, mais il
+   * ne saura qu'on est revenu que si on le dit — et c'est cette trame qui leve
+   * son sursis et previent le correspondant. Sans elle, l'appel mourrait a
+   * l'echeance alors que le reseau est deja de retour.
+   *
+   * Le meme modele que les reunions, et pour la meme raison : c'est
+   * idempotent, donc l'envoyer sur une socket qui n'etait pas tombee ne coute
+   * rien.
+   */
+  subscribeToWsConnected(() => {
+    if (state.activeCallId) sendCallRejoin(state.activeCallId)
+  })
   registerPageHideCleanup()
 }
 
@@ -1897,7 +2079,9 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
       salleReunion !== null
         ? sendMeetingSignal(salleReunion, peerId, signal)
         : sendCallSignal(callId, peerId, signal),
-    publishRemoteStreams
+    publishRemoteStreams,
+    () => marquerReconnexion(peerId, true),
+    () => marquerReconnexion(peerId, false)
   )
   peers.set(peerId, session)
   await session.start()
@@ -2512,6 +2696,17 @@ async function handleServerEvent(event: CallServerEvent) {
     const displayName = (event.displayName as string | null) ?? null
     const me = myUserId()
     if (!callId) return
+
+    if (callState === "reconnecting" || callState === "resumed") {
+      // Le pair a perdu (ou retrouve) sa socket. C'est le serveur qui le dit,
+      // et lui seul peut le savoir : une socket tombee ne coupe pas forcement
+      // le media tout de suite, l'ecran doit pourtant le montrer.
+      const pair = String(event.userId ?? event.from ?? "")
+      if (pair && pair !== myUserId() && callId === state.activeCallId) {
+        marquerReconnexion(pair, callState === "reconnecting")
+      }
+      return
+    }
 
     if (callState === "ringing") {
       if (userId !== me && callId === state.activeCallId && state.role === "outgoing") {
