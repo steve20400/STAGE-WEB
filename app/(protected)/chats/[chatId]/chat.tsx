@@ -7241,12 +7241,25 @@ export default function ChatRoomPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <rect x="4" y="10.5" width="16" height="10.5" rx="2" />
-                    {e2ee.e2eeActif ? (
-                      <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
-                    ) : (
-                      <path d="M8 10.5V7a4 4 0 0 1 7.5-2" />
-                    )}
+                    {/*
+                      🔴 UN BOUCLIER, PAS UN CADENAS — signalé par le user le
+                      23/09/2026 : « on confond avec l'autre icône ».
+
+                      Le cadenas sert DÉJÀ trois fois dans cet écran, pour la
+                      RÉSERVATION de la conversation : le bouton juste à côté,
+                      le bandeau, et le badge de la liste. Deux cadenas
+                      voisins, chacun avec un état ouvert et un état fermé,
+                      faisaient quatre combinaisons pour deux formes
+                      identiques.
+
+                      ⚠️ C'EST LE CHIFFREMENT QUI CHANGE, ET NON LA
+                      RÉSERVATION, parce que le cadenas décrit mieux celle-ci :
+                      elle s'ouvre et se referme. Le chiffrement, lui, ne se
+                      défait pas — un cadenas qu'on ne peut pas rouvrir est
+                      une métaphore qui ment.
+                    */}
+                    <path d="M12 2.8 4.5 6v6c0 4.6 3.1 8.2 7.5 9.2 4.4-1 7.5-4.6 7.5-9.2V6L12 2.8z" />
+                    {e2ee.e2eeActif && <path d="m8.8 11.8 2.3 2.3 4.1-4.4" />}
                   </svg>
                 </button>
               )}
@@ -7729,8 +7742,10 @@ export default function ChatRoomPage() {
                   0,
                   <div className="e2ee-banniere" key="e2ee-banniere">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <rect x="5" y="10.5" width="14" height="9" rx="2" />
-                      <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+                      {/* ⚠️ LE MÊME BOUCLIER QUE LE BOUTON. Deux dessins pour
+                          une seule idée obligeraient à apprendre deux fois. */}
+                      <path d="M12 2.8 4.5 6v6c0 4.6 3.1 8.2 7.5 9.2 4.4-1 7.5-4.6 7.5-9.2V6L12 2.8z" />
+                      <path d="m8.8 11.8 2.3 2.3 4.1-4.4" />
                     </svg>
                     <span>{t("e2ee_banner")}</span>
                     {/*
