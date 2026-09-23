@@ -260,6 +260,25 @@ export class CoffreE2ee implements StorageType {
     effacer(`prekeySignee.${id}`)
   }
 
+  /* ── Les générations de pré-clés signées ── */
+
+  /**
+   * Les identifiants des pré-clés signées publiées, de la plus ancienne à la
+   * plus récente.
+   *
+   * ⚠️ IL FAUT LA LISTE, PAS UN COMPTEUR : `removeSignedPreKey` veut un
+   * identifiant, et ceux-ci sont tirés au sort. Sans cette trace, on ne
+   * saurait plus lesquelles retirer — elles s'accumulaient précisément parce
+   * que personne ne les notait.
+   */
+  lireGenerationsSignees(): number[] {
+    return lire<number[]>("generationsSignees") ?? []
+  }
+
+  poseGenerationsSignees(ids: number[]): void {
+    ecrire("generationsSignees", ids)
+  }
+
   /* ── Les sessions : l'état du Double Ratchet ── */
 
   /**

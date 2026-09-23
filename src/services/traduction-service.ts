@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from "../lib/api-client"
+import { estChiffree } from "./e2ee-fil"
 import { langueInitiale, traduire, type Cle } from "../i18n"
 import {
   compterTraductions,
@@ -64,6 +65,37 @@ const CLE_MODE_HERITEE = "alanya-traduction-mode-v1"
 
 const abonnesAuMoteur = new Set<(moteur: CodeMoteur) => void>()
 
+/**
+ * LE MOTEUR POUR UNE CONVERSATION DONNEE.
+ *
+ * 🔴 DANS UN FIL CHIFFRE, LE MOTEUR DE L'APPAREIL EST IMPOSE — quel que soit
+ * le reglage de l'utilisateur.
+ *
+ * POURQUOI. Le reglage du moteur et l'etat chiffre d'une conversation ont ete
+ * ecrits par des gens differents, a des moments differents, et rien ne les
+ * reliait. Un utilisateur qui avait choisi Azure six mois plus tot envoyait
+ * donc le texte dechiffre de ses conversations chiffrees a Microsoft — et a
+ * un cache PARTAGE entre comptes — pendant que l'ecran affichait « chiffre ».
+ *
+ * ⚠️ IL NE L'AURAIT JAMAIS SU. Rien dans l'interface ne rapproche les deux
+ * reglages. C'est la pire forme de fuite : celle que l'utilisateur declenche
+ * lui-meme en croyant etre protege.
+ *
+ * ⚠️ CE N'EST PAS UN DEFAUT DU RELAIS. Il fait exactement ce pour quoi il a
+ * ete ecrit, et le defaut par defaut etait deja le bon moteur. Le trou est un
+ * trou de PERIMETRE, et il se bouche ici, au seul endroit ou le moteur est
+ * choisi.
+ */
+export function moteurPourConversation(conversationId: string): CodeMoteur {
+  if (estChiffree(conversationId)) return MOTEUR_PAR_DEFAUT
+  return lireMoteurTraduction()
+}
+
+/**
+ * ⚠️ NE PLUS APPELER DIRECTEMENT POUR TRADUIRE. Cette fonction rend le reglage
+ * BRUT, sans savoir de quelle conversation il s'agit : elle sert aux Reglages,
+ * qui affichent ce choix. Pour traduire, c'est `moteurPourConversation`.
+ */
 export function lireMoteurTraduction(): CodeMoteur {
   try {
     const enregistre = localStorage.getItem(CLE_MOTEUR)
@@ -398,13 +430,25 @@ function codeBackend(erreur: ApiError): string {
 async function appelerRelais(
   cible: string,
   moteur: CodeMoteur,
-  elements: ElementRelais[]
+  elements: ElementRelais[],
+  /**
+   * ⚠️ ANNONCEE AU SERVEUR POUR QU'IL PUISSE REFUSER. Le client impose deja le
+   * moteur de l'appareil sur un fil chiffre : si cette valeur arrive ici avec
+   * une conversation chiffree, c'est que quelque chose a contourne la regle, et
+   * le serveur doit pouvoir dire non de son cote.
+   */
+  conversationId: string,
 ): Promise<ResultatRelais[]> {
   if (Date.now() < pauseRelaisJusqua) throw new TraductionError(causePause)
   try {
     const reponse = await apiRequest<{ results?: ResultatRelais[] }>("/api/translate", {
       method: "POST",
-      body: { target: cible, provider: moteur, items: elements },
+      body: {
+        target: cible,
+        provider: moteur,
+        items: elements,
+        ...(conversationId ? { convId: conversationId } : {}),
+      },
     })
     return reponse?.results ?? []
   } catch (erreur) {
@@ -506,11 +550,23 @@ async function lireEnCache(
 export async function traduireMessage(
   texte: string,
   cible: string,
+  /**
+   * 🔴 OBLIGATOIRE, ET C'EST DELIBERE.
+   *
+   * Un parametre facultatif se serait oublie au premier nouvel appelant, et
+   * l'oubli aurait rouvert la fuite en silence. Le rendre obligatoire fait
+   * porter la regle par le compilateur au lieu de la memoire : on ne PEUT
+   * plus traduire sans dire de quelle conversation il s'agit.
+   *
+   * C'est la lecon du chapitre 4 : quand l'ordre ou le contexte comptent,
+   * c'est a la fonction de l'exiger, pas au lecteur de s'en souvenir.
+   */
+  conversationId: string,
   /** Voir `preparer` : renseignee, elle supprime l'etape de detection. */
   sourceDeclaree?: string | null
 ): Promise<ResultatTraduction> {
   const cibleNormalisee = normaliserLangue(cible)
-  const moteur = lireMoteurTraduction()
+  const moteur = moteurPourConversation(conversationId)
   const demande = await preparer(texte, cibleNormalisee, sourceDeclaree)
   // Le moteur entre dans la cle de deduplication : changer de moteur puis
   // redemander la meme bulle doit relancer un vrai travail, pas rendre la
@@ -540,7 +596,7 @@ export async function traduireMessage(
       throw new TraductionError("local-indisponible")
     }
 
-    const enLigne = await traduireParRelais([demande], cibleNormalisee, moteur)
+    const enLigne = await traduireParRelais([demande], cibleNormalisee, moteur, conversationId)
     const resultat = enLigne[0]
     if (!resultat) throw new TraductionError("service")
     return resultat
@@ -557,10 +613,12 @@ export async function traduireMessage(
  */
 export async function traduireMessages(
   textes: string[],
-  cible: string
+  cible: string,
+  /** Obligatoire, meme raison que `traduireMessage`. */
+  conversationId: string
 ): Promise<(ResultatTraduction | null)[]> {
   const cibleNormalisee = normaliserLangue(cible)
-  const moteur = lireMoteurTraduction()
+  const moteur = moteurPourConversation(conversationId)
   const resultats: (ResultatTraduction | null)[] = new Array(textes.length).fill(null)
 
   const demandes: { index: number; demande: Demande }[] = []
@@ -604,7 +662,8 @@ export async function traduireMessages(
     const enLigne = await traduireParRelais(
       demandes.map((e) => e.demande),
       cibleNormalisee,
-      moteur
+      moteur,
+      conversationId,
     )
     demandes.forEach((entree, position) => {
       resultats[entree.index] = enLigne[position] ?? null
@@ -677,7 +736,8 @@ async function essayerLocal(
 async function traduireParRelais(
   demandes: Demande[],
   cible: string,
-  moteur: CodeMoteur
+  moteur: CodeMoteur,
+  conversationId: string,
 ): Promise<(ResultatTraduction | null)[]> {
   if (moteurSurAppareil(moteur)) throw new TraductionError("local-indisponible")
 
@@ -691,7 +751,8 @@ async function traduireParRelais(
         empreinte: d.empreinte,
         texte: d.texte,
         ...(d.source ? { source: d.source } : {}),
-      }))
+      })),
+      conversationId,
     )
     for (const reponse of reponses) {
       if (!reponse?.texte || !reponse.empreinte) continue

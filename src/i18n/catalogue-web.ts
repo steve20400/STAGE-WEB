@@ -22,6 +22,18 @@ export const WEB_TRANSLATION_KEYS = [
   "e2ee_cle_changee",
   // La banniere « a partir d ici, chiffre » du fil de discussion.
   "e2ee_banner",
+  // Ce que la LISTE des conversations affiche a la place du dernier message.
+  //
+  // 🔴 LE SERVEUR NE PEUT PAS FOURNIR CE TEXTE : il ne lit pas le message, et
+  // l application parle neuf langues — la regle du projet est « des CODES,
+  // jamais des phrases ». Sans cette cle, la liste se rabattait sur l apercu du
+  // dernier APPEL : un fil chiffre affichait « Appel manque » sous le nom de
+  // quelqu un qui venait d ecrire.
+  "e2ee_apercu",
+  // Dit, AU MOMENT DE JOINDRE UN FICHIER dans un fil chiffre, que les medias
+  // ne le sont pas encore. Le silence ici laisserait croire que la piece
+  // jointe est protegee comme le texte — elle ne l est pas.
+  "e2ee_medias_clairs",
   "call_ringing",
   "call_ongoing",
   "call_ended",
@@ -1352,6 +1364,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "Votre correspondant doit d'abord ouvrir l'application sur un appareil à jour",
     e2ee_cle_changee: "La clé de sécurité de votre correspondant a changé. Il a peut-être réinstallé l'application — ou quelqu'un s'est interposé. Vérifiez de vive voix avant d'écrire quoi que ce soit de sensible.",
     e2ee_banner: "Les messages envoyés à partir d'ici sont chiffrés de bout en bout. Les précédents restent lisibles.",
+    e2ee_apercu: "Message chiffré",
+    e2ee_medias_clairs: "Les fichiers joints ne sont pas encore chiffrés.",
     company_no_type: "Aucun type d'entreprise n'est disponible.",
     company_count_none: "Aucune dans votre pays",
     company_count_one: "1 entreprise",
@@ -2696,6 +2710,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "Your contact must first open the app on an up-to-date device",
     e2ee_cle_changee: "Your contact's security key has changed. They may have reinstalled the app — or someone has stepped in between. Check in person before writing anything sensitive.",
     e2ee_banner: "Messages sent from here are end-to-end encrypted. Earlier ones remain readable.",
+    e2ee_apercu: "Encrypted message",
+    e2ee_medias_clairs: "Attachments are not encrypted yet.",
     company_no_type: "No company type is available.",
     company_count_none: "None in your country",
     company_count_one: "1 company",
@@ -4026,6 +4042,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "Tu contacto debe abrir primero la aplicación en un dispositivo actualizado",
     e2ee_cle_changee: "La clave de seguridad de tu contacto ha cambiado. Puede haber reinstalado la aplicación, o alguien se ha interpuesto. Verifícalo en persona antes de escribir algo delicado.",
     e2ee_banner: "Los mensajes enviados a partir de aquí están cifrados de extremo a extremo. Los anteriores siguen siendo legibles.",
+    e2ee_apercu: "Mensaje cifrado",
+    e2ee_medias_clairs: "Los archivos adjuntos aún no están cifrados.",
     company_no_type: "No hay ningún tipo de empresa disponible.",
     company_count_none: "Ninguna en su país",
     company_count_one: "1 empresa",
@@ -5363,6 +5381,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "Ihr Kontakt muss die App zuerst auf einem aktuellen Gerät öffnen",
     e2ee_cle_changee: "Der Sicherheitsschlüssel Ihres Kontakts hat sich geändert. Möglicherweise wurde die App neu installiert — oder jemand hat sich dazwischengeschaltet. Prüfen Sie es persönlich, bevor Sie Vertrauliches schreiben.",
     e2ee_banner: "Ab hier gesendete Nachrichten sind Ende-zu-Ende-verschlüsselt. Frühere bleiben lesbar.",
+    e2ee_apercu: "Verschlüsselte Nachricht",
+    e2ee_medias_clairs: "Anhänge sind noch nicht verschlüsselt.",
     company_no_type: "Es ist keine Unternehmensart verfügbar.",
     company_count_none: "Keines in Ihrem Land",
     company_count_one: "1 Unternehmen",
@@ -6713,6 +6733,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "O seu contacto deve primeiro abrir a aplicação num dispositivo atualizado",
     e2ee_cle_changee: "A chave de segurança do seu contacto mudou. Pode ter reinstalado a aplicação — ou alguém se intrometeu. Verifique pessoalmente antes de escrever algo sensível.",
     e2ee_banner: "As mensagens enviadas a partir daqui são cifradas de ponta a ponta. As anteriores continuam legíveis.",
+    e2ee_apercu: "Mensagem cifrada",
+    e2ee_medias_clairs: "Os anexos ainda não são cifrados.",
     company_no_type: "Nenhum tipo de empresa disponível.",
     company_count_none: "Nenhuma no seu país",
     company_count_one: "1 empresa",
@@ -8050,6 +8072,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "Собеседник должен сначала открыть приложение на актуальном устройстве",
     e2ee_cle_changee: "Ключ безопасности собеседника изменился. Возможно, он переустановил приложение — или кто-то вмешался. Проверьте лично, прежде чем писать что-то важное.",
     e2ee_banner: "Сообщения, отправленные начиная отсюда, защищены сквозным шифрованием. Предыдущие остаются читаемыми.",
+    e2ee_apercu: "Зашифрованное сообщение",
+    e2ee_medias_clairs: "Вложения пока не шифруются.",
     company_no_type: "Нет доступных типов компаний.",
     company_count_none: "Нет в вашей стране",
     company_count_one: "1 компания",
@@ -9380,6 +9404,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "对方需先在已更新的设备上打开应用",
     e2ee_cle_changee: "对方的安全密钥已更改。可能是重新安装了应用，也可能有人从中介入。在发送敏感内容前请当面核实。",
     e2ee_banner: "从这里开始发送的消息已端到端加密。此前的消息仍可读。",
+    e2ee_apercu: "加密消息",
+    e2ee_medias_clairs: "附件尚未加密。",
     company_no_type: "暂无可用的企业类型。",
     company_count_none: "您所在国家没有",
     company_count_one: "1 家企业",
@@ -10668,6 +10694,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "Din kontakt måste först öppna appen på en uppdaterad enhet",
     e2ee_cle_changee: "Din kontakts säkerhetsnyckel har ändrats. Hen kan ha installerat om appen — eller så har någon klivit emellan. Kontrollera personligen innan du skriver något känsligt.",
     e2ee_banner: "Meddelanden som skickas härifrån är totalsträckskrypterade. Tidigare meddelanden förblir läsbara.",
+    e2ee_apercu: "Krypterat meddelande",
+    e2ee_medias_clairs: "Bifogade filer är ännu inte krypterade.",
     company_no_type: "Ingen företagstyp är tillgänglig.",
     company_count_none: "Inget i ert land",
     company_count_one: "1 företag",
@@ -12000,6 +12028,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_cles_manquantes: "Kontakten din må først åpne appen på en oppdatert enhet",
     e2ee_cle_changee: "Sikkerhetsnøkkelen til kontakten din er endret. Vedkommende kan ha installert appen på nytt — eller noen har kommet imellom. Sjekk personlig før du skriver noe sensitivt.",
     e2ee_banner: "Meldinger som sendes herfra er ende-til-ende-kryptert. Tidligere meldinger forblir lesbare.",
+    e2ee_apercu: "Kryptert melding",
+    e2ee_medias_clairs: "Vedlegg er ennå ikke kryptert.",
     company_no_type: "Ingen selskapstype er tilgjengelig.",
     company_count_none: "Ingen i landet deres",
     company_count_one: "1 selskap",

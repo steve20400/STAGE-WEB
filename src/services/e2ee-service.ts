@@ -49,6 +49,15 @@ const CLE_DEVICE = "alanya.e2ee.deviceId"
 /** Combien de pré-clés à usage unique on publie d'un coup. */
 const LOT_PREKEYS = 50
 
+/**
+ * Combien de pré-clés signées on garde en arrière.
+ *
+ * ⚠️ PAS UNE SEULE : un message en vol désigne celle qui était publiée quand
+ * son expéditeur a récupéré notre paquet. Trois générations couvrent le temps
+ * de vol sans laisser le coffre grossir.
+ */
+const SIGNEES_GARDEES = 3
+
 const coffre = new CoffreE2ee()
 
 /**
@@ -226,6 +235,28 @@ export async function preparerCetAppareil(): Promise<{
   const signee = await KeyHelper.generateSignedPreKey(identite, idSignee)
   await coffre.storeSignedPreKey(idSignee, signee.keyPair)
 
+  /*
+   * 🐛 LES PRÉ-CLÉS SIGNÉES S'ACCUMULAIENT SANS FIN.
+   *
+   * Une neuve est produite à CHAQUE appel — donc à chaque connexion — et
+   * l'ancienne n'était jamais retirée. Le coffre étant désormais chargé en
+   * mémoire au démarrage, la fuite se payait deux fois : sur le disque et à
+   * l'ouverture.
+   *
+   * ⚠️ ON N'EN GARDE PAS QU'UNE, ET C'EST ESSENTIEL. Un correspondant a pu
+   * récupérer notre paquet il y a dix minutes et ne nous écrire que
+   * maintenant : son message désigne l'ANCIENNE pré-clé signée. La retirer
+   * aussitôt rendrait ce message illisible — définitivement, personne d'autre
+   * ne le détenant.
+   *
+   * Trois générations couvrent largement le temps de vol d'un message, et
+   * bornent le coffre. C'est la fenêtre de grâce, pas de la prudence vague.
+   */
+  const generations = [...(coffre.lireGenerationsSignees() ?? []), idSignee]
+  const aRetirer = generations.slice(0, Math.max(0, generations.length - SIGNEES_GARDEES))
+  for (const vieille of aRetirer) await coffre.removeSignedPreKey(vieille)
+  coffre.poseGenerationsSignees(generations.slice(-SIGNEES_GARDEES))
+
   // Les pré-clés à usage unique : chacune ne sert qu'une fois, d'où le lot.
   const prekeys: { id: number; clePublique: string }[] = []
   const base = Math.floor(Math.random() * 100_000) + 1
@@ -256,6 +287,54 @@ export async function preparerCetAppareil(): Promise<{
     },
   )
   return r
+}
+
+/* ══════════════════ RÉAPPROVISIONNEMENT ══════════════════ */
+
+/**
+ * Republie un lot de pré-clés si le serveur dit que le stock est bas.
+ *
+ * 🐛 LE SERVEUR RÉCLAMAIT DÉJÀ, ET PERSONNE N'ÉCOUTAIT. `GET /api/e2ee/cles`
+ * rend `reapproNecessaire` depuis le premier jour, avec ce commentaire :
+ * « C'EST LE SERVEUR QUI RÉCLAME, PAS LE CLIENT QUI DEVINE ». Le client, lui,
+ * ne lisait ce champ nulle part.
+ *
+ * ⚠️ CE QUE ÇA DONNAIT : les 50 pré-clés à usage unique s'épuisent au fil des
+ * nouveaux correspondants, et le jour où il n'en reste plus, PLUS PERSONNE ne
+ * peut ouvrir de conversation avec cet appareil. Panne muette : rien ne casse
+ * chez celui qui la subit, ce sont les AUTRES qui n'arrivent pas à lui écrire.
+ *
+ * ⚠️ RIEN NE SE VÉRIFIAIT AU FIL DE L'EAU. Le stock n'était republié qu'à la
+ * connexion. Quelqu'un qui reste connecté des semaines — le cas normal sur le
+ * web — pouvait le vider sans jamais repasser par là.
+ *
+ * ⚠️ NE LÈVE JAMAIS, ET NE BLOQUE RIEN. C'est un entretien de fond : l'échouer
+ * ne doit pas empêcher d'envoyer le message qu'on est en train d'écrire.
+ */
+export async function reapprovisionnerSiNecessaire(): Promise<boolean> {
+  try {
+    const deviceId = idAppareil()
+    const etat = await apiRequest<{
+      appareils: { deviceId: number; reapproNecessaire: boolean }[]
+    }>("/api/e2ee/cles")
+    const moi = etat.appareils.find((a) => a.deviceId === deviceId)
+    if (!moi?.reapproNecessaire) return false
+
+    /*
+     * ⚠️ ON REPASSE PAR `preparerCetAppareil`, ON NE DUPLIQUE PAS. Elle publie
+     * un lot neuf ET fait tourner la pré-clé signée — la rotation que Signal
+     * fait périodiquement. Écrire un second chemin « juste pour les pré-clés »
+     * ferait diverger les deux le jour où l'un changerait.
+     *
+     * ⚠️ ELLE NE RÉGÉNÈRE PAS L'IDENTITÉ : c'est ce qui rend ce rappel sans
+     * danger, et c'est écrit dans son en-tête.
+     */
+    await preparerCetAppareil()
+    return true
+  } catch {
+    // Réseau coupé, serveur ancien : on réessaiera au prochain passage.
+    return false
+  }
 }
 
 /* ══════════════════ OUVERTURE DE SESSION ══════════════════ */
@@ -301,6 +380,23 @@ interface PaquetRecu {
  * promesse à tous ses appelants. Le coût est un `await` déjà résolu.
  */
 export async function ouvrirSessions(userId: string): Promise<number[]> {
+  const devices = await ouvrirSessionsInterne(userId)
+  /*
+   * ⚠️ L'ENTRETIEN SE FAIT ICI, ET APRÈS COUP.
+   *
+   * Ouvrir une session consomme une pré-clé — celle du correspondant. C'est
+   * donc le moment où le stock BOUGE dans le système, et le bon endroit pour
+   * regarder le nôtre.
+   *
+   * ⚠️ `void`, PAS `await` : on ne retarde pas l'envoi d'un message pour un
+   * entretien de fond. Un réapprovisionnement manqué se rattrape au passage
+   * suivant ; un message retardé se voit.
+   */
+  void reapprovisionnerSiNecessaire()
+  return devices
+}
+
+async function ouvrirSessionsInterne(userId: string): Promise<number[]> {
   await ouvrirCoffre()
   const r = await apiRequest<{ paquets: PaquetRecu[] }>(
     `/api/e2ee/cles/${encodeURIComponent(userId)}`,

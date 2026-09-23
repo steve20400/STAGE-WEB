@@ -3449,8 +3449,16 @@ function MessageBubble({
   onOpenAlbum,
   autoTraduction,
   langueSourceDeclaree,
+  conversationId,
 }: {
   msg: Message
+  /**
+   * ⚠️ DESCENDUE JUSQU'ICI POUR LA TRADUCTION, et ce n'est pas du confort :
+   * sur un fil chiffre, le service impose le moteur de l'appareil. Sans cet
+   * identifiant il ne peut pas le savoir, et le texte dechiffre partirait chez
+   * un tiers pour peu que l'utilisateur ait choisi un moteur en ligne.
+   */
+  conversationId: string
   isMe: boolean
   replyMsg?: Message
   onReply: (m: Message) => void
@@ -4171,6 +4179,7 @@ function MessageBubble({
               {blocTraductionVisible && texteATraduire && (
                 <MessageTranslation
                   texte={texteATraduire}
+                  conversationId={conversationId}
                   automatique={traductionAutomatique}
                   langueSource={langueSourceDeclaree}
                 />
@@ -7562,6 +7571,7 @@ export default function ChatRoomPage() {
                     name={t("f2_n_files", { count: lot.length })}
                   >
                     <MessageBubble
+                    conversationId={chatId}
                       msg={head}
                       isMe={albumIsMe}
                       replyMsg={head.replyTo ? messagesById.get(head.replyTo) : undefined}
@@ -7638,6 +7648,7 @@ export default function ChatRoomPage() {
                     </div>
                   )}
                   <MessageBubble
+                    conversationId={chatId}
                     key={msg.id}
                     msg={msg}
                     isMe={isMe}
@@ -7835,6 +7846,34 @@ export default function ChatRoomPage() {
             {/* Popup attachement */}
             {showAttach && (
               <div className="attach-menu">
+                {/*
+                  🔴 LE FIL EST CHIFFRÉ, LES PIÈCES JOINTES NE LE SONT PAS.
+
+                  Le chiffrement des médias est remis à plus tard (décision du
+                  21/09/2026). En attendant, un fichier envoyé dans un fil
+                  marqué « chiffré » traverse le chemin ORDINAIRE : le serveur
+                  le stocke et peut l'ouvrir.
+
+                  ⚠️ NE PAS LE DIRE SERAIT LE PIRE DES CHOIX. L'utilisateur a
+                  sous les yeux un cadenas et une bannière ; il en déduit,
+                  légitimement, que tout ce qu'il envoie est protégé. Le
+                  silence ici ne cache pas une limite, il fabrique une
+                  croyance fausse — et c'est sur cette croyance que les gens
+                  décident quoi envoyer.
+
+                  ⚠️ ICI ET PAS AILLEURS : au moment de CHOISIR le fichier,
+                  quand l'information peut encore changer la décision. Après
+                  l'envoi, elle ne sert plus à rien.
+                */}
+                {estChiffree(chatId) && (
+                  <div className="attach-avertissement">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 9v4M12 17h.01" />
+                      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                    </svg>
+                    <span>{t("e2ee_medias_clairs")}</span>
+                  </div>
+                )}
                 <button
                   className="attach-opt"
                   onClick={() => {

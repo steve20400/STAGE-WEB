@@ -26,6 +26,7 @@ import { teinteCss } from "../contacts/contact-lists-affichage"
 import {
 } from "../../../src/services/message-payload"
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
+import { estChiffree } from "../../../src/services/e2ee-fil"
 import "./chats-page.css"
 
 // Helper hors composant : la langue est relue a chaque appel, donc a chaque
@@ -62,6 +63,28 @@ function lastMsgIcon(type: ConversationMock["lastMessageType"]) {
  */
 function apercuDernierMessage(conv: ConversationMock): string {
   const langue = langueInitiale()
+
+  /*
+   * 🔴 UN FIL CHIFFRE N'A PAS D'APERCU, ET C'EST NORMAL.
+   *
+   * Le serveur ecrit `lastMessage: null` pour un message chiffre — il ne le
+   * lit pas, il ne peut rien en resumer. La liste tombait alors dans le repli
+   * prevu pour les conversations sans message : elle affichait l'apercu du
+   * dernier APPEL.
+   *
+   * 🐛 CE QUE CA DONNAIT A L'ECRAN : « Appel manque » sous le nom de quelqu'un
+   * qui venait d'ecrire. Pas une fuite — l'inverse : une information FAUSSE,
+   * qui donne l'impression que le message n'est pas arrive.
+   *
+   * ⚠️ LE LIBELLE VIENT D'ICI ET NON DU SERVEUR. Regle du projet : des CODES,
+   * jamais des phrases — l'application parle neuf langues, et c'est le client
+   * qui traduit. Le serveur n'a pas a inventer un texte qu'il ne peut pas
+   * ecrire dans la bonne langue.
+   *
+   * ⚠️ AVANT TOUT LE RESTE : le type du dernier message n'a plus de sens ici,
+   * la ligne etant vide de toute facon.
+   */
+  if (estChiffree(conv.id)) return traduire(langue, "e2ee_apercu")
 
   if (conv.lastMessageType === "contact" || conv.lastMessageType === "location") {
     /*

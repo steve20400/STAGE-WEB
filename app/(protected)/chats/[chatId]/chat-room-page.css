@@ -1196,3 +1196,48 @@ textarea.room-textarea::placeholder {
     color: #f0c9c4;
   }
 }
+
+/* ══════════════════ « LES FICHIERS NE SONT PAS CHIFFRÉS » ══════════════════
+ *
+ * En tête du menu des pièces jointes, et SEULEMENT sur un fil chiffré.
+ *
+ * ⚠️ MÊME FAMILLE QUE LA BANNIÈRE, PAS LA MÊME QUE L'ALERTE DE CLÉ. C'est une
+ * mise en garde, pas un danger : l'ambre informe, le rouge alarme. Prendre le
+ * rouge ici userait l'alarme pour un cas qui se produit à chaque pièce jointe,
+ * et le jour où la clé d'un correspondant changerait vraiment, plus personne ne
+ * la regarderait.
+ */
+.attach-avertissement {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 2px 6px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff4e5;
+  border: 1px solid #f0d5b8;
+  color: #6b4b2a;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.attach-avertissement svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 1px;
+  fill: none;
+  stroke: #b85c38;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .attach-avertissement {
+    background: #2a2118;
+    border-color: #4a3a28;
+    color: #e0cdb5;
+  }
+}
