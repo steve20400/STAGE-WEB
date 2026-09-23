@@ -163,11 +163,30 @@ let ecouteurPose = false
 /* ══════════════════ LES SERRURES, CÔTÉ RÉSEAU ══════════════════ */
 
 export async function lireSerrures(): Promise<Serrure[]> {
+  return (await lireCoffre()).serrures
+}
+
+/**
+ * L'état du coffre : ses serrures, et si l'utilisateur l'a REFUSÉ.
+ *
+ * ⚠️ « PAS ENCORE ACTIVÉE » ET « REFUSÉE » NE SE CONFONDENT PAS. La première
+ * appelle une activation silencieuse à la connexion ; la seconde l'interdit.
+ * Les traiter pareil ferait réapparaître la sauvegarde chez quelqu'un qui
+ * vient de la supprimer — et il la supprimerait encore, et encore.
+ */
+export async function lireCoffre(): Promise<{ serrures: Serrure[]; refusee: boolean }> {
   try {
-    const r = await apiRequest<{ serrures: Serrure[] }>("/api/e2ee/coffre")
-    return r.serrures ?? []
+    const r = await apiRequest<{ serrures: Serrure[]; refusee?: boolean }>(
+      "/api/e2ee/coffre",
+    )
+    return { serrures: r.serrures ?? [], refusee: r.refusee === true }
   } catch {
-    return []
+    /*
+     * ⚠️ UN ÉCHEC RÉSEAU VAUT « REFUSÉE », PAS « À ACTIVER ». Dans le doute on
+     * ne crée rien : activer une sauvegarde par erreur envoie l'historique sur
+     * nos serveurs sans que personne l'ait demandé, et c'est irréversible.
+     */
+    return { serrures: [], refusee: true }
   }
 }
 
@@ -544,6 +563,50 @@ export async function suivreChangementMotDePasse(
  * d'entrer parce qu'une restauration a échoué serait bien pire que l'absence
  * d'historique.
  */
+/**
+ * À la connexion : restaure si une archive existe, l'active sinon.
+ *
+ * 🔴 ACTIVÉE PAR DÉFAUT — décision du user, 23/09/2026 : « c'est plus
+ * intuitif ». Perdre son historique en changeant d'appareil est un piège que
+ * personne ne voit venir ; le défaut doit protéger, pas attendre qu'on sache
+ * qu'il faut se protéger.
+ *
+ * ⚠️ CE QUE LE DÉFAUT COÛTE, ET IL FAUT LE SAVOIR : la seule serrure posable
+ * sans rien demander est celle du MOT DE PASSE — celle qui ne protège pas
+ * contre nous. Activer par défaut met donc l'historique de tout le monde sur
+ * nos serveurs, sous une serrure que nous pourrions ouvrir si nous étions
+ * compromis. C'est assumé, c'est écrit dans l'écran, et c'est désactivable.
+ *
+ * ⚠️ UN REFUS EST DÉFINITIF JUSQU'À NOUVEL ORDRE. Quelqu'un qui supprime sa
+ * sauvegarde ne doit pas la retrouver recréée à la connexion suivante.
+ *
+ * ⚠️ PAS DE CLÉ DE RÉCUPÉRATION À L'ACTIVATION SILENCIEUSE : elle ne vaut que
+ * montrée, et personne ne regarde. L'écran des réglages la propose ensuite.
+ */
+export async function activerOuRestaurerALaConnexion(
+  motDePasse: string,
+  ranger: (m: MessageArchive) => Promise<void>,
+): Promise<number> {
+  try {
+    const { serrures, refusee } = await lireCoffre()
+
+    if (serrures.length === 0) {
+      if (refusee) {
+        console.info("[e2ee] sauvegarde refusée sur ce compte — on n'y touche pas.")
+        return 0
+      }
+      await activerSauvegarde({ motDePasse })
+      console.info("[e2ee] sauvegarde activée automatiquement.")
+      return 0
+    }
+
+    return await restaurerALaConnexion(motDePasse, ranger)
+  } catch (e) {
+    console.error("[e2ee] activation ou restauration à la connexion :", e)
+    return 0
+  }
+}
+
 export async function restaurerALaConnexion(
   motDePasse: string,
   ranger: (m: MessageArchive) => Promise<void>,

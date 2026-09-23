@@ -18,6 +18,8 @@ import {
   ouvrir,
   refermer,
   restaurerTout,
+  activerOuRestaurerALaConnexion,
+  lireCoffre,
   suivreChangementMotDePasse,
   toutEffacer,
   vider,
@@ -216,8 +218,37 @@ export async function scenario() {
     "l'ancien mot de passe ouvre encore — le changement n'a rien changé",
   )
 
-  /* ── ⑦ TOUT EFFACER ──────────────────────────────────────────────── */
-  titre("⑦ Tout effacer")
+  /* ── ⑦ LE DÉFAUT, ET LE REFUS QUI DOIT TENIR ─────────────────────── */
+  titre("⑦ Activée par défaut — mais un refus tient")
+
+  // On efface tout : c'est le geste de quelqu'un qui refuse.
+  await toutEffacer()
+  const apresRefus = await lireCoffre()
+  verifie("supprimer vaut refus", apresRefus.refusee === true)
+
+  /*
+   * 🔴 LE CONTRÔLE QUI PORTE TOUTE LA DÉCISION. Sans mémoire du refus, la
+   * connexion suivante recréerait la sauvegarde — et l'utilisateur la
+   * supprimerait encore, et encore. Ce ne serait pas une maladresse
+   * d'affichage : ce serait passer outre une décision explicite sur ses
+   * propres données.
+   */
+  refermer()
+  await activerOuRestaurerALaConnexion(NOUVEAU_MDP, async () => {})
+  verifie(
+    "une reconnexion NE la recrée PAS",
+    (await lireCoffre()).serrures.length === 0,
+    "la sauvegarde revient malgré le refus",
+  )
+
+  // Et l'utilisateur peut revenir sur sa décision.
+  await activerSauvegarde({ motDePasse: NOUVEAU_MDP })
+  const revenu = await lireCoffre()
+  verifie("la réactiver lève le refus", revenu.refusee === false && revenu.serrures.length === 1)
+
+
+  /* ── ⑧ TOUT EFFACER ──────────────────────────────────────────────── */
+  titre("⑧ Tout effacer")
 
   await toutEffacer()
   verifie("plus aucune serrure", (await lireSerrures()).length === 0)

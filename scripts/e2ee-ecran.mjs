@@ -71,6 +71,15 @@ async function main() {
   const u = await prisma.user.findUnique({ where: { email: "ecran@e2ee.test" } });
   await prisma.e2eeArchiveBloc.deleteMany({ where: { userId: u.id } });
   await prisma.e2eeSerrure.deleteMany({ where: { userId: u.id } });
+  /*
+   * ⚠️ ON LÈVE AUSSI LE REFUS. Depuis que la sauvegarde s'active d'elle-même,
+   * effacer les serrures ne suffit plus à repartir de zéro : un refus resté
+   * en base empêcherait l'activation, et le banc croirait à un défaut.
+   */
+  await prisma.user.update({
+    where: { id: u.id },
+    data: { e2eeSauvegardeRefusee: false },
+  });
 
   const navigateur = await chromium
     .launch(
@@ -166,34 +175,63 @@ async function main() {
     fatales.slice(0, 3).join(" | "),
   );
 
-  /* ── ② ACTIVER, ET VOIR LA CLÉ ───────────────────────────────────── */
-  titre("② Activer la sauvegarde, et la clé s'affiche UNE fois");
+  /* ── ② ELLE EST DÉJÀ ACTIVE ──────────────────────────────────────── */
+  titre("② La sauvegarde s'est installée toute seule");
 
-  const champ = page.locator('input[placeholder*="connectez"]').first();
+  /*
+   * 🔴 C'EST LE DÉFAUT DEPUIS LE 23/09/2026. L'utilisateur n'a rien fait : sa
+   * sauvegarde existe déjà quand il ouvre l'écran pour la première fois. Un
+   * bouton « Activer » ici serait un piège — il ferait appuyer sur quelque
+   * chose qui est fait.
+   */
+  const posees = await page.locator(".sauv-serrure.on").count();
+  verifie("une serrure est déjà en place", posees === 1, `${posees}`);
+
+  const absentes = await page.locator(".sauv-serrure:not(.on)").count();
+  verifie("et deux sont annoncées absentes", absentes === 2, `${absentes}`);
+
+  /*
+   * 🐛 `/Activer la sauvegarde/` CORRESPOND AUSSI À « DÉSACTIVER LA
+   * SAUVEGARDE » — le second contient le premier. Le banc se piégeait
+   * lui-même et accusait le produit.
+   *
+   * ⚠️ UN MOTIF DE TEST QUI N'EST PAS ANCRÉ FINIT PAR ATTRAPER AUTRE CHOSE,
+   * surtout dans une langue où l'on préfixe pour nier. On ancre au début.
+   */
+  const boutonActiver = await page
+    .getByRole("button", { name: /^Activer la sauvegarde$/i })
+    .isVisible()
+    .catch(() => false);
+  verifie("aucun bouton « Activer » — il n'y a rien à activer", !boutonActiver);
+
+  /* ── ③ LA CLÉ DE RÉCUPÉRATION, À LA DEMANDE ──────────────────────── */
+  titre("③ Créer une clé de récupération");
+
+  const champ = page.locator('input[placeholder*="ouvrir"]').first();
   const champVisible = await champ.isVisible().catch(() => false);
-  verifie("le champ de mot de passe est là", champVisible);
+  verifie("le champ du secret est là", champVisible);
 
   if (champVisible) {
     await champ.fill(motDePasse);
-    await page.getByRole("button", { name: /Activer la sauvegarde/i }).click();
+    await page.getByRole("button", { name: /Créer une clé de récupération/i }).click();
 
     /*
-     * ⚠️ ARGON2ID PREND ~750 ms DANS CHROME, plus l'aller-retour réseau. Un
-     * délai d'attente trop court ferait échouer le banc pour une raison qui
-     * n'est pas un défaut — et on chercherait le problème au mauvais endroit.
+     * ⚠️ ARGON2ID PREND ~750 ms DANS CHROME, deux fois — une pour ouvrir, une
+     * pour ré-envelopper — plus les allers-retours. Un délai trop court ferait
+     * échouer le banc pour une raison qui n'est pas un défaut.
      */
-    await page.waitForTimeout(6000);
+    await page.waitForTimeout(9000);
 
     const cleVisible = await page
       .getByText("Votre clé de récupération")
       .first()
       .isVisible()
       .catch(() => false);
-    verifie("la clé de récupération s'affiche", cleVisible, "l'utilisateur ne la verra jamais");
+    verifie("la clé s'affiche", cleVisible, "l'utilisateur ne la verra jamais");
 
     if (cleVisible) {
       const mots = await page.locator(".sauv-cle-mots span").count();
-      verifie("douze mots, tous affichés", mots === 12, `${mots} mot(s) à l'écran`);
+      verifie("douze mots, tous affichés", mots === 12, `${mots} mot(s)`);
 
       /*
        * 🔴 LE CONTRÔLE QUI COMPTE VRAIMENT : l'avertissement est-il AU-DESSUS
@@ -201,44 +239,29 @@ async function main() {
        * c'est-à-dire trop tard pour changer le soin qu'on y a mis.
        */
       const ordre = await page.evaluate(() => {
-        const avert = document.querySelector(".sauv-cle-avert");
-        const mots = document.querySelector(".sauv-cle-mots");
-        if (!avert || !mots) return null;
-        return avert.getBoundingClientRect().top < mots.getBoundingClientRect().top;
+        const a = document.querySelector(".sauv-cle-avert");
+        const m = document.querySelector(".sauv-cle-mots");
+        if (!a || !m) return null;
+        return a.getBoundingClientRect().top < m.getBoundingClientRect().top;
       });
       verifie(
         "l'avertissement est AU-DESSUS des mots",
         ordre === true,
         "placé après, il se lit une fois la clé déjà recopiée",
       );
+
+      await page.getByRole("button", { name: /Je l'ai notée/i }).click();
+      await page.waitForTimeout(1500);
+
+      const deux = await page.locator(".sauv-serrure.on").count();
+      verifie("deux serrures maintenant", deux === 2, `${deux}`);
+      verifie(
+        "et la clé a disparu de l'écran",
+        (await page.locator(".sauv-cle").count()) === 0,
+        "la clé reste affichée après avoir été notée",
+      );
     }
-
-    /* ── ③ L'ÉTAT APRÈS ─────────────────────────────────────────────── */
-    titre("③ Une fois notée, l'écran montre les serrures posées");
-
-    await page.getByRole("button", { name: /Je l'ai notée/i }).click();
-    await page.waitForTimeout(800);
-
-    const posees = await page.locator(".sauv-serrure.on").count();
-    verifie("deux serrures marquées en place", posees === 2, `${posees}`);
-
-    const manquante = await page.locator(".sauv-serrure:not(.on)").count();
-    verifie("et celle du trousseau est annoncée absente", manquante === 1, `${manquante}`);
-
-    /*
-     * ⚠️ LA CLÉ NE DOIT PLUS ÊTRE NULLE PART. Un composant qui la garderait en
-     * mémoire pour « au cas où » la rendrait récupérable par un script sur la
-     * page — ce qui reviendrait à poser une serrure que personne n'a choisie.
-     */
-    const resteClePart = await page.evaluate(() => document.body.innerText.includes("tortue") ||
-      document.body.innerText.includes("riviere"));
-    verifie(
-      "elle a bien disparu de l'écran",
-      !resteClePart || (await page.locator(".sauv-cle").count()) === 0,
-      "la clé reste affichée après avoir été notée",
-    );
   }
-
   await navigateur.close();
   await prisma.$disconnect();
 

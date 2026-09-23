@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import {
   activerSauvegarde,
   ajouterUneSerrure,
-  lireSerrures,
+  lireCoffre,
   ouvrir,
   restaurerTout,
   toutEffacer,
@@ -24,7 +24,15 @@ import "./e2ee-sauvegarde-panneau.css"
  * dans cette seconde-là : ni le serveur ni nous ne pouvons la redonner.
  */
 
-type Etat = "chargement" | "absente" | "presente"
+/**
+ * ⚠️ TROIS ÉTATS, ET « REFUSÉE » N'EST PAS « ABSENTE ».
+ *
+ * La sauvegarde s'active d'elle-même à la connexion : « absente » ne dure
+ * donc qu'un instant, et signifie « en cours d'installation ». « Refusée »
+ * est une décision de l'utilisateur, et l'écran doit la montrer comme telle —
+ * pas comme un réglage qu'on aurait oublié de faire.
+ */
+type Etat = "chargement" | "absente" | "refusee" | "presente"
 
 export function E2eeSauvegardePanneau() {
   const { t } = useTranslation()
@@ -42,9 +50,9 @@ export function E2eeSauvegardePanneau() {
   const [confirmeEffacement, setConfirmeEffacement] = useState(false)
 
   async function relire() {
-    const s = await lireSerrures()
-    setTypes(s.map((x) => x.type))
-    setEtat(s.length > 0 ? "presente" : "absente")
+    const { serrures, refusee } = await lireCoffre()
+    setTypes(serrures.map((x) => x.type))
+    setEtat(serrures.length > 0 ? "presente" : refusee ? "refusee" : "absente")
   }
 
   useEffect(() => {
@@ -181,9 +189,16 @@ export function E2eeSauvegardePanneau() {
         </div>
       )}
 
-      {etat === "absente" && !cleMontree && (
+      {/*
+        ⚠️ « ABSENTE » NE DURE QU'UN INSTANT : la sauvegarde s'installe à la
+        connexion. Afficher un bouton « Activer » ici ferait appuyer sur
+        quelque chose qui est déjà en train de se faire.
+      */}
+      {etat === "absente" && <p className="sauv-attente">{t("e2ee_sauv_installation")}</p>}
+
+      {etat === "refusee" && !cleMontree && (
         <>
-          <p className="sauv-explique">{t("e2ee_sauv_absente")}</p>
+          <p className="sauv-explique">{t("e2ee_sauv_refusee")}</p>
           <label className="sauv-champ">
             <span>{t("e2ee_sauv_mdp_label")}</span>
             <input
@@ -289,11 +304,11 @@ export function E2eeSauvegardePanneau() {
           <div className="sauv-danger">
             {!confirmeEffacement ? (
               <button type="button" className="sauv-lien" onClick={() => setConfirmeEffacement(true)}>
-                {t("e2ee_sauv_effacer")}
+                {t("e2ee_sauv_desactiver")}
               </button>
             ) : (
               <>
-                <p>{t("e2ee_sauv_effacer_avert")}</p>
+                <p>{t("e2ee_sauv_desactiver_avert")}</p>
                 <div className="sauv-actions">
                   <button
                     type="button"
@@ -301,7 +316,7 @@ export function E2eeSauvegardePanneau() {
                     disabled={occupe}
                     onClick={() => void effacer()}
                   >
-                    {t("e2ee_sauv_effacer_oui")}
+                    {t("e2ee_sauv_desactiver_oui")}
                   </button>
                   <button
                     type="button"

@@ -30,7 +30,12 @@ import {
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
 import { oublierCetAppareil, preparerCetAppareil } from "../services/e2ee-service"
-import { refermer as refermerSauvegarde, vider as viderSauvegarde } from "../services/e2ee-sauvegarde"
+import {
+  refermer as refermerSauvegarde,
+  activerOuRestaurerALaConnexion,
+  vider as viderSauvegarde,
+} from "../services/e2ee-sauvegarde"
+import { cacheMessage } from "../services/indexeddb-cache"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -218,6 +223,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(nextUser)
     setIsReady(true)
     publierMesCles()
+
+    /*
+     * 🐛 « JE ME RECONNECTE ET TOUS LES MESSAGES SONT VIDES » (23/09/2026),
+     * ET L'ACTIVATION PAR DÉFAUT QUI A SUIVI.
+     *
+     * La déconnexion efface le coffre ET purge le cache — les deux à juste
+     * titre — et les enveloppes sont déjà acquittées. L'historique chiffré
+     * disparaissait donc, sans que rien ne prévienne.
+     *
+     * 🔴 LE MOT DE PASSE EST DÉJÀ LÀ : l'utilisateur vient de le taper. On
+     * ouvre l'archive avec, on restaure, on l'oublie. C'est le seul moment du
+     * cycle de vie où ce secret existe sans qu'on ait à le redemander — et
+     * c'est précisément ce qui rend la serrure « mot de passe » utile malgré
+     * sa limite.
+     *
+     * ⚠️ `void` : la connexion ne l'attend pas. Restaurer peut prendre
+     * plusieurs secondes — Argon2id à lui seul en prend près d'une — et faire
+     * patienter devant un écran figé pour un historique qui arrivera de toute
+     * façon serait un mauvais échange.
+     */
+    void activerOuRestaurerALaConnexion(payload.password, async (m) => {
+      await cacheMessage({
+        id: m.id,
+        conversationId: m.convId,
+        senderId: m.expediteurId,
+        content: m.texte,
+        type: "TEXT",
+        status: "SENT",
+        createdAt: m.quand,
+      })
+    })
+
     return nextUser
   }, [publierMesCles])
 
