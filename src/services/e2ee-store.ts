@@ -6,6 +6,12 @@ import type {
   SignedPublicPreKeyType,
   StorageType,
 } from "@privacyresearch/libsignal-protocol-typescript"
+import {
+  clesSecrets,
+  effacerSecret,
+  ecrireSecret,
+  lireSecret,
+} from "./coffre-chiffre"
 
 /**
  * LE COFFRE DU CLIENT — tout ce que le serveur ne doit jamais voir.
@@ -21,14 +27,16 @@ import type {
  * bout en bout, sans qu'aucun test ne le remarque : les messages continueraient
  * de s'afficher normalement.
  *
- * ⚠️ `localStorage` POUR CE PREMIER JET, ET C'EST INSUFFISANT POUR LA
- * PRODUCTION. Il est synchrone, plafonné à quelques mégaoctets, et lisible par
- * tout script de la même origine. La cible est IndexedDB, chiffré par une clé
- * non extractible de WebCrypto ; ce choix-ci ne tient que pour développer et
- * tester en local, et il est marqué comme tel.
+ * ⚠️ LE MAGASIN EST DANS `coffre-chiffre.ts`, ET IL EST CHIFFRÉ — depuis le
+ * 23/09/2026. Ce fichier ne sait plus OÙ ni COMMENT les secrets sont rangés :
+ * il passe par trois fonctions, et c'est tout. C'est ce découplage qui a permis
+ * de remplacer `localStorage` par IndexedDB chiffré sans rien changer ici.
+ *
+ * ⚠️ CE QUE LE CHIFFREMENT LOCAL FAIT ET NE FAIT PAS est écrit en tête de
+ * `coffre-chiffre.ts`. En deux mots : il empêche d'EMPORTER les clés, il
+ * n'empêche pas un script hostile de s'en servir sur place.
  */
 
-const PREFIXE = "alanya.e2ee."
 
 /**
  * LES CLÉS D'IDENTITÉ QUI ONT CHANGÉ DEPUIS L'OUVERTURE DE L'APPLICATION.
@@ -108,37 +116,34 @@ function lisCouple(c: CoupleRange): KeyPairType {
   return { pubKey: depuisB64(c.pubKey), privKey: depuisB64(c.privKey) }
 }
 
+/*
+ * ══════════════ LE MAGASIN EST DÉSORMAIS CHIFFRÉ ══════════════
+ *
+ * 🔴 CES TROIS FONCTIONS SONT LA SEULE PORTE. Tout ce que la bibliothèque
+ * Signal range passe par elles, et c'est ce qui a permis de changer de magasin
+ * sans toucher au reste du fichier : `coffre-chiffre.ts` sert désormais depuis
+ * IndexedDB, chiffré par une clé NON EXTRACTIBLE.
+ *
+ * ⚠️ ELLES RESTENT SYNCHRONES, ET C'EST OBLIGATOIRE. `StorageType` les appelle
+ * au milieu d'un déchiffrement ; les rendre asynchrones remonterait jusque dans
+ * le protocole. Le coffre tient donc une copie en mémoire, chargée une fois par
+ * `ouvrirCoffre()`, et persiste derrière.
+ *
+ * ⚠️ D'OÙ UNE RÈGLE À NE JAMAIS OUBLIER : `ouvrirCoffre()` DOIT avoir été
+ * attendu avant le premier appel. Un coffre non ouvert répond « vide », et un
+ * coffre vide fait générer une identité NEUVE. Le coffre le signale bruyamment
+ * plutôt que de laisser cette faute passer inaperçue.
+ */
 function lire<T>(cle: string): T | undefined {
-  try {
-    const brut = localStorage.getItem(PREFIXE + cle)
-    return brut === null ? undefined : (JSON.parse(brut) as T)
-  } catch {
-    // Stockage indisponible (navigation privée, quota) : on se comporte comme
-    // un coffre vide plutôt que de lever au milieu d'un déchiffrement.
-    return undefined
-  }
+  return lireSecret<T>(cle)
 }
 
 function ecrire(cle: string, valeur: unknown): void {
-  try {
-    localStorage.setItem(PREFIXE + cle, JSON.stringify(valeur))
-  } catch {
-    /*
-     * ⚠️ UNE ÉCRITURE PERDUE ICI PERD UNE SESSION. On ne peut pas faire mieux
-     * que le signaler : lever remonterait au milieu d'un envoi, et avaler en
-     * silence laisserait croire que tout va bien. La console est le moindre
-     * mal tant que le coffre n'est pas passé à IndexedDB.
-     */
-    console.error("[e2ee] écriture impossible dans le coffre :", cle)
-  }
+  ecrireSecret(cle, valeur)
 }
 
 function effacer(cle: string): void {
-  try {
-    localStorage.removeItem(PREFIXE + cle)
-  } catch {
-    /* rien à faire de plus */
-  }
+  effacerSecret(cle)
 }
 
 /**
@@ -279,14 +284,15 @@ export class CoffreE2ee implements StorageType {
   }
 
   async removeAllSessions(prefixe: string): Promise<void> {
-    const aRetirer: string[] = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const cle = localStorage.key(i)
-      if (cle && cle.startsWith(`${PREFIXE}session.${prefixe}`)) aRetirer.push(cle)
+    /*
+     * ⚠️ ON COPIE LA LISTE AVANT DE SUPPRIMER. `clesSecrets()` rend un
+     * instantané, mais la règle vaut d'être écrite : parcourir et supprimer en
+     * même temps faisait sauter une entrée sur deux du temps de `localStorage`,
+     * dont les indices se décalaient à chaque retrait.
+     */
+    for (const cle of clesSecrets()) {
+      if (cle.startsWith(`session.${prefixe}`)) effacer(cle)
     }
-    // Retiré APRÈS le parcours : supprimer pendant décale les indices et fait
-    // sauter une entrée sur deux.
-    for (const cle of aRetirer) localStorage.removeItem(cle)
   }
 }
 

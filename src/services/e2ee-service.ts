@@ -9,6 +9,7 @@ import {
 import { apiRequest } from "../lib/api-client"
 import { getOrCreateWebDeviceId } from "./appareils-service"
 import { CoffreE2ee } from "./e2ee-store"
+import { ouvrirCoffre, viderCoffre, coffreEcrit } from "./coffre-chiffre"
 
 /**
  * LE CHIFFREMENT DE BOUT EN BOUT — protocole Signal, côté navigateur.
@@ -132,6 +133,16 @@ export async function oublierCetAppareil(): Promise<void> {
   } catch {
     // Voir ci-dessus : le balayage rattrapera.
   }
+  /*
+   * ⚠️ LES DEUX MAGASINS SONT VIDÉS, ET IL FAUT LES DEUX.
+   *
+   * Le coffre chiffré porte désormais les secrets — sa clé part avec, sans
+   * quoi ce qui resterait sur le disque serait encore lisible. `localStorage`
+   * est nettoyé lui aussi : il garde le `deviceId`, et peut garder des restes
+   * d'avant la reprise si celle-ci a été interrompue.
+   */
+  await coffreEcrit()
+  await viderCoffre()
   try {
     const aRetirer: string[] = []
     for (let i = 0; i < localStorage.length; i++) {
@@ -178,6 +189,23 @@ export async function preparerCetAppareil(): Promise<{
   prekeysRestantes: number
 }> {
   const deviceId = idAppareil()
+
+  /*
+   * 🔴 LE COFFRE S'OUVRE ICI, ET AVANT TOUT LE RESTE.
+   *
+   * Le magasin est asynchrone depuis le 23/09/2026 : il charge ses secrets
+   * d'IndexedDB, les déchiffre, et reprend au passage l'ancien coffre
+   * `localStorage`. Lire avant que ce travail soit fini rendrait « vide ».
+   *
+   * ⚠️ ET UN COFFRE VIDE FAIT GÉNÉRER UNE IDENTITÉ NEUVE — trois lignes plus
+   * bas. C'est la faute la plus coûteuse du chiffrement : l'ancienne identité
+   * reste publiée et muette, chaque message part en double dont un exemplaire
+   * que personne ne lira, et RIEN à l'écran ne le signale.
+   *
+   * ⚠️ C'EST LE SEUL ENDROIT À OUVRIR, parce que c'est le seul point d'entrée
+   * du chiffrement : tout le reste suppose qu'un appareil est déjà préparé.
+   */
+  await ouvrirCoffre()
 
   let identite = await coffre.getIdentityKeyPair()
   let registrationId = await coffre.getLocalRegistrationId()
@@ -252,7 +280,28 @@ interface PaquetRecu {
  * ⚠️ LA ROUTE CONSOMME UNE PRÉ-CLÉ UNIQUE PAR APPAREIL. On ne l'appelle donc
  * QUE pour ouvrir réellement une session, jamais pour « voir ».
  */
+/*
+ * ══════════════ CHAQUE ENTRÉE OUVRE LE COFFRE ELLE-MÊME ══════════════
+ *
+ * 🐛 CONSTATÉ LE 23/09/2026 : « Missing Signed PreKey for PreKeyWhisperMessage ».
+ * Un message parfaitement valide, refusé — parce que le coffre n'était pas
+ * encore chargé et répondait « vide ».
+ *
+ * LA CAUSE N'ÉTAIT PAS LE CHIFFREMENT. Le magasin est asynchrone depuis
+ * qu'il est chiffré ; il se charge dans `preparerCetAppareil()`. Mais rien
+ * n'oblige à passer par là avant de déchiffrer : `releverEtDechiffrer()`
+ * part du fil de discussion, qui peut s'ouvrir AVANT que la préparation
+ * lancée à la connexion n'ait abouti.
+ *
+ * ⚠️ NE PAS COMPTER SUR L'ORDRE DES APPELS. « Il suffit d'appeler A avant B »
+ * est une règle qu'aucun test ne vérifie et qu'un écran suffit à violer.
+ * Chaque fonction qui touche au coffre l'ouvre donc elle-même.
+ *
+ * ⚠️ C'EST GRATUIT QUAND C'EST DÉJÀ FAIT : `ouvrirCoffre()` rend la MÊME
+ * promesse à tous ses appelants. Le coût est un `await` déjà résolu.
+ */
 export async function ouvrirSessions(userId: string): Promise<number[]> {
+  await ouvrirCoffre()
   const r = await apiRequest<{ paquets: PaquetRecu[] }>(
     `/api/e2ee/cles/${encodeURIComponent(userId)}`,
   )
@@ -314,6 +363,7 @@ export async function chiffrerPour(
   devices: number[],
   texte: string,
 ): Promise<EnveloppeSortante[]> {
+  await ouvrirCoffre()
   const octets = new TextEncoder().encode(texte)
   const enveloppes: EnveloppeSortante[] = []
 
@@ -366,6 +416,7 @@ export interface EnveloppeRecue {
  * nombre.
  */
 export async function dechiffrer(e: EnveloppeRecue): Promise<string> {
+  await ouvrirCoffre()
   const adresse = new SignalProtocolAddress(e.expediteurId, e.expediteurDevice)
   const chiffreur = new SessionCipher(coffre, adresse)
   const clair =

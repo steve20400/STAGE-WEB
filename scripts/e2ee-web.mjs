@@ -13,6 +13,13 @@
  * Usage : node scripts/e2ee-web.mjs   (backend local démarré)
  */
 
+/*
+ * ⚠️ UN INDEXEDDB AVANT TOUT LE RESTE. Le coffre y vit depuis le 23/09/2026,
+ * et il l'ouvre au démarrage : sans magasin, le banc ne trouverait aucune
+ * identité et en génèrerait une neuve à chaque étape.
+ */
+import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 import { execSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { PrismaClient } from "../../backend-alanya/node_modules/@prisma/client/default.js";
@@ -32,6 +39,26 @@ const SORTIE = "scripts/.banc";
  * ⚠️ IL DOIT EXISTER AVANT LE PREMIER IMPORT du module testé : celui-ci crée son
  * coffre au chargement. Poser le mannequin après ne servirait à rien.
  */
+/**
+ * Le magasin IndexedDB d'un « client ».
+ *
+ * 🔴 SWAPPER `localStorage` NE SUFFIT PLUS. Les secrets vivent maintenant dans
+ * IndexedDB, et le coffre garde une copie en mémoire dans des variables de
+ * MODULE. Changer d'identité demande donc trois gestes, pas un :
+ *
+ *   · un `localStorage` neuf      (le deviceId, qui n'est pas un secret) ;
+ *   · une `IDBFactory` neuve       (les secrets chiffrés) ;
+ *   · `refermerCoffre()`           (l'état en mémoire du module).
+ *
+ * ⚠️ `refermerCoffre` ET NON `viderCoffre` : le second EFFACE. Bob doit
+ * retrouver son coffre intact quand il revient lire, plus tard dans le banc.
+ */
+function poseIndexedDb(existante) {
+  const fabrique = existante ?? new IDBFactory();
+  globalThis.indexedDB = fabrique;
+  return fabrique;
+}
+
 function poseCoffre(existant) {
   /*
    * ⚠️ `existant` PERMET DE REPRENDRE UN COFFRE DÉJÀ REMPLI, et c'est ce qui
@@ -112,6 +139,9 @@ async function compte(marque) {
 
 /* ══════════════════ LE SCÉNARIO ══════════════════ */
 
+/** Posé après le premier import : voir plus bas. */
+let refermerCoffre = async () => {};
+
 async function main() {
   console.log("\n════ BANC DES MODULES WEB RÉELS ════");
 
@@ -181,8 +211,13 @@ async function main() {
 
   /* ── BOB d'abord : il doit avoir publié ses clés pour qu'Alice lui écrive ── */
   const coffreBob = poseCoffre();
+  const idbBob = poseIndexedDb();
+  await refermerCoffre();
   poseJeton(b.jeton);
   const modBob = await import(`../${SORTIE}/e2ee-web-test.js`);
+  // ⚠️ PRIS DANS LE BUNDLE, pas dans les sources : c'est CETTE copie du
+  // module qui porte l'état que le banc doit détacher.
+  refermerCoffre = modBob.refermerCoffre;
   console.log("\n▸ BOB publie ses clés");
   await modBob.scenario({
     moi: b.user.id,
@@ -197,6 +232,8 @@ async function main() {
 
   /* ── ALICE : publie, ouvre vers Bob, chiffre, dépose ── */
   poseCoffre();
+  poseIndexedDb();
+  await refermerCoffre();
   poseJeton(a.jeton);
   /*
    * ⚠️ `import` REND LE MÊME MODULE la seconde fois — Node met en cache. Le
@@ -223,6 +260,8 @@ async function main() {
 
   /* ── BOB reprend SON coffre et lit ── */
   poseCoffre(coffreBob);
+  poseIndexedDb(idbBob);
+  await refermerCoffre();
   poseJeton(b.jeton);
   console.log("\n▸ BOB relève et déchiffre");
   echecs += await modBob.scenarioReception(SECRET);

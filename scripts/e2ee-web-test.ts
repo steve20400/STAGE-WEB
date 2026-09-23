@@ -154,3 +154,11 @@ export async function scenarioFilReception(
   verifier(trouve, `le texte revient et se rattache : « ${attendu} »`)
   return echecs
 }
+
+/**
+ * ⚠️ RÉEXPORTÉ POUR LE LANCEUR, ET C'EST NÉCESSAIRE : le coffre garde son état
+ * dans des variables de MODULE. Le lanceur doit détacher CETTE copie-là — celle
+ * du bundle — entre les deux identités, sinon Alice hériterait du coffre de Bob
+ * et l'on croirait se parler à soi-même.
+ */
+export { refermerCoffre } from "../src/services/coffre-chiffre"
