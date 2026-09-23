@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react"
 import {
   activerSauvegarde,
+  ajouterTrousseau,
   ajouterUneSerrure,
   lireCoffre,
   ouvrir,
+  ouvrirParTrousseau,
   restaurerTout,
   toutEffacer,
 } from "../../../src/services/e2ee-sauvegarde"
@@ -49,6 +51,13 @@ export function E2eeSauvegardePanneau() {
   const [restaure, setRestaure] = useState<{ n: number; illisibles: number } | null>(null)
   const [confirmeEffacement, setConfirmeEffacement] = useState(false)
 
+  /*
+   * ⚠️ ON NE PROPOSE PAS CE QU'ON NE PEUT PAS TENIR. Un bouton qui échouera
+   * après une demande de Face ID est pire que pas de bouton : la personne
+   * croit avoir raté quelque chose.
+   */
+  const [trousseauPossible, setTrousseauPossible] = useState(false)
+
   async function relire() {
     const { serrures, refusee } = await lireCoffre()
     setTypes(serrures.map((x) => x.type))
@@ -57,6 +66,15 @@ export function E2eeSauvegardePanneau() {
 
   useEffect(() => {
     void relire()
+    /*
+     * ⚠️ CHARGÉ À LA DEMANDE : le module WebAuthn n'a aucune raison de peser
+     * sur les réglages de quelqu'un dont le navigateur ne sait pas s'en
+     * servir.
+     */
+    void import("../../../src/services/e2ee-trousseau")
+      .then((m) => m.capacites())
+      .then((c) => setTrousseauPossible(c.disponible))
+      .catch(() => setTrousseauPossible(false))
   }, [])
 
   async function avec(travail: () => Promise<void>) {
@@ -128,6 +146,34 @@ export function E2eeSauvegardePanneau() {
       setSecretSaisi("")
       setCleMontree(cleRecuperation)
       await relire()
+    })
+
+  /* ── LE TROUSSEAU ────────────────────────────────────────────────── */
+
+  const poserTrousseau = () =>
+    avec(async () => {
+      if (!secretSaisi) throw new Error(t("e2ee_sauv_mdp_requis"))
+      await ajouterTrousseau(secretSaisi, "motdepasse")
+      setSecretSaisi("")
+      await relire()
+    })
+
+  const restaurerParTrousseau = () =>
+    avec(async () => {
+      if (!(await ouvrirParTrousseau())) throw new Error(t("e2ee_sauv_trousseau_refus"))
+      const { messages, blocsIllisibles } = await restaurerTout()
+      for (const m of messages) {
+        await cacheMessage({
+          id: m.id,
+          conversationId: m.convId,
+          senderId: m.expediteurId,
+          content: m.texte,
+          type: "TEXT",
+          status: "SENT",
+          createdAt: m.quand,
+        })
+      }
+      setRestaure({ n: messages.length, illisibles: blocsIllisibles })
     })
 
   /* ── TOUT EFFACER ────────────────────────────────────────────────── */
@@ -275,6 +321,31 @@ export function E2eeSauvegardePanneau() {
             >
               {t("e2ee_sauv_restaurer_cle")}
             </button>
+            {/*
+              ⚠️ « RESTAURER PAR LE TROUSSEAU » NE DEMANDE RIEN — pas de champ à
+              remplir. C'est tout l'intérêt de cette serrure, et le bouton doit
+              le montrer : il n'est pas désactivé quand le champ est vide.
+            */}
+            {trousseauPossible && types.includes("trousseau") && (
+              <button
+                type="button"
+                className="sauv-btn"
+                disabled={occupe}
+                onClick={() => void restaurerParTrousseau()}
+              >
+                {t("e2ee_sauv_restaurer_trousseau")}
+              </button>
+            )}
+            {trousseauPossible && !types.includes("trousseau") && (
+              <button
+                type="button"
+                className="sauv-btn"
+                disabled={occupe || !secretSaisi}
+                onClick={() => void poserTrousseau()}
+              >
+                {t("e2ee_sauv_poser_trousseau")}
+              </button>
+            )}
             {!types.includes("recuperation") && (
               <button
                 type="button"

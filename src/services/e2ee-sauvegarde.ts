@@ -328,6 +328,51 @@ async function rattraperLExistant(): Promise<number> {
   }
 }
 
+/* ══════════════════ LA SERRURE « TROUSSEAU » ══════════════════ */
+
+/**
+ * Pose la serrure du trousseau, en créant une clé d'accès.
+ *
+ * 🔴 IL FAUT DÉJÀ SAVOIR OUVRIR — comme pour toute serrure ajoutée. On ne pose
+ * pas une clé sur une porte qu'on ne sait pas franchir.
+ *
+ * ⚠️ LA CLÉ D'ACCÈS EST CRÉÉE AVANT D'ÊTRE UTILE. Si l'utilisateur annule la
+ * demande de vérification qui suit, une clé d'accès orpheline reste sur son
+ * appareil. Ce n'est pas grave — elle ne donne accès à rien — mais il faut le
+ * savoir : ce n'est pas une fuite, c'est un résidu.
+ */
+export async function ajouterTrousseau(
+  secretConnu: string,
+  typeConnu: TypeSerrure,
+): Promise<void> {
+  const { capacites, creerTrousseau } = await import("./e2ee-trousseau")
+
+  const dispo = await capacites()
+  if (!dispo.disponible) {
+    throw new Error("Cet appareil ne sait pas fabriquer cette serrure.")
+  }
+
+  const moiId = getMyUserId()
+  if (!moiId) throw new Error("Session introuvable.")
+
+  const secret = await creerTrousseau({ userId: moiId, nom: moiId })
+  await ajouterUneSerrure(secretConnu, typeConnu, "trousseau", secret)
+}
+
+/**
+ * Ouvre l'archive par le trousseau de l'appareil.
+ *
+ * ⚠️ REND `false` SI L'UTILISATEUR ANNULE, sans distinction d'avec un échec.
+ * L'écran affiche la même chose dans les deux cas — « ça n'a pas ouvert » —
+ * et c'est suffisant : insister sur la différence n'aiderait personne.
+ */
+export async function ouvrirParTrousseau(): Promise<boolean> {
+  const { ouvrirTrousseau } = await import("./e2ee-trousseau")
+  const secret = await ouvrirTrousseau()
+  if (!secret) return false
+  return ouvrir("trousseau", secret)
+}
+
 /* ══════════════════ OUVRIR ══════════════════ */
 
 /**
