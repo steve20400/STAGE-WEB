@@ -161,7 +161,23 @@ async function main() {
   titre("① Le panneau se rend sans planter");
 
   await page.goto(`${WEB}/settings?section=security`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(1500);
+
+  /*
+   * 🐛 ON ATTEND L'ÉTAT, PAS UNE DURÉE. Avec un simple `waitForTimeout(1500)`,
+   * ce banc échouait au PREMIER lancement suivant un redémarrage du serveur de
+   * développement, puis passait au second : Vite compile les modules à la
+   * demande, et l'activation automatique enchaîne Argon2id (~750 ms) et un
+   * aller-retour réseau. Le délai suffisait à chaud, pas à froid.
+   *
+   * ⚠️ UN BANC QUI ÉCHOUE UNE FOIS SUR DEUX EST UN BANC QU'ON CESSE DE CROIRE,
+   * et le jour où il a raison on ne le regarde plus. On attend donc que la
+   * première serrure apparaisse — l'état que le reste du banc suppose.
+   */
+  await page
+    .locator(".sauv-serrure.on")
+    .first()
+    .waitFor({ state: "visible", timeout: 45_000 })
+    .catch(() => {});
 
   const titrePanneau = await page.getByText("Sauvegarde chiffrée").first().isVisible().catch(() => false);
   verifie("le panneau est visible", titrePanneau, "le composant ne se rend pas");
