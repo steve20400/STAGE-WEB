@@ -211,6 +211,35 @@ async function main() {
   const inverse = await web.empreinteWeb(bundle.identityKey, ID_BOB, alice.identiteAlice, ID_ALICE);
   verifie("et ne dépendent pas de qui regarde", inverse === cotéWeb);
 
+
+  /* ── ⑥ LE QR, D'UN CLIENT À L'AUTRE ──────────────────────────────── */
+  titre("⑥ Le QR produit par le WEB se relit par le MOBILE");
+
+  /*
+   * 🔴 LE DÉFAUT QUE CETTE SECTION GARDE FERMÉ. Le préfixe du QR est écrit DEUX
+   * FOIS — dans l'écran web et dans le service Dart. Les faire diverger rendrait
+   * les QR illisibles d'un client à l'autre, et personne ne s'en apercevrait
+   * avant qu'un utilisateur inquiet essaie VRAIMENT de vérifier.
+   */
+  const contenuQr = `alanya-e2ee:1:${cotéWeb}`;
+  const relu = mobile("qr", { contenu: contenuQr }).code;
+
+  verifie("le mobile relit le QR du web", relu === cotéWeb, `relu : ${relu}`);
+
+  /*
+   * ⚠️ ET IL REFUSE CE QUI N'EST PAS DES NÔTRES. Accepter le QR d'une autre
+   * application afficherait « ne correspond pas » — ce qui ferait croire à une
+   * interposition là où il n'y a qu'un mauvais QR scanné.
+   */
+  verifie(
+    "et refuse un QR étranger",
+    mobile("qr", { contenu: "https://exemple.test/autre-chose" }).code === null,
+  );
+  verifie(
+    "comme un code de la mauvaise longueur",
+    mobile("qr", { contenu: "alanya-e2ee:1:12345" }).code === null,
+  );
+
   rmSync(TRAVAIL, { recursive: true, force: true });
   rmSync(SORTIE, { recursive: true, force: true });
 

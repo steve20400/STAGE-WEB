@@ -261,3 +261,18 @@
     color: #9fd3a6;
   }
 }
+
+/*
+ * ⚠️ LE QR EST PLUS PETIT QUE LE CODE NE L'EST LARGE. Il complète, il ne
+ * remplace pas : sur deux ordinateurs sans caméra, seuls les chiffres servent.
+ */
+.e2ee-verif-qr {
+  display: block;
+  width: 160px;
+  height: 160px;
+  margin: 14px auto 4px;
+  border-radius: 10px;
+  /* Fond blanc imposé : un QR sur fond sombre ne se scanne pas. */
+  background: #fff;
+  padding: 8px;
+}

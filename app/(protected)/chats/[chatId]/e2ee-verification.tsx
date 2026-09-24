@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import QRCode from "qrcode"
 import {
   empreintesPour,
   enGroupes,
@@ -21,9 +22,19 @@ import "./e2ee-verification.css"
  * les deux ? ». Envoyer ce code DANS la conversation qu'il doit vérifier ne
  * prouverait rien — un serveur qui s'interpose réécrirait le message.
  *
- * ⚠️ IL N'Y A PAS DE QR CODE, ET C'EST DÉLIBÉRÉ POUR L'INSTANT. Un QR affiché
- * sans lecteur en face est de la décoration : personne ne peut le comparer. Il
- * arrivera avec le client mobile, qui a une caméra — et là, il servira vraiment.
+ * ⚠️ LE QR EST ARRIVÉ AVEC LE CLIENT MOBILE, et pas avant : un QR affiché sans
+ * lecteur en face est de la décoration, personne ne peut le comparer. Maintenant
+ * qu'un téléphone a une caméra, il sert — on scanne l'écran de l'autre.
+ *
+ * 🔴 IL ENCODE LE CODE LUI-MÊME, RIEN D'AUTRE. Deux formats différents — l'un
+ * pour l'œil, l'autre pour la caméra — peuvent DIVERGER, et le défaut ne se
+ * verrait qu'au moment où quelqu'un essaie vraiment de vérifier, c'est-à-dire
+ * quand il s'inquiète. En scannant exactement ce qui est écrit, la divergence
+ * devient impossible par construction.
+ *
+ * ⚠️ LE QR N'AJOUTE AUCUNE SÉCURITÉ, seulement de la COMMODITÉ : comparer
+ * soixante chiffres à l'œil est pénible et on se trompe. La garantie reste la
+ * même — être EN FACE, hors du canal qu'on vérifie.
  */
 export function E2eeVerification({
   peerUserId,
@@ -37,6 +48,40 @@ export function E2eeVerification({
   const { t } = useTranslation()
   const [etat, setEtat] = useState<"calcul" | "pret">("calcul")
   const [empreintes, setEmpreintes] = useState<Empreinte[]>([])
+
+  /**
+   * Les QR, un par appareil, en images de données.
+   *
+   * ⚠️ FABRIQUÉS DANS UN EFFET, PAS AU RENDU : la génération est asynchrone, et
+   * l'appeler pendant le rendu produirait un écran qui clignote à chaque
+   * passage de React.
+   */
+  const [qr, setQr] = useState<Record<number, string>>({})
+
+  useEffect(() => {
+    let vivant = true
+    void Promise.all(
+      empreintes.map(async (e) => {
+        /*
+         * 🔴 LE MÊME PRÉFIXE QUE LE MOBILE — `alanya-e2ee:1:`. Il est écrit ici
+         * et dans `alanya/lib/services/e2ee/e2ee_service.dart`. Les faire
+         * diverger rendrait les QR illisibles d'un client à l'autre, et le
+         * défaut ne se verrait qu'au moment d'une vraie vérification.
+         */
+        const image = await QRCode.toDataURL(`alanya-e2ee:1:${e.code}`, {
+          margin: 1,
+          width: 200,
+          errorCorrectionLevel: "M",
+        })
+        return [e.deviceId, image] as const
+      }),
+    ).then((paires) => {
+      if (vivant) setQr(Object.fromEntries(paires))
+    })
+    return () => {
+      vivant = false
+    }
+  }, [empreintes])
 
   async function recharger() {
     const liste = await empreintesPour(peerUserId)
@@ -128,6 +173,20 @@ export function E2eeVerification({
                   <span key={i}>{groupe}</span>
                 ))}
               </div>
+
+              {/*
+                ⚠️ LE QR VIENT APRÈS LE CODE, jamais à sa place. Sur deux
+                ordinateurs il n'y a pas de caméra : les chiffres restent le
+                seul moyen, et les cacher derrière une image les rendrait
+                inaccessibles là où ils sont indispensables.
+              */}
+              {qr[e.deviceId] && (
+                <img
+                  className="e2ee-verif-qr"
+                  src={qr[e.deviceId]}
+                  alt={t("e2ee_verif_qr_alt")}
+                />
+              )}
 
               <button
                 type="button"
