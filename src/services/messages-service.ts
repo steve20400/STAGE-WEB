@@ -22,9 +22,18 @@ import {
   enqueueOffline,
 } from "./indexeddb-cache"
 import { uploadMedia } from "./media-service"
+import {
+  estChiffree,
+  envoyerChiffre,
+  noteEtatChiffrement,
+  releverEtDechiffrer,
+} from "./e2ee-fil"
+import { archiver } from "./e2ee-sauvegarde"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
+  /** Le serveur le deduit de l existence d une enveloppe chiffree. */
+  chiffre?: boolean
   id: string
   convId: string
   senderId: string // UUID de l'expediteur
@@ -171,6 +180,9 @@ export function toFrontMessage(
     content: m.content ?? "",
     type: media?.mimeType?.startsWith("video/") ? "video" : mapType(m.type),
     status: mapStatus(m.status),
+    // Ce message est chiffre : le serveur le deduit de l existence d une
+    // enveloppe. Sert a placer la banniere du fil.
+    chiffre: (m as BackendMessage).chiffre === true,
     // Les mentions accompagnent le message. Absentes d'un backend anterieur :
     // le texte porte deja « @Dominique » en clair, la bulle reste juste.
     mentions: (m as BackendMessage).mentions ?? undefined,
@@ -264,7 +276,97 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
   cacheBackendMessages(backendMessages)
 
   // Le backend pagine en ordre descendant ; l'UI affiche en ordre chronologique.
-  return backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
+  const messages = backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
+
+  /*
+   * ══════════════ LE CONTENU CHIFFRÉ REJOINT SON MESSAGE ══════════════
+   *
+   * 🔴 LE SERVEUR REND DES LIGNES SANS TEXTE. Pour une conversation chiffrée,
+   * `content` est nul : le texte vit dans les enveloppes, qu'on relève et
+   * qu'on déchiffre ICI, puis qu'on rapproche par identifiant de message.
+   *
+   * ⚠️ LA RELÈVE RAMÈNE TOUT CE QUI ATTEND CET APPAREIL, pas seulement ce fil.
+   * C'est voulu : les enveloppes n'ont pas d'autre moment pour être lues, et
+   * les laisser en attente parce qu'on regarde ailleurs les ferait s'accumuler
+   * jusqu'à la prochaine ouverture de LA bonne conversation.
+   *
+   * ⚠️ ON NE LA FAIT QUE POUR UN FIL CHIFFRÉ. La déclencher partout ajouterait
+   * un appel réseau à chaque ouverture de conversation, pour rien dans
+   * l'immense majorité des cas.
+   */
+  if (estChiffree(chatId)) {
+    const clairs = await releverEtDechiffrer()
+
+    /*
+     * 🐛 LES MESSAGES QUE J'AI ÉCRITS REVENAIENT VIDES.
+     *
+     * Le serveur rend `content: null` pour tout message chiffré, et les
+     * enveloppes ne sont adressées qu'au DESTINATAIRE : l'expéditeur n'en
+     * reçoit aucune. À la relecture du fil, ses propres messages
+     * s'affichaient donc en bulles vides — il voyait disparaître ce qu'il
+     * venait d'écrire.
+     *
+     * ⚠️ LE CACHE EST LA SEULE SOURCE POUR SES PROPRES MESSAGES, et c'est
+     * pour cela qu'on l'y range à l'envoi. On le relit ici pour tout message
+     * chiffré qu'aucune enveloppe n'a éclairé.
+     *
+     * ⚠️ NE JAMAIS ÉCRASER UN TEXTE CONNU PAR DU VIDE. C'est la règle de fond :
+     * une lecture fraîche du serveur est plus à jour sur les métadonnées, mais
+     * pour le CONTENU d'un message chiffré elle ne sait rien. La laisser
+     * gagner ferait perdre le message à chaque rafraîchissement.
+     */
+    const enCache = new Map<string, string>()
+    try {
+      const caches = await loadCachedMessages(chatId, INITIAL_PAGE_SIZE)
+      for (const c of caches) {
+        const texte = (c as { id: string; content?: string | null }).content
+        if (texte) enCache.set((c as { id: string }).id, texte)
+      }
+    } catch {
+      // Cache indisponible : on fera sans, et les messages non déchiffrés
+      // resteront vides plutôt que de faire échouer tout le fil.
+    }
+
+    for (const m of messages) {
+      const clair = clairs.get(m.id) ?? (m.chiffre ? enCache.get(m.id) : undefined)
+      if (clair === undefined) continue
+      m.content = clair
+      /*
+       * 🔴 LE DÉCHIFFRÉ EST MIS EN CACHE, ET IL LE FAUT — voir la décision du
+       * 21/09/2026, côté envoi.
+       *
+       * ⚠️ ICI, CE N'EST MÊME PAS UN CONFORT : l'enveloppe vient d'être
+       * ACQUITTÉE, donc retirée du serveur. Si le clair n'était pas rangé, ce
+       * message serait DÉFINITIVEMENT perdu au prochain rechargement —
+       * personne ne peut le reconstituer, pas même le serveur.
+       */
+      void cacheMessage({
+        id: m.id,
+        conversationId: chatId,
+        senderId: m.senderId === "me" ? (myId ?? "") : m.senderId,
+        content: clair,
+        type: toBackendType(m.type),
+        status: "SENT",
+        createdAt: m.timestamp.getTime(),
+      })
+
+      /*
+       * ⚠️ ARCHIVÉ ICI AUSSI, ET C'EST LE CAS QUI COMPTE LE PLUS : l'enveloppe
+       * vient d'être ACQUITTÉE, donc retirée du serveur. Si ce texte n'entre
+       * pas dans l'archive maintenant, il n'existera plus que dans le cache de
+       * CET appareil — et disparaîtra avec lui.
+       */
+      archiver({
+        id: m.id,
+        convId: chatId,
+        expediteurId: m.senderId === "me" ? (myId ?? "") : m.senderId,
+        texte: clair,
+        quand: m.timestamp.getTime(),
+      })
+    }
+  }
+
+  return messages
 }
 
 /**
@@ -454,6 +556,96 @@ export async function sendChatMessage(
   const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const msgType = toBackendType(type)
 
+  /*
+   * ══════════════ LE CHEMIN CHIFFRÉ, ET IL S'ARRÊTE ICI ══════════════
+   *
+   * 🔴 UNE BRANCHE QUI SORT, PAS UN DÉTOUR. Tout ce qui suit — file hors
+   * ligne, affichage optimiste, remise par WebSocket, repli REST — suppose
+   * que le serveur voit le texte. Aucun de ces mécanismes ne s'applique à un
+   * message chiffré, et les adapter un par un reviendrait à mêler deux
+   * régimes dans la même fonction : c'est exactement ce qu'on a refusé de
+   * faire dans la table `message`, et pour les mêmes raisons.
+   *
+   * ⚠️ CE QU'ON PERD, ET QU'IL FAUT SAVOIR :
+   *
+   *   · LA FILE HORS LIGNE. Un message chiffré ne part pas si le réseau est
+   *     coupé — on le dit tout de suite au lieu de le mettre en attente. La
+   *     file recopierait le TEXTE EN CLAIR dans IndexedDB, ce qui reviendrait
+   *     à ranger en clair ce qu'on vient de chiffrer ;
+   *
+   *   · LA REMISE INSTANTANÉE. Le destinataire lira à sa prochaine relève.
+   *
+   * ⚠️ SEUL LE TEXTE EST COUVERT. Un média chiffré demanderait de chiffrer le
+   * fichier lui-même, ce qui est un autre chantier. On laisse donc passer les
+   * médias par le chemin ordinaire plutôt que de les refuser en silence — mais
+   * ils NE SONT PAS chiffrés, et l'écran doit finir par le dire.
+   */
+  if (estChiffree(chatId) && type === "text" && (content ?? "").trim() !== "") {
+    if (!navigator.onLine) {
+      throw new Error(
+        "Pas de réseau : un message chiffré ne peut pas être mis en attente.",
+      )
+    }
+    const cree = await envoyerChiffre(chatId, content)
+
+    /*
+     * 🔴 LE CLAIR EST MIS EN CACHE, COMME N'IMPORTE QUEL MESSAGE — décision du
+     * user, 21/09/2026, après que la question a été posée.
+     *
+     * ⚠️ CE QUE CELA COÛTE, ET QU'IL FAUT ASSUMER : `cacheMessage` écrit dans
+     * IndexedDB, qui n'est PAS chiffré. Le texte d'une conversation chiffrée
+     * est donc lisible par qui obtient l'appareil ou exécute un script sur
+     * cette origine. Le chiffrement protège le TRANSPORT et le SERVEUR ; il ne
+     * protège plus l'appareil.
+     *
+     * ⚠️ CE QUE CELA APPORTE, ET POURQUOI C'EST DÉFENDABLE : sans cache, un fil
+     * chiffré redeviendrait vide à chaque rechargement — les enveloppes ayant
+     * été acquittées, PERSONNE ne peut les relire, pas même le serveur. On
+     * échangerait une protection contre le vol d'appareil contre une perte
+     * d'historique à la première actualisation.
+     *
+     * Le jour où le coffre passera à IndexedDB chiffré (dette du chapitre 1),
+     * ce cache-ci devra le rejoindre — et la question cessera de se poser.
+     */
+    void cacheMessage({
+      id: cree.id,
+      conversationId: chatId,
+      senderId: myId ?? "",
+      content,
+      type: msgType,
+      status: "SENT",
+      createdAt: new Date(cree.createdAt).getTime(),
+    })
+
+    /*
+     * 🔴 ARCHIVÉ AU MÊME ENDROIT QUE MIS EN CACHE, et jamais ailleurs.
+     *
+     * Ce qui est affiché à l'utilisateur doit être ce qui est sauvegardé.
+     * Deux chemins distincts finiraient par diverger, et la divergence ne se
+     * verrait qu'au moment de restaurer — c'est-à-dire trop tard, quand
+     * l'appareil d'origine n'existe plus.
+     *
+     * ⚠️ SANS EFFET SI LA SAUVEGARDE N'EST PAS ACTIVE : `archiver` sort
+     * aussitôt. Aucun clair ne s'accumule pour une archive qui n'existe pas.
+     */
+    archiver({
+      id: cree.id,
+      convId: chatId,
+      expediteurId: myId ?? "",
+      texte: content,
+      quand: new Date(cree.createdAt).getTime(),
+    })
+
+    return {
+      id: cree.id,
+      senderId: "me",
+      content,
+      type,
+      status: "sent",
+      timestamp: new Date(cree.createdAt),
+    }
+  }
+
   // Hors ligne → outbox pour envoi ultérieur
   if (!navigator.onLine) {
     const pending = await enqueueOffline({
@@ -509,6 +701,65 @@ export async function sendChatMessage(
      * l'ecran de discussion. Le message n'est PAS mis en file d'attente : la
      * file reessaie au retour du reseau, et il repartirait indefiniment.
      */
+    /*
+     * 🐛 « UN MESSAGE D'ERREUR S'AFFICHE À L'ENVOI ».
+     *
+     * Le client ne sait qu'une conversation est chiffrée qu'après avoir lu
+     * son état — ce qui prend un aller-retour. Deux situations lui font
+     * prendre le chemin du CLAIR sur un fil qui ne l'accepte plus :
+     *
+     *   · on écrit dans la seconde qui suit l'ouverture, avant la réponse ;
+     *   · le CORRESPONDANT vient d'activer le chiffrement, et rien ne nous
+     *     l'a encore dit.
+     *
+     * Le serveur refuse alors, à juste titre — il ne peut pas ranger du clair
+     * dans un fil chiffré. Mais afficher cette erreur à quelqu'un qui n'a
+     * rien fait de mal, et dont le message EST envoyable, serait absurde.
+     *
+     * ⚠️ ON REJOUE PAR LE CHEMIN CHIFFRÉ AU LIEU D'ÉCHOUER. C'est le serveur
+     * qui vient de nous apprendre l'état réel : on le note, et on recommence.
+     *
+     * ⚠️ UNE SEULE FOIS. Si le second essai échoue aussi, c'est autre chose —
+     * pas de clés, correspondant hors périmètre — et il faut le dire.
+     */
+    if (estRefusChiffrement(err) && type === "text" && (content ?? "").trim() !== "") {
+      noteEtatChiffrement(chatId, true)
+      const cree = await envoyerChiffre(chatId, content)
+      void cacheMessage({
+        id: cree.id,
+        conversationId: chatId,
+        senderId: myId ?? "",
+        content,
+        type: msgType,
+        status: "SENT",
+        createdAt: new Date(cree.createdAt).getTime(),
+      })
+      /*
+       * ⚠️ ARCHIVÉ ICI AUSSI — c'est le TROISIÈME chemin par lequel un message
+       * chiffré part, et il est facile à oublier : on n'y arrive qu'après un
+       * refus du serveur, donc jamais pendant un essai ordinaire.
+       *
+       * La règle qui l'attrape est simple et vaut d'être suivie partout :
+       * PARTOUT OÙ L'ON MET EN CACHE, ON ARCHIVE. Un `cacheMessage` sans
+       * `archiver` à côté est un message que la restauration ne rendra pas.
+       */
+      archiver({
+        id: cree.id,
+        convId: chatId,
+        expediteurId: myId ?? "",
+        texte: content,
+        quand: new Date(cree.createdAt).getTime(),
+      })
+      return {
+        id: cree.id,
+        senderId: "me",
+        content,
+        type,
+        status: "sent",
+        timestamp: new Date(cree.createdAt),
+      }
+    }
+
     if (estRefusPourBlocage(err)) {
       await cacheMessage({
         id: tempId,
@@ -541,6 +792,19 @@ export async function sendChatMessage(
  * client bascule quand le WebSocket n'acquitte pas — ce qui est precisement ce
  * qui se passe entre deux personnes bloquees.
  */
+/**
+ * Le serveur refuse-t-il parce que la conversation est CHIFFRÉE ?
+ *
+ * ⚠️ DISTINCT DU BLOCAGE, ET IL FAUT QUE ÇA LE RESTE : « cette personne vous
+ * a bloqué » et « ce fil est chiffré » appellent des conduites opposées — se
+ * taire dans un cas, recommencer autrement dans l'autre.
+ */
+function estRefusChiffrement(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false
+  const charge = err.payload as { error?: { code?: unknown } } | undefined
+  return charge?.error?.code === "CONVERSATION_CHIFFREE"
+}
+
 function estRefusPourBlocage(err: unknown): boolean {
   if (!(err instanceof ApiError) || err.status !== 403) return false
   // Le code voyage dans la charge : { error: { message, code } }.

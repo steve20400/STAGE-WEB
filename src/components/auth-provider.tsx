@@ -29,6 +29,13 @@ import {
 } from "../services/websocket-service"
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
+import { oublierCetAppareil, preparerCetAppareil } from "../services/e2ee-service"
+import {
+  refermer as refermerSauvegarde,
+  activerOuRestaurerALaConnexion,
+  vider as viderSauvegarde,
+} from "../services/e2ee-sauvegarde"
+import { cacheMessage } from "../services/indexeddb-cache"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -111,6 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!isMounted) return
         saveSessionUser(restoredUser)
         setUser(restoredUser)
+        // Voir `publierMesCles` : la reprise de session est le SEUL chemin
+        // d'un compte déjà connecté avant cette version.
+        void preparerCetAppareil().catch(() => undefined)
       } else {
         clearSessionToken()
         clearSessionUser()
@@ -176,14 +186,77 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("online", signaler)
   }, [user])
 
+  /*
+   * ══════ PUBLIER LES CLÉS DE CET APPAREIL ══════
+   *
+   * 🐛 RIEN NE LES PUBLIAIT EN USAGE NORMAL. Seule la page d'essai
+   * `/e2ee-test` appelait `preparerCetAppareil`. Résultat : aucun compte
+   * ordinaire n'avait de clés, et le cadenas d'une conversation restait
+   * définitivement grisé sur « un participant n'a pas publié ses clés » —
+   * message exact, mais dont personne ne pouvait rien faire, puisque rien
+   * dans l'application ne permettait de les publier.
+   *
+   * ⚠️ À CHAQUE ENTRÉE EN SESSION, et non une seule fois : connexion,
+   * inscription, ET reprise de session au chargement. Un compte déjà connecté
+   * quand cette version arrive ne passerait par aucune des deux premières, et
+   * n'aurait jamais de clés.
+   *
+   * ⚠️ IDEMPOTENTE ET SANS DANGER : `preparerCetAppareil` ne régénère pas
+   * l'identité si elle existe. La rappeler ne coûte qu'un aller-retour, et
+   * c'est ce qui réapprovisionne le stock de pré-clés au passage.
+   *
+   * ⚠️ NE BLOQUE JAMAIS L'ENTRÉE EN SESSION. Un échec de publication — réseau,
+   * serveur trop ancien — doit laisser l'application parfaitement utilisable
+   * en clair. Le chiffrement est un supplément, pas une condition.
+   */
+  const publierMesCles = useCallback(() => {
+    void preparerCetAppareil().catch((e) => {
+      // eslint-disable-next-line no-console
+      console.warn("[e2ee] clés non publiées pour cet appareil", e)
+    })
+  }, [])
+
   const login = useCallback(async (payload: LoginPayload) => {
     const nextUser = storeAuthenticatedSession(await loginWithPassword(payload))
     await claimLocalCaches(accountKey(nextUser))
     saveSessionUser(nextUser)
     setUser(nextUser)
     setIsReady(true)
+    publierMesCles()
+
+    /*
+     * 🐛 « JE ME RECONNECTE ET TOUS LES MESSAGES SONT VIDES » (23/09/2026),
+     * ET L'ACTIVATION PAR DÉFAUT QUI A SUIVI.
+     *
+     * La déconnexion efface le coffre ET purge le cache — les deux à juste
+     * titre — et les enveloppes sont déjà acquittées. L'historique chiffré
+     * disparaissait donc, sans que rien ne prévienne.
+     *
+     * 🔴 LE MOT DE PASSE EST DÉJÀ LÀ : l'utilisateur vient de le taper. On
+     * ouvre l'archive avec, on restaure, on l'oublie. C'est le seul moment du
+     * cycle de vie où ce secret existe sans qu'on ait à le redemander — et
+     * c'est précisément ce qui rend la serrure « mot de passe » utile malgré
+     * sa limite.
+     *
+     * ⚠️ `void` : la connexion ne l'attend pas. Restaurer peut prendre
+     * plusieurs secondes — Argon2id à lui seul en prend près d'une — et faire
+     * patienter devant un écran figé pour un historique qui arrivera de toute
+     * façon serait un mauvais échange.
+     */
+    void activerOuRestaurerALaConnexion(payload.password, async (m) => {
+      await cacheMessage({
+        id: m.id,
+        conversationId: m.convId,
+        senderId: m.expediteurId,
+        content: m.texte,
+        type: "TEXT",
+        status: "SENT",
+        createdAt: m.quand,
+      })
+    })
+
     return nextUser
-  }, [])
+  }, [publierMesCles])
 
   const register = useCallback(async (draft: RegistrationDraft, otp: string) => {
     const nextUser = storeAuthenticatedSession(await completeRegistration(draft, otp))
@@ -191,8 +264,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveSessionUser(nextUser)
     setUser(nextUser)
     setIsReady(true)
+    publierMesCles()
     return nextUser
-  }, [])
+  }, [publierMesCles])
 
   /**
    * Inscription SANS adresse : le compte est cree sans code de confirmation.
@@ -275,6 +349,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const logout = useCallback(async () => {
+    /*
+     * 🔴 RETIRER L IDENTITE CHIFFREE AVANT TOUT LE RESTE.
+     *
+     * Sans ce geste, elle reste publiee POUR TOUJOURS : les correspondants
+     * continuent de chiffrer pour un appareil qui ne lira plus rien — un
+     * exemplaire de trop par message, une pre-cle consommee pour rien, et des
+     * enveloppes que personne ne relevera jamais.
+     *
+     * ⚠️ AVANT , QUI EFFACE LE JETON : sans jeton, la
+     * route de retrait repondrait 401 et l identite survivrait a la
+     * deconnexion.
+     *
+     * ⚠️ NE LEVE JAMAIS — une deconnexion ne doit pas echouer parce que le
+     * reseau est coupe. Le balayage du serveur rattrapera au bout de trente
+     * jours de silence.
+     */
+    /*
+     * ⚠️ ON DÉPOSE CE QUI ATTEND AVANT DE REFERMER, et l'ordre compte.
+     *
+     * Le tampon garde jusqu'à dix messages en mémoire. Refermer sans vider
+     * les perdrait pour l'archive — et ce sont les DERNIERS échangés, donc
+     * ceux dont on se souvient le mieux et dont l'absence se remarquerait.
+     *
+     * ⚠️ NE DOIT PAS EMPÊCHER LA DÉCONNEXION : `vider` ne lève jamais, et si
+     * le réseau est coupé on referme quand même. Rester connecté parce qu'une
+     * sauvegarde a échoué serait le pire des deux maux.
+     */
+    await viderSauvegarde().catch(() => undefined)
+    refermerSauvegarde()
+    await oublierCetAppareil()
     notifyServerOfDeparture(leaveSessionLocally(), revokeSession)
   }, [leaveSessionLocally, notifyServerOfDeparture])
 

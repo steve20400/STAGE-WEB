@@ -56,10 +56,19 @@ export const EVENEMENT_ECHEC_AUTO = "alanya:traduction-echec-auto"
 
 export function MessageTranslation({
   texte,
+  conversationId,
   automatique = false,
   langueSource = null,
 }: {
   texte: string
+  /**
+   * 🔴 LA CONVERSATION, ET ELLE EST OBLIGATOIRE.
+   *
+   * Sur un fil chiffre, le service impose le moteur de l'appareil : sans cet
+   * identifiant il ne pourrait pas le savoir, et le texte dechiffre partirait
+   * chez un tiers pour peu que l'utilisateur ait choisi un moteur en ligne.
+   */
+  conversationId: string
   /**
    * Langue DECLAREE du correspondant pour cette conversation, ou `null`.
    *
@@ -103,7 +112,7 @@ export function MessageTranslation({
   useEffect(() => {
     let vivant = true
     setEtat({ phase: "chargement" })
-    traduireMessage(texte, language, langueSource)
+    traduireMessage(texte, language, conversationId, langueSource)
       .then((resultat) => {
         if (vivant) setEtat({ phase: "pret", resultat })
       })
@@ -119,7 +128,7 @@ export function MessageTranslation({
     return () => {
       vivant = false
     }
-  }, [texte, language, langueSource, essai])
+  }, [texte, language, conversationId, langueSource, essai])
 
   /**
    * En automatique, un echec ne s'ecrit PAS sous la bulle.

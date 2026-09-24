@@ -105,6 +105,14 @@ export interface MentionMessage {
 
 export interface ChatMessageMock {
   /**
+   * Ce message est-il chiffre de bout en bout ?
+   *
+   * ⚠️ IL VIENT DU SERVEUR, qui le deduit de l existence d une enveloppe — pas
+   * de l absence de contenu. Un message en clair peut legitimement n avoir
+   * aucun texte, comme un media sans legende.
+   */
+  chiffre?: boolean
+  /**
    * Appel que ce message prolonge — une messagerie vocale laissee apres un
    * appel sans reponse. `null` pour un message ordinaire.
    */

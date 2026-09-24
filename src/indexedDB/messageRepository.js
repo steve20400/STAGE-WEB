@@ -39,19 +39,65 @@ export const deleteConversation = async (id) => {
 // MESSAGES
 // ═══════════════════════════════════════════════════════════
 
+/**
+ * UN TEXTE DEJA RANGE NE SE REMPLACE JAMAIS PAR DU VIDE.
+ *
+ * 🐛 LE DEFAUT, CONSTATE LE 23/09/2026 : « lorsque je rafraichis, les messages
+ * deviennent vides ». Et ils le devenaient DEFINITIVEMENT.
+ *
+ * Le serveur rend `content: null` pour tout message chiffre — il ne le lit pas.
+ * `cacheBackendMessages` ecrivait ce vide par-dessus le clair range ici, a
+ * chaque ouverture de conversation, AVANT que le fil n'aille relire le cache
+ * pour completer les messages sans enveloppe.
+ *
+ * ⚠️ ET C'ETAIT IRREVERSIBLE. Une enveloppe relevee est ACQUITTEE, donc
+ * SUPPRIMEE du serveur : le cache etait la derniere copie du texte. L'ecraser
+ * ne le rendait pas « a recharger », il le detruisait. Personne ne pouvait le
+ * reconstituer, pas meme nous.
+ *
+ * 🔴 LA REGLE VIT ICI, AU PLUS BAS NIVEAU, ET C'EST DELIBERE. C'est la
+ * TROISIEME fois que le meme oubli se paie — la fusion de l'ecran, le repli de
+ * `fetchMessages`, et maintenant le cache. Tant qu'elle depend de la vigilance
+ * de chaque appelant, il suffit d'un nouveau chemin d'ecriture pour la reperdre.
+ * Le schema la documentait deja sans la faire respecter : les traductions ont
+ * du demenager dans leur propre magasin pour survivre a ces reecritures.
+ *
+ * ⚠️ UNE SUPPRESSION POUR TOUS FAIT EXCEPTION, et elle est vitale : la, le vide
+ * est VOULU. Preserver l'ancien texte ressusciterait un message que son auteur
+ * a retire — un defaut bien pire que celui qu'on corrige.
+ */
+const preserveLeTexte = (entrant, existant) => {
+    if (!existant) return entrant;
+    // Le vide est voulu : l'auteur a supprime son message pour tout le monde.
+    if (entrant.deletedAt) return entrant;
+    if (entrant.content || !existant.content) return entrant;
+    return { ...entrant, content: existant.content };
+};
+
 export const upsertMessage = async (message) => {
     const db = await initIndexedDB();
-    await db.put('messages', message);
+    const tx = db.transaction('messages', 'readwrite');
+    const existant = message?.id ? await tx.store.get(message.id) : undefined;
+    await tx.store.put(preserveLeTexte(message, existant));
+    await tx.done;
 };
 
 export const saveBulkMessages = async (messages = []) => {
     if (!messages.length) return;
     const db = await initIndexedDB();
     const tx = db.transaction('messages', 'readwrite');
-    await Promise.all([
-        ...messages.map((m) => tx.store.put(m)),
-        tx.done,
-    ]);
+    /*
+     * ⚠️ SEQUENTIEL, ET NON `Promise.all` : chaque ecriture doit voir ce qui est
+     * DEJA range sous le meme identifiant. Lancer les lectures en parallele
+     * marcherait aussi, mais melanger lectures et ecritures concurrentes dans
+     * une seule transaction IndexedDB est un bon moyen de la voir se fermer
+     * toute seule au premier `await` mal place.
+     */
+    for (const m of messages) {
+        const existant = m?.id ? await tx.store.get(m.id) : undefined;
+        await tx.store.put(preserveLeTexte(m, existant));
+    }
+    await tx.done;
 };
 
 export const getMessagesByConversation = async (conversationId, limit = 50) => {

@@ -1110,3 +1110,134 @@ textarea.room-textarea::placeholder {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ══════════════════ LA BANNIÈRE DU CHIFFREMENT ══════════════════
+ *
+ * 🔴 ELLE DOIT SE LIRE, PAS SE FONDRE. C'est la seule chose qui distingue la
+ * partie protégée du fil de celle qui ne l'est pas ; la rendre discrète au
+ * point qu'on la saute reviendrait à ne rien indiquer du tout.
+ *
+ * ⚠️ MAIS PAS UNE ALERTE NON PLUS : le fond ambré dit « information », là où du
+ * rouge dirait « problème ». Il n'y a pas de problème — c'est même l'inverse.
+ */
+.e2ee-banniere {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px auto;
+  max-width: 480px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: #fff4e5;
+  border: 1px solid #f0d5b8;
+  color: #6b4b2a;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.e2ee-banniere svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: #b85c38;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .e2ee-banniere {
+    background: #2a2118;
+    border-color: #4a3a28;
+    color: #e0cdb5;
+  }
+}
+
+/* ══════════════════ L'ALERTE DE CHANGEMENT DE CLÉ ══════════════════
+ *
+ * ⚠️ ROUGE, ET C'EST LA DIFFÉRENCE AVEC LA BANNIÈRE DU CHIFFREMENT : celle-ci
+ * informe, celle-là alerte. Leur donner la même couleur reviendrait à dire que
+ * les deux se valent — or l'une annonce une protection, l'autre un doute sur
+ * cette protection.
+ */
+.e2ee-alerte {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 12px auto 4px;
+  max-width: 520px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fdecea;
+  border: 1px solid #f3c2bd;
+  color: #7a2620;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.e2ee-alerte svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  margin-top: 1px;
+  fill: none;
+  stroke: #b3261e;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .e2ee-alerte {
+    background: #2e1a18;
+    border-color: #5a2a26;
+    color: #f0c9c4;
+  }
+}
+
+/* ══════════════════ « LES FICHIERS NE SONT PAS CHIFFRÉS » ══════════════════
+ *
+ * En tête du menu des pièces jointes, et SEULEMENT sur un fil chiffré.
+ *
+ * ⚠️ MÊME FAMILLE QUE LA BANNIÈRE, PAS LA MÊME QUE L'ALERTE DE CLÉ. C'est une
+ * mise en garde, pas un danger : l'ambre informe, le rouge alarme. Prendre le
+ * rouge ici userait l'alarme pour un cas qui se produit à chaque pièce jointe,
+ * et le jour où la clé d'un correspondant changerait vraiment, plus personne ne
+ * la regarderait.
+ */
+.attach-avertissement {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 2px 6px 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff4e5;
+  border: 1px solid #f0d5b8;
+  color: #6b4b2a;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.attach-avertissement svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin-top: 1px;
+  fill: none;
+  stroke: #b85c38;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .attach-avertissement {
+    background: #2a2118;
+    border-color: #4a3a28;
+    color: #e0cdb5;
+  }
+}

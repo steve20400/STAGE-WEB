@@ -126,6 +126,8 @@ import { type EtatCacheTraductions } from "../../../src/services/traduction-cach
 import { sendSessionRevoked } from "../../../src/services/websocket-service"
 import { avatarDisplaySrc, fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
+import { E2eeSauvegardePanneau } from "./e2ee-sauvegarde-panneau"
+import { suivreChangementMotDePasse } from "../../../src/services/e2ee-sauvegarde"
 
 type SettingsSection =
   | "profile"
@@ -2356,6 +2358,25 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       await changePasswordApi(security.currentPwd, security.newPwd)
+
+      /*
+       * 🐛 LA SAUVEGARDE DOIT SUIVRE, SINON ELLE CASSE EN SILENCE.
+       *
+       * Sa serrure « mot de passe » garde l'ANCIEN tant qu'on ne la
+       * ré-enveloppe pas. La restauration automatique échouerait alors à la
+       * connexion suivante, et l'utilisateur le découvrirait au pire moment :
+       * en changeant d'appareil.
+       *
+       * ⚠️ ICI ET NULLE PART AILLEURS : c'est le seul endroit où l'ANCIEN mot
+       * de passe est encore connu. Après cet écran, la serrure ne s'ouvrirait
+       * plus et il n'y aurait aucun moyen de la mettre à jour.
+       *
+       * ⚠️ APRÈS le changement, jamais avant : si l'API refuse, il n'y a rien
+       * à ré-envelopper — et on aurait posé une serrure pour un mot de passe
+       * que le compte n'a pas.
+       */
+      await suivreChangementMotDePasse(security.currentPwd, security.newPwd)
+
       setSecurity({ currentPwd: "", newPwd: "", confirmPwd: "" })
       success(t("set_password_changed"), t("set_password_changed_detail"))
     } catch (err) {
@@ -3214,6 +3235,21 @@ export default function SettingsPage() {
             <>
               <div className="s-page-title">{t("settings_security")}</div>
               <p className="s-page-sub">{t("security_sub")}</p>
+
+              {/*
+                LA SAUVEGARDE CHIFFRÉE.
+
+                ⚠️ DANS « SÉCURITÉ » ET NON DANS UNE SECTION À ELLE. C'est là
+                qu'on va chercher ce qui touche à ses clés et à son compte ;
+                une section de plus se serait ajoutée à une navigation déjà
+                longue, pour un réglage qu'on fait une fois.
+
+                ⚠️ EN TÊTE, AVANT LE CHANGEMENT DE MOT DE PASSE. L'ordre n'est
+                pas neutre : changer son mot de passe sans savoir qu'il ouvre
+                une sauvegarde est exactement le geste qui fait perdre son
+                historique.
+              */}
+              <E2eeSauvegardePanneau />
 
               <div className="s-card">
                 <div className="s-card-title">{t("change_password")}</div>

@@ -1,0 +1,271 @@
+/* ══════════════════ LA SAUVEGARDE CHIFFRÉE, DANS LES RÉGLAGES ══════════════════
+ *
+ * 🔴 UN SEUL ÉLÉMENT DOMINE : la clé de récupération. Elle n'existe en clair
+ * qu'une seconde, et si quelqu'un la manque, sa sauvegarde devient dépendante
+ * d'un mot de passe qu'il peut oublier. Tout le reste de ce panneau est donc
+ * volontairement discret, pour qu'elle ne le soit pas.
+ */
+
+.sauv-intro,
+.sauv-explique {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--txt-2, #55555a);
+}
+
+.sauv-attente {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--txt-3, #8a8a90);
+}
+
+/* ── LA CLÉ, MONTRÉE UNE SEULE FOIS ── */
+
+.sauv-cle {
+  margin: 4px 0 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #fff8e8;
+  border: 1px solid #e8d08c;
+}
+
+.sauv-cle-titre {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 650;
+  color: #6b4b2a;
+}
+
+/*
+ * ⚠️ L'AVERTISSEMENT EST AU-DESSUS DES MOTS, pas en dessous. Placé après, il se
+ * lit une fois les mots recopiés — c'est-à-dire trop tard pour changer quoi que
+ * ce soit au soin qu'on y a mis.
+ */
+.sauv-cle-avert {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #7a5b38;
+}
+
+.sauv-cle-mots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 12px;
+  margin-bottom: 14px;
+}
+
+@media (min-width: 420px) {
+  .sauv-cle-mots {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/*
+ * ⚠️ LES MOTS SONT NUMÉROTÉS. Douze mots se recopient dans le désordre plus
+ * souvent qu'on ne le croit, et l'erreur ne se découvre qu'au moment de s'en
+ * servir — des mois plus tard, quand il est trop tard pour la corriger.
+ */
+.sauv-cle-mots span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.75);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: #4a3520;
+}
+
+.sauv-cle-mots em {
+  min-width: 14px;
+  font-style: normal;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: #a58b62;
+}
+
+.sauv-cle-actions,
+.sauv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── L'ÉTAT DES SERRURES ── */
+
+.sauv-serrures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sauv-serrure {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--bord, #d5d5da);
+  font-size: 12px;
+  color: var(--txt-3, #8a8a90);
+}
+
+.sauv-serrure svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/*
+ * ⚠️ VERT POUR CE QUI EXISTE, GRIS POUR CE QUI MANQUE — et surtout pas rouge.
+ * Une serrure absente n'est pas une panne : c'est un choix que l'utilisateur
+ * n'a pas encore fait. Le rouge est réservé aux alertes de sécurité réelles,
+ * et l'user pour cela le rendrait invisible ailleurs.
+ */
+.sauv-serrure.on {
+  border-color: #b7ddb9;
+  background: #eef7ef;
+  color: #2c6b34;
+}
+
+/* ── CHAMPS ET BOUTONS ── */
+
+.sauv-champ {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.sauv-champ span {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--txt-2, #55555a);
+}
+
+.sauv-champ input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--bord, #d5d5da);
+  border-radius: 9px;
+  background: var(--fond-champ, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 13.5px;
+}
+
+.sauv-btn,
+.sauv-cle-actions button {
+  padding: 8px 14px;
+  border: 1px solid var(--bord, #d5d5da);
+  border-radius: 9px;
+  background: var(--fond-champ, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.sauv-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sauv-btn.primaire,
+.sauv-cle-actions button.primaire {
+  border-color: transparent;
+  background: var(--accent, #1c1c1e);
+  color: var(--accent-text, #fff);
+}
+
+.sauv-btn.danger {
+  border-color: #e0b4b4;
+  background: #fdf0f0;
+  color: #9b2c2c;
+}
+
+/* ── LE RESTE ── */
+
+.sauv-resultat {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #2c6b34;
+}
+
+.sauv-resultat strong {
+  color: #9b2c2c;
+}
+
+.sauv-erreur {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: #9b2c2c;
+}
+
+.sauv-danger {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--bord, #e5e5ea);
+}
+
+.sauv-danger p {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #9b2c2c;
+}
+
+.sauv-lien {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--txt-3, #8a8a90);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .sauv-cle {
+    background: #2a2418;
+    border-color: #55462a;
+  }
+  :root:not([data-theme="light"]) .sauv-cle-titre {
+    color: #f0dcb4;
+  }
+  :root:not([data-theme="light"]) .sauv-cle-avert {
+    color: #d3bb90;
+  }
+  :root:not([data-theme="light"]) .sauv-cle-mots span {
+    background: rgba(0, 0, 0, 0.25);
+    color: #ecdcc0;
+  }
+  :root:not([data-theme="light"]) .sauv-cle-mots em {
+    color: #9c8459;
+  }
+  :root:not([data-theme="light"]) .sauv-serrure.on {
+    border-color: #35603a;
+    background: #1e2a20;
+    color: #9fd3a6;
+  }
+  :root:not([data-theme="light"]) .sauv-btn.danger {
+    border-color: #5c2f2f;
+    background: #2a1a1a;
+    color: #e8a0a0;
+  }
+  :root:not([data-theme="light"]) .sauv-danger p,
+  :root:not([data-theme="light"]) .sauv-erreur {
+    color: #e8a0a0;
+  }
+}

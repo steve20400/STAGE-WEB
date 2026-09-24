@@ -45,6 +45,14 @@ import {
   apercusMediasEnAttente,
 } from "../../../../src/services/messages-service"
 import {
+  activerE2ee,
+  cleAChange,
+  estChiffree,
+  lireEtatE2ee,
+  releverEtDechiffrer,
+  type EtatE2ee,
+} from "../../../../src/services/e2ee-fil"
+import {
   EVENEMENT_REGLAGES_TRADUCTION,
   langueSourceDe,
   traduireCetteConversation,
@@ -93,6 +101,7 @@ import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
 import {
   publishTyping,
   subscribeToConversation,
+  subscribeToE2eeArrivee,
   subscribeToMessageDeleted,
   subscribeToMessageEdited,
   subscribeToPresence,
@@ -115,6 +124,8 @@ import {
 } from "../../../../src/services/traduction-service"
 import ChatInfoPage from "./chat-info"
 import { CLE_ERREUR, EVENEMENT_ECHEC_AUTO, MessageTranslation } from "./message-translation"
+import { E2eeVerification } from "./e2ee-verification"
+import { estVerifie } from "../../../../src/services/e2ee-empreinte"
 import { PartagerContact } from "./partager-contact"
 import "./chat-room-page.css"
 
@@ -3440,8 +3451,16 @@ function MessageBubble({
   onOpenAlbum,
   autoTraduction,
   langueSourceDeclaree,
+  conversationId,
 }: {
   msg: Message
+  /**
+   * ⚠️ DESCENDUE JUSQU'ICI POUR LA TRADUCTION, et ce n'est pas du confort :
+   * sur un fil chiffre, le service impose le moteur de l'appareil. Sans cet
+   * identifiant il ne peut pas le savoir, et le texte dechiffre partirait chez
+   * un tiers pour peu que l'utilisateur ait choisi un moteur en ligne.
+   */
+  conversationId: string
   isMe: boolean
   replyMsg?: Message
   onReply: (m: Message) => void
@@ -4162,6 +4181,7 @@ function MessageBubble({
               {blocTraductionVisible && texteATraduire && (
                 <MessageTranslation
                   texte={texteATraduire}
+                  conversationId={conversationId}
                   automatique={traductionAutomatique}
                   langueSource={langueSourceDeclaree}
                 />
@@ -5056,6 +5076,63 @@ export default function ChatRoomPage() {
   /** L'interrupteur GENERAL, celui que porte le bouton de la barre d'en-tete. */
   const [tradGlobale, setTradGlobale] = useState(() => traductionGlobaleActive())
 
+  /*
+   * L'ÉTAT DU CHIFFREMENT DE CETTE CONVERSATION.
+   *
+   * ⚠️ `null` TANT QU'ON NE SAIT PAS, et le bouton reste alors inerte : un
+   * bouton qui promet d'activer avant d'avoir demandé au serveur promettrait
+   * ce qu'il ne peut pas tenir — la route refuse les groupes, les comptes
+   * professionnels et les correspondants sans clés.
+   */
+  const [e2ee, setE2ee] = useState<EtatE2ee | null>(null)
+  const [e2eeEnCours, setE2eeEnCours] = useState(false)
+
+  /*
+   * Le correspondant, pour l'avertissement de changement de clé.
+   *
+   * ⚠️ `null` EN GROUPE, et l'avertissement ne paraît alors jamais : le
+   * chiffrement ne couvre pas les groupes, il n'y a donc aucune clé à
+   * surveiller.
+   */
+  const peerIdPourCle = chat?.isGroup
+    ? null
+    : (chat?.membersInfo?.find((m) => m.id !== getMyUserId())?.id ?? null)
+
+  /** L'ecran de comparaison des codes de securite est-il ouvert ? */
+  const [verifOuverte, setVerifOuverte] = useState(false)
+
+  /*
+   * L'ETAT DU CHIFFREMENT, LU A L'OUVERTURE DE LA CONVERSATION.
+   *
+   * 🐛 CET EFFET A D'ABORD ETE POSE A L'INTERIEUR D'UN AUTRE, et la page
+   * entiere plantait — l'ecran affichait « une partie de l'application a
+   * rencontre un probleme ».
+   *
+   * ⚠️ UN HOOK NE S'APPELLE QU'AU PREMIER NIVEAU DU COMPOSANT. Imbrique, il
+   * s'enregistre a chaque execution de l'effet parent : React compte alors
+   * plus de hooks qu'au rendu precedent et leve. TypeScript ne voit rien — un
+   * appel de fonction dans un corps de fonction est parfaitement valide.
+   *
+   * ⚠️ UNE SEULE LECTURE PAR CONVERSATION OUVERTE : l'etat ne change qu'a
+   * l'activation, qui est a sens unique.
+   */
+  useEffect(() => {
+    if (!chatId) return
+    let vivant = true
+    void lireEtatE2ee(chatId)
+      .then((r) => {
+        if (vivant) setE2ee(r)
+      })
+      .catch(() => {
+        // Serveur trop ancien, ou route indisponible : on se tait. Le fil
+        // fonctionne exactement comme avant, sans bouton.
+        if (vivant) setE2ee(null)
+      })
+    return () => {
+      vivant = false
+    }
+  }, [chatId])
+
   /**
    * Traduction automatique de cette discussion.
    *
@@ -5242,7 +5319,30 @@ export default function ChatRoomPage() {
     for (const entrant of entrants) {
       const existant = parId.get(entrant.id)
       // Un message deja connu est mis a jour (statut, suppression), pas duplique.
-      parId.set(entrant.id, existant ? { ...existant, ...entrant } : entrant)
+      if (!existant) {
+        parId.set(entrant.id, entrant)
+        continue
+      }
+      /*
+       * 🐛 UN TEXTE CONNU NE DOIT JAMAIS ETRE REMPLACE PAR DU VIDE.
+       *
+       * Le serveur rend `content: null` pour tout message CHIFFRE — il ne
+       * peut pas faire autrement, il ne le lit pas. La fusion recopiait ce
+       * vide par-dessus le texte deja dechiffre, et le message disparaissait
+       * de l'ecran a la premiere trame temps reel.
+       *
+       * C'est exactement ce que le user a decrit : « quand Bob envoie, le
+       * message d'Alice devient vide chez Alice ». Le message de Bob arrivait
+       * par le temps reel, la fusion s'executait, et emportait au passage le
+       * contenu de tous les messages chiffres deja affiches.
+       *
+       * ⚠️ LA REGLE EST GENERALE, pas propre au chiffrement : une mise a jour
+       * apporte des metadonnees plus fraiches — statut, suppression — mais
+       * elle n'a aucune raison de faire OUBLIER un contenu.
+       */
+      const fusionne = { ...existant, ...entrant }
+      if (!entrant.content && existant.content) fusionne.content = existant.content
+      parId.set(entrant.id, fusionne)
     }
     return [...parId.values()].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   }, [])
@@ -5346,7 +5446,8 @@ export default function ChatRoomPage() {
     })
     void refreshCallEvents()
 
-    // Temps reel : abonnement aux nouveaux messages de la conversation
+
+  // Temps reel : abonnement aux nouveaux messages de la conversation
     const myId = getMyUserId()
     // Correspondant d'une conversation directe : sert a filtrer les evenements
     // de presence, qui sont diffuses toutes conversations confondues.
@@ -5358,11 +5459,62 @@ export default function ChatRoomPage() {
     // l'activite reelle reste plus juste.
     if (!chat?.isGroup && chat?.online) setPeerPresence(true)
 
+    /*
+     * LA SONNETTE DES FILS CHIFFRES.
+     *
+     * 🔴 ON RELIT LE FIL AU LIEU DE FABRIQUER LA BULLE. La trame ne porte ni
+     * la ligne du message ni son texte — elle ne porte RIEN, exprès. Il faut
+     * donc aller chercher les deux, et `refreshMessages` fait deja exactement
+     * ça : il relit le fil ET releve les enveloppes en passant.
+     *
+     * ⚠️ C'EST LE MEME CHEMIN QUE CELUI QUI MARCHAIT DEJA. Avant ce correctif,
+     * le message finissait par apparaitre — quand le destinataire ecrivait a
+     * son tour, ce qui rafraichissait le fil. On ne change donc pas la façon
+     * dont le message arrive, seulement le MOMENT : maintenant, au lieu de
+     * quand la personne veut bien agir.
+     */
+    const unsubscribeSonnette = subscribeToE2eeArrivee(chatId, () => {
+      if (cancelled) return
+      void refreshMessages().catch(() => {
+        // Le reseau a bronche : les enveloppes attendent, la prochaine
+        // ouverture du fil les relevera. Rien n'est perdu.
+      })
+    })
+
     const unsubscribeMessages = subscribeToConversation(chatId, (message, tempId) => {
       if (cancelled) return
       const incoming = toFrontMessage(message, myId)
       // Persiste le message entrant en IndexedDB
       void persistIncomingWsMessage(message)
+
+      /*
+       * 🐛 « LE MESSAGE N'ARRIVE PAS INSTANTANEMENT ».
+       *
+       * Le temps reel transporte la LIGNE du message, pas son contenu — qui
+       * pour un fil chiffre vit dans une enveloppe, relevee separement. Le
+       * destinataire voyait donc arriver une bulle VIDE, et n'en decouvrait le
+       * texte qu'au prochain rafraichissement du fil, c'est-a-dire quand il
+       * ecrivait lui-meme.
+       *
+       * ⚠️ LA TRAME SERT DE SONNETTE. On ne change rien a `ws-server.mjs` — il
+       * n'a pas a connaitre le chiffrement : on se contente de relever quand
+       * il nous previent que quelque chose est arrive.
+       *
+       * ⚠️ SEULEMENT SUR UN FIL CHIFFRE, et seulement quand le contenu manque :
+       * partout ailleurs la trame porte deja le texte, et relever serait un
+       * aller-retour pour rien.
+       */
+      if (!incoming.content && estChiffree(chatId)) {
+        void releverEtDechiffrer().then((clairs) => {
+          if (cancelled || clairs.size === 0) return
+          setMessages((prev) =>
+            prev.map((m) => {
+              const clair = clairs.get(m.id)
+              return clair === undefined ? m : { ...m, content: clair }
+            }),
+          )
+        })
+      }
       setMessages((prev) => {
         if (prev.some((m) => m.id === incoming.id)) {
           // Deja affiche : il reste peut-etre sa bulle d'attente a retirer.
@@ -5561,6 +5713,7 @@ export default function ChatRoomPage() {
     return () => {
       cancelled = true
       unsubscribeMessages()
+      unsubscribeSonnette()
       unsubscribeTyping()
       unsubscribeStatus()
       unsubscribeEpingle()
@@ -6864,6 +7017,18 @@ export default function ChatRoomPage() {
     window.setTimeout(() => target.classList.remove("msg-highlight"), MSG_FLASH_MS)
   }
 
+  /*
+   * LA FRONTIERE DU CHIFFREMENT — le premier message chiffre du fil ENTIER.
+   *
+   * ⚠️ CALCULEE SUR TOUTE LA LISTE, PAS PAR JOUR. Cherchee dans chaque groupe
+   * de date, la banniere reparaitrait tous les jours — et une indication qui
+   * se repete cesse d etre lue. Une fois le fil passe au chiffre, il l est
+   * pour de bon : la frontiere est unique.
+   */
+  const premierChiffreId = timeline.find(
+    (it) => it.kind === "msg" && it.msg.chiffre === true,
+  )
+
   // Grouper par date
   const grouped = timeline.reduce<{ date: string; items: TimelineItem[] }[]>((acc, item) => {
     const dateStr = formatDateSeparator(item.ts)
@@ -7002,6 +7167,123 @@ export default function ChatRoomPage() {
                   toute l'application doit dire s'il est allume, sinon on
                   l'actionne pour savoir — et on eteint ce qu'on voulait
                   verifier. */}
+              {/*
+                ══════ LE CADENAS DU CHIFFREMENT ══════
+
+                🔴 TROIS ÉTATS, ET CHACUN DOIT SE LIRE SANS CLIQUER :
+                  · chiffrée      → cadenas plein, bouton inerte (c'est à sens
+                    unique, il n'y a rien à défaire) ;
+                  · activable     → cadenas ouvert, on peut appuyer ;
+                  · impossible    → cadenas barré, et le TITRE dit pourquoi.
+
+                ⚠️ LE MOTIF VIENT DU SERVEUR. Un bouton grisé sans explication
+                fait ouvrir un ticket ; « les groupes ne sont pas couverts »
+                clôt la question sur place.
+              */}
+              {/*
+                🐛 PLUS D'`aria-pressed` — signalé par le user le 24/09/2026 :
+                « j'ai l'impression qu'une fois activé il est impossible de le
+                désactiver ».
+
+                C'est exact, et c'est voulu : le chiffrement ne se retire pas.
+                Mais `aria-pressed` annonce un INTERRUPTEUR — un lecteur
+                d'écran disait « bouton, enfoncé », ce qui promet qu'on peut le
+                relâcher. Le fond du défaut n'était pas le comportement :
+                c'était la PROMESSE que faisait le bouton.
+
+                ⚠️ L'ÉTAT PASSE DONC PAR LE LIBELLÉ, qui le dit en toutes
+                lettres — « le chiffrement ne se retire pas » — plutôt que par
+                un attribut qui suggère l'inverse.
+              */}
+              {e2ee !== null && (
+                <button
+                  className="action-btn"
+                  aria-label={
+                    e2ee.e2eeActif
+                      ? peerIdPourCle !== null
+                        ? t("e2ee_actif_definitif_verif")
+                        : t("e2ee_actif_definitif")
+                      : t("e2ee_bouton")
+                  }
+                  disabled={e2eeEnCours || (!e2ee.e2eeActif && !e2ee.activable)}
+                  title={
+                    e2ee.e2eeActif
+                      ? peerIdPourCle !== null
+                        ? t("e2ee_actif_definitif_verif")
+                        : t("e2ee_actif_definitif")
+                      : e2ee.motif === "HORS_PERIMETRE"
+                        ? t("e2ee_hors_perimetre")
+                        : e2ee.motif === "GROUPE_NON_SUPPORTE"
+                          ? t("e2ee_groupe")
+                          : e2ee.motif === "CLES_MANQUANTES"
+                            ? t("e2ee_cles_manquantes")
+                            : t("e2ee_activer")
+                  }
+                  onClick={() => {
+                    /*
+                     * ⚠️ UNE FOIS CHIFFRE, LE CADENAS MENE A LA VERIFICATION.
+                     *
+                     * Il etait inerte — le chiffrement ne se defait pas, il
+                     * n'y avait rien a faire. Mais un bouton mort a l'endroit
+                     * exact ou l'on va chercher « l'etat du chiffrement » est
+                     * une place gachee : c'est LA que l'utilisateur regarde,
+                     * et c'est donc la que doit vivre la seule action qui lui
+                     * reste — comparer le code hors de ce canal.
+                     *
+                     * ⚠️ PAS EN GROUPE : il n'y a pas d'identite unique a
+                     * comparer, et proposer l'ecran laisserait croire le
+                     * contraire.
+                     */
+                    if (e2ee.e2eeActif) {
+                      if (peerIdPourCle !== null) setVerifOuverte(true)
+                      return
+                    }
+                    if (!e2ee.activable) return
+                    setE2eeEnCours(true)
+                    void activerE2ee(chatId)
+                      .then(() => setE2ee({ ...e2ee, e2eeActif: true }))
+                      .catch(() => undefined)
+                      .finally(() => setE2eeEnCours(false))
+                  }}
+                  style={
+                    e2ee.e2eeActif
+                      ? { background: "var(--accent)", color: "var(--accent-text)" }
+                      : undefined
+                  }
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {/*
+                      🔴 UN BOUCLIER, PAS UN CADENAS — signalé par le user le
+                      23/09/2026 : « on confond avec l'autre icône ».
+
+                      Le cadenas sert DÉJÀ trois fois dans cet écran, pour la
+                      RÉSERVATION de la conversation : le bouton juste à côté,
+                      le bandeau, et le badge de la liste. Deux cadenas
+                      voisins, chacun avec un état ouvert et un état fermé,
+                      faisaient quatre combinaisons pour deux formes
+                      identiques.
+
+                      ⚠️ C'EST LE CHIFFREMENT QUI CHANGE, ET NON LA
+                      RÉSERVATION, parce que le cadenas décrit mieux celle-ci :
+                      elle s'ouvre et se referme. Le chiffrement, lui, ne se
+                      défait pas — un cadenas qu'on ne peut pas rouvrir est
+                      une métaphore qui ment.
+                    */}
+                    <path d="M12 2.8 4.5 6v6c0 4.6 3.1 8.2 7.5 9.2 4.4-1 7.5-4.6 7.5-9.2V6L12 2.8z" />
+                    {e2ee.e2eeActif && <path d="m8.8 11.8 2.3 2.3 4.1-4.4" />}
+                  </svg>
+                </button>
+              )}
+
               <button
                 className="action-btn"
                 aria-label={t("trad_globale_titre")}
@@ -7202,6 +7484,53 @@ export default function ChatRoomPage() {
           </div>
         )}
 
+        {/*
+          ══════ LA CLÉ DU CORRESPONDANT A CHANGÉ ══════
+
+          🔴 C'EST LE SEUL SIGNAL QUI PUISSE RÉVÉLER UNE INTERPOSITION. Deux
+          lectures sont possibles, et elles se ressemblent trait pour trait :
+          le correspondant a réinstallé, ou quelqu'un a pris sa place entre
+          vous. Seul l'utilisateur peut trancher, en vérifiant hors de ce
+          canal.
+
+          ⚠️ ON PRÉVIENT SANS BLOQUER — décision du user, 21/09/2026. Refuser
+          figerait la conversation sans rien expliquer, alors que le cas le
+          plus fréquent est parfaitement innocent : un changement de téléphone.
+
+          ⚠️ EN TÊTE DU FIL, PAS DANS UNE NOTIFICATION QUI PASSE. Un
+          avertissement de sécurité qui disparaît au bout de trois secondes
+          n'avertit personne.
+
+          ⚠️ FOND ROUGE, ICI, ET C'EST LA DIFFÉRENCE AVEC LA BANNIÈRE DU
+          CHIFFREMENT : celle-ci informe, celle-là alerte. Leur donner la même
+          couleur reviendrait à dire que les deux se valent.
+        */}
+        {e2ee?.e2eeActif && peerIdPourCle !== null && cleAChange(peerIdPourCle) && (
+          <div className="e2ee-alerte">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3.5 2.8 19.5h18.4L12 3.5Z" />
+              <path d="M12 10v4" />
+              <path d="M12 17h.01" />
+            </svg>
+            <span>{t("e2ee_cle_changee")}</span>
+            {/*
+              🔴 L'ALERTE MENE A L'ACTION, ELLE N'INFORME PLUS SEULEMENT.
+
+              Dire « la cle a change » a quelqu'un qui n'a aucun moyen de
+              trancher, c'est l'inquieter sans l'aider — et lui apprendre a
+              ignorer la prochaine. Le bouton mene a la seule chose qui
+              reponde a la question : comparer le code hors de ce canal.
+            */}
+            <button
+              type="button"
+              className="e2ee-alerte-action"
+              onClick={() => setVerifOuverte(true)}
+            >
+              {t("e2ee_verif_ouvrir")}
+            </button>
+          </div>
+        )}
+
         {grouped.map(({ date, items }) => (
           <div key={date}>
             <div className="date-sep">
@@ -7210,7 +7539,29 @@ export default function ChatRoomPage() {
               <div className="date-sep-line" />
             </div>
 
-            {items.map((item, indexFil) => {
+            {(() => {
+              /*
+               * ══════ « À PARTIR D'ICI, CHIFFRÉ » ══════
+               *
+               * 🔴 LES ANCIENS MESSAGES RESTENT LISIBLES, et c'est une
+               * décision, pas un oubli : le serveur ne peut pas les chiffrer
+               * rétroactivement — il faudrait qu'un client les relise, les
+               * chiffre et les repose, ce qui suppose qu'il les ait TOUS et
+               * que personne n'ait changé d'appareil depuis.
+               *
+               * ⚠️ IL FAUT DONC LE DIRE. Un fil dont la moitié est protégée et
+               * l'autre non, sans rien qui marque la frontière, laisse croire
+               * que TOUT l'est. Cette ligne est la seule chose qui empêche ce
+               * malentendu — et sur du chiffrement, un malentendu fait prendre
+               * des risques qu'on croyait écartés.
+               *
+               * ⚠️ ON ENVELOPPE LA BOUCLE AU LIEU D'Y TOUCHER. Elle rend des
+               * formes différentes selon le type d'entrée — appel, répondeur,
+               * message — et y insérer une branche de plus aurait demandé de
+               * modifier chacun de ses retours. Poser la bannière APRÈS coup,
+               * dans le tableau rendu, ne touche à aucun d'eux.
+               */
+              const rendus = items.map((item, indexFil) => {
               if (item.kind === "call") {
                 return <CallEventChip key={`call-${item.call.id}`} call={item.call} />
               }
@@ -7293,6 +7644,7 @@ export default function ChatRoomPage() {
                     name={t("f2_n_files", { count: lot.length })}
                   >
                     <MessageBubble
+                    conversationId={chatId}
                       msg={head}
                       isMe={albumIsMe}
                       replyMsg={head.replyTo ? messagesById.get(head.replyTo) : undefined}
@@ -7369,6 +7721,7 @@ export default function ChatRoomPage() {
                     </div>
                   )}
                   <MessageBubble
+                    conversationId={chatId}
                     key={msg.id}
                     msg={msg}
                     isMe={isMe}
@@ -7392,7 +7745,54 @@ export default function ChatRoomPage() {
                   />
                 </MessageErrorBoundary>
               )
-            })}
+            })
+              /*
+               * ⚠️ LE PREMIER MESSAGE CHIFFRE DU JOUR AFFICHE, et la garde
+               * ci-dessous evite qu elle reparaisse a chaque separateur de date :
+               * une fois le fil passe au chiffre, TOUS les jours suivants le sont.
+               * Sans cela, la banniere se repeterait tous les jours, et une
+               * indication qui se repete cesse d etre lue.
+               */
+              const place = items.findIndex(
+                (it) => it === premierChiffreId,
+              )
+              if (place >= 0) {
+                rendus.splice(
+                  place,
+                  0,
+                  <div className="e2ee-banniere" key="e2ee-banniere">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      {/* ⚠️ LE MÊME BOUCLIER QUE LE BOUTON. Deux dessins pour
+                          une seule idée obligeraient à apprendre deux fois. */}
+                      <path d="M12 2.8 4.5 6v6c0 4.6 3.1 8.2 7.5 9.2 4.4-1 7.5-4.6 7.5-9.2V6L12 2.8z" />
+                      <path d="m8.8 11.8 2.3 2.3 4.1-4.4" />
+                    </svg>
+                    <span>{t("e2ee_banner")}</span>
+                    {/*
+                      LE BADGE « VERIFIE », DANS LA BANNIERE ET NULLE PART AILLEURS.
+
+                      🔴 IL NE DIT PAS « C'EST SUR ». Il dit « VOUS avez compare
+                      ce code ». Le produit n'en sait rien de plus que ce que
+                      l'utilisateur a declare — et la nuance est tout le sujet.
+
+                      ⚠️ IL DISPARAIT TOUT SEUL si la cle change, parce que la
+                      verification est rangee AVEC la cle comparee. Un badge qui
+                      survivrait a un changement de cle affirmerait le contraire
+                      de la verite au moment exact ou ca compte.
+                    */}
+                    {peerIdPourCle !== null && estVerifie(peerIdPourCle) && (
+                      <span className="e2ee-badge-verifie">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                        {t("e2ee_verif_fait")}
+                      </span>
+                    )}
+                  </div>,
+                )
+              }
+              return rendus
+            })()}
           </div>
         ))}
 
@@ -7541,6 +7941,34 @@ export default function ChatRoomPage() {
             {/* Popup attachement */}
             {showAttach && (
               <div className="attach-menu">
+                {/*
+                  🔴 LE FIL EST CHIFFRÉ, LES PIÈCES JOINTES NE LE SONT PAS.
+
+                  Le chiffrement des médias est remis à plus tard (décision du
+                  21/09/2026). En attendant, un fichier envoyé dans un fil
+                  marqué « chiffré » traverse le chemin ORDINAIRE : le serveur
+                  le stocke et peut l'ouvrir.
+
+                  ⚠️ NE PAS LE DIRE SERAIT LE PIRE DES CHOIX. L'utilisateur a
+                  sous les yeux un cadenas et une bannière ; il en déduit,
+                  légitimement, que tout ce qu'il envoie est protégé. Le
+                  silence ici ne cache pas une limite, il fabrique une
+                  croyance fausse — et c'est sur cette croyance que les gens
+                  décident quoi envoyer.
+
+                  ⚠️ ICI ET PAS AILLEURS : au moment de CHOISIR le fichier,
+                  quand l'information peut encore changer la décision. Après
+                  l'envoi, elle ne sert plus à rien.
+                */}
+                {estChiffree(chatId) && (
+                  <div className="attach-avertissement">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 9v4M12 17h.01" />
+                      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                    </svg>
+                    <span>{t("e2ee_medias_clairs")}</span>
+                  </div>
+                )}
                 <button
                   className="attach-opt"
                   onClick={() => {
@@ -8001,6 +8429,21 @@ export default function ChatRoomPage() {
           onFermer={() => setMentionOuverte(null)}
           onRetirer={jeSuisAdminDuGroupe ? retirerDuGroupe : undefined}
           onNommerAdmin={jeSuisAdminDuGroupe ? nommerAdmin : undefined}
+        />
+      )}
+
+      {/*
+        L'ECRAN DE COMPARAISON DES CODES DE SECURITE.
+
+        ⚠️ SEULEMENT SUR UN FIL CHIFFRE ET EN TETE-A-TETE. En groupe il n'y a
+        pas d'identite unique a comparer — le chiffrement des groupes est hors
+        perimetre, et proposer l'ecran laisserait croire le contraire.
+      */}
+      {verifOuverte && peerIdPourCle !== null && (
+        <E2eeVerification
+          peerUserId={peerIdPourCle}
+          peerName={chat?.name ?? ""}
+          onClose={() => setVerifOuverte(false)}
         />
       )}
 

@@ -19,6 +19,7 @@ import AiAssistantPage from "../app/(protected)/ai/ai"
 import ForgotPasswordPage from "../app/(auth)/forgot-password/forgot-password"
 import SignUpPage from "../app/(auth)/signup/signup"
 import WelcomePage from "../app/(public)/welcome/welcome"
+import E2eeTestPage from "./pages/E2eeTestPage"
 import NotFoundPage from "../app/(public)/not-found/not-found"
 import SettingsPage from "../app/(protected)/settings/settings"
 import AbandonedClientsPage from "../app/(protected)/abandoned-clients/abandoned-clients"
@@ -45,6 +46,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <BrowserRouter basename={import.meta.env.BASE_URL}>
               <AuthProvider>
                 <Routes>
+                  {/*
+                    🔴 BANC D'ESSAI DU CHIFFREMENT — DEVELOPPEMENT UNIQUEMENT.
+                    Route volontairement HORS du garde d'authentification et
+                    sans lien depuis l'interface : elle n'a rien a faire dans
+                    un parcours, et rien ne doit y mener par accident. Elle
+                    disparait quand le chiffrement rejoint le fil de discussion.
+                  */}
+                  <Route path="/e2ee-test" element={<E2eeTestPage />} />
                   <Route path="/" element={<WelcomePage />} />
                   <Route path="/welcome" element={<WelcomePage />} />
                   <Route
