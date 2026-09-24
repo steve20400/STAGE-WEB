@@ -177,6 +177,17 @@ async function main() {
   /* ── ③ DÉPOSER, PUIS TOUT PERDRE ─────────────────────────────────── */
   titre("③ Écrire, puis effacer tout le local");
 
+  /*
+   * 🐛 C'EST CE VIDAGE QUI A RÉVÉLÉ LE DÉFAUT. La serrure était liée à
+   * `idAppareil()`, un numéro rangé dans `localStorage` — que la déconnexion
+   * purge. Au retour, le navigateur s'en attribuait un nouveau et la serrure
+   * devenait introuvable, alors que la clé d'accès marchait toujours.
+   *
+   * ⚠️ LE BANC NE L'AVAIT PAS VU AU PREMIER JET parce qu'il vidait le local
+   * APRÈS avoir ouvert l'archive. C'est en l'exécutant après le changement de
+   * schéma que l'ordre réel — vider PUIS rouvrir — a fait apparaître le cas.
+   */
+
   const depose = await page.evaluate(async () => {
     const m = await import("/src/services/e2ee-sauvegarde.ts");
     for (let i = 1; i <= 4; i++) {
@@ -224,6 +235,20 @@ async function main() {
    * ouverte.
    */
   verifie("le trousseau seul ouvre l'archive", parTrousseau.ok === true);
+
+  /*
+   * 🔴 ET LA SERRURE SURVIT AU VIDAGE DU NAVIGATEUR. C'est la propriété qui
+   * manquait : elle est liée à la clé d'accès, pas au stockage local.
+   */
+  const liee = await prisma.e2eeSerrure.findFirst({
+    where: { type: "trousseau", user: { email: EMAIL } },
+    select: { appareil: true },
+  });
+  verifie(
+    "elle désigne la clé d'accès, pas le stockage local",
+    typeof liee?.appareil === "string" && liee.appareil.length > 20,
+    `appareil = ${JSON.stringify(liee?.appareil)} — un numéro court trahirait idAppareil()`,
+  );
   verifie("et rend les quatre messages", parTrousseau.n === 4, `${parTrousseau.n}`);
 
   /* ── ⑤ SANS L'APPAREIL, RIEN ─────────────────────────────────────── */

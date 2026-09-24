@@ -56,18 +56,34 @@ async function compte() {
       typeCompte: 0,
     },
   });
-  const r = await fetch(`${API}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      identifier: email,
-      password: motDePasse,
-      deviceId: "sauvegarde-banc",
-      typeDevice: 0,
-    }),
-  });
-  if (!r.ok) throw new Error(`login → ${r.status} ${await r.text()}`);
-  return (await r.json()).accessToken;
+  /*
+   * 🐛 LA ROUTE DE CONNEXION LIMITE À 5 TENTATIVES PAR MINUTE ET PAR IP. Les
+   * bancs enchaînés la déclenchaient, et celui-ci échouait alors sur un `429`
+   * qui n'a rien à voir avec ce qu'il éprouve : on cherche le défaut dans le
+   * chiffrement, il est dans la cadence.
+   *
+   * ⚠️ ON ATTEND, ON NE CONTOURNE PAS. Désactiver la limite pour les tests
+   * reviendrait à ne plus éprouver le vrai serveur.
+   */
+  for (let essai = 1; essai <= 6; essai++) {
+    const r = await fetch(`${API}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        identifier: email,
+        password: motDePasse,
+        deviceId: "sauvegarde-banc",
+        typeDevice: 0,
+      }),
+    });
+    if (r.ok) return (await r.json()).accessToken;
+
+    const texte = await r.text();
+    if (r.status !== 429) throw new Error(`login → ${r.status} ${texte}`);
+    console.log(`⏳ cadence limitée — on patiente 12 s (essai ${essai}/6)`);
+    await new Promise((ok) => setTimeout(ok, 12_000));
+  }
+  throw new Error("login → toujours limité après six essais");
 }
 
 const jeton = await compte();

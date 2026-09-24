@@ -126,6 +126,26 @@ export async function capacites(): Promise<Capacites> {
   return { disponible: true }
 }
 
+/**
+ * Ce qu'une clé d'accès rend quand elle répond.
+ *
+ * 🐛 `identifiant` A ÉTÉ AJOUTÉ APRÈS COUP, et la raison mérite d'être lue.
+ *
+ * La serrure était d'abord liée à `idAppareil()` — un numéro rangé dans
+ * `localStorage`. Or la DÉCONNEXION PURGE `localStorage` : au retour, le
+ * navigateur s'attribuait un nouveau numéro, et la serrure posée la veille
+ * devenait introuvable alors que la clé d'accès, elle, marchait toujours.
+ *
+ * ⚠️ ON LIE DONC LA SERRURE À CE QUI PEUT L'OUVRIR, et à rien d'autre : la
+ * clé d'accès. Elle survit au vidage du navigateur, c'est tout son intérêt.
+ */
+export interface Reponse {
+  /** Le secret PRF, base64 — 256 bits. */
+  secret: string
+  /** L'identifiant de la clé d'accès qui l'a produit. Public. */
+  identifiant: string
+}
+
 /** Le résultat PRF, encodé — c'est le « secret » de la serrure. */
 function versB64(buf: ArrayBuffer): string {
   const o = new Uint8Array(buf)
@@ -134,13 +154,16 @@ function versB64(buf: ArrayBuffer): string {
   return btoa(s)
 }
 
-function extraireSecret(cred: PublicKeyCredential | null): string | null {
+function extraireReponse(cred: PublicKeyCredential | null): Reponse | null {
   const ext = cred?.getClientExtensionResults() as {
     prf?: { results?: { first?: ArrayBuffer | Uint8Array } }
   }
   const brut = ext?.prf?.results?.first
-  if (!brut) return null
-  return versB64(brut instanceof Uint8Array ? (brut.buffer as ArrayBuffer) : brut)
+  if (!brut || !cred) return null
+  return {
+    secret: versB64(brut instanceof Uint8Array ? (brut.buffer as ArrayBuffer) : brut),
+    identifiant: versB64(cred.rawId),
+  }
 }
 
 /**
@@ -158,7 +181,7 @@ function extraireSecret(cred: PublicKeyCredential | null): string | null {
 export async function creerTrousseau(opts: {
   userId: string
   nom: string
-}): Promise<string> {
+}): Promise<Reponse> {
   const defi = crypto.getRandomValues(new Uint8Array(32))
 
   const cree = (await navigator.credentials.create({
@@ -195,13 +218,13 @@ export async function creerTrousseau(opts: {
 
   if (!cree) throw new Error("La création de la clé d'accès a été annulée.")
 
-  const secret = await ouvrirTrousseau()
-  if (!secret) {
+  const reponse = await ouvrirTrousseau()
+  if (!reponse) {
     throw new Error(
       "La clé d'accès a été créée mais ne sait pas dériver de secret sur cet appareil.",
     )
   }
-  return secret
+  return reponse
 }
 
 /**
@@ -211,7 +234,7 @@ export async function creerTrousseau(opts: {
  * n'est pas une panne : c'est une réponse. La traiter comme une erreur ferait
  * afficher un message rouge à quelqu'un qui a simplement changé d'avis.
  */
-export async function ouvrirTrousseau(): Promise<string | null> {
+export async function ouvrirTrousseau(): Promise<Reponse | null> {
   const defi = crypto.getRandomValues(new Uint8Array(32))
 
   try {
@@ -232,7 +255,7 @@ export async function ouvrirTrousseau(): Promise<string | null> {
       },
     })) as PublicKeyCredential | null
 
-    return extraireSecret(obtenu)
+    return extraireReponse(obtenu)
   } catch (e) {
     /*
      * ⚠️ ON DISTINGUE L'ANNULATION DU RESTE. `NotAllowedError` couvre à la fois

@@ -179,6 +179,16 @@ export async function lireCoffre(): Promise<{ serrures: Serrure[]; refusee: bool
     const r = await apiRequest<{ serrures: Serrure[]; refusee?: boolean }>(
       "/api/e2ee/coffre",
     )
+    /*
+     * ⚠️ ON NE FILTRE PLUS SUR L'APPAREIL, et c'est délibéré : savoir si CE
+     * navigateur possède une clé d'accès demande une vérification de
+     * l'utilisateur — Face ID, Windows Hello. On ne va pas la déclencher pour
+     * afficher un écran de réglages.
+     *
+     * L'écran annonce donc combien d'appareils ont posé leur trousseau, ce qui
+     * est vrai, plutôt que « posé ici », ce qu'on ne peut pas savoir sans
+     * demander.
+     */
     return { serrures: r.serrures ?? [], refusee: r.refusee === true }
   } catch {
     /*
@@ -190,8 +200,35 @@ export async function lireCoffre(): Promise<{ serrures: Serrure[]; refusee: bool
   }
 }
 
-async function poserSerrure(serrure: Serrure): Promise<void> {
-  await apiRequest("/api/e2ee/coffre", { method: "PUT", body: serrure })
+/**
+ * Les types de serrure liés à UN APPAREIL.
+ *
+ * 🔴 UN TROUSSEAU APPARTIENT À UN APPAREIL, pas à une personne. Face ID sur le
+ * téléphone et Windows Hello sur le portable sont deux secrets différents, et
+ * les deux doivent ouvrir l'archive. Le mot de passe et la clé de récupération,
+ * eux, suivent la personne.
+ */
+const LIEES_A_L_APPAREIL = new Set<TypeSerrure>(["trousseau"])
+
+/**
+ * Pose une serrure. `appareil` n'est requis que pour celles qui en dépendent.
+ *
+ * 🐛 IL NE VIENT PLUS DE `idAppareil()`, ET C'EST UNE CORRECTION. Ce numéro vit
+ * dans `localStorage`, que la DÉCONNEXION PURGE : au retour, le navigateur
+ * s'en attribuait un nouveau et la serrure posée la veille devenait
+ * introuvable — alors que la clé d'accès, elle, marchait toujours.
+ *
+ * ⚠️ UNE SERRURE SE LIE À CE QUI PEUT L'OUVRIR. Pour le trousseau, c'est
+ * l'identifiant de la clé d'accès, qui survit au vidage du navigateur.
+ */
+async function poserSerrure(serrure: Serrure, appareil = ""): Promise<void> {
+  await apiRequest("/api/e2ee/coffre", {
+    method: "PUT",
+    body: {
+      ...serrure,
+      appareil: LIEES_A_L_APPAREIL.has(serrure.type) ? appareil : "",
+    },
+  })
 }
 
 /** L'archive est-elle en place sur ce compte ? */
@@ -270,6 +307,7 @@ export async function ajouterUneSerrure(
   typeConnu: TypeSerrure,
   nouveauType: TypeSerrure,
   nouveauSecret?: string,
+  appareil = "",
 ): Promise<{ cleRecuperation: string | null }> {
   const serrures = await lireSerrures()
   const connue = serrures.find((s) => s.type === typeConnu)
@@ -284,7 +322,7 @@ export async function ajouterUneSerrure(
   if (!secret) throw new Error("Aucun secret fourni pour la nouvelle serrure.")
 
   const posee = await ajouterSerrure(secretConnu, connue, nouveauType, secret)
-  await poserSerrure(posee)
+  await poserSerrure(posee, appareil)
   return { cleRecuperation }
 }
 
@@ -355,8 +393,8 @@ export async function ajouterTrousseau(
   const moiId = getMyUserId()
   if (!moiId) throw new Error("Session introuvable.")
 
-  const secret = await creerTrousseau({ userId: moiId, nom: moiId })
-  await ajouterUneSerrure(secretConnu, typeConnu, "trousseau", secret)
+  const { secret, identifiant } = await creerTrousseau({ userId: moiId, nom: moiId })
+  await ajouterUneSerrure(secretConnu, typeConnu, "trousseau", secret, identifiant)
 }
 
 /**
@@ -368,9 +406,27 @@ export async function ajouterTrousseau(
  */
 export async function ouvrirParTrousseau(): Promise<boolean> {
   const { ouvrirTrousseau } = await import("./e2ee-trousseau")
-  const secret = await ouvrirTrousseau()
-  if (!secret) return false
-  return ouvrir("trousseau", secret)
+  const reponse = await ouvrirTrousseau()
+  if (!reponse) return false
+
+  /*
+   * ⚠️ ON CHERCHE LA SERRURE DE CETTE CLÉ D'ACCÈS, pas « la » serrure trousseau.
+   * Plusieurs appareils peuvent en avoir posé une ; celle du téléphone n'ouvre
+   * rien depuis le portable, et essayer avec le mauvais secret échouerait sans
+   * qu'on sache pourquoi.
+   */
+  const { serrures } = await lireCoffre()
+  const sienne = serrures.find(
+    (s) =>
+      s.type === "trousseau" &&
+      (s as Serrure & { appareil?: string }).appareil === reponse.identifiant,
+  )
+  if (!sienne) {
+    console.info("[e2ee] cette clé d'accès n'a pas de serrure sur ce compte.")
+    return false
+  }
+
+  return ouvrir("trousseau", reponse.secret, sienne)
 }
 
 /* ══════════════════ OUVRIR ══════════════════ */
@@ -382,9 +438,18 @@ export async function ouvrirParTrousseau(): Promise<boolean> {
  * une quatrième serrure que l'utilisateur n'a pas choisie, ouverte par le seul
  * fait d'avoir accès au navigateur.
  */
-export async function ouvrir(type: TypeSerrure, secret: string): Promise<boolean> {
-  const serrures = await lireSerrures()
-  const serrure = serrures.find((s) => s.type === type)
+export async function ouvrir(
+  type: TypeSerrure,
+  secret: string,
+  /**
+   * ⚠️ LA SERRURE PEUT ÊTRE FOURNIE, et il le faut dès qu'il y en a plusieurs
+   * du même type : le trousseau du téléphone et celui du portable portent tous
+   * deux `type: "trousseau"`. Sans ce paramètre, on prendrait la première
+   * venue et le déchiffrement échouerait sans qu'on sache pourquoi.
+   */
+  serrureChoisie?: Serrure,
+): Promise<boolean> {
+  const serrure = serrureChoisie ?? (await lireSerrures()).find((s) => s.type === type)
   if (!serrure) return false
 
   const propre = type === "recuperation" ? normaliserCleRecuperation(secret) : secret

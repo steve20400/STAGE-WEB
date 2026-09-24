@@ -176,12 +176,25 @@ export async function scenario() {
   titre("⑤ Poser une serrure des mois après")
 
   const NOUVEAU = "un tout nouveau secret de trousseau"
-  await ajouterUneSerrure(MDP, "motdepasse", "trousseau", NOUVEAU)
+  /*
+   * ⚠️ UN TROUSSEAU DOIT DÉSIGNER UN APPAREIL — le serveur le refuse sinon, et
+   * c'est la règle qui permet à plusieurs appareils d'avoir chacun le sien.
+   *
+   * Ici on passe un identifiant arbitraire : sous Node il n'y a pas de clé
+   * d'accès, et ce banc n'éprouve pas WebAuthn — c'est le travail de
+   * `e2ee-trousseau.mjs`, dans un vrai navigateur. Ce qu'on éprouve ici, c'est
+   * qu'une serrure ajoutée PLUS TARD ouvre les blocs écrits AVANT elle.
+   */
+  await ajouterUneSerrure(MDP, "motdepasse", "trousseau", NOUVEAU, "appareil-du-banc")
 
   verifie("trois serrures maintenant", (await lireSerrures()).length === 3)
 
   refermer()
-  verifie("la nouvelle ouvre l'archive", await ouvrir("trousseau", NOUVEAU))
+  const trousseauPose = (await lireSerrures()).find((s) => s.type === "trousseau")
+  verifie(
+    "la nouvelle ouvre l'archive",
+    await ouvrir("trousseau", NOUVEAU, trousseauPose),
+  )
   verifie(
     "et rend les messages écrits AVANT elle",
     (await restaurerTout()).messages.length === 20,
