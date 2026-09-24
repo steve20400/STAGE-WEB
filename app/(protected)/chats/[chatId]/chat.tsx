@@ -7180,17 +7180,37 @@ export default function ChatRoomPage() {
                 fait ouvrir un ticket ; « les groupes ne sont pas couverts »
                 clôt la question sur place.
               */}
+              {/*
+                🐛 PLUS D'`aria-pressed` — signalé par le user le 24/09/2026 :
+                « j'ai l'impression qu'une fois activé il est impossible de le
+                désactiver ».
+
+                C'est exact, et c'est voulu : le chiffrement ne se retire pas.
+                Mais `aria-pressed` annonce un INTERRUPTEUR — un lecteur
+                d'écran disait « bouton, enfoncé », ce qui promet qu'on peut le
+                relâcher. Le fond du défaut n'était pas le comportement :
+                c'était la PROMESSE que faisait le bouton.
+
+                ⚠️ L'ÉTAT PASSE DONC PAR LE LIBELLÉ, qui le dit en toutes
+                lettres — « le chiffrement ne se retire pas » — plutôt que par
+                un attribut qui suggère l'inverse.
+              */}
               {e2ee !== null && (
                 <button
                   className="action-btn"
-                  aria-label={t("e2ee_bouton")}
-                  aria-pressed={e2ee.e2eeActif}
+                  aria-label={
+                    e2ee.e2eeActif
+                      ? peerIdPourCle !== null
+                        ? t("e2ee_actif_definitif_verif")
+                        : t("e2ee_actif_definitif")
+                      : t("e2ee_bouton")
+                  }
                   disabled={e2eeEnCours || (!e2ee.e2eeActif && !e2ee.activable)}
                   title={
                     e2ee.e2eeActif
                       ? peerIdPourCle !== null
-                        ? t("e2ee_verif_ouvrir")
-                        : t("e2ee_actif")
+                        ? t("e2ee_actif_definitif_verif")
+                        : t("e2ee_actif_definitif")
                       : e2ee.motif === "HORS_PERIMETRE"
                         ? t("e2ee_hors_perimetre")
                         : e2ee.motif === "GROUPE_NON_SUPPORTE"

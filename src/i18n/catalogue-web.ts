@@ -44,6 +44,8 @@ export const WEB_TRANSLATION_KEYS = [
   "e2ee_verif_fait",
   "e2ee_verif_limite",
   "e2ee_verif_ouvrir",
+  // Le chiffrement est DEFINITIF : le bouton doit le dire, pas le suggerer.
+  "e2ee_actif_definitif", "e2ee_actif_definitif_verif",
   // La sauvegarde chiffree, dans les Reglages > Securite.
   "e2ee_sauv_titre", "e2ee_sauv_intro", "e2ee_sauv_chargement", "e2ee_sauv_absente",
   "e2ee_sauv_mdp_label", "e2ee_sauv_mdp_place", "e2ee_sauv_mdp_requis",
@@ -1383,6 +1385,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   fr: {
     e2ee_bouton: "Chiffrement de bout en bout",
     e2ee_actif: "Conversation chiffrée de bout en bout",
+    e2ee_actif_definitif: "Chiffrée de bout en bout — le chiffrement ne se retire pas",
+    e2ee_actif_definitif_verif: "Chiffrée de bout en bout — le chiffrement ne se retire pas. Appuyez pour vérifier le code de sécurité.",
     e2ee_activer: "Chiffrer cette conversation de bout en bout",
     e2ee_hors_perimetre: "Le chiffrement ne couvre que les conversations entre deux comptes personnels",
     e2ee_groupe: "Le chiffrement ne couvre pas encore les groupes",
@@ -2774,6 +2778,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   en: {
     e2ee_bouton: "End-to-end encryption",
     e2ee_actif: "Conversation is end-to-end encrypted",
+    e2ee_actif_definitif: "End-to-end encrypted — encryption cannot be removed",
+    e2ee_actif_definitif_verif: "End-to-end encrypted — encryption cannot be removed. Tap to check the security code.",
     e2ee_activer: "Encrypt this conversation end-to-end",
     e2ee_hors_perimetre: "Encryption only covers conversations between two personal accounts",
     e2ee_groupe: "Encryption does not cover groups yet",
@@ -4151,6 +4157,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   es: {
     e2ee_bouton: "Cifrado de extremo a extremo",
     e2ee_actif: "Conversación cifrada de extremo a extremo",
+    e2ee_actif_definitif: "End-to-end encrypted — encryption cannot be removed",
+    e2ee_actif_definitif_verif: "End-to-end encrypted — encryption cannot be removed. Tap to check the security code.",
     e2ee_activer: "Cifrar esta conversación de extremo a extremo",
     e2ee_hors_perimetre: "El cifrado solo cubre conversaciones entre dos cuentas personales",
     e2ee_groupe: "El cifrado aún no cubre los grupos",
@@ -5535,6 +5543,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   de: {
     e2ee_bouton: "Ende-zu-Ende-Verschlüsselung",
     e2ee_actif: "Unterhaltung ist Ende-zu-Ende-verschlüsselt",
+    e2ee_actif_definitif: "End-to-end encrypted — encryption cannot be removed",
+    e2ee_actif_definitif_verif: "End-to-end encrypted — encryption cannot be removed. Tap to check the security code.",
     e2ee_activer: "Diese Unterhaltung Ende-zu-Ende verschlüsseln",
     e2ee_hors_perimetre: "Die Verschlüsselung gilt nur für Unterhaltungen zwischen zwei privaten Konten",
     e2ee_groupe: "Gruppen werden noch nicht verschlüsselt",
@@ -6932,6 +6942,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   pt: {
     e2ee_bouton: "Cifragem de ponta a ponta",
     e2ee_actif: "Conversa cifrada de ponta a ponta",
+    e2ee_actif_definitif: "End-to-end encrypted — encryption cannot be removed",
+    e2ee_actif_definitif_verif: "End-to-end encrypted — encryption cannot be removed. Tap to check the security code.",
     e2ee_activer: "Cifrar esta conversa de ponta a ponta",
     e2ee_hors_perimetre: "A cifragem só cobre conversas entre duas contas pessoais",
     e2ee_groupe: "A cifragem ainda não cobre grupos",
@@ -8316,6 +8328,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   ru: {
     e2ee_bouton: "Сквозное шифрование",
     e2ee_actif: "Переписка защищена сквозным шифрованием",
+    e2ee_actif_definitif: "End-to-end encrypted — encryption cannot be removed",
+    e2ee_actif_definitif_verif: "End-to-end encrypted — encryption cannot be removed. Tap to check the security code.",
     e2ee_activer: "Включить сквозное шифрование для этой переписки",
     e2ee_hors_perimetre: "Шифрование доступно только между двумя личными аккаунтами",
     e2ee_groupe: "Шифрование пока не поддерживает группы",
@@ -9693,6 +9707,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   zh: {
     e2ee_bouton: "端到端加密",
     e2ee_actif: "此对话已端到端加密",
+    e2ee_actif_definitif: "End-to-end encrypted — encryption cannot be removed",
+    e2ee_actif_definitif_verif: "End-to-end encrypted — encryption cannot be removed. Tap to check the security code.",
     e2ee_activer: "为此对话启用端到端加密",
     e2ee_hors_perimetre: "加密仅适用于两个个人账户之间的对话",
     e2ee_groupe: "加密尚不支持群组",
@@ -11028,6 +11044,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   sv: {
     e2ee_bouton: "Totalsträckskryptering",
     e2ee_actif: "Konversationen är totalsträckskrypterad",
+    e2ee_actif_definitif: "End-to-end encrypted — encryption cannot be removed",
+    e2ee_actif_definitif_verif: "End-to-end encrypted — encryption cannot be removed. Tap to check the security code.",
     e2ee_activer: "Kryptera den här konversationen",
     e2ee_hors_perimetre: "Kryptering omfattar endast konversationer mellan två privata konton",
     e2ee_groupe: "Kryptering omfattar ännu inte grupper",
@@ -12407,6 +12425,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
   no: {
     e2ee_bouton: "Ende-til-ende-kryptering",
     e2ee_actif: "Samtalen er ende-til-ende-kryptert",
+    e2ee_actif_definitif: "End-to-end encrypted — encryption cannot be removed",
+    e2ee_actif_definitif_verif: "End-to-end encrypted — encryption cannot be removed. Tap to check the security code.",
     e2ee_activer: "Krypter denne samtalen ende-til-ende",
     e2ee_hors_perimetre: "Kryptering gjelder bare samtaler mellom to personlige kontoer",
     e2ee_groupe: "Kryptering omfatter ennå ikke grupper",
