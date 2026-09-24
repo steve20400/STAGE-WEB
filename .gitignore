@@ -44,3 +44,7 @@ Thumbs.db
 # Claude Code
 .claude/
 scripts/.banc/
+
+# Bancs : dossiers de travail temporaires
+scripts/.interop/
+scripts/.banc-interop/
