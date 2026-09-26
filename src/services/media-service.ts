@@ -6,25 +6,53 @@ export interface UploadedMedia {
   id: string
   /** URL relative proxyfiee par le backend : /api/media/{id} */
   url: string
+  /**
+   * L'adresse FIXE du fichier, quand il est parti dans le bucket ouvert.
+   *
+   * `null` dans tous les autres cas — et c'est le cas normal : la quasi-totalite
+   * des medias reste privee. Ne jamais la lire sans repli sur `url`.
+   */
+  urlPublique?: string | null
   mimeType: string
   sizeBytes: number
   durationMs: number | null
 }
 
 /**
+ * CE QUE CE FICHIER VA SERVIR — ET DONC OU LE SERVEUR VA LE RANGER.
+ *
+ * 🔴 DEUX USAGES SEULEMENT, ET LA LISTE EST CLOSE. Un accueil de repondeur et
+ * une sonnerie sont entendus par TOUS ceux qui appellent : les publier ne
+ * devoile rien qui ne soit deja devoile, et leur adresse devient fixe, donc
+ * mise en cache par le navigateur pendant un an. C'est ce qui permet a l'accueil
+ * de partir a l'instant ou la sonnerie s'arrete.
+ *
+ * ⚠️ RIEN D'AUTRE NE DOIT PORTER D'USAGE. Un message laisse PAR quelqu'un sur
+ * un repondeur est un enregistrement prive ; une photo de discussion aussi. Le
+ * serveur refuse d'ailleurs tout usage qu'il ne connait pas et range en prive —
+ * mais la premiere protection, c'est de ne pas l'ecrire ici.
+ */
+export type UsageMedia = "accueil" | "sonnerie"
+
+/**
  * POST /api/media — upload multipart (champ "file").
  * durationMs est fourni pour l'audio/video (affichage cote destinataire).
+ *
+ * `usage` est OPTIONNEL et le reste : sans lui, le fichier va dans le stockage
+ * prive, ce qui est le bon defaut. Le nommer est un choix, jamais un oubli.
  */
 export async function uploadMedia(
   file: File | Blob,
   filename: string,
-  durationMs?: number
+  durationMs?: number,
+  usage?: UsageMedia
 ): Promise<UploadedMedia> {
   const form = new FormData()
   form.append("file", file, filename)
   if (durationMs && Number.isFinite(durationMs)) {
     form.append("durationMs", String(Math.round(durationMs)))
   }
+  if (usage) form.append("usage", usage)
   return apiRequest<UploadedMedia>("/api/media", { method: "POST", body: form })
 }
 

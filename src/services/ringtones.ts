@@ -449,7 +449,13 @@ export async function importRingtone(file: File): Promise<CustomRingtone> {
     )
   }
 
-  const media = await uploadMedia(file, file.name)
+  /*
+   * ⚠️ `"sonnerie"` ENVOIE CE FICHIER DANS LE BUCKET OUVERT. Une sonnerie
+   * personnalisee est jouee a chaque appel : une adresse fixe, mise en cache,
+   * evite de la retelecharger a chacun. Elle ne revele rien — c'est un son
+   * choisi, pas une conversation.
+   */
+  const media = await uploadMedia(file, file.name, undefined, "sonnerie")
   /*
    * Le nom du fichier sans son extension : c'est ce que l'utilisateur reconnait.
    * Il part ENTIER, la coupe a 80 caracteres appartient au serveur — lui seul sait

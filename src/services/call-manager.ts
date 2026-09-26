@@ -2371,7 +2371,11 @@ async function handleServerEvent(event: CallServerEvent) {
     // n'aurait plus rien à faire.
     repondeurTente = callId
 
-    const accueil = (event.accueil ?? null) as { url?: string } | null
+    const accueil = (event.accueil ?? null) as {
+      url?: string
+      /** L'adresse fixe du bucket ouvert, quand l'accueil y est. Voir `prechargement-accueil`. */
+      urlPublique?: string | null
+    } | null
     if (!accueil?.url) {
       // Sans accueil il n'y a rien à jouer ni à proposer. On termine l'appel
       // comme un appel manqué ordinaire plutôt que d'ouvrir une feuille vide.
@@ -2397,7 +2401,7 @@ async function handleServerEvent(event: CallServerEvent) {
      * clignote et l'on n'a rien entendu. Un plafond, sinon un réseau lent
      * ferait sonner une minute dans le vide pour un appel qui n'aboutira pas.
      */
-    demarrerPrechargement(callId, accueil.url)
+    demarrerPrechargement(callId, accueil.url, accueil.urlPublique)
 
     const nomAffiche = String(event.peerName ?? state.peerName ?? tr("call"))
     const typeAppel = event.callType === "VIDEO" ? "video" : "audio"

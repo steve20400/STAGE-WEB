@@ -21,7 +21,24 @@ import { uploadMedia } from "./media-service"
 /** Le média d'un message d'accueil, tel que le serveur le décrit. */
 export interface AccueilRepondeur {
   id: string
+  /**
+   * LA VOIE SURE : `/api/media/<id>`, meme origine, authentifiee, toujours
+   * fonctionnelle. C'est elle qu'on donne a une balise `<audio>`, et le repli de
+   * tout le reste.
+   */
   url: string
+  /**
+   * LA VOIE RAPIDE : l'adresse fixe du bucket ouvert, ou `null`.
+   *
+   * Aucun jeton, aucune signature, mise en cache par le navigateur pendant un
+   * an — un accueil deja entendu ne se retelecharge pas.
+   *
+   * ⚠️ TOUJOURS AVEC UN REPLI SUR `url`. Elle est absente quand le bucket ouvert
+   * n'est pas configure, et elle peut echouer quand il l'est : un `fetch()` vers
+   * un autre domaine exige des en-tetes CORS sur le bucket. La lire seule ferait
+   * dependre le son d'un reglage de console.
+   */
+  urlPublique?: string | null
   mimeType: string
   durationMs: number | null
   filename: string
@@ -149,7 +166,19 @@ export async function ajouterAccueil(
   libelle: string | null,
   dureeMs?: number,
 ): Promise<EtatRepondeur> {
-  const media = await uploadMedia(fichier, nomFichier, dureeMs)
+  /*
+   * ⚠️ `"accueil"` ENVOIE CE FICHIER DANS LE BUCKET OUVERT. C'est voulu, et ce
+   * n'est pas une fuite : cet enregistrement est destine a etre entendu par
+   * QUICONQUE appelle. Son adresse devient fixe, donc mise en cache par le
+   * navigateur — et l'accueil peut partir a l'instant ou la sonnerie s'arrete,
+   * sans une seule requete.
+   *
+   * 🔴 NE JAMAIS RECOPIER CE TROISIEME ARGUMENT DANS `deposerMessagerie`. Un
+   * message laisse PAR quelqu'un est un enregistrement prive : il reste dans le
+   * bucket ferme, servi par URL signee. C'est la seule frontiere qui rend ce
+   * dispositif acceptable.
+   */
+  const media = await uploadMedia(fichier, nomFichier, dureeMs, "accueil")
   return normaliser(
     await apiRequest<unknown>("/api/repondeur", {
       method: "POST",
@@ -229,6 +258,15 @@ export async function deposerMessagerie(
   video = false,
 ): Promise<void> {
   const nom = `repondeur-${video ? "video-" : ""}${Date.now()}.webm`
+  /*
+   * 🔴 AUCUN `usage` ICI, ET C'EST LE POINT LE PLUS IMPORTANT DU FICHIER.
+   *
+   * Sans quatrieme argument, le fichier part dans le stockage PRIVE, servi par
+   * URL signee. Ce message a ete laisse par quelqu'un pour une seule personne :
+   * le mettre dans le bucket ouvert le rendrait lisible de tout Internet a qui
+   * connait son adresse. L'absence d'argument est la protection — ne la comble
+   * pas en croyant harmoniser avec `ajouterAccueil`.
+   */
   const media = await uploadMedia(enregistrement, nom, dureeMs)
   await apiRequest(`/api/calls/${encodeURIComponent(callId)}/voicemail`, {
     method: "POST",
