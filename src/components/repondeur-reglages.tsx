@@ -550,7 +550,32 @@ export function RepondeurReglages() {
     }
   }
 
-  /** « 14 h 30 » — une heure de fin se vérifie sur une horloge, pas un décompte. */
+  /**
+ * CE QU'UNE PLAGE DIT DANS LA LISTE.
+ *
+ * 🔴 « lundi · 21:00 – 06:00 » SE LIRAIT COMME UNE ERREUR. C'est la forme qu'on
+ * affichait, et elle est illisible dès qu'une plage traverse minuit : on y voit
+ * une fin qui précède son début, sur une seule journée, donc une saisie ratée.
+ *
+ * On nomme donc les DEUX jours : « lundi 21:00 → mardi 06:00 ». Plus rien à
+ * deviner, et personne ne vient demander si c'est un défaut.
+ *
+ * ⚠️ Le modulo referme la semaine : une nuit du dimanche se termine un lundi.
+ */
+function libellePlage(
+  plage: { jour: number; debutMin: number; finMin: number },
+  langue: string,
+): string {
+  const debut = `${nomDuJour(plage.jour, langue)} ${enHeure(plage.debutMin)}`
+  if (plage.finMin > plage.debutMin) {
+    // Plage ordinaire : un seul jour, on ne le répète pas.
+    return `${debut} – ${enHeure(plage.finMin)}`
+  }
+  const lendemain = nomDuJour((plage.jour + 1) % 7, langue)
+  return `${debut} → ${lendemain} ${enHeure(plage.finMin)}`
+}
+
+/** « 14 h 30 » — une heure de fin se vérifie sur une horloge, pas un décompte. */
   const heureFin = (iso: string) =>
     new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
 
@@ -589,10 +614,22 @@ export function RepondeurReglages() {
     }
     const debutMin = enMinutes(debutPlage)
     const finMin = enMinutes(finPlage)
-    // Refusée, pas corrigée en silence : une plage qui finit avant de commencer
-    // ne s'ouvrirait jamais, et personne ne comprendrait pourquoi.
-    if (finMin <= debutMin) {
-      error(t("rep_prog_jour_requis"))
+    /*
+     * 🔴 UNE FIN AVANT LE DÉBUT SIGNIFIE « TRAVERSE MINUIT ».
+     *
+     * 🐛 Ce test disait `finMin <= debutMin` et refusait donc « 21 h → 6 h »,
+     * signalé par le user le 26/09/2026. Une nuit est le cas le plus naturel
+     * qu'on puisse demander à un répondeur, et c'était le seul interdit.
+     *
+     * 🐛 ET IL AFFICHAIT `rep_prog_jour_requis` — « choisissez au moins un jour »
+     * — pour une erreur d'HORAIRE. On cherchait le jour manquant devant un jour
+     * pourtant coché.
+     *
+     * ⚠️ Seule l'égalité reste refusée : `21 h → 21 h` est ambigu — zéro minute,
+     * ou vingt-quatre heures ? Qui veut la journée entière saisit 0 h → 24 h.
+     */
+    if (finMin === debutMin) {
+      error(t("rep_prog_horaire_egal"))
       return
     }
     setOccupe(true)
@@ -758,6 +795,11 @@ export function RepondeurReglages() {
         .rep-jour:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
         .rep-prog-heures { display: flex; gap: 8px; flex-wrap: wrap; }
+        /* L'aide qui n'apparaît QUE si la saisie traverse minuit. Discrète : elle
+           informe, elle n'alerte pas — ce n'est pas une erreur. */
+        .rep-prog-aide {
+          margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: var(--text-muted);
+        }
         .rep-prog-champ {
           flex: 1 1 130px; display: flex; align-items: center; gap: 8px;
           padding: 6px 11px; border-radius: 9px;
@@ -1062,6 +1104,15 @@ export function RepondeurReglages() {
             </label>
           </div>
 
+          {/* ⚠️ SANS CETTE LIGNE, PERSONNE NE DEVINE QU'UNE NUIT EST PERMISE.
+              Deux champs « de » et « à » sur une même journée suggèrent l'inverse,
+              et c'est ce qui a fait croire à un défaut de format. On ne l'affiche
+              que quand la saisie traverse effectivement minuit : une aide
+              permanente devient du décor qu'on ne lit plus. */}
+          {enMinutes(finPlage) < enMinutes(debutPlage) && (
+            <p className="rep-prog-aide">{t("rep_prog_nuit_aide")}</p>
+          )}
+
           {/* L'accueil de la plage. Vide = celui qui sera actif ce jour-là,
               ce qui est le cas courant : on ne veut pas choisir à chaque fois. */}
           {accueils.length > 1 && (
@@ -1098,8 +1149,7 @@ export function RepondeurReglages() {
                   <li key={plage.id} className={`rep-prog-ligne ${morte ? "morte" : ""}`}>
                     <span className="rep-prog-quand">
                       <b>
-                        {nomDuJour(plage.jour, language)} · {enHeure(plage.debutMin)} –{" "}
-                        {enHeure(plage.finMin)}
+                        {libellePlage(plage, language)}
                       </b>
                       {/* ⚠️ LA PÉREMPTION SE DIT, elle ne se cache pas : une
                           ligne qui disparaît laisse croire qu'on ne l'a jamais
