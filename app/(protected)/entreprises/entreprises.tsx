@@ -62,7 +62,17 @@ import "./entreprises-page.css"
 type Liste =
   | { niveau: "types" }
   | { niveau: "entreprises"; type: TypeEntreprise }
-  | { niveau: "recherche" }
+  /**
+   * Une recherche affichée.
+   *
+   * 🔴 `parPays` DISTINGUE DEUX CHOSES QUI PARTAGEAIENT UN SEUL ÉTAT. Saisir
+   * « Cameroun » affiche les entreprises DU PAYS ; saisir « Orange » cherche
+   * dans les raisons sociales. Les deux aboutissaient au même `niveau`, donc on
+   * ne pouvait plus savoir laquelle rejouer quand le filtre change — et rejouer
+   * la mauvaise vide la liste, puisque aucune entreprise ne s'appelle
+   * « Cameroun ».
+   */
+  | { niveau: "recherche"; parPays: boolean }
 
 /** CE QUE MONTRE LE VOLET DROIT, ou `null` quand rien n'est choisi. */
 type Detail =
@@ -113,27 +123,95 @@ export default function EntreprisesPage() {
    */
   const demande = useRef(0)
 
-  const chargerTypes = useCallback(async () => {
-    const mien = ++demande.current
-    setEchec(false)
-    try {
-      const recus = await listerTypes(paysChoisi)
-      if (demande.current !== mien) return
-      setTypes(recus)
-    } catch {
-      if (demande.current !== mien) return
-      // ⚠️ LA LISTE EST VIDÉE, PAS CONSERVÉE. Garder celle d'avant sous un
-      // nouveau filtre afficherait des données qui ne correspondent ni au
-      // filtre demandé ni à ce que dit la base : mieux vaut une erreur visible
-      // qu'une liste plausible et fausse.
-      setTypes([])
-      setEchec(true)
-    }
-  }, [paysChoisi])
+  /*
+   * CE QUE L'ÉCRAN REGARDE, LISIBLE SANS DEVENIR UNE DÉPENDANCE.
+   *
+   * ⚠️ DES `ref`, PAS DES DÉPENDANCES. Mettre `voletGauche` et `requete` dans les
+   * dépendances de l'effet ci-dessous le relancerait à chaque frappe et à chaque
+   * clic — donc rejouerait le pays sans qu'on ait changé de pays. On veut lire
+   * leur valeur COURANTE au moment où le pays change, pas réagir à elles.
+   */
+  const vueCourante = useRef(voletGauche)
+  vueCourante.current = voletGauche
+  const requeteCourante = useRef(requete)
+  requeteCourante.current = requete
 
+  /**
+   * CHANGER DE PAYS REJOUE TOUT CE QUI EST À L'ÉCRAN.
+   *
+   * 🐛 IL NE REJOUAIT QUE LE MENU DE GAUCHE. Signalé par le user le 26/09/2026 :
+   * « on applique un filtre pour un pays et les résultats ne correspondent pas ».
+   *
+   * On regarde les Telecom du Cameroun, on passe au Burkina : le menu de gauche
+   * se mettait à jour, et la liste de droite restait celle du Cameroun. Rien ne
+   * le disait — les deux volets affirmaient deux pays différents à la même
+   * seconde, et celui qu'on lit est celui qui a tort.
+   *
+   * ⚠️ TROIS VUES EN DÉPENDENT, et l'app mobile le disait déjà noir sur blanc
+   * (`entreprises_tab.dart`, `_appliquePays`) : les types, les entreprises du
+   * type ouvert, et la recherche en cours. N'en rafraîchir qu'une laisse les
+   * autres afficher le pays précédent.
+   *
+   * ⚠️ UN SEUL NUMÉRO POUR TOUTE LA SÉQUENCE. En prendre un par requête ferait
+   * qu'un changement de pays en cours de route invaliderait ses propres étapes
+   * suivantes — c'est le défaut que porte encore la version mobile, corrigé là-bas
+   * dans le même lot.
+   */
   useEffect(() => {
-    void chargerTypes()
-  }, [chargerTypes])
+    const mien = ++demande.current
+    void (async () => {
+      setEchec(false)
+
+      // 1. Le menu de gauche.
+      try {
+        const recus = await listerTypes(paysChoisi)
+        if (demande.current !== mien) return
+        setTypes(recus)
+      } catch {
+        if (demande.current !== mien) return
+        /*
+         * ⚠️ LA LISTE EST VIDÉE, PAS CONSERVÉE. Garder celle d'avant sous un
+         * nouveau filtre afficherait des données qui ne correspondent ni au
+         * filtre demandé ni à ce que dit la base : mieux vaut une erreur visible
+         * qu'une liste plausible et fausse.
+         */
+        setTypes([])
+        setEchec(true)
+        return
+      }
+
+      // 2. Ce que montre le volet droit, s'il montre quelque chose.
+      const vue = vueCourante.current
+      if (vue.niveau === "types") return
+
+      setListe(null)
+      try {
+        let recus: Entreprise[]
+        if (vue.niveau === "entreprises") {
+          recus = await entreprisesDuType(vue.type.id, paysChoisi)
+        } else if (vue.parPays) {
+          /*
+           * La liste venait d'un NOM DE PAYS saisi. Le filtre qu'on vient de
+           * changer est le geste le plus récent et le plus délibéré : c'est lui
+           * qui gagne. Rejouer la recherche textuelle « Cameroun » ne trouverait
+           * rien — aucune entreprise ne porte ce nom — et viderait la liste.
+           */
+          if (paysChoisi === null) return
+          recus = await entreprisesDuPays(paysChoisi)
+        } else {
+          const q = requeteCourante.current.trim()
+          if (q === "") return
+          recus = await chercherEntreprises(q, paysChoisi)
+        }
+        if (demande.current !== mien) return
+        setListe(recus)
+      } catch {
+        if (demande.current !== mien) return
+        setListe([])
+        setEchec(true)
+      }
+    })()
+  }, [paysChoisi])
 
   // La liste des pays ne depend ni du type regarde ni du pays courant : une
   // seule fois suffit, et la recharger a chaque changement serait du travail
@@ -235,13 +313,13 @@ export default function EntreprisesPage() {
         // ⚠️ APRÈS L'ATTENTE, PAS AVANT : c'est en revenant qu'on peut être
         // périmé. Contrôler en partant ne contrôle rien.
         if (demande.current !== mien) return
-        setVoletGauche({ niveau: "recherche" })
+        setVoletGauche({ niveau: "recherche", parPays: true })
         setListe(recus)
         return
       }
       const recus = await chercherEntreprises(q, paysChoisi)
       if (demande.current !== mien) return
-      setVoletGauche({ niveau: "recherche" })
+      setVoletGauche({ niveau: "recherche", parPays: false })
       setListe(recus)
     } catch {
       // ⚠️ MÊME UN ÉCHEC DOIT SE TAIRE S'IL EST PÉRIMÉ. Sans ce contrôle, une
