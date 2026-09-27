@@ -49,9 +49,9 @@ import {
   cleAChange,
   estChiffree,
   lireEtatE2ee,
-  releverEtDechiffrer,
   type EtatE2ee,
 } from "../../../../src/services/e2ee-fil"
+import { releverEtRanger } from "../../../../src/services/e2ee-releve"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
   langueSourceDe,
@@ -5534,9 +5534,14 @@ export default function ChatRoomPage() {
        * ⚠️ SEULEMENT SUR UN FIL CHIFFRE, et seulement quand le contenu manque :
        * partout ailleurs la trame porte deja le texte, et relever serait un
        * aller-retour pour rien.
+       *
+       * 🐛 CE CHEMIN NE RANGEAIT RIEN : le texte relevé ici n'allait que dans
+       * l'état de l'écran. Au rechargement suivant, l'enveloppe étant déjà
+       * acquittée, le message redevenait « indisponible ». `releverEtRanger`
+       * range tout — ce fil comme les autres — avant d'acquitter.
        */
       if (!incoming.content && estChiffree(chatId)) {
-        void releverEtDechiffrer().then((clairs) => {
+        void releverEtRanger().then((clairs) => {
           if (cancelled || clairs.size === 0) return
           setMessages((prev) =>
             prev.map((m) => {

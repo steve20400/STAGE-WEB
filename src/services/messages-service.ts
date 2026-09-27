@@ -26,8 +26,8 @@ import {
   estChiffree,
   envoyerChiffre,
   noteEtatChiffrement,
-  releverEtDechiffrer,
 } from "./e2ee-fil"
+import { releverEtRanger } from "./e2ee-releve"
 import { archiver } from "./e2ee-sauvegarde"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
@@ -295,7 +295,9 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
    * l'immense majorité des cas.
    */
   if (estChiffree(chatId)) {
-    const clairs = await releverEtDechiffrer()
+    // ⚠️ `releverEtRanger` et non `releverEtDechiffrer` : ce qui est relevé
+    // pour les AUTRES fils y est rangé aussi — voir `e2ee-releve.ts`.
+    const clairs = await releverEtRanger()
 
     /*
      * 🐛 LES MESSAGES QUE J'AI ÉCRITS REVENAIENT VIDES.
@@ -332,37 +334,18 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
       if (clair === undefined) continue
       m.content = clair
       /*
-       * 🔴 LE DÉCHIFFRÉ EST MIS EN CACHE, ET IL LE FAUT — voir la décision du
-       * 21/09/2026, côté envoi.
+       * ⚠️ PLUS DE MISE EN CACHE NI D'ARCHIVAGE ICI, et c'est voulu.
        *
-       * ⚠️ ICI, CE N'EST MÊME PAS UN CONFORT : l'enveloppe vient d'être
-       * ACQUITTÉE, donc retirée du serveur. Si le clair n'était pas rangé, ce
-       * message serait DÉFINITIVEMENT perdu au prochain rechargement —
-       * personne ne peut le reconstituer, pas même le serveur.
+       * Ce qui vient d'une enveloppe a DÉJÀ été rangé par `releverEtRanger`,
+       * avant l'acquittement — c'est là que se joue sa survie. Ce qui vient du
+       * cache y est déjà, par définition.
+       *
+       * 🐛 L'ARCHIVAGE D'ICI RENVOYAIT LE CACHE À CHAQUE OUVERTURE. La boucle
+       * ne distinguait pas un texte tout juste déchiffré d'un texte relu dans
+       * le cache : ouvrir un fil chiffré ré-archivait ses trente derniers
+       * messages, soit trois blocs de doublons par ouverture — autant de pris
+       * sur la limite de lecture de l'archive côté serveur.
        */
-      void cacheMessage({
-        id: m.id,
-        conversationId: chatId,
-        senderId: m.senderId === "me" ? (myId ?? "") : m.senderId,
-        content: clair,
-        type: toBackendType(m.type),
-        status: "SENT",
-        createdAt: m.timestamp.getTime(),
-      })
-
-      /*
-       * ⚠️ ARCHIVÉ ICI AUSSI, ET C'EST LE CAS QUI COMPTE LE PLUS : l'enveloppe
-       * vient d'être ACQUITTÉE, donc retirée du serveur. Si ce texte n'entre
-       * pas dans l'archive maintenant, il n'existera plus que dans le cache de
-       * CET appareil — et disparaîtra avec lui.
-       */
-      archiver({
-        id: m.id,
-        convId: chatId,
-        expediteurId: m.senderId === "me" ? (myId ?? "") : m.senderId,
-        texte: clair,
-        quand: m.timestamp.getTime(),
-      })
     }
   }
 

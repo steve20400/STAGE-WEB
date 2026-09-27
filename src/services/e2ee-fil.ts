@@ -170,6 +170,16 @@ export async function envoyerChiffre(
 
 /* ══════════════════ RECEVOIR ══════════════════ */
 
+/** Un message relevé et déchiffré, prêt à être rangé dans SON fil. */
+export interface ClairRecu {
+  messageId: string
+  convId: string
+  expediteurId: string
+  texte: string
+  /** Heure du dépôt de l'enveloppe, en millisecondes. */
+  quand: number
+}
+
 /**
  * Relève tout ce qui attend cet appareil et rend le clair, par message.
  *
@@ -180,9 +190,24 @@ export async function envoyerChiffre(
  * ⚠️ UNE ENVELOPPE ILLISIBLE N'ARRÊTE PAS LES AUTRES. Un déchiffrement qui
  * échoue — session perdue, appareil réinstallé — ne doit pas empêcher de lire
  * les messages qui suivent. On la laisse en attente et on continue.
+ *
+ * 🔴 `ranger` PASSE AVANT L'ACQUITTEMENT, et c'est tout son objet.
+ *
+ * 🐛 LA RELÈVE RAMÈNE LES ENVELOPPES DE TOUS LES FILS, et chaque appelant ne
+ * rangeait que le texte du fil qu'il affichait. Le reste était acquitté PUIS
+ * jeté : le serveur ne l'avait plus, la clé du message était consommée par le
+ * cliquet, et le fil concerné affichait « indisponible sur cet appareil ».
+ * Prouvé par `scripts/e2ee-releve-multifil.mjs` le 28/09/2026.
+ *
+ * ⚠️ UN MESSAGE DÉCHIFFRÉ NE SE DÉCHIFFRE PAS DEUX FOIS. Ce n'est donc pas
+ * l'acquittement qui protège le texte — une enveloppe non acquittée serait
+ * illisible au tour suivant —, c'est le rangement. D'où son ordre.
  */
-export async function releverEtDechiffrer(): Promise<Map<string, string>> {
+export async function releverEtDechiffrer(
+  ranger?: (recus: ClairRecu[]) => Promise<void>,
+): Promise<Map<string, string>> {
   const parMessage = new Map<string, string>()
+  const aRanger: ClairRecu[] = []
   let recues: EnveloppeRecue[] = []
   try {
     recues = await relever()
@@ -195,7 +220,16 @@ export async function releverEtDechiffrer(): Promise<Map<string, string>> {
   for (const e of recues) {
     try {
       const clair = await dechiffrer(e)
-      if (e.messageId) parMessage.set(e.messageId, clair)
+      if (e.messageId) {
+        parMessage.set(e.messageId, clair)
+        aRanger.push({
+          messageId: e.messageId,
+          convId: e.convId,
+          expediteurId: e.expediteurId,
+          texte: clair,
+          quand: new Date(e.createdAt).getTime(),
+        })
+      }
       acquittables.push(e.id)
     } catch (err) {
       console.warn(
@@ -205,6 +239,19 @@ export async function releverEtDechiffrer(): Promise<Map<string, string>> {
       )
     }
   }
+
+  if (ranger && aRanger.length > 0) {
+    /*
+     * ⚠️ UN RANGEMENT RATÉ N'EMPÊCHE PAS L'ACQUITTEMENT. Garder l'enveloppe ne
+     * sauverait rien — elle ne se relirait plus — et la laisserait en tête de
+     * file, relevée et refusée à chaque tour. Le texte reste au moins dans ce
+     * que rend la fonction, pour l'écran.
+     */
+    await ranger(aRanger).catch((err) => {
+      console.warn("[e2ee] rangement des messages relevés impossible :", err)
+    })
+  }
+
   await acquitter(acquittables).catch(() => undefined)
   return parMessage
 }
