@@ -185,6 +185,32 @@ export default function EntreprisesPage() {
   const lancerRecherche = useCallback(async () => {
     const q = requete.trim()
     if (q === "") return
+
+    /*
+     * 🔴 CE CHEMIN ÉCRIVAIT SANS GARDE, ET IL EST LE PLUS EXPOSÉ DES TROIS.
+     *
+     * 🐛 Signalé par le user le 26/09/2026 : « les résultats qui s'affichent ne
+     * correspondent pas exactement ». Trois chemins écrivent dans `liste` —
+     * `listerTypes`, `entreprisesDuType` et celui-ci. Les deux premiers prenaient
+     * un numéro de demande ; celui-ci écrivait ce qui revenait, quand ça revenait.
+     *
+     * Or c'est LUI qu'on déclenche en tapant, donc lui qui lance le plus de
+     * requêtes concurrentes. Taper « Ban » puis « Banque » lance deux recherches :
+     * si la première met plus longtemps, elle écrase la seconde. L'écran affiche
+     * alors le résultat d'une requête que l'utilisateur a déjà remplacée — et rien
+     * ne le signale, puisque les deux réponses sont valides.
+     *
+     * ⚠️ IL RACE AUSSI AVEC L'EFFET DU PAYS. Quand la saisie reconnaît un nom de
+     * pays, on appelle `setPaysChoisi`, ce qui réveille l'effet qui recharge les
+     * types — lequel prend un numéro. Sans numéro ici, les deux écrivaient dans
+     * le même état sans arbitre.
+     *
+     * L'app mobile règle le même problème autrement (`entreprises_tab.dart` :
+     * elle compare le texte courant à celui qu'elle a envoyé). Le résultat est
+     * équivalent ; on garde le numéro de demande, déjà en place dans ce fichier —
+     * deux mécanismes concurrents pour un même but se contrediraient un jour.
+     */
+    const mien = ++demande.current
     setListe(null)
     setDetail(null)
 
@@ -205,13 +231,23 @@ export default function EntreprisesPage() {
     try {
       if (paysTrouve) {
         setPaysChoisi(paysTrouve.idPays)
+        const recus = await entreprisesDuPays(paysTrouve.idPays)
+        // ⚠️ APRÈS L'ATTENTE, PAS AVANT : c'est en revenant qu'on peut être
+        // périmé. Contrôler en partant ne contrôle rien.
+        if (demande.current !== mien) return
         setVoletGauche({ niveau: "recherche" })
-        setListe(await entreprisesDuPays(paysTrouve.idPays))
+        setListe(recus)
         return
       }
+      const recus = await chercherEntreprises(q, paysChoisi)
+      if (demande.current !== mien) return
       setVoletGauche({ niveau: "recherche" })
-      setListe(await chercherEntreprises(q, paysChoisi))
+      setListe(recus)
     } catch {
+      // ⚠️ MÊME UN ÉCHEC DOIT SE TAIRE S'IL EST PÉRIMÉ. Sans ce contrôle, une
+      // recherche abandonnée qui échoue afficherait « échec » par-dessus les
+      // résultats valides de la suivante.
+      if (demande.current !== mien) return
       setListe([])
       setEchec(true)
     }
