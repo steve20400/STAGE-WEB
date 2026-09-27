@@ -4776,6 +4776,37 @@ function MessageBubble({
                     <LocationCard content={msg.content ?? null} isMe={isMe} />
                   )}
 
+                  {/*
+                    🔴 UNE BULLE CHIFFREE SANS TEXTE DOIT DIRE POURQUOI.
+                    Elle n'affichait RIEN : ni texte, ni explication. Une
+                    conversation entiere se lisait comme une colonne d'heures
+                    sans un mot, et rien ne distinguait « je n'ai pas la cle »
+                    d'un defaut d'affichage.
+
+                    ⚠️ C'EST UN ETAT LEGITIME, PAS UNE PANNE : le texte d'un
+                    message chiffre ne vit que chez les appareils a qui une
+                    enveloppe etait adressee, plus l'archive. Un navigateur
+                    ouvert apres coup n'a ni l'une ni l'autre pour l'historique.
+
+                    ⚠️ LE MOBILE LE DIT DEJA. Deux clients qui se taisent
+                    differemment sur la meme situation, c'est deux produits.
+                  */}
+                  {!msg.isDeleted &&
+                    !msg.content &&
+                    msg.type === "text" &&
+                    estChiffree(conversationId) && (
+                      <span
+                        style={{
+                          display: "block",
+                          fontStyle: "italic",
+                          opacity: 0.75,
+                          fontSize: "0.86em",
+                        }}
+                      >
+                        {t("e2ee_indisponible")}
+                      </span>
+                    )}
+
                   {/* Legende du media : elle accompagne aussi les documents et les
                     audios, sinon le texte saisi au moment de l'envoi serait perdu
                     a l'affichage. */}
