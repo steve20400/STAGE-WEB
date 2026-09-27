@@ -269,6 +269,60 @@ export async function ouvrirArchive(secret: string, serrure: Serrure): Promise<C
   return desenvelopper(secret, serrure, false)
 }
 
+/**
+ * Les réglages d'une serrure servis par le serveur — mais seulement s'ils sont
+ * ceux que NOUS aurions écrits.
+ *
+ * 🔴 LE CLIENT OBÉISSAIT AU SERVEUR SUR LA DÉRIVATION. `algo` et `parametres`
+ * sont écrits par nous à la pose, mais RELUS TELS QUELS à l'ouverture. Un
+ * serveur hostile — ou une base modifiée — pouvait donc choisir la fonction
+ * de dérivation que le navigateur allait exécuter.
+ *
+ * ⚠️ CE N'EST PAS UNE DIVULGATION DE CLÉ, ET IL FAUT le dire honnêtement : le
+ * paquet reste chiffré sous la vraie KEK, et de mauvais paramètres donnent une
+ * mauvaise clé, donc un échec d'authentification. Ce qu'on évite ici, c'est
+ * autre chose :
+ *
+ *   ① le DENI DE SERVICE — `memoireKio: 4000000` demande quatre gigaoctets à
+ *     Argon2id, et l'onglet tombe ;
+ *   ② le DÉCLASSEMENT À VENIR — le jour où un algorithme plus faible sera
+ *     accepté pour lire d'anciennes serrures, le serveur pourra le RÉCLAMER.
+ *
+ * 🔴 ON NE FAIT JAMAIS TOURNER UNE FONCTION DE DÉRIVATION DONT UN TIERS CHOISIT
+ * LES PARAMÈTRES. La règle vaut même quand on ne voit pas d'attaque : c'est
+ * l'attaque qu'on ne voit pas qui la rend utile.
+ *
+ * ⚠️ ON COMPARE AUX RÉGLAGES DU TYPE, pas à une liste séparée : `REGLAGES`
+ * est déjà la vérité à la pose. Deux listes divergeraient.
+ */
+function reglagesSurs(
+  type: TypeSerrure,
+  algo: string,
+  parametres: unknown,
+): Record<string, number> {
+  const attendu = REGLAGES[type]
+  if (algo !== attendu.algo) {
+    throw new Error(
+      `Serrure refusée : le serveur annonce « ${algo} » là où cette serrure ` +
+        `s'écrit en « ${attendu.algo} ».`,
+    )
+  }
+  const recu = parametres as Record<string, number>
+  const cles = Object.keys(attendu.parametres)
+  const memes =
+    recu !== null &&
+    typeof recu === "object" &&
+    Object.keys(recu).length === cles.length &&
+    cles.every((c) => recu[c] === attendu.parametres[c])
+  if (!memes) {
+    throw new Error(
+      "Serrure refusée : les paramètres de dérivation ne sont pas ceux " +
+        "attendus pour ce type de serrure.",
+    )
+  }
+  return attendu.parametres
+}
+
 async function desenvelopper(
   secret: string,
   serrure: Serrure,
@@ -278,7 +332,11 @@ async function desenvelopper(
     secret,
     depuisB64(serrure.sel),
     serrure.algo,
-    JSON.parse(serrure.parametres) as Record<string, number>,
+    reglagesSurs(
+      serrure.type,
+      serrure.algo,
+      JSON.parse(serrure.parametres) as unknown,
+    ),
   )
   return crypto.subtle.unwrapKey(
     "raw",

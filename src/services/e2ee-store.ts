@@ -51,15 +51,61 @@ import {
  * Un avertissement que personne ne lit ne protège de rien : c'est l'écran qui
  * doit le dire, à l'endroit où la conversation se tient.
  *
- * ⚠️ EN MÉMOIRE, PAS DANS LE COFFRE : l'avertissement porte sur CETTE session.
- * Le ranger ferait réapparaître à chaque ouverture une alerte déjà vue et déjà
- * jugée — et une alerte qui se répète cesse d'être lue.
+ * 🔴 IL VIT DANS LE COFFRE, ET NON PLUS EN MÉMOIRE. Il l'a été, avec cette
+ * justification : « le ranger ferait réapparaître à chaque ouverture une alerte
+ * déjà vue, et une alerte qui se répète cesse d'être lue ».
+ *
+ * La crainte était juste. Le remède, non — il en créait un pire.
+ *
+ * ⚠️ `isTrustedIdentity` REND TOUJOURS `true` : au moment où l'on détecte le
+ * changement, la nouvelle clé est DÉJÀ RANGÉE. Plus rien ne pourra le
+ * redétecter ensuite. Un onglet fermé avant d'avoir ouvert la conversation, et
+ * l'avertissement était perdu POUR TOUJOURS.
+ *
+ * 🔴 UNE SUBSTITUTION DE CLÉ RÉUSSIE POUVAIT DONC PASSER INAPERÇUE — il
+ * suffisait d'un rechargement de page. C'est le seul signal capable de révéler
+ * une interposition ; le perdre, c'est perdre la seule défense.
+ *
+ * ⚠️ LES DEUX PROPRIÉTÉS SE TIENNENT ENSEMBLE, et c'est l'accusé de lecture
+ * qui les concilie : l'alerte PERSISTE tant qu'elle n'a pas été vue, et
+ * disparaît DÉFINITIVEMENT une fois vue. Elle ne se répète jamais, et ne se
+ * perd jamais. Le `Set` en mémoire n'offrait que la première moitié.
  */
-const clesChangees = new Set<string>()
+const PREFIXE_CHANGEE = "cle-changee."
 
-/** Les correspondants dont la clé a changé pendant cette session. */
+/** Les correspondants dont la clé a changé et dont l'alerte n'a pas été vue. */
 export function identitesChangees(): string[] {
-  return [...clesChangees]
+  /*
+   * ⚠️ LECTURE SYNCHRONE, ET IL LE FAUT : `cleAChange()` est appelée pendant
+   * le rendu de la conversation. Le coffre garde ses valeurs en mémoire et
+   * n'écrit sur le disque qu'en arrière-plan, donc la persistance ne coûte
+   * rien ici.
+   */
+  return clesSecrets()
+    .filter((c) => c.startsWith(PREFIXE_CHANGEE))
+    .map((c) => c.slice(PREFIXE_CHANGEE.length))
+}
+
+/** Note qu'une clé a changé, de façon à ce que le redémarrage ne l'efface pas. */
+function noterChangement(adresse: string): void {
+  /*
+   * 🔴 ON RANGE LE COMPTE, PAS L'APPAREIL. L'adresse Signal s'écrit
+   * `compte.appareil` ; l'écran, lui, interroge `cleAChange(peerId)` avec le
+   * seul compte. Ranger l'adresse complète posait une alerte que PERSONNE
+   * n'aurait jamais lue — et le numéro d'appareil ne signifie rien pour la
+   * personne à qui on parle.
+   *
+   * ⚠️ LA NORMALISATION VIT ICI, pas chez les appelants : il y en a deux, et
+   * l'un d'eux l'oubliait déjà.
+   */
+  const identifiant = adresse.split(".")[0]
+  /*
+   * ⚠️ ON N'ÉCRASE PAS UNE ALERTE DÉJÀ POSÉE. Deux changements de suite sans
+   * que personne n'ait rien vu, ce n'est pas deux alertes : c'est la même, et
+   * c'est sa PREMIÈRE date qui renseigne.
+   */
+  const cle = PREFIXE_CHANGEE + identifiant
+  if (lireSecret<number>(cle) === undefined) ecrireSecret(cle, Date.now())
 }
 
 /**
@@ -67,10 +113,10 @@ export function identitesChangees(): string[] {
  *
  * ⚠️ CELA NE VALIDE RIEN. Rien ici ne dit que la nouvelle clé est la bonne :
  * seul un code de sécurité comparé de vive voix le dirait. On note seulement
- * que l'avertissement a été vu.
+ * que l'avertissement a été vu — et cette fois la note survit à la fermeture.
  */
 export function oublierAvertissement(identifiant: string): void {
-  clesChangees.delete(identifiant)
+  effacerSecret(PREFIXE_CHANGEE + identifiant)
 }
 
 /* ══════════════════ SÉRIALISATION ══════════════════
@@ -202,7 +248,7 @@ export class CoffreE2ee implements StorageType {
        * compte : c'est de la personne qu'on veut parler à l'écran, pas de
        * l'un de ses appareils, dont le numéro ne signifie rien pour elle.
        */
-      clesChangees.add(identifiant.split(".")[0])
+      noterChangement(identifiant)
       console.warn(
         `[e2ee] ⚠️ la clé d'identité de ${identifiant} a CHANGÉ. ` +
           "Réinstallation du correspondant, ou interception : seul un code de " +
@@ -214,9 +260,17 @@ export class CoffreE2ee implements StorageType {
 
   async saveIdentity(identifiant: string, cle: ArrayBuffer): Promise<boolean> {
     const avant = lire<string>(`identite.${identifiant}`)
-    ecrire(`identite.${identifiant}`, versB64(cle))
+    const apres = versB64(cle)
+    ecrire(`identite.${identifiant}`, apres)
+    const change = avant !== undefined && avant !== apres
+    /*
+     * 🔴 C'EST ICI, ET NULLE PART AILLEURS, QUE LE CHANGEMENT EST VISIBLE. Une
+     * ligne plus haut, l'ancienne clé vient d'être écrasée : ne pas le noter
+     * maintenant, c'est ne plus jamais pouvoir le savoir.
+     */
+    if (change) noterChangement(identifiant)
     // `true` = l'identité a changé ; la bibliothèque s'en sert pour signaler.
-    return avant !== undefined && avant !== versB64(cle)
+    return change
   }
 
   async loadIdentityKey(identifiant: string): Promise<ArrayBuffer | undefined> {
