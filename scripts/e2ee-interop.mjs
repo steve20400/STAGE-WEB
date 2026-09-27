@@ -162,6 +162,28 @@ async function main() {
   /* ── ④ LE WEB DÉCHIFFRE LA RÉPONSE ───────────────────────────────── */
   titre("④ Le WEB déchiffre la réponse du mobile");
 
+  /*
+   * 🔴 LE TYPE SUR LE FIL, AVANT LE CONTENU — ET CE CONTRÔLE MANQUAIT.
+   *
+   * 🐛 Les deux bibliothèques ne numérotent pas pareil : Dart met 2 pour un
+   * message ordinaire, TypeScript et le serveur attendent 1. Ce banc ne
+   * REGARDAIT PAS `reponseType` : il passait le corps directement au
+   * déchiffreur, qui devine. La divergence a donc traversé le banc d'interopé-
+   * rabilité sans être vue, et seul le vrai serveur l'a refusée — avec un 400
+   * sur CHAQUE message après le premier.
+   *
+   * ⚠️ UN BANC QUI IGNORE UN CHAMP NE PROUVE RIEN SUR CE CHAMP. Deviner à la
+   * place du serveur, c'est éprouver une indulgence que la production n'a pas.
+   *
+   * Les valeurs admises sont celles du serveur (`enveloppes/route.ts`) :
+   * 3 ouvre la session, 1 la poursuit. 2 n'existe pas sur ce fil.
+   */
+  verifie(
+    "le type annoncé par le mobile est accepté par le serveur (1 ou 3)",
+    retour.reponseType === 1 || retour.reponseType === 3,
+    `reçu : ${retour.reponseType}`,
+  );
+
   const lu = await web.aliceDechiffre(alice.chiffreur, retour.reponseCorps);
 
   /* 🔴 L'AUTRE MOITIÉ — et elle compte autant : un protocole qui ne marche que

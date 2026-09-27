@@ -222,6 +222,69 @@ export async function scenario() {
   verifie("ni la clé de récupération", !dehors.includes(RECUP))
   verifie("ni le secret du trousseau", !dehors.includes(TROUSSEAU))
 
+  /* ── ⑨ LE SERVEUR NE CHOISIT PAS LA DÉRIVATION ──────────────────── */
+  titre("⑨ Le serveur ne choisit pas la fonction de dérivation")
+
+  /*
+   * 🔴 `algo` ET `parametres` ARRIVENT DU SERVEUR. Ils sont écrits par nous à
+   * la pose, mais relus à l'ouverture — et une base modifiée peut donc dicter
+   * au navigateur la fonction qu'il va exécuter.
+   *
+   * ⚠️ LE DANGER N'EST PAS LA DIVULGATION mais le déni de service (demander
+   * quatre gigaoctets à Argon2id) et le déclassement à venir. On refuse tout
+   * ce qui n'est pas exactement ce qu'on aurait écrit.
+   */
+  /*
+   * ⚠️ UNE ARCHIVE NEUVE, ET NON `serrures` : à ce stade du banc, ce tableau a
+   * déjà servi à des scénarios qui l'ont modifié. Repartir de lui faisait
+   * échouer l'ouverture pour une raison SANS RAPPORT avec ce qu'on éprouve —
+   * et les trois refus auraient été comptés justes pour une mauvaise raison.
+   *
+   * 🔴 UN BANC QUI PASSE POUR LA MAUVAISE RAISON EST PIRE QU'UN BANC QUI
+   * ÉCHOUE : il donne de la confiance sans rien prouver.
+   */
+  const neuf = await creerArchive({ motdepasse: MDP })
+  const serrureMdp = neuf.serrures.find((s) => s.type === "motdepasse")
+
+  verifie(
+    "la serrure témoin s'ouvre AVANT qu'on y touche",
+    (await ouvrirArchive(MDP, serrureMdp)) !== undefined,
+    "sans cela, les refus qui suivent ne prouveraient rien",
+  )
+
+  const affaiblie = {
+    ...serrureMdp,
+    parametres: JSON.stringify({ memoireKio: 8, passes: 1, parallelisme: 1 }),
+  }
+  verifie(
+    "des paramètres affaiblis sont REFUSÉS",
+    await leve(() => ouvrirArchive(MDP, affaiblie)),
+    "sans ce contrôle, le serveur décidait du coût de la dérivation",
+  )
+
+  const enorme = {
+    ...serrureMdp,
+    parametres: JSON.stringify({ memoireKio: 4000000, passes: 3, parallelisme: 1 }),
+  }
+  verifie(
+    "une demande de quatre gigaoctets est REFUSÉE avant d'être tentée",
+    await leve(() => ouvrirArchive(MDP, enorme)),
+    "l'onglet tombait au lieu de refuser",
+  )
+
+  const autreAlgo = { ...serrureMdp, algo: "pbkdf2-sha256" }
+  verifie(
+    "un algorithme substitué est REFUSÉ",
+    await leve(() => ouvrirArchive(MDP, autreAlgo)),
+    "c'est le déclassement : une serrure forte relue en faible",
+  )
+
+  verifie(
+    "et la serrure intacte ouvre toujours",
+    (await ouvrirArchive(MDP, serrureMdp)) !== undefined,
+    "un contrôle qui refuse tout ne prouve rien",
+  )
+
   console.log(
     `\n\x1b[1m════ ${echecs === 0 ? "\x1b[32mTOUT EST VERT" : `\x1b[31m${echecs} ÉCHEC(S)`}\x1b[0m\x1b[1m ════\x1b[0m\n`,
   )
