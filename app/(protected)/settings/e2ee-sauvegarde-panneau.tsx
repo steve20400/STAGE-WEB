@@ -346,16 +346,24 @@ export function E2eeSauvegardePanneau() {
                 {t("e2ee_sauv_poser_trousseau")}
               </button>
             )}
-            {!types.includes("recuperation") && (
-              <button
-                type="button"
-                className="sauv-btn"
-                disabled={occupe || !secretSaisi}
-                onClick={() => void nouvelleCleRecuperation()}
-              >
-                {t("e2ee_sauv_nouvelle_cle")}
-              </button>
-            )}
+            {/*
+              ⚠️ « REMPLACER » EXISTE POUR LES CLÉS DE 60 BITS. Jusqu'au
+              28/09/2026, une clé de récupération valait 12 mots parmi 32 ;
+              elle en vaut désormais 12 parmi 2 048. Sans ce bouton, une
+              personne qui en avait déjà une ne pouvait pas la renforcer.
+              Même geste que la création : le serveur REMPLACE la serrure
+              (`upsert` sur compte + type), l'ancienne clé cesse d'ouvrir.
+            */}
+            <button
+              type="button"
+              className="sauv-btn"
+              disabled={occupe || !secretSaisi}
+              onClick={() => void nouvelleCleRecuperation()}
+            >
+              {types.includes("recuperation")
+                ? t("e2ee_sauv_renouveler_cle")
+                : t("e2ee_sauv_nouvelle_cle")}
+            </button>
           </div>
 
           {restaure && (

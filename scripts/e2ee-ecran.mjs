@@ -227,6 +227,7 @@ async function main() {
   const champVisible = await champ.isVisible().catch(() => false);
   verifie("le champ du secret est là", champVisible);
 
+  let premiereCle = [];
   if (champVisible) {
     await champ.fill(motDePasse);
     await page.getByRole("button", { name: /Créer une clé de récupération/i }).click();
@@ -247,6 +248,8 @@ async function main() {
 
     if (cleVisible) {
       const mots = await page.locator(".sauv-cle-mots span").count();
+      // Relevée ICI, pendant qu’elle est affichée : l’étape ④ la compare à la suivante.
+      premiereCle = await page.locator(".sauv-cle-mots span").allInnerTexts();
       verifie("douze mots, tous affichés", mots === 12, `${mots} mot(s)`);
 
       /*
@@ -276,6 +279,36 @@ async function main() {
         (await page.locator(".sauv-cle").count()) === 0,
         "la clé reste affichée après avoir été notée",
       );
+
+      /* ── ④ REMPLACER LA CLÉ ─────────────────────────────────────────── */
+      titre("④ Remplacer une clé existante");
+      /*
+       * Les clés remises avant le 28/09/2026 valaient 60 bits (12 mots parmi
+       * 32). Sans ce bouton, leurs titulaires ne pouvaient pas les renforcer.
+       */
+      const u2 = await prisma.user.findUnique({ where: { email: "ecran@e2ee.test" } });
+      const selAvant = (
+        await prisma.e2eeSerrure.findFirst({ where: { userId: u2.id, type: "recuperation" } })
+      )?.sel;
+      const remplacer = page.getByRole("button", { name: /Remplacer ma clé de récupération/i });
+      verifie("le bouton « Remplacer » est proposé", await remplacer.isVisible().catch(() => false));
+      await champ.fill(motDePasse);
+      await remplacer.click();
+      await page.getByText("Votre clé de récupération").first().waitFor({ timeout: 20000 }).catch(() => {});
+      const neuve = await page.locator(".sauv-cle-mots span").allInnerTexts().catch(() => []);
+      verifie("une nouvelle clé de douze mots s'affiche", neuve.length === 12, `${neuve.length} mot(s)`);
+      verifie(
+        "différente de la précédente",
+        premiereCle.length === 12 && neuve.join(" ") !== premiereCle.join(" "),
+        `première : ${premiereCle.length} mot(s)`,
+      );
+      const recups = await prisma.e2eeSerrure.findMany({ where: { userId: u2.id, type: "recuperation" } });
+      verifie(
+        "toujours UNE serrure de récupération, refaite (l'ancienne clé n'ouvre plus)",
+        recups.length === 1 && recups[0].sel !== selAvant,
+        `${recups.length} serrure(s), sel ${recups[0]?.sel === selAvant ? "inchangé" : "neuf"}`,
+      );
+      await page.getByRole("button", { name: /Je l'ai notée/i }).click().catch(() => {});
     }
   }
   await navigateur.close();
