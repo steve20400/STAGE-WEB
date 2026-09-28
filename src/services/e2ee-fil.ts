@@ -4,6 +4,7 @@ import { identitesChangees as identitesChangeesInternes } from "./e2ee-store"
 import { ouvrirCoffre } from "./coffre-chiffre"
 import {
   chiffrerPour,
+  idAppareil,
   dechiffrer,
   deposer,
   ouvrirSessions,
@@ -166,6 +167,32 @@ export async function envoyerChiffre(
 
   // 2. Les enveloppes, rattachées à cette ligne.
   const enveloppes = await chiffrerPour(destinataireId, devices, texte)
+
+  /*
+   * 3. Et une pour chacun de MES AUTRES appareils.
+   *
+   * 🐛 ON NE CHIFFRAIT QUE POUR LE CORRESPONDANT. Un message écrit depuis ce
+   * navigateur n'arrivait jamais sur le téléphone du même compte — sauf plus
+   * tard, par l'archive, si elle était ouverte là-bas. Prouvé par l'étape ⑩ de
+   * `scripts/e2ee-releve-multifil.mjs` (0 enveloppe vers l'autre appareil).
+   *
+   * ⚠️ CET appareil est exclu : il a déjà le texte, et s'ouvrir une session
+   * vers lui-même consommerait une de ses pré-clés pour rien.
+   *
+   * ⚠️ UN ÉCHEC ICI N'EMPÊCHE PAS L'ENVOI. Le correspondant doit recevoir son
+   * message même si mon autre appareil est injoignable ; celui-ci le
+   * rattrapera par l'archive.
+   */
+  const moi = getMyUserId()
+  if (moi && moi !== destinataireId) {
+    try {
+      const miens = await ouvrirSessions(moi, idAppareil())
+      if (miens.length > 0) enveloppes.push(...(await chiffrerPour(moi, miens, texte)))
+    } catch (err) {
+      console.warn("[e2ee] copie vers mes autres appareils impossible :", err)
+    }
+  }
+
   await deposer(convId, enveloppes, message.id)
 
   return message

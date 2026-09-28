@@ -11,7 +11,7 @@ import {
   ouvrirArchive,
   tirerCleRecuperation,
 } from "../src/services/e2ee-serrures"
-import { chiffrerBloc, dechiffrerBloc } from "../src/services/e2ee-archive"
+import { chiffrerBloc, dechiffrerBloc, restaurer } from "../src/services/e2ee-archive"
 import { MOTS_RECUPERATION } from "../src/services/mots-recuperation"
 
 let echecs = 0
@@ -324,6 +324,41 @@ export async function scenario() {
     (await ouvrirArchive(MDP, serrureMdp)) !== undefined,
     "un contrôle qui refuse tout ne prouve rien",
   )
+
+  titre("⑩ Une archive de plus de 2 000 blocs se restaure en entier")
+  /*
+   * Le serveur rend 2 000 blocs par page et donne `suivant` quand il en
+   * reste. On ne lisait que la première page : les messages les plus RÉCENTS
+   * manquaient. Ici, un faux serveur rend 2 100 blocs réellement chiffrés,
+   * en deux pages — comme la route réelle, prouvée par le banc backend ⑧.
+   */
+  const { maitresse: cleGrande } = await creerArchive({ trousseau: "secret-grande-archive" })
+  const grands = []
+  for (let i = 0; i < 2100; i++) {
+    grands.push(
+      await chiffrerBloc(cleGrande, [
+        { id: `m-${i}`, convId: "c", expediteurId: "e", texte: `t${i}`, quand: i },
+      ]),
+    )
+  }
+  const fetchReel = globalThis.fetch
+  let appels = 0
+  globalThis.fetch = async (url) => {
+    appels++
+    const apres = new URL(String(url), "http://x").searchParams.get("apres")
+    const debut = apres === null ? 0 : Number(apres) + 1
+    const page = grands.slice(debut, debut + 2000)
+    const suivant = page.length === 2000 ? String(debut + 1999) : null
+    return new Response(JSON.stringify({ blocs: page, total: page.length, suivant }), { status: 200 })
+  }
+  try {
+    const r = await restaurer(cleGrande)
+    verifie("les 2 100 messages sont restaurés", r.messages.length === 2100, `${r.messages.length}`)
+    verifie("le plus récent compris", r.messages.at(-1)?.texte === "t2099", r.messages.at(-1)?.texte)
+    verifie("en suivant les pages (2 appels)", appels === 2, `${appels} appel(s)`)
+  } finally {
+    globalThis.fetch = fetchReel
+  }
 
   console.log(
     `\n\x1b[1m════ ${echecs === 0 ? "\x1b[32mTOUT EST VERT" : `\x1b[31m${echecs} ÉCHEC(S)`}\x1b[0m\x1b[1m ════\x1b[0m\n`,

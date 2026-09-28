@@ -188,8 +188,25 @@ export async function deposerBloc(
 export async function restaurer(
   maitresse: CryptoKey,
 ): Promise<{ messages: MessageArchive[]; blocsIllisibles: number }> {
-  const reponse = await apiRequest<{ blocs: BlocChiffre[] }>("/api/e2ee/archive")
-  const blocs = reponse.blocs ?? []
+  /*
+   * ⚠️ PAGE PAR PAGE, JUSQU'AU BOUT. Le serveur rend au plus 2 000 blocs par
+   * appel et donne `suivant` quand il en reste. On ne lisait que la première
+   * page : au-delà de 20 000 messages, les plus RÉCENTS manquaient à la
+   * restauration, en silence.
+   *
+   * ⚠️ UN PLAFOND DE TOURS, par prudence : un serveur qui rendrait toujours le
+   * même `suivant` ferait tourner la boucle sans fin. 50 pages = 100 000 blocs.
+   */
+  const blocs: BlocChiffre[] = []
+  let suivant: string | null = null
+  for (let tour = 0; tour < 50; tour++) {
+    const reponse: { blocs?: BlocChiffre[]; suivant?: string | null } = await apiRequest(
+      `/api/e2ee/archive${suivant ? `?apres=${encodeURIComponent(suivant)}` : ""}`,
+    )
+    blocs.push(...(reponse.blocs ?? []))
+    suivant = reponse.suivant ?? null
+    if (!suivant) break
+  }
 
   const messages: MessageArchive[] = []
   let blocsIllisibles = 0

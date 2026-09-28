@@ -382,8 +382,8 @@ interface PaquetRecu {
  * ⚠️ C'EST GRATUIT QUAND C'EST DÉJÀ FAIT : `ouvrirCoffre()` rend la MÊME
  * promesse à tous ses appelants. Le coût est un `await` déjà résolu.
  */
-export async function ouvrirSessions(userId: string): Promise<number[]> {
-  const devices = await ouvrirSessionsInterne(userId)
+export async function ouvrirSessions(userId: string, exclure?: number): Promise<number[]> {
+  const devices = await ouvrirSessionsInterne(userId, exclure)
   /*
    * ⚠️ L'ENTRETIEN SE FAIT ICI, ET APRÈS COUP.
    *
@@ -425,7 +425,7 @@ export async function ouvrirSessions(userId: string): Promise<number[]> {
  * ⚠️ SERVEUR ANTÉRIEUR : il ignore `?liste=1` et rend directement des
  * paquets. On les traite alors comme avant, plutôt que de ne rien envoyer.
  */
-async function ouvrirSessionsInterne(userId: string): Promise<number[]> {
+async function ouvrirSessionsInterne(userId: string, exclure?: number): Promise<number[]> {
   await ouvrirCoffre()
   const base = `/api/e2ee/cles/${encodeURIComponent(userId)}`
   const liste = await apiRequest<{
@@ -433,11 +433,22 @@ async function ouvrirSessionsInterne(userId: string): Promise<number[]> {
     paquets?: PaquetRecu[]
   }>(`${base}?liste=1`)
 
-  if (!liste.appareils) return ouvrirDepuisPaquets(userId, liste.paquets ?? [])
+  if (!liste.appareils) {
+    return ouvrirDepuisPaquets(
+      userId,
+      (liste.paquets ?? []).filter((p) => p.deviceId !== exclure),
+    )
+  }
 
-  const vivants = liste.appareils.map((a) => a.deviceId)
+  /*
+   * ⚠️ `exclure` : CET appareil, quand on vise son propre compte. S’ouvrir une
+   * session vers soi-même consommerait une de ses propres pré-clés pour rien.
+   */
+  const appareils = liste.appareils.filter((a) => a.deviceId !== exclure)
+
+  const vivants = appareils.map((a) => a.deviceId)
   const aOuvrir: number[] = []
-  for (const a of liste.appareils) {
+  for (const a of appareils) {
     const adresse = new SignalProtocolAddress(userId, a.deviceId)
     const ouverte = await new SessionCipher(coffre, adresse).hasOpenSession()
     const connue = await coffre.loadIdentityKey(adresse.toString())
