@@ -1,6 +1,7 @@
 import { apiRequest } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
 import { identitesChangees as identitesChangeesInternes } from "./e2ee-store"
+import { ouvrirCoffre } from "./coffre-chiffre"
 import {
   chiffrerPour,
   dechiffrer,
@@ -183,13 +184,13 @@ export interface ClairRecu {
 /**
  * Relève tout ce qui attend cet appareil et rend le clair, par message.
  *
- * 🔴 ON N'ACQUITTE QU'APRÈS DÉCHIFFREMENT RÉUSSI. Acquitter puis échouer
- * perdrait le message DÉFINITIVEMENT : personne d'autre ne le détient, et le
- * serveur ne peut pas le reconstituer.
+ * 🔴 ON N'ACQUITTE QU'APRÈS AVOIR TENTÉ, ET JAMAIS SI LE COFFRE EST FERMÉ.
+ * Une panne de notre côté ne coûte aucun message : rien n'est acquitté. Un
+ * échec sur le message lui-même — session perdue, appareil réinstallé, message
+ * déjà ouvert — est définitif, et l'enveloppe est acquittée : la garder ne la
+ * rendrait pas lisible, et elle bloquerait la file.
  *
- * ⚠️ UNE ENVELOPPE ILLISIBLE N'ARRÊTE PAS LES AUTRES. Un déchiffrement qui
- * échoue — session perdue, appareil réinstallé — ne doit pas empêcher de lire
- * les messages qui suivent. On la laisse en attente et on continue.
+ * ⚠️ UNE ENVELOPPE ILLISIBLE N'ARRÊTE PAS LES AUTRES : on continue.
  *
  * 🔴 `ranger` PASSE AVANT L'ACQUITTEMENT, et c'est tout son objet.
  *
@@ -216,6 +217,18 @@ export async function releverEtDechiffrer(
     return parMessage
   }
 
+  /*
+   * ⚠️ LE COFFRE S'OUVRE ICI, HORS DE LA BOUCLE, et c'est ce qui départage les
+   * échecs. S'il ne s'ouvre pas, la panne est de notre côté et passagère : on
+   * n'acquitte RIEN, la prochaine relève lira tout. S'il s'ouvre, un échec dans
+   * la boucle tient au message lui-même — et celui-là ne s'ouvrira jamais.
+   */
+  try {
+    await ouvrirCoffre()
+  } catch {
+    return parMessage
+  }
+
   const acquittables: string[] = []
   for (const e of recues) {
     try {
@@ -232,11 +245,21 @@ export async function releverEtDechiffrer(
       }
       acquittables.push(e.id)
     } catch (err) {
-      console.warn(
-        `[e2ee] enveloppe ${e.id.slice(0, 8)} illisible — elle N'EST PAS ` +
-          "acquittée, on préfère la garder que la perdre.",
-        err,
-      )
+      /*
+       * 🔴 UNE ILLISIBLE EST ACQUITTÉE.
+       *
+       * 🐛 ELLE NE L'ÉTAIT JAMAIS, « pour ne pas la perdre ». Mais un message
+       * dont la session ou la clé n'existe plus ne se lira pas mieux demain :
+       * la garder ne sauvait rien. Elle revenait à chaque relève, et la relève
+       * n'en rend que 200 — deux cents illisibles en tête de file, et plus
+       * aucun message n'arrivait sur cet appareil. Prouvé par l'étape ⑥ de
+       * `scripts/e2ee-releve-multifil.mjs`.
+       *
+       * ⚠️ UN MESSAGE DÉJÀ OUVERT échoue aussi (compteur répété) ; l'acquitter
+       * est alors simplement juste.
+       */
+      acquittables.push(e.id)
+      console.warn(`[e2ee] enveloppe ${e.id.slice(0, 8)} illisible — acquittée.`, err)
     }
   }
 

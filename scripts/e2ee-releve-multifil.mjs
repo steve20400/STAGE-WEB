@@ -239,6 +239,48 @@ async function main() {
     "le texte ne vivait qu'en mémoire d'écran",
   );
 
+  titre("⑥ Une enveloppe que rien ne peut ouvrir ne reste pas en file");
+  /*
+   * 🐛 UNE ILLISIBLE N'ÉTAIT JAMAIS ACQUITTÉE. Elle revenait à chaque relève, et
+   * la relève n'en rend que 200 : deux cents illisibles en tête de file, et
+   * plus aucun message n'arrivait jamais sur cet appareil.
+   */
+  const appareilBob = await prisma.e2eeIdentite.findFirst({
+    where: { userId: bob.id },
+    select: { deviceId: true },
+  });
+  const appareilAlice = await prisma.e2eeIdentite.findFirst({
+    where: { userId: alice.id },
+    select: { deviceId: true },
+  });
+  const illisible = await prisma.e2eeEnveloppe.create({
+    data: {
+      convId: filAlice,
+      expediteurId: alice.id,
+      expediteurDevice: appareilAlice.deviceId,
+      destinataireId: bob.id,
+      destinataireDevice: appareilBob.deviceId,
+      type: 1,
+      corps: "AAAA",
+    },
+    select: { id: true },
+  });
+  await B.page.goto(`${WEB}/chats/${filAlice}`, { waitUntil: "networkidle" });
+  await B.page.waitForTimeout(3000);
+  const apres = await prisma.e2eeEnveloppe.findUnique({
+    where: { id: illisible.id },
+    select: { remisLe: true },
+  });
+  verifie(
+    "elle est acquittée après la relève",
+    apres?.remisLe != null,
+    "elle restera en tête de file, relevée et refusée à chaque tour",
+  );
+  verifie(
+    "et le fil d'Alice reste lisible",
+    await afficheLeTexte(B.page, texteAlice),
+  );
+
   const fatales = [...B.erreurs, ...A.erreurs, ...C.erreurs];
   verifie("aucune erreur JavaScript", fatales.length === 0, fatales.slice(0, 3).join(" | "));
 
