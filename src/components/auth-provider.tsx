@@ -255,6 +255,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(nextUser)
     setIsReady(true)
     publierMesCles()
+    /*
+     * 🔴 L'ARCHIVE CHIFFRÉE S'OUVRE AUSSI À L'INSCRIPTION, comme à la connexion.
+     *
+     * 🐛 SEULE LA CONNEXION CONFIAIT LE MOT DE PASSE à la page de restauration.
+     * Un compte créé ici n'avait donc jamais d'archive : `archiver` sortait
+     * sans rien faire, et un autre appareil du compte n'avait rien à restaurer
+     * — « indisponible sur cet appareil » (signalé le 29/09/2026, même défaut
+     * sur le mobile). Pour un compte neuf, la page crée l'archive puis laisse
+     * entrer. Prouvé par `scripts/inscription-archive.mjs`.
+     *
+     * ⚠️ ICI, DANS LE MÊME TOUR QUE `setUser`, et pas dans la page
+     * d'inscription : dès le rendu suivant, le garde des pages publiques
+     * (`PublicOnlyRoute`) renvoie l'utilisateur connecté — vers
+     * `/restauration` s'il trouve un mot de passe confié, sinon vers `/chats`.
+     * Un code placé après, dans la page, ne s'exécute jamais.
+     */
+    confierMotDePasse(draft.password)
     return nextUser
   }, [publierMesCles])
 
@@ -279,9 +296,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       saveSessionUser(nextUser)
       setUser(nextUser)
       setIsReady(true)
+      /*
+       * 🐛 CE CHEMIN NE PUBLIAIT PAS LES CLÉS (elles ne l'étaient qu'au
+       * rechargement suivant) et ne créait pas l'archive. Même geste que
+       * `register` ci-dessus.
+       */
+      publierMesCles()
+      confierMotDePasse(draft.password)
       return { user: nextUser, idRecuperation }
     },
-    [],
+    [publierMesCles],
   )
 
   /**
