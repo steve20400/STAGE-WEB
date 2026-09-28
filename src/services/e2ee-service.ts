@@ -231,7 +231,8 @@ export async function preparerCetAppareil(): Promise<{
    * cette signature avant d'ouvrir la session ; sans elle, il ferait confiance
    * à ce que le serveur veut bien lui servir.
    */
-  const idSignee = Math.floor(Math.random() * 100_000) + 1
+  // Numéro RÉSERVÉ, plus tiré au sort : voir `reserverIdentifiants`.
+  const idSignee = coffre.reserverIdentifiants(1)
   const signee = await KeyHelper.generateSignedPreKey(identite, idSignee)
   await coffre.storeSignedPreKey(idSignee, signee.keyPair)
 
@@ -259,7 +260,9 @@ export async function preparerCetAppareil(): Promise<{
 
   // Les pré-clés à usage unique : chacune ne sert qu'une fois, d'où le lot.
   const prekeys: { id: number; clePublique: string }[] = []
-  const base = Math.floor(Math.random() * 100_000) + 1
+  // ⚠️ Des numéros jamais servis : un chevauchement écraserait une clé privée
+  // dont le serveur garde la clé publique. Voir `reserverIdentifiants`.
+  const base = coffre.reserverIdentifiants(LOT_PREKEYS)
   for (let i = 0; i < LOT_PREKEYS; i++) {
     const id = base + i
     const pk = await KeyHelper.generatePreKey(id)
@@ -396,14 +399,77 @@ export async function ouvrirSessions(userId: string): Promise<number[]> {
   return devices
 }
 
+/**
+ * Les appareils à viser, en n'ouvrant une session QUE là où il en manque une.
+ *
+ * 🐛 CHAQUE ENVOI REFAISAIT UN X3DH. On demandait le paquet de chaque
+ * appareil du correspondant — ce qui CONSOMME une de ses pré-clés — puis
+ * `processPreKey` REMPLAÇAIT la session existante (l'ancienne passe aux
+ * archives, elle n'est pas réutilisée). Chaque message partait en type 3 :
+ * le cliquet ne servait jamais, et le correspondant perdait une pré-clé par
+ * message. Un commentaire affirmait le contraire (« la bibliothèque ne refait
+ * pas le travail si la session existe déjà ») ; `session-builder.js` dit
+ * `record.archiveCurrentState()`, sans condition. Prouvé par
+ * `scripts/e2ee-releve-multifil.mjs` ⑧ le 28/09/2026.
+ *
+ * DÉSORMAIS, EN DEUX TEMPS :
+ *   ① `?liste=1` → les appareils vivants et leur clé d'identité, SANS rien
+ *     consommer ;
+ *   ② `?deviceIds=` → un paquet, seulement pour ceux sans session — ou dont la
+ *     clé a changé (appareil réinstallé : l'ancienne session ne vaut plus rien).
+ *
+ * ⚠️ LA LISTE EST DEMANDÉE À CHAQUE ENVOI, ET C'EST VOULU : un appareil que le
+ * correspondant vient d'ajouter doit recevoir le message. Mais elle ne coûte
+ * plus rien au correspondant.
+ *
+ * ⚠️ SERVEUR ANTÉRIEUR : il ignore `?liste=1` et rend directement des
+ * paquets. On les traite alors comme avant, plutôt que de ne rien envoyer.
+ */
 async function ouvrirSessionsInterne(userId: string): Promise<number[]> {
   await ouvrirCoffre()
-  const r = await apiRequest<{ paquets: PaquetRecu[] }>(
-    `/api/e2ee/cles/${encodeURIComponent(userId)}`,
-  )
+  const base = `/api/e2ee/cles/${encodeURIComponent(userId)}`
+  const liste = await apiRequest<{
+    appareils?: { deviceId: number; cleIdentite: string }[]
+    paquets?: PaquetRecu[]
+  }>(`${base}?liste=1`)
 
+  if (!liste.appareils) return ouvrirDepuisPaquets(userId, liste.paquets ?? [])
+
+  const vivants = liste.appareils.map((a) => a.deviceId)
+  const aOuvrir: number[] = []
+  for (const a of liste.appareils) {
+    const adresse = new SignalProtocolAddress(userId, a.deviceId)
+    const ouverte = await new SessionCipher(coffre, adresse).hasOpenSession()
+    const connue = await coffre.loadIdentityKey(adresse.toString())
+    const meme = connue !== undefined && versB64(connue) === a.cleIdentite
+    if (!ouverte || !meme) aOuvrir.push(a.deviceId)
+  }
+
+  if (aOuvrir.length > 0) {
+    const r = await apiRequest<{ paquets: PaquetRecu[] }>(
+      `${base}?deviceIds=${aOuvrir.join(",")}`,
+    )
+    await ouvrirDepuisPaquets(userId, r.paquets)
+  }
+
+  /*
+   * ⚠️ ON NE VISE QUE LES APPAREILS DE LA LISTE, même si une session ancienne
+   * existe pour un autre : un appareil retiré ou muet depuis trente jours
+   * n'est plus servi, et lui chiffrer un message serait l'écrire pour
+   * personne.
+   */
+  const prets: number[] = []
+  for (const d of vivants) {
+    const adresse = new SignalProtocolAddress(userId, d)
+    if (await new SessionCipher(coffre, adresse).hasOpenSession()) prets.push(d)
+  }
+  return prets
+}
+
+/** Ouvre une session par paquet reçu — X3DH, signature vérifiée. */
+async function ouvrirDepuisPaquets(userId: string, paquets: PaquetRecu[]): Promise<number[]> {
   const ouverts: number[] = []
-  for (const p of r.paquets) {
+  for (const p of paquets) {
     const adresse = new SignalProtocolAddress(userId, p.deviceId)
     const batisseur = new SessionBuilder(coffre, adresse)
 
