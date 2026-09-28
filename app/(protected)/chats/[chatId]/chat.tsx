@@ -3975,7 +3975,10 @@ function MessageBubble({
                         onTogglePin(estEpingle ? null : msg.id)
                       )
                     : null}
-                  {menuItem(t("forward"), () => onForward(msg))}
+                  {/* ⚠️ PAS DE TRANSFERT D'UN MESSAGE CHIFFRÉ : le serveur recopie
+                    `content`, qu'il n'a pas — il fabriquait une bulle vide chez
+                    le destinataire, et le refuse désormais (`e2ee-clair.mjs`). */}
+                  {!msg.chiffre ? menuItem(t("forward"), () => onForward(msg)) : null}
                   {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
                   {isMe
                     ? menuItem(t("delete_for_all"), () => onDelete(msg, "everyone"), true)
@@ -8494,6 +8497,16 @@ export default function ChatRoomPage() {
           onForward={async (convIds) => {
             try {
               const count = await forwardChatMessage(forwardMsg.id, convIds)
+              /*
+               * ⚠️ ZÉRO TRANSFERT N'EST PAS UN SUCCÈS. Le serveur écarte les fils
+               * chiffrés quand le message porte du texte (il y entrerait en
+               * clair) : sans ce contrôle, l'écran annonçait « envoyé dans 0
+               * conversation » sous une bannière verte.
+               */
+              if (count === 0) {
+                error(t("f2_forward_error"), t("f2_forward_failed"))
+                return
+              }
               success(t("forwarded_success"), t("f2_sent_in_n_convs", { count }))
             } catch (err) {
               const message = err instanceof Error ? err.message : t("f2_forward_failed")
