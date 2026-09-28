@@ -23,8 +23,11 @@ import {
 } from "./indexeddb-cache"
 import { uploadMedia } from "./media-service"
 import {
+  clairPour,
   estChiffree,
+  etatConnu,
   envoyerChiffre,
+  lireEtatE2ee,
   noteEtatChiffrement,
 } from "./e2ee-fil"
 import { releverEtRanger } from "./e2ee-releve"
@@ -330,7 +333,8 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
     }
 
     for (const m of messages) {
-      const clair = clairs.get(m.id) ?? (m.chiffre ? enCache.get(m.id) : undefined)
+      const clair =
+        clairPour(clairs, m.id, m.senderId, chatId) ?? (m.chiffre ? enCache.get(m.id) : undefined)
       if (clair === undefined) continue
       m.content = clair
       /*
@@ -563,6 +567,16 @@ export async function sendChatMessage(
    * médias par le chemin ordinaire plutôt que de les refuser en silence — mais
    * ils NE SONT PAS chiffrés, et l'écran doit finir par le dire.
    */
+  /*
+   * 🔴 ÉTAT INCONNU → ON DEMANDE AVANT D'ENVOYER. Un fil jamais vu par ce
+   * client (ni par la liste, ni par la mémoire) partait en clair par défaut ;
+   * le serveur le refusait s'il était chiffré… après l'avoir reçu. Voir
+   * `etatConnu` dans `e2ee-fil.ts`.
+   */
+  if (type === "text" && (content ?? "").trim() !== "" && !etatConnu(chatId)) {
+    await lireEtatE2ee(chatId).catch(() => undefined)
+  }
+
   if (estChiffree(chatId) && type === "text" && (content ?? "").trim() !== "") {
     if (!navigator.onLine) {
       throw new Error(

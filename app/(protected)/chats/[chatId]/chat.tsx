@@ -47,6 +47,7 @@ import {
 } from "../../../../src/services/messages-service"
 import {
   activerE2ee,
+  clairPour,
   cleAChange,
   estChiffree,
   lireEtatE2ee,
@@ -5539,8 +5540,27 @@ export default function ChatRoomPage() {
       })
     })
 
-    const unsubscribeMessages = subscribeToConversation(chatId, (message, tempId) => {
+    const unsubscribeMessages = subscribeToConversation(chatId, (recu, tempId) => {
       if (cancelled) return
+      /*
+       * 🔴 DANS UN FIL CHIFFRÉ, UN TEXTE ARRIVÉ EN CLAIR NE S'AFFICHE PAS.
+       *
+       * Le serveur refuse tout texte en clair dans un fil chiffré ; un texte qui
+       * arrive quand même ne peut venir que de lui — erreur ou interposition.
+       * 🐛 Il s'affichait comme les autres, sous la bannière « chiffré ».
+       * Prouvé par `scripts/e2ee-etat-memorise.mjs` ④ le 28/09/2026.
+       *
+       * ⚠️ ON LE TRAITE COMME UN MESSAGE SANS CONTENU : la relève ira chercher
+       * son enveloppe, s'il en a une, et c'est elle seule qui fait foi.
+       * ⚠️ LE TEXTE SEULEMENT : les avis système portent un contenu légitime.
+       */
+      const message =
+        estChiffree(chatId) && recu.type === "TEXT" && (recu.content ?? "") !== ""
+          ? { ...recu, content: "" }
+          : recu
+      if (message !== recu) {
+        console.warn(`[e2ee] texte en clair reçu dans un fil chiffré (${recu.id.slice(0, 8)}) — écarté.`)
+      }
       const incoming = toFrontMessage(message, myId)
       // Persiste le message entrant en IndexedDB
       void persistIncomingWsMessage(message)
@@ -5572,7 +5592,8 @@ export default function ChatRoomPage() {
           if (cancelled || clairs.size === 0) return
           setMessages((prev) =>
             prev.map((m) => {
-              const clair = clairs.get(m.id)
+              // ⚠️ Seulement la ligne de CET expéditeur, dans CE fil : voir `clairPour`.
+              const clair = clairPour(clairs, m.id, m.senderId, chatId)
               return clair === undefined ? m : { ...m, content: clair }
             }),
           )

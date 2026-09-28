@@ -82,6 +82,37 @@ export const upsertMessage = async (message) => {
     await tx.done;
 };
 
+/**
+ * Range le texte qu'une enveloppe vient de rendre — SEULEMENT dans une ligne
+ * qui est bien celle de son expéditeur et de son fil.
+ *
+ * 🐛 L'IDENTIFIANT DU MESSAGE VIENT DU SERVEUR, HORS DU CHIFFRÉ. Un serveur
+ * malveillant rattachait le texte de Bob à un message d'Alice : `upsertMessage`
+ * écrasait alors le vrai texte d'Alice, dernière copie qui existait. Prouvé par
+ * `scripts/e2ee-etat-memorise.mjs` ⑤ le 28/09/2026.
+ *
+ * ⚠️ L'EXPÉDITEUR, LUI, EST SÛR : c'est sa session qui a déchiffré. Une ligne
+ * existante d'un autre expéditeur ou d'un autre fil est donc laissée intacte.
+ *
+ * Rend `false` quand la ligne a été écartée.
+ */
+export const rangerClairRecu = async (message) => {
+    const db = await initIndexedDB();
+    const tx = db.transaction('messages', 'readwrite');
+    const existant = await tx.store.get(message.id);
+    if (
+        existant &&
+        (existant.senderId !== message.senderId ||
+            existant.conversationId !== message.conversationId)
+    ) {
+        await tx.done;
+        return false;
+    }
+    await tx.store.put(preserveLeTexte(message, existant));
+    await tx.done;
+    return true;
+};
+
 export const saveBulkMessages = async (messages = []) => {
     if (!messages.length) return;
     const db = await initIndexedDB();

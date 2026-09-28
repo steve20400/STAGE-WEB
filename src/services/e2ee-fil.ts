@@ -40,14 +40,79 @@ import {
 /**
  * Les conversations dont on sait qu'elles sont chiffrées.
  *
- * ⚠️ UN CACHE, PAS UNE VÉRITÉ. Le serveur reste seul juge : ce cache évite un
- * aller-retour par message, rien de plus. Il est alimenté par la liste des
- * conversations, qui porte déjà `e2eeActif`.
+ * Alimentée par la liste des conversations et par `lireEtatE2ee`, qui portent
+ * `e2eeActif`. Elle évite un aller-retour par message.
  */
 const chiffrees = new Map<string, boolean>()
 
+/*
+ * ══════════════ UN FIL CHIFFRÉ LE RESTE — LE CLIENT S'EN SOUVIENT ══════════════
+ *
+ * 🐛 LE SERVEUR ÉTAIT SEUL JUGE. Sa réponse n'était gardée qu'en mémoire, vide
+ * à chaque rechargement : un serveur compromis qui répondait `e2eeActif: false`
+ * faisait repartir les messages EN CLAIR, sans rien à l'écran. Prouvé par
+ * `scripts/e2ee-etat-memorise.mjs` ③ le 28/09/2026.
+ *
+ * 🔴 UN FIL VU CHIFFRÉ UNE FOIS NE REDESCEND JAMAIS. Aucune route du serveur ne
+ * désactive le chiffrement d'un fil : un « non chiffré » après un « chiffré »
+ * n'a pas d'explication honnête. On garde donc « chiffré », et l'envoi échoue
+ * ouvertement (le serveur refuse le dépôt) au lieu de partir en clair.
+ *
+ * ⚠️ EN `localStorage`, PAR COMPTE. Ce n'est pas un secret — la menace est le
+ * serveur, pas l'appareil —, et la lecture doit rester SYNCHRONE : `estChiffree`
+ * est appelé partout. La clé commence par `alanya.e2ee.` : la déconnexion la
+ * retire avec le reste (`oublierCetAppareil`).
+ */
+function cleMemoire(): string | null {
+  const moi = getMyUserId()
+  return moi ? `alanya.e2ee.fils-chiffres.${moi}` : null
+}
+
+function filsMemorises(): Set<string> {
+  const cle = cleMemoire()
+  if (!cle) return new Set()
+  try {
+    const brut = localStorage.getItem(cle)
+    return new Set(brut ? (JSON.parse(brut) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function memoriser(convId: string): void {
+  const cle = cleMemoire()
+  if (!cle) return
+  const fils = filsMemorises()
+  if (fils.has(convId)) return
+  fils.add(convId)
+  try {
+    localStorage.setItem(cle, JSON.stringify([...fils]))
+  } catch {
+    // Stockage refusé : on garde au moins la mémoire de la page.
+  }
+}
+
 export function noteEtatChiffrement(convId: string, actif: boolean): void {
-  chiffrees.set(convId, actif)
+  if (actif) {
+    chiffrees.set(convId, true)
+    memoriser(convId)
+    return
+  }
+  if (estChiffree(convId)) {
+    console.warn(
+      `[e2ee] le serveur dit « non chiffré » pour un fil chiffré (${convId.slice(0, 8)}) — ignoré.`,
+    )
+    return
+  }
+  chiffrees.set(convId, false)
+}
+
+/**
+ * Connaît-on l'état de ce fil — par le serveur dans cette page, ou par la
+ * mémoire du client ? Tant que non, on ne doit pas envoyer de texte en clair.
+ */
+export function etatConnu(convId: string): boolean {
+  return chiffrees.has(convId) || filsMemorises().has(convId)
 }
 
 /**
@@ -62,13 +127,15 @@ export function noteEtatChiffrement(convId: string, actif: boolean): void {
  * quelqu'un qui veut justement partir vite.
  */
 export function conversationsChiffrees(): number {
-  let n = 0
-  for (const actif of chiffrees.values()) if (actif) n++
-  return n
+  // La mémoire compte aussi : après un rechargement, la table de la page est
+  // vide jusqu'à la liste des conversations.
+  const tous = filsMemorises()
+  for (const [id, actif] of chiffrees) if (actif) tous.add(id)
+  return tous.size
 }
 
 export function estChiffree(convId: string): boolean {
-  return chiffrees.get(convId) === true
+  return chiffrees.get(convId) === true || filsMemorises().has(convId)
 }
 
 export interface EtatE2ee {
@@ -211,6 +278,40 @@ export interface ClairRecu {
 }
 
 /**
+ * Le texte relevé pour ce message — s'il est bien de son expéditeur et de son
+ * fil, `undefined` sinon.
+ *
+ * 🐛 L'IDENTIFIANT DU MESSAGE VIENT DU SERVEUR, HORS DU CHIFFRÉ. Le texte était
+ * appliqué à n'importe quelle ligne portant cet identifiant : un serveur
+ * malveillant faisait parler Alice avec les mots de Bob. Prouvé par
+ * `scripts/e2ee-etat-memorise.mjs` ⑤ le 28/09/2026.
+ *
+ * ⚠️ L'EXPÉDITEUR EST SÛR — c'est sa session qui a déchiffré —, donc exiger
+ * qu'il soit l'auteur de la ligne suffit à ce qu'on ne fasse parler personne
+ * d'autre. Le fil aussi doit correspondre. Ce qui reste possible au serveur
+ * (attacher le texte de Bob à un AUTRE message de Bob du même fil) demande de
+ * chiffrer l'identifiant avec le texte : une évolution du protocole, à faire
+ * des deux côtés ensemble.
+ *
+ * @param expediteurAffiche l'expéditeur tel que l'écran le porte (« me » pour soi).
+ */
+export function clairPour(
+  clairs: Map<string, ClairRecu>,
+  messageId: string,
+  expediteurAffiche: string,
+  convId: string,
+): string | undefined {
+  const c = clairs.get(messageId)
+  if (!c) return undefined
+  const expediteur = expediteurAffiche === "me" ? getMyUserId() : expediteurAffiche
+  if (c.expediteurId !== expediteur || c.convId !== convId) {
+    console.warn(`[e2ee] texte relevé pour ${messageId.slice(0, 8)} écarté : expéditeur ou fil ne correspond pas.`)
+    return undefined
+  }
+  return c.texte
+}
+
+/**
  * Relève tout ce qui attend cet appareil et rend le clair, par message.
  *
  * 🔴 ON N'ACQUITTE QU'APRÈS AVOIR TENTÉ, ET JAMAIS SI LE COFFRE EST FERMÉ.
@@ -235,8 +336,8 @@ export interface ClairRecu {
  */
 export async function releverEtDechiffrer(
   ranger?: (recus: ClairRecu[]) => Promise<void>,
-): Promise<Map<string, string>> {
-  const parMessage = new Map<string, string>()
+): Promise<Map<string, ClairRecu>> {
+  const parMessage = new Map<string, ClairRecu>()
   let recues: EnveloppeRecue[] = []
   try {
     recues = await relever()
@@ -262,7 +363,14 @@ export async function releverEtDechiffrer(
     try {
       const clair = await dechiffrer(e)
       if (e.messageId) {
-        parMessage.set(e.messageId, clair)
+        const recu: ClairRecu = {
+          messageId: e.messageId,
+          convId: e.convId,
+          expediteurId: e.expediteurId,
+          texte: clair,
+          quand: new Date(e.createdAt).getTime(),
+        }
+        parMessage.set(e.messageId, recu)
         /*
          * 🔴 RANGÉ AUSSITÔT, AVANT LE MESSAGE SUIVANT.
          *
@@ -279,15 +387,7 @@ export async function releverEtDechiffrer(
          * moins dans ce que rend la fonction, pour l'écran.
          */
         if (ranger) {
-          await ranger([
-            {
-              messageId: e.messageId,
-              convId: e.convId,
-              expediteurId: e.expediteurId,
-              texte: clair,
-              quand: new Date(e.createdAt).getTime(),
-            },
-          ]).catch((err) => {
+          await ranger([recu]).catch((err) => {
             console.warn("[e2ee] rangement d'un message relevé impossible :", err)
           })
         }

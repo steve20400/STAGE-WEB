@@ -17,7 +17,7 @@
  * `e2ee-fil.ts`. Les réunir ferait une dépendance circulaire.
  */
 import { releverEtDechiffrer, type ClairRecu } from "./e2ee-fil"
-import { cacheMessage } from "./indexeddb-cache"
+import { cacheClairRecu } from "./indexeddb-cache"
 import { archiver } from "./e2ee-sauvegarde"
 
 /**
@@ -34,7 +34,9 @@ import { archiver } from "./e2ee-sauvegarde"
  */
 async function ranger(recus: ClairRecu[]): Promise<void> {
   for (const r of recus) {
-    await cacheMessage({
+    // ⚠️ Écarté si la ligne existante est d'un autre expéditeur ou d'un autre
+    // fil — et alors pas archivé non plus. Voir `rangerClairRecu`.
+    const range = await cacheClairRecu({
       id: r.messageId,
       conversationId: r.convId,
       senderId: r.expediteurId,
@@ -43,6 +45,7 @@ async function ranger(recus: ClairRecu[]): Promise<void> {
       status: "SENT",
       createdAt: r.quand,
     })
+    if (!range) continue
     archiver({
       id: r.messageId,
       convId: r.convId,
@@ -68,7 +71,7 @@ async function ranger(recus: ClairRecu[]): Promise<void> {
  */
 let file: Promise<unknown> = Promise.resolve()
 
-export function releverEtRanger(): Promise<Map<string, string>> {
+export function releverEtRanger(): Promise<Map<string, ClairRecu>> {
   const tour = file.then(
     () => releverEtDechiffrer(ranger),
     () => releverEtDechiffrer(ranger),
