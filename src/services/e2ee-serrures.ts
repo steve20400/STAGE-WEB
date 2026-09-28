@@ -24,6 +24,8 @@
  * l'archive AU REPOS, pas contre nous. Les deux autres n'ont pas cette limite.
  */
 
+import { MOTS_RECUPERATION } from "./mots-recuperation"
+
 /** D'où vient le secret qui ouvre une serrure. */
 export type TypeSerrure = "trousseau" | "motdepasse" | "recuperation"
 
@@ -88,7 +90,8 @@ const REGLAGES: Record<TypeSerrure, Reglage> = {
   },
   /*
    * ⚠️ UNE ITÉRATION, ET CE N'EST PAS UNE NÉGLIGENCE. L'étirement compense le
-   * manque d'entropie. Ces deux secrets font 256 bits tirés au sort : ils ne
+   * manque d'entropie. Ces deux secrets sont TIRÉS AU SORT — 256 bits pour le
+   * trousseau, 132 pour la clé de récupération (12 mots parmi 2 048) : ils ne
    * se devinent pas, et les étirer ne protégerait de RIEN — seulement coûter
    * une seconde à quelqu'un qui déverrouille son téléphone.
    *
@@ -417,35 +420,22 @@ export async function ajouterSerrure(
 /* ══════════════════ LA CLÉ DE RÉCUPÉRATION ══════════════════ */
 
 /**
- * Les mots de la clé de récupération.
+ * Tire une clé de récupération : 12 mots parmi 2 048, soit 132 bits.
  *
- * ⚠️ DES MOTS, PAS DE L'HEXADÉCIMAL, et c'est une décision d'usage autant que
- * de sécurité : une clé se recopie à la main, sur un papier, souvent mal. Un
- * « 0 » et un « O », un « 1 » et un « l » se confondent ; « tortue » et
- * « rivière », non. À entropie égale, celle qui se transcrit sans faute est
- * celle qui sera encore lisible dans deux ans.
+ * ⚠️ DES MOTS, PAS DE L'HEXADÉCIMAL : une clé se recopie à la main, souvent
+ * mal. Un « 0 » et un « O » se confondent ; « abeille » et « rivage », non.
  *
- * ⚠️ AUCUN MOT AMBIGU, ET AUCUN ACCENT dans la liste : elle se tape aussi bien
- * sur un clavier français que sur un téléphone.
- */
-const MOTS = [
-  "tortue", "riviere", "lampe", "cousin", "fenetre", "orage",
-  "sable", "guitare", "renard", "marbre", "pluie", "cerise",
-  "montagne", "velours", "hibou", "bambou", "falaise", "encrier",
-  "girafe", "menthe", "tambour", "nuage", "corail", "pivoine",
-  "safran", "brume", "loutre", "cypres", "silex", "harpe",
-  "jonquille", "ocean",
-] as const
-
-/**
- * Tire une clé de récupération : 12 mots, soit 60 bits.
+ * 🐛 ELLE N'EN VALAIT QUE 60 : 12 mots parmi 32. Ce secret n'est pas étiré
+ * (une itération), sa force est sa seule protection — et 2^60 essais d'un
+ * HMAC sont à la portée d'une ferme de cartes graphiques louée quelques jours.
+ * Or cette serrure est celle qui doit tenir face à un serveur compromis.
  *
- * ⚠️ 60 BITS SUFFISENT ICI, ET IL FAUT SAVOIR POURQUOI : ce secret n'est pas
- * étiré (voir `ITERATIONS`), donc sa force est sa seule protection. Soixante
- * bits résistent à une attaque hors ligne pour un coût qui dépasse de très loin
- * l'intérêt d'une archive de messagerie personnelle. Les porter à 128 ferait
- * vingt-quatre mots à recopier, et c'est le papier perdu qui deviendrait le
- * vrai risque.
+ * ⚠️ L'ANCIEN COMMENTAIRE SE TROMPAIT DE LEVIER : « 128 bits feraient
+ * vingt-quatre mots ». Vrai à 5 bits par mot ; avec 2 048 mots, chacun en
+ * porte 11. C'est la taille de la LISTE qui fait l'entropie.
+ *
+ * ⚠️ LES CLÉS DÉJÀ DISTRIBUÉES S'OUVRENT TOUJOURS : la serrure dérive sa clé du
+ * TEXTE saisi, jamais d'une position dans la liste.
  */
 export function tirerCleRecuperation(): string {
   const mots: string[] = []
@@ -453,18 +443,24 @@ export function tirerCleRecuperation(): string {
   crypto.getRandomValues(alea)
   for (let i = 0; i < 12; i++) {
     /*
-     * ⚠️ `% MOTS.length` AVEC UNE LISTE DE 32 MOTS : 2^32 est un multiple exact
-     * de 32, donc le reste ne favorise aucun mot. Avec une liste dont la taille
-     * n'est pas une puissance de deux, ce modulo introduirait un biais — les
-     * premiers mots sortiraient plus souvent, et l'entropie annoncée serait
-     * fausse.
+     * ⚠️ SANS BIAIS PARCE QUE 2 048 = 2^11 : 2^32 en est un multiple exact, le
+     * reste ne favorise aucun mot. Une liste d'une autre taille ferait sortir
+     * les premiers mots plus souvent, et l'entropie annoncée serait fausse.
      */
-    mots.push(MOTS[alea[i] % MOTS.length])
+    mots.push(MOTS_RECUPERATION[alea[i] % MOTS_RECUPERATION.length])
   }
   return mots.join(" ")
 }
 
 /** Remet une clé recopiée à la main dans sa forme canonique. */
 export function normaliserCleRecuperation(saisie: string): string {
-  return saisie.trim().toLowerCase().split(/\s+/).join(" ")
+  // ⚠️ ACCENTS RETIRÉS : la liste n'en a aucun, mais la liste BIP39 d'où elle
+  // vient en porte (« abîme ») ; un clavier qui corrige les ajouterait.
+  return saisie
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .join(" ")
 }
