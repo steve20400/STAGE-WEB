@@ -145,11 +145,13 @@ export async function envoyerChiffre(
   const destinataireId = await correspondant(convId)
 
   /*
-   * ⚠️ LES SESSIONS S'OUVRENT À CHAQUE ENVOI, et ce n'est pas un gaspillage :
-   * la bibliothèque ne refait pas le travail si la session existe déjà. Le
-   * coût est un aller-retour, contre le risque d'ignorer un appareil que le
-   * correspondant vient d'ajouter — auquel cas il ne lirait rien, sans que
-   * personne ne s'en doute.
+   * ⚠️ LA LISTE DES APPAREILS EST RELUE À CHAQUE ENVOI : un appareil que le
+   * correspondant vient d'ajouter doit recevoir le message. Mais une session
+   * ne s'ouvre QUE là où il en manque une.
+   *
+   * 🐛 CE COMMENTAIRE AFFIRMAIT QUE « LA BIBLIOTHÈQUE NE REFAIT PAS LE TRAVAIL
+   * SI LA SESSION EXISTE DÉJÀ ». C'était faux : chaque envoi refaisait un
+   * X3DH et consommait une pré-clé du correspondant. Voir `ouvrirSessions`.
    */
   const devices = await ouvrirSessions(destinataireId)
   if (devices.length === 0) {

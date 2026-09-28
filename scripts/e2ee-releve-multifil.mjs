@@ -326,6 +326,82 @@ async function main() {
     "transférer produirait une bulle vide chez le destinataire",
   );
 
+  titre("⑧ Une session sert plus d'un message");
+  /*
+   * 🐛 LE WEB REFAISAIT UN X3DH À CHAQUE ENVOI. Chaque message redemandait le
+   * paquet de clés de Bob — ce qui CONSOMME une de ses pré-clés uniques — et
+   * repartait d'une session neuve (type 3). Le cliquet ne servait jamais, et
+   * le stock de Bob fondait d'une pré-clé par message.
+   */
+  const consommees = () =>
+    prisma.e2eePrekeyUnique.count({
+      where: { identite: { userId: bob.id }, consommeLe: { not: null } },
+    });
+  const avantEnvois = await consommees();
+  const ids = [];
+  const textesSuite = [0, 1, 2].map((i) => `Suite-${i}-${Date.now().toString(36)}`);
+  for (const t of textesSuite) {
+    ids.push(await envoyer(A.page, filAlice, t));
+  }
+  const apresEnvois = await consommees();
+  verifie(
+    "trois messages de plus ne consomment AUCUNE pré-clé de Bob",
+    apresEnvois === avantEnvois,
+    `${apresEnvois - avantEnvois} pré-clé(s) consommée(s)`,
+  );
+  /*
+   * ⚠️ PAS « TYPE 1 » TOUT DE SUITE, et c’était mon erreur d’attendu : tant
+   * que Bob n’a pas RÉPONDU, Alice ne sait pas s’il a reçu l’amorce X3DH. La
+   * bibliothèque garde donc `pendingPreKey` et chaque message reste de type 3
+   * — même session, même pré-clé, rien de consommé. C’est le protocole.
+   * Le contrôle juste : après une réponse de Bob, Alice passe en type 1.
+   */
+  await envoyer(B.page, filAlice, `Reponse-${Date.now().toString(36)}`);
+  await A.page.goto(`${WEB}/chats/${filAlice}`, { waitUntil: "networkidle" });
+  await A.page.waitForTimeout(2000);
+  const idApres = await envoyer(A.page, filAlice, `Apres-${Date.now().toString(36)}`);
+  const typeApres = await prisma.e2eeEnveloppe.findFirst({
+    where: { messageId: idApres, destinataireId: bob.id },
+    select: { type: true },
+  });
+  verifie(
+    "après une réponse de Bob, Alice écrit en message ordinaire (type 1)",
+    typeApres?.type === 1,
+    `type ${typeApres?.type}`,
+  );
+  await B.page.goto(`${WEB}/chats/${filAlice}`, { waitUntil: "networkidle" });
+  verifie("Bob lit le dernier, sur la même session", await afficheLeTexte(B.page, textesSuite[2]));
+
+  titre("⑨ Les numéros de pré-clés ne se chevauchent plus");
+  /*
+   * Ils étaient tirés au sort (1 à 100 000, par lots de 50). Un chevauchement
+   * écrasait une clé privée dont le serveur gardait l'ANCIENNE clé publique —
+   * `skipDuplicates` écartant la nouvelle en silence.
+   *
+   * ⚠️ CE CONTRÔLE PROUVE LA PROPRIÉTÉ, PAS LA PANNE : un chevauchement au
+   * hasard est trop rare pour se provoquer à coup sûr. On vérifie donc que deux
+   * publications ajoutent EXACTEMENT deux lots (aucun doublon écarté), sous
+   * des numéros croissants.
+   */
+  const identiteBob = await prisma.e2eeIdentite.findFirst({ where: { userId: bob.id }, select: { id: true } });
+  const numeros = async () =>
+    (await prisma.e2eePrekeyUnique.findMany({ where: { identiteId: identiteBob.id }, select: { prekeyId: true } }))
+      .map((p) => p.prekeyId);
+  const avantPub = await numeros();
+  await B.page.evaluate(async () => {
+    const s = await import("/src/services/e2ee-service.ts");
+    await s.preparerCetAppareil();
+    await s.preparerCetAppareil();
+  });
+  const apresPub = await numeros();
+  const neufs = apresPub.filter((n) => !avantPub.includes(n));
+  verifie("deux publications = cent pré-clés neuves, aucune écartée", neufs.length === 100, `${neufs.length} neuve(s)`);
+  verifie(
+    "sous des numéros tous supérieurs aux précédents",
+    neufs.length > 0 && Math.min(...neufs) > Math.max(...avantPub),
+    `min neuf ${Math.min(...neufs)}, max ancien ${Math.max(...avantPub)}`,
+  );
+
   const fatales = [...B.erreurs, ...A.erreurs, ...C.erreurs];
   verifie("aucune erreur JavaScript", fatales.length === 0, fatales.slice(0, 3).join(" | "));
 

@@ -321,7 +321,7 @@ export class CoffreE2ee implements StorageType {
    * plus récente.
    *
    * ⚠️ IL FAUT LA LISTE, PAS UN COMPTEUR : `removeSignedPreKey` veut un
-   * identifiant, et ceux-ci sont tirés au sort. Sans cette trace, on ne
+   * identifiant — tirés au sort jusqu’au 28/09/2026, réservés depuis. Sans cette trace, on ne
    * saurait plus lesquelles retirer — elles s'accumulaient précisément parce
    * que personne ne les notait.
    */
@@ -331,6 +331,40 @@ export class CoffreE2ee implements StorageType {
 
   poseGenerationsSignees(ids: number[]): void {
     ecrire("generationsSignees", ids)
+  }
+
+  /**
+   * Réserve `n` identifiants de pré-clé consécutifs, jamais encore servis.
+   *
+   * 🐛 ILS ÉTAIENT TIRÉS AU SORT entre 1 et 100 000, par lots de 50 consécutifs.
+   * Deux lots pouvaient se chevaucher : la clé privée d'un numéro était alors
+   * ÉCRASÉE ici, pendant que le serveur — qui écarte les doublons
+   * (`skipDuplicates`) — gardait l'ANCIENNE clé publique. Le premier
+   * correspondant à la recevoir ouvrait une session que personne ne pouvait
+   * déchiffrer. Rare, silencieux, définitif.
+   *
+   * ⚠️ UN COMPTEUR, et au premier appel il part AU-DESSUS du plus grand numéro
+   * déjà rangé : une installation existante a des pré-clés publiées sous des
+   * numéros au hasard, qu'il ne faut pas heurter.
+   *
+   * ⚠️ 0xFFFFFF EST LA BORNE DU PROTOCOLE (identifiant sur 24 bits). On
+   * repart de 1 au-delà — soit après seize millions de pré-clés.
+   */
+  reserverIdentifiants(n: number): number {
+    const BORNE = 0xffffff
+    let debut = lire<number>("prochainIdentifiant")
+    if (debut === undefined) {
+      let plusGrand = 0
+      for (const cle of clesSecrets()) {
+        const m = /^(?:prekey|prekeySignee)\.(\d+)$/.exec(cle)
+        if (m) plusGrand = Math.max(plusGrand, Number(m[1]))
+      }
+      for (const id of this.lireGenerationsSignees()) plusGrand = Math.max(plusGrand, id)
+      debut = plusGrand + 1
+    }
+    if (debut + n > BORNE) debut = 1
+    ecrire("prochainIdentifiant", debut + n)
+    return debut
   }
 
   /* ── Les sessions : l'état du Double Ratchet ── */
