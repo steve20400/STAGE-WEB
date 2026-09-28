@@ -83,6 +83,23 @@ function isSpaFallback(response: Response): boolean {
   return (response.headers.get("content-type") ?? "").toLowerCase().includes("text/html")
 }
 
+/**
+ * DEMANDE LE FICHIER AU BACKEND LUI-MÊME, sans redirection vers Backblaze.
+ *
+ * 🔴 `?flux=1` EST LA VOIE QUI NE PEUT PAS ÉCHOUER POUR UNE RAISON DE CORS.
+ * Elle reste same-origin de bout en bout : le backend lit l'objet et renvoie les
+ * octets, au lieu de renvoyer une adresse chez un autre domaine.
+ *
+ * ⚠️ ELLE COÛTE LA BANDE PASSANTE DU SERVEUR, et le backend la plafonne à 8 Mio
+ * pour qu'un client ne puisse pas lui faire relayer des vidéos en ajoutant un
+ * paramètre. Au-delà, il redirige quand même — d'où l'intérêt de poser une règle
+ * CORS sur `alanyawork`, qui rend la voie directe utilisable pour tout.
+ */
+function parLeServeur(url: string, headers: HeadersInit | undefined): Promise<Response> {
+  const sep = url.includes("?") ? "&" : "?"
+  return fetch(`${url}${sep}flux=1`, { credentials: "same-origin", headers })
+}
+
 /** Une seule purge par session, même si dix aperçus se chargent en parallèle. */
 let purgeOnce: Promise<void> | null = null
 
@@ -181,11 +198,47 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
     try {
       response = await fetch(url, { credentials: "same-origin", headers })
     } catch {
-      // Sans proxy same-origin, la redirection du backend vers Backblaze B2 est
-      // cross-origin : le navigateur bloque la lecture si B2 n'envoie pas les
-      // en-tetes CORS. C'est le cas typique quand `api/media-proxy` n'est pas
-      // deploye sur l'hebergement (voir MEDIA_PREVIEW_PROXY.md).
-      throw new Error(traduire(langueInitiale(), "core_preview_unreadable"))
+      /*
+       * 🐛 PLUS AUCUN APERÇU NE S'AFFICHAIT (signalé par le user le 27/09/2026).
+       * Le cadre était là, l'image non.
+       *
+       * La cause était écrite ICI depuis des mois : sans proxy same-origin, la
+       * redirection du backend vers Backblaze est CROSS-ORIGIN, et le navigateur
+       * refuse de LIRE une réponse qui ne porte pas d'en-tête CORS. `alanyawork`
+       * n'en a pas. Le fichier était parfaitement servi ; c'est sa lecture qui
+       * était interdite.
+       *
+       * ⚠️ CE N'EST DEVENU VRAI QU'AVEC BACKBLAZE. Tant que le backend servait
+       * les octets lui-même, la requête restait same-origin et la question ne se
+       * posait pas. Le commentaire décrivait un risque ; la bascule vers le nuage
+       * l'a réalisé, sans que personne ne touche à cette ligne.
+       *
+       * 🔴 `?flux=1` DEMANDE AU BACKEND DE SERVIR LES OCTETS LUI-MÊME au lieu de
+       * rediriger. Même origine, aucun CORS en jeu : ça marche même sans règle
+       * sur le bucket. Régler CORS sur `alanyawork` reste préférable — le fichier
+       * ne transite alors plus par le serveur, et le plafond de 8 Mio du repli ne
+       * s'applique plus — mais l'aperçu ne DÉPEND plus d'une case cochée dans une
+       * console.
+       */
+      response = await parLeServeur(url, headers).catch(() => {
+        // Le repli a échoué aussi : là c'est vraiment le réseau, et le message
+        // traduit vaut mieux qu'un `TypeError: Failed to fetch` à l'écran.
+        throw new Error(traduire(langueInitiale(), "core_preview_unreadable"))
+      })
+    }
+
+    /*
+     * ⚠️ ET AUSSI QUAND LA RÉPONSE ARRIVE, MAIS EN ERREUR. CORS peut très bien
+     * passer et Backblaze refuser quand même : une URL signée EXPIRE. Le
+     * navigateur lit alors un 403 au lieu d'échouer — le `catch` ci-dessus ne
+     * voit rien, et l'aperçu reste vide pour une raison entièrement différente.
+     *
+     * Une seule requête de plus sur un chemin qui est déjà en échec : c'est le
+     * bon prix.
+     */
+    if (response && !response.ok && response.status !== 404) {
+      const secours = await parLeServeur(url, headers).catch(() => null)
+      if (secours?.ok) response = secours
     }
   }
   if (!response.ok) throw new Error(`Chargement échoué (${response.status})`)

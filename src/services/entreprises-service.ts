@@ -72,14 +72,87 @@ export interface FicheEntreprise {
   centres: CentreEntreprise[]
 }
 
+/*
+ * ══════════════════════════════════════════════════════════════════════════
+ * CE QUE LE SERVEUR ENVOIE VRAIMENT — ET POURQUOI IL FAUT LE TRADUIRE
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * 🐛 CLIQUER SUR UNE CATÉGORIE N'AFFICHAIT AUCUNE ENTREPRISE (signalé par le
+ * user le 27/09/2026 : « je clique sur Telecom, les deux entreprises qu'on est
+ * censé me montrer, je ne vois rien »).
+ *
+ * La cause : ce fichier DÉCLARAIT que le serveur renvoie `id`, alors qu'il
+ * renvoie `idTypeCompany` et `idCompany`. `apiRequest<T>` ne vérifie RIEN — le
+ * paramètre de type est une AFFIRMATION, pas un contrôle. TypeScript faisait
+ * donc confiance, et `type.id` valait `undefined` à l'exécution. L'écran
+ * demandait `?type=undefined`, le serveur répondait 400 « Type invalide », et le
+ * `catch` affichait une liste vide. Aucune erreur visible, aucune alerte : juste
+ * du vide, là où la catégorie annonçait deux entreprises.
+ *
+ * 🔴 ET DEUX AUTRES CHAMPS MENTAIENT DE LA MÊME FAÇON. `pays` et `ville` sont des
+ * OBJETS côté serveur — `{ libelle, iso2 }` et `{ nom }` — pas des chaînes.
+ *
+ * ⚠️ L'APP MOBILE N'A JAMAIS EU CE DÉFAUT parce qu'elle TRADUIT, champ par champ,
+ * dans des `fromJson` (`entreprises_repository.dart`). Dart n'a pas le choix : il
+ * n'existe pas de conversion silencieuse depuis du JSON. TypeScript, lui, en
+ * offre une — et c'est précisément le piège.
+ *
+ * ⚠️ LA RÈGLE À TENIR : une forme brute par réponse, et un traducteur. Le coût
+ * est de quelques lignes ; le défaut qu'il évite est invisible à la compilation
+ * et ne se manifeste qu'à l'écran, sous la forme d'un vide inexplicable.
+ */
+
+/** La forme brute d'un type, telle que `annuaire-entreprises.ts` la sérialise. */
+interface TypeBrut {
+  idTypeCompany?: number
+  libelle?: string
+  nbEntreprises?: number
+}
+
+/** La forme brute d'une entreprise. `pays` et `ville` sont des OBJETS. */
+interface EntrepriseBrute {
+  idCompany?: number
+  libelle?: string
+  description?: string | null
+  adresse?: string | null
+  pays?: { libelle?: string | null } | null
+  ville?: { nom?: string | null } | null
+}
+
+/** Une chaîne utilisable, ou `null` — jamais une chaîne vide. */
+function texte(valeur: unknown): string | null {
+  const v = typeof valeur === "string" ? valeur.trim() : ""
+  return v === "" ? null : v
+}
+
+function versType(brut: TypeBrut): TypeEntreprise {
+  return {
+    id: Number(brut.idTypeCompany ?? 0),
+    libelle: brut.libelle ?? "",
+    nbEntreprises: Number(brut.nbEntreprises ?? 0),
+  }
+}
+
+function versEntreprise(brut: EntrepriseBrute): Entreprise {
+  return {
+    id: Number(brut.idCompany ?? 0),
+    libelle: brut.libelle ?? "",
+    description: texte(brut.description),
+    adresse: texte(brut.adresse),
+    // Les deux sont des objets côté serveur : on en extrait le libellé.
+    pays: texte(brut.pays?.libelle),
+    ville: texte(brut.ville?.nom),
+  }
+}
+
 interface ReponseTypes {
-  types?: TypeEntreprise[]
+  types?: TypeBrut[]
 }
 interface ReponseEntreprises {
-  entreprises?: Entreprise[]
+  entreprises?: EntrepriseBrute[]
 }
 interface ReponseFiche {
-  entreprise?: Entreprise
+  entreprise?: EntrepriseBrute
   centres?: CentreEntreprise[]
 }
 
@@ -113,7 +186,7 @@ export async function listerTypes(idPays: number | null = null): Promise<TypeEnt
   const reponse = await apiRequest<ReponseTypes>(
     `/api/entreprises?_=1${fragmentPays(idPays)}`,
   )
-  return reponse.types ?? []
+  return (reponse.types ?? []).map(versType)
 }
 
 /** Les entreprises d'un type, dans le pays retenu. */
@@ -124,7 +197,7 @@ export async function entreprisesDuType(
   const reponse = await apiRequest<ReponseEntreprises>(
     `/api/entreprises?type=${idType}${fragmentPays(idPays)}`,
   )
-  return reponse.entreprises ?? []
+  return (reponse.entreprises ?? []).map(versEntreprise)
 }
 
 /**
@@ -137,7 +210,7 @@ export async function entreprisesDuPays(idPays: number): Promise<Entreprise[]> {
   const reponse = await apiRequest<ReponseEntreprises>(
     `/api/entreprises?toutes=1&pays=${idPays}`,
   )
-  return reponse.entreprises ?? []
+  return (reponse.entreprises ?? []).map(versEntreprise)
 }
 
 /**
@@ -160,7 +233,7 @@ export async function chercherEntreprises(
   const reponse = await apiRequest<ReponseEntreprises>(
     `/api/entreprises?q=${encodeURIComponent(requete)}${fragmentPays(idPays)}`,
   )
-  return reponse.entreprises ?? []
+  return (reponse.entreprises ?? []).map(versEntreprise)
 }
 
 /** La fiche d'une entreprise : ses standards et leurs services. */
@@ -171,7 +244,7 @@ export async function ficheEntreprise(
     `/api/entreprises?entreprise=${idEntreprise}`,
   )
   return {
-    entreprise: reponse.entreprise ?? {
+    entreprise: reponse.entreprise ? versEntreprise(reponse.entreprise) : {
       id: idEntreprise,
       libelle: "",
       description: null,
