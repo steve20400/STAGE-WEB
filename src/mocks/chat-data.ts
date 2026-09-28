@@ -8,7 +8,8 @@ export interface MediaJointe {
   durationMs: number | null
 }
 
-export type MessageStatus = "sending" | "sent" | "delivered" | "read"
+// `failed` : l’envoi a échoué — la bulle garde son texte et propose « Réessayer ».
+export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed"
 // `contact` et `location` : fiches de contact et positions partagées. Leur
 // charge utile est du JSON dans `content` — voir `services/message-payload.ts`,
 // miroir du format que le serveur impose aux trois clients.

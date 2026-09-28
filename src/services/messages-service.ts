@@ -424,7 +424,7 @@ export async function markChatAsRead(chatId: string): Promise<void> {
   }
 }
 
-interface SendOptions {
+export interface SendOptions {
   replyToId?: string
   mediaId?: string
   /** Les comptes vises par un `@`. Le serveur les refiltre sur les membres. */
