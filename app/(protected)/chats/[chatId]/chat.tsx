@@ -5534,10 +5534,29 @@ export default function ChatRoomPage() {
      */
     const unsubscribeSonnette = subscribeToE2eeArrivee(chatId, () => {
       if (cancelled) return
-      void refreshMessages().catch(() => {
-        // Le reseau a bronche : les enveloppes attendent, la prochaine
-        // ouverture du fil les relevera. Rien n'est perdu.
-      })
+      void refreshMessages()
+        .then(() => {
+          /*
+           * 🔴 « J'AI LU » PART AUSSI POUR UN MESSAGE CHIFFRÉ.
+           *
+           * 🐛 SEUL L'ÉVÉNEMENT TEMPS RÉEL ORDINAIRE ENVOYAIT L'ACCUSÉ DE
+           * LECTURE. Un message chiffré n'arrive jamais par lui (sa route REST
+           * ne diffuse rien) : il arrive par cette sonnette. Le fil ouvert
+           * affichait donc le message sans jamais le dire lu, et l'expéditeur
+           * restait sur la coche grise (signalé le 29/09/2026 : « l'état du
+           * message chiffré lu n'est pas affiché par le mobile »). Prouvé par
+           * `scripts/e2ee-lu.mjs`.
+           *
+           * ⚠️ APRÈS LA RELÈVE, pas avant : on ne dit lu que ce qui est affiché.
+           * Même règle que le mobile (`chat_screen.dart`, après
+           * `fusionnerReleve`).
+           */
+          if (!cancelled) void markChatAsRead(chatId)
+        })
+        .catch(() => {
+          // Le reseau a bronche : les enveloppes attendent, la prochaine
+          // ouverture du fil les relevera. Rien n'est perdu.
+        })
     })
 
     const unsubscribeMessages = subscribeToConversation(chatId, (recu, tempId) => {
