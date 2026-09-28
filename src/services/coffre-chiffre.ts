@@ -47,6 +47,10 @@ const VERSION = 1
 const MAGASIN_CLE = "cle"
 const MAGASIN_SECRETS = "secrets"
 const ID_CLE = "principale"
+/** Le jeton qui change à chaque écriture — voir `sousVerrouCoffre`. */
+const ID_GENERATION = "generation"
+/** Le nom du verrou partagé par les onglets de cette origine. */
+const VERROU = "alanya-coffre-e2ee"
 
 /** Le préfixe de l'ancien coffre, pour la reprise. */
 const PREFIXE_ANCIEN = "alanya.e2ee."
@@ -138,6 +142,8 @@ let base: IDBDatabase | null = null
 let cle: CryptoKey | null = null
 let ouverture: Promise<void> | null = null
 let pret = false
+/** Le jeton de génération du disque tel que cette copie en mémoire le reflète. */
+let generationConnue: string | null = null
 
 /**
  * La file d'écriture.
@@ -170,29 +176,50 @@ export function ouvrirCoffre(): Promise<void> {
   ouverture = (async () => {
     base = await ouvrirBase()
     cle = await cleDuCoffre(base)
-
-    const magasin = base.transaction(MAGASIN_SECRETS, "readonly").objectStore(MAGASIN_SECRETS)
-    const tous = (await promesse(magasin.getAll())) as Enregistre[]
-
-    for (const e of tous) {
-      try {
-        const clair = await crypto.subtle.decrypt({ name: "AES-GCM", iv: e.iv }, cle, e.chiffre)
-        memoire.set(e.cle, JSON.parse(new TextDecoder().decode(clair)))
-      } catch {
-        /*
-         * ⚠️ UNE ENTRÉE ILLISIBLE N'ARRÊTE PAS LES AUTRES. Elle signale une clé
-         * qui a changé sous nos pieds — profil restauré, base recréée. Mieux
-         * vaut repartir avec ce qui reste que refuser d'ouvrir : le pire serait
-         * de bloquer l'application sur un secret qu'on ne récupérera pas.
-         */
-        console.warn(`[e2ee] entrée illisible dans le coffre : ${e.cle}`)
-      }
-    }
-
+    await chargerDepuisLeDisque()
     pret = true
     await reprendreAncienCoffre()
   })()
   return ouverture
+}
+
+/**
+ * Remplace la copie en mémoire par ce qu'il y a sur le disque.
+ *
+ * ⚠️ LA NOUVELLE COPIE EST BÂTIE À CÔTÉ, PUIS SUBSTITUÉE D'UN COUP. Vider la
+ * mémoire d'abord et la remplir au fil des déchiffrements laisserait, pendant
+ * ces `await`, un coffre à moitié vide à qui le lirait — et un coffre sans
+ * identité fait générer une identité neuve.
+ */
+async function chargerDepuisLeDisque(): Promise<void> {
+  if (!base || !cle) return
+  const tx = base.transaction([MAGASIN_SECRETS, MAGASIN_CLE], "readonly")
+  // ⚠️ Les deux requêtes partent AVANT le premier `await` : une transaction
+  // IndexedDB se referme dès qu'elle n'a plus rien en cours.
+  const [tous, generation] = (await Promise.all([
+    promesse(tx.objectStore(MAGASIN_SECRETS).getAll()),
+    promesse(tx.objectStore(MAGASIN_CLE).get(ID_GENERATION)),
+  ])) as [Enregistre[], string | undefined]
+
+  const neuve = new Map<string, unknown>()
+  for (const e of tous) {
+    try {
+      const clair = await crypto.subtle.decrypt({ name: "AES-GCM", iv: e.iv }, cle, e.chiffre)
+      neuve.set(e.cle, JSON.parse(new TextDecoder().decode(clair)))
+    } catch {
+      /*
+       * ⚠️ UNE ENTRÉE ILLISIBLE N'ARRÊTE PAS LES AUTRES. Elle signale une clé
+       * qui a changé sous nos pieds — profil restauré, base recréée. Mieux
+       * vaut repartir avec ce qui reste que refuser d'ouvrir : le pire serait
+       * de bloquer l'application sur un secret qu'on ne récupérera pas.
+       */
+      console.warn(`[e2ee] entrée illisible dans le coffre : ${e.cle}`)
+    }
+  }
+
+  memoire.clear()
+  for (const [k, v] of neuve) memoire.set(k, v)
+  generationConnue = generation ?? null
 }
 
 /**
@@ -261,14 +288,85 @@ async function persiste(cleSecret: string): Promise<void> {
     new TextEncoder().encode(JSON.stringify(valeur)),
   )
 
-  const magasin = base.transaction(MAGASIN_SECRETS, "readwrite").objectStore(MAGASIN_SECRETS)
-  await promesse(magasin.put({ cle: cleSecret, iv: iv.buffer, chiffre } satisfies Enregistre))
+  const tx = base.transaction([MAGASIN_SECRETS, MAGASIN_CLE], "readwrite")
+  await Promise.all([
+    promesse(
+      tx.objectStore(MAGASIN_SECRETS).put({ cle: cleSecret, iv: iv.buffer, chiffre } satisfies Enregistre),
+    ),
+    marqueGeneration(tx),
+  ])
 }
 
 async function retire(cleSecret: string): Promise<void> {
   if (!base) return
-  const magasin = base.transaction(MAGASIN_SECRETS, "readwrite").objectStore(MAGASIN_SECRETS)
-  await promesse(magasin.delete(cleSecret))
+  const tx = base.transaction([MAGASIN_SECRETS, MAGASIN_CLE], "readwrite")
+  await Promise.all([promesse(tx.objectStore(MAGASIN_SECRETS).delete(cleSecret)), marqueGeneration(tx)])
+}
+
+/**
+ * Change le jeton de génération, DANS LA MÊME TRANSACTION que l'écriture.
+ *
+ * ⚠️ UN JETON AU HASARD, PAS UN COMPTEUR : deux onglets qui incrémentent le
+ * même compteur depuis la même valeur écriraient le même nombre, et chacun
+ * croirait l'autre à jour.
+ */
+function marqueGeneration(tx: IDBTransaction): Promise<void> {
+  const jeton = crypto.randomUUID()
+  return promesse(tx.objectStore(MAGASIN_CLE).put(jeton, ID_GENERATION)).then(() => {
+    generationConnue = jeton
+  })
+}
+
+/* ══════════════════ PLUSIEURS ONGLETS ══════════════════ */
+
+/**
+ * Exécute une opération du protocole seule contre tous les onglets.
+ *
+ * 🐛 DEUX ONGLETS DU MÊME COMPTE SE CORROMPAIENT LE COFFRE. Chacun charge sa
+ * copie en mémoire à l'ouverture et n'en relit jamais le disque. Le second
+ * onglet chiffrait donc sur un cliquet PÉRIMÉ : même compteur, même clé de
+ * message que l'envoi du premier — le destinataire refusait le second message
+ * comme un doublon, et la clé avait servi deux fois. Même chose pour le
+ * compteur des pré-clés : les collisions de numéros revenaient. Prouvé par
+ * `scripts/e2ee-onglets.mjs` le 28/09/2026.
+ *
+ * DEUX MOITIÉS, ET IL FAUT LES DEUX :
+ *   ① un verrou de navigateur (`navigator.locks`), partagé par les onglets de
+ *     l'origine : une seule opération à la fois, tous onglets confondus ;
+ *   ② une fois le verrou pris, si un autre onglet a écrit depuis notre dernier
+ *     passage — le jeton de génération a changé —, on RECHARGE la copie en
+ *     mémoire. Le verrou seul ne suffirait pas : il ordonnerait les écritures
+ *     sans que personne relise celles des autres.
+ *
+ * ⚠️ ON ATTEND NOS PROPRES ÉCRITURES AVANT DE RENDRE LE VERROU. Sinon l'onglet
+ * suivant lirait le disque avant qu'elles y soient.
+ *
+ * ⚠️ PAS RÉENTRANT : une fonction sous verrou n'en appelle pas une autre sous
+ * verrou, elle attendrait sa propre fin. Ne verrouiller que les points
+ * d'entrée, jamais ce qu'ils appellent.
+ *
+ * ⚠️ SANS `navigator.locks` (navigateur ancien), l'opération passe telle
+ * quelle : c'est le comportement d'avant, pas une panne.
+ */
+export async function sousVerrouCoffre<T>(travail: () => Promise<T>): Promise<T> {
+  const verrous = typeof navigator !== "undefined" ? navigator.locks : undefined
+  if (!verrous) return travail()
+  return verrous.request(VERROU, async () => {
+    await ouvrirCoffre()
+    await coffreEcrit()
+    if (base) {
+      const tx = base.transaction(MAGASIN_CLE, "readonly")
+      const surDisque = (await promesse(tx.objectStore(MAGASIN_CLE).get(ID_GENERATION))) as
+        | string
+        | undefined
+      if ((surDisque ?? null) !== generationConnue) await chargerDepuisLeDisque()
+    }
+    try {
+      return await travail()
+    } finally {
+      await coffreEcrit()
+    }
+  })
 }
 
 /* ══════════════════ L'INTERFACE SYNCHRONE ══════════════════ */
@@ -335,6 +433,7 @@ export async function refermerCoffre(): Promise<void> {
   cle = null
   pret = false
   ouverture = null
+  generationConnue = null
 }
 
 /**
@@ -359,4 +458,5 @@ export async function viderCoffre(): Promise<void> {
   cle = null
   pret = false
   ouverture = null
+  generationConnue = null
 }

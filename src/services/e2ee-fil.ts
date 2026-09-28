@@ -237,7 +237,6 @@ export async function releverEtDechiffrer(
   ranger?: (recus: ClairRecu[]) => Promise<void>,
 ): Promise<Map<string, string>> {
   const parMessage = new Map<string, string>()
-  const aRanger: ClairRecu[] = []
   let recues: EnveloppeRecue[] = []
   try {
     recues = await relever()
@@ -264,13 +263,34 @@ export async function releverEtDechiffrer(
       const clair = await dechiffrer(e)
       if (e.messageId) {
         parMessage.set(e.messageId, clair)
-        aRanger.push({
-          messageId: e.messageId,
-          convId: e.convId,
-          expediteurId: e.expediteurId,
-          texte: clair,
-          quand: new Date(e.createdAt).getTime(),
-        })
+        /*
+         * 🔴 RANGÉ AUSSITÔT, AVANT LE MESSAGE SUIVANT.
+         *
+         * 🐛 TOUT LE LOT ÉTAIT DÉCHIFFRÉ, PUIS RANGÉ D'UN COUP — jusqu'à deux
+         * cents messages. Un onglet fermé entre les deux perdait tous les
+         * textes déjà ouverts : le cliquet avait avancé, ils ne se
+         * déchiffreraient plus, et rien ne les avait écrits. Ranger message
+         * par message réduit cette fenêtre à un seul. Prouvé par
+         * `scripts/e2ee-onglets.mjs` ⑥ le 28/09/2026.
+         *
+         * ⚠️ UN RANGEMENT RATÉ N'EMPÊCHE PAS L'ACQUITTEMENT. Garder l'enveloppe
+         * ne sauverait rien — elle ne se relirait plus — et la laisserait en
+         * tête de file, relevée et refusée à chaque tour. Le texte reste au
+         * moins dans ce que rend la fonction, pour l'écran.
+         */
+        if (ranger) {
+          await ranger([
+            {
+              messageId: e.messageId,
+              convId: e.convId,
+              expediteurId: e.expediteurId,
+              texte: clair,
+              quand: new Date(e.createdAt).getTime(),
+            },
+          ]).catch((err) => {
+            console.warn("[e2ee] rangement d'un message relevé impossible :", err)
+          })
+        }
       }
       acquittables.push(e.id)
     } catch (err) {
@@ -290,18 +310,6 @@ export async function releverEtDechiffrer(
       acquittables.push(e.id)
       console.warn(`[e2ee] enveloppe ${e.id.slice(0, 8)} illisible — acquittée.`, err)
     }
-  }
-
-  if (ranger && aRanger.length > 0) {
-    /*
-     * ⚠️ UN RANGEMENT RATÉ N'EMPÊCHE PAS L'ACQUITTEMENT. Garder l'enveloppe ne
-     * sauverait rien — elle ne se relirait plus — et la laisserait en tête de
-     * file, relevée et refusée à chaque tour. Le texte reste au moins dans ce
-     * que rend la fonction, pour l'écran.
-     */
-    await ranger(aRanger).catch((err) => {
-      console.warn("[e2ee] rangement des messages relevés impossible :", err)
-    })
   }
 
   await acquitter(acquittables).catch(() => undefined)
