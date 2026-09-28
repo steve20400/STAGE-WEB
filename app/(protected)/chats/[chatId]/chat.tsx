@@ -7256,13 +7256,22 @@ export default function ChatRoomPage() {
           >
             {/* Presence du serveur temps reel, avec repli sur l'activite recente
                 si elle est masquee ; rien (plutot qu'un faux "Hors ligne") sinon. */}
-            {isTyping
-              ? t("f2_typing")
-              : chat.isGroup
-                ? t("cinfo_members_count", { count: chat.members?.length ?? 0 })
-                : peerOnline
-                  ? t("online")
-                  : " "}
+            {/*
+                🔴 LA FRAPPE NE S'AFFICHE PLUS ICI (demande du user, 27/09/2026) :
+                « le online là devait toujours rester en haut, mais le typing
+                devait être en dessous du dernier message ».
+
+                Elle REMPLAÇAIT la présence : « en ligne » disparaissait pendant
+                que l'autre tapait — une information perdue pour en afficher une
+                autre, au même endroit. Elle vit maintenant dans son propre
+                bandeau juste au-dessus du champ de saisie, comme l'app mobile
+                (`ActivityIndicatorBar`) et comme WhatsApp.
+            */}
+            {chat.isGroup
+              ? t("cinfo_members_count", { count: chat.members?.length ?? 0 })
+              : peerOnline
+                ? t("online")
+                : " "}
           </div>
         </div>
 
@@ -7951,20 +7960,6 @@ export default function ChatRoomPage() {
           </div>
         ))}
 
-        {/* Indicateur de frappe */}
-        {isTyping && (
-          <div className="typing-indicator">
-            <div className="typing-av" style={{ background: color.bg, color: color.text }}>
-              {chat.initials}
-            </div>
-            <div className="typing-bubble">
-              <div className="td" />
-              <div className="td" />
-              <div className="td" />
-            </div>
-          </div>
-        )}
-
         <div ref={bottomRef} />
       </div>
 
@@ -7999,6 +7994,36 @@ export default function ChatRoomPage() {
               <span className="retour-fil-compte">{nbNonLus > 99 ? "99+" : nbNonLus}</span>
             )}
           </button>
+        )}
+      </div>
+
+      {/*
+        LE BANDEAU D'ACTIVITÉ — « en train d'écrire… », sous le dernier message.
+
+        🔴 IL EST HORS DE LA ZONE DÉFILANTE, ET C'EST VOULU. Placé DEDANS, il
+        n'était visible qu'en bas de conversation : remonter de trois messages le
+        faisait disparaître alors que l'autre tapait toujours. Ici il reste sous
+        les yeux, juste au-dessus du champ.
+
+        ⚠️ MÊME PLACE ET MÊME ORDRE QUE L'APP MOBILE — la liste, puis l'activité,
+        puis le champ (`chat_screen.dart`, `ActivityIndicatorBar`). Les deux
+        clients doivent se ressembler : c'est la même conversation vue de deux
+        écrans.
+
+        ⚠️ LE CONTENEUR EST TOUJOURS RENDU, vide quand personne ne tape. C'est ce
+        qui permet à la hauteur de s'animer au lieu de faire sauter le champ de
+        saisie d'un coup — l'équivalent de l'`AnimatedSize` du mobile.
+      */}
+      <div className={`bandeau-activite${isTyping ? " visible" : ""}`} aria-live="polite">
+        {isTyping && (
+          <div className="activite-pastille">
+            <span className="activite-points" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="activite-texte">{t("f2_typing")}</span>
+          </div>
         )}
       </div>
 
