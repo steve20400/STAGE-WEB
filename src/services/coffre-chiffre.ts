@@ -447,11 +447,19 @@ export async function viderCoffre(): Promise<void> {
   memoire.clear()
   await coffreEcrit()
   try {
-    if (base) {
-      const tx = base.transaction([MAGASIN_SECRETS, MAGASIN_CLE], "readwrite")
-      await promesse(tx.objectStore(MAGASIN_SECRETS).clear())
-      await promesse(tx.objectStore(MAGASIN_CLE).clear())
-    }
+    /*
+     * 🐛 ON NE VIDAIT QUE SI LA BASE ÉTAIT DÉJÀ OUVERTE DANS CETTE PAGE. Après
+     * un rechargement — la page de connexion, justement —, elle ne l'est pas
+     * encore : le vidage ne faisait rien, et le compte suivant reprenait
+     * l'identité du précédent. On l'ouvre donc s'il le faut.
+     */
+    const db = base ?? (await ouvrirBase())
+    const tx = db.transaction([MAGASIN_SECRETS, MAGASIN_CLE], "readwrite")
+    await Promise.all([
+      promesse(tx.objectStore(MAGASIN_SECRETS).clear()),
+      promesse(tx.objectStore(MAGASIN_CLE).clear()),
+    ])
+    if (db !== base) db.close()
   } catch (e) {
     console.error("[e2ee] le coffre n'a pas pu être vidé :", e)
   }

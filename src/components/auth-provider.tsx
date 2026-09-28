@@ -395,6 +395,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, logout])
 
   const logoutEverywhere = useCallback(async () => {
+    /*
+     * 🐛 « DÉCONNECTER PARTOUT » NE TOUCHAIT PAS AU CHIFFREMENT : ni l'archive
+     * en attente, ni l'identité publiée — qui restait servie trente jours, et
+     * chiffrée pour personne. Même geste que `logout`, dans le même ordre, et
+     * avant que le jeton ne parte. Le coffre local, lui, est vidé par
+     * `purgeLocalAccountData` (voir `session-reset.ts`).
+     */
+    await viderSauvegarde().catch(() => undefined)
+    refermerSauvegarde()
+    await oublierCetAppareil()
     notifyServerOfDeparture(leaveSessionLocally(), logoutAllSessions)
   }, [leaveSessionLocally, notifyServerOfDeparture])
 
