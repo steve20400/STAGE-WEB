@@ -61,6 +61,7 @@ import {
 } from "../../../../src/services/traduction-conversation"
 import { RowActionsMenu } from "../../../../src/components/row-actions-menu"
 import { decrireMessage } from "../../../../src/lib/apercu-message"
+import { statutFusionne } from "../../../../src/lib/statut-envoi"
 import {
   PanneauMembre,
   type MembreDuGroupe,
@@ -102,6 +103,7 @@ import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
 import {
   publishTyping,
   subscribeToConversation,
+  subscribeToDistribue,
   subscribeToE2eeArrivee,
   subscribeToMessageDeleted,
   subscribeToMessageEdited,
@@ -5671,9 +5673,36 @@ export default function ChatRoomPage() {
           (prev[event.readBy] ?? 0) >= quand ? prev : { ...prev, [event.readBy]: quand }
         )
       }
+      // ⚠️ « En cours » est marqué lu, et c'est voulu : le destinataire peut
+      // lire avant que le serveur nous ait répondu (voir `statutFusionne`). Un
+      // message en ÉCHEC, lui, n'est jamais parti.
       setMessages((prev) =>
-        prev.map((m) => (m.senderId === "me" && m.status !== "read" ? { ...m, status: "read" } : m))
+        prev.map((m) =>
+          m.senderId === "me" && m.status !== "read" && m.status !== "failed"
+            ? { ...m, status: "read" }
+            : m,
+        )
       )
+    })
+
+    /*
+     * « Distribué » pour un message chiffré (backend d443124).
+     *
+     * ⚠️ L'ÉTAT PEUT PRÉCÉDER SON MESSAGE : la bulle porte encore son
+     * identifiant provisoire tant que le serveur n'a pas répondu. On le garde
+     * alors de côté ; `envoyerEnFond` l'appliquera au remplacement.
+     */
+    const unsubscribeDistribue = subscribeToDistribue(chatId, (messageId) => {
+      if (cancelled) return
+      setMessages((prev) => {
+        if (!prev.some((m) => m.id === messageId)) {
+          statutsEnAvanceRef.current.set(messageId, "delivered")
+          return prev
+        }
+        return prev.map((m) =>
+          m.id === messageId ? { ...m, status: statutFusionne(m.status, "delivered") } : m,
+        )
+      })
     })
 
     // Abonnement a la presence du correspondant (conversation directe).
@@ -5777,6 +5806,7 @@ export default function ChatRoomPage() {
       unsubscribeSonnette()
       unsubscribeTyping()
       unsubscribeStatus()
+      unsubscribeDistribue()
       unsubscribeEpingle()
       unsubscribePresence()
       unsubscribeDeleted()
@@ -6096,6 +6126,9 @@ export default function ChatRoomPage() {
    */
   const fileEnvoisRef = useRef<Promise<void>>(Promise.resolve())
 
+  /** États reçus pour un message encore connu sous son identifiant provisoire. */
+  const statutsEnAvanceRef = useRef(new Map<string, Message["status"]>())
+
   const envoyerEnFond = useCallback(
     (
       tempId: string,
@@ -6107,10 +6140,23 @@ export default function ChatRoomPage() {
           const saved = await sendChatMessage(chatId, text, "text", options)
           // Replace le message optimiste par celui renvoye par le backend.
           // Si le broadcast WebSocket est arrive avant (id deja present), on retire juste le tempId.
+          /*
+           * 🔴 LA RÉPONSE NE DOIT PAS EFFACER UN « LU » OU UN « DISTRIBUÉ » DÉJÀ
+           * REÇU. Le serveur prévient le destinataire avant d'attendre Google,
+           * et ne nous répond qu'après : l'état a pu arriver pendant ce temps,
+           * sur la bulle provisoire ou mis de côté. Voir `statutFusionne`.
+           */
+          const enAvance = statutsEnAvanceRef.current.get(saved.id)
+          statutsEnAvanceRef.current.delete(saved.id)
           setMessages((prev) => {
             const alreadyReceived = prev.some((m) => m.id === saved.id)
             if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
-            return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: m.timestamp } : m))
+            return prev.map((m) => {
+              if (m.id !== tempId) return m
+              let status = statutFusionne(m.status, saved.status)
+              if (enAvance) status = statutFusionne(status, enAvance)
+              return { ...saved, status, timestamp: m.timestamp }
+            })
           })
         } catch (err) {
           /*
