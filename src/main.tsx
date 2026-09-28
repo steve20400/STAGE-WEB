@@ -22,6 +22,7 @@ import WelcomePage from "../app/(public)/welcome/welcome"
 import E2eeTestPage from "./pages/E2eeTestPage"
 import NotFoundPage from "../app/(public)/not-found/not-found"
 import SettingsPage from "../app/(protected)/settings/settings"
+import RestaurationPage from "../app/(protected)/restauration/restauration"
 import AbandonedClientsPage from "../app/(protected)/abandoned-clients/abandoned-clients"
 import NewChatPage from "../app/(protected)/chats/new/new-chat"
 import ConvInfoPage from "../app/(protected)/chats/[chatId]/chat-info"
@@ -91,6 +92,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 
                   {/* L'ecran d'accueil est la liste des discussions, comme sur mobile. */}
                   <Route path="/dashboard" element={<Navigate to="/chats" replace />} />
+                  {/* Entre la connexion et la session : l historique chiffré revient,
+                  avec sa progression. Plein écran, hors de la mise en page. */}
+                  <Route
+                    path="/restauration"
+                    element={
+                      <ProtectedRoute>
+                        <RestaurationPage />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="/ai"
                     element={

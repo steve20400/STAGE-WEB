@@ -72,7 +72,9 @@ export default function LoginPage() {
 
     try {
       await login({ phone: normalizeIdentifier(phone), password: pwd })
-      navigate(redirectTo, { replace: true })
+      // L'historique chiffré revient d'abord, sur sa propre page, avec sa
+      // progression ; elle mène ensuite là où l'on voulait aller.
+      navigate("/restauration", { replace: true, state: { suite: redirectTo } })
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t("x2_login_failed"))
     } finally {

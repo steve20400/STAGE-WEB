@@ -3,6 +3,7 @@ import { getMyUserId } from "../data/session-user"
 import { estChiffree } from "./e2ee-fil"
 import { ecrireSecret, effacerSecret, lireSecret, ouvrirCoffre } from "./coffre-chiffre"
 import { deposerBloc, restaurer, type MessageArchive } from "./e2ee-archive"
+import type { SuiviRestauration } from "../lib/restauration-progression"
 import {
   ajouterSerrure,
   cleDepuisMatiere,
@@ -697,63 +698,91 @@ export async function activerOuRestaurerALaConnexion(
   motDePasse: string,
   ranger: (m: MessageArchive) => Promise<void>,
 ): Promise<number> {
-  try {
-    const { serrures, refusee } = await lireCoffre()
-
-    if (serrures.length === 0) {
-      if (refusee) {
-        console.info("[e2ee] sauvegarde refusée sur ce compte — on n'y touche pas.")
-        return 0
-      }
-      await activerSauvegarde({ motDePasse })
-      console.info("[e2ee] sauvegarde activée automatiquement.")
-      return 0
-    }
-
-    return await restaurerALaConnexion(motDePasse, ranger)
-  } catch (e) {
-    console.error("[e2ee] activation ou restauration à la connexion :", e)
-    return 0
-  }
+  /*
+   * ⚠️ UN SEUL CHEMIN : la page de restauration (28/09/2026) passe par
+   * `restaurerALaConnexionSuivie`, et celle-ci aussi. Deux versions de la
+   * même règle finiraient par diverger.
+   */
+  return (await restaurerALaConnexionSuivie(motDePasse, ranger)).restaures
 }
 
-export async function restaurerALaConnexion(
+/* ══════════════════ LA PAGE DE RESTAURATION ══════════════════ */
+
+/**
+ * Ce qu'a donné l'ouverture de l'archive à la connexion.
+ *
+ * ⚠️ « FERMÉE » ET « ÉCHEC » NE SE CONFONDENT PAS. Fermée : ce mot de passe
+ * n'ouvre pas l'archive (il a changé, ou seule la clé de récupération la
+ * protège) — réessayer n'y changera rien. Échec : réseau ou serveur.
+ */
+export type IssueConnexion = "rienARestaurer" | "restauree" | "fermee" | "echec"
+
+/**
+ * La restauration à la connexion, vue de la page qui la montre.
+ *
+ * 🐛 « UN NOUVEAU NAVIGATEUR NE CHARGE PAS L'ARCHIVE » (user, 28/09/2026).
+ * Elle tournait en fond (`void` dans `auth-provider`) et chaque échec finissait
+ * dans la console : un mot de passe changé, une archive sous la seule clé de
+ * récupération, une coupure — même résultat, rien à l'écran.
+ *
+ * ⚠️ `lireCoffre` N'EST PAS UTILISÉ ICI : il fait passer une panne réseau pour
+ * « refusée », ce qui est juste pour lui (ne rien créer dans le doute) mais
+ * ferait dire « rien à restaurer » à une coupure.
+ */
+export async function restaurerALaConnexionSuivie(
   motDePasse: string,
   ranger: (m: MessageArchive) => Promise<void>,
-): Promise<number> {
+  suivi?: SuiviRestauration,
+): Promise<{ issue: IssueConnexion; restaures: number; illisibles: number }> {
+  const rien = { issue: "rienARestaurer" as const, restaures: 0, illisibles: 0 }
+  const echec = { issue: "echec" as const, restaures: 0, illisibles: 0 }
+  const fermee = { issue: "fermee" as const, restaures: 0, illisibles: 0 }
+
+  suivi?.({ etape: "ouverture", fait: 0 })
+
+  let serrures: Serrure[]
+  let refusee: boolean
   try {
-    const serrures = await lireSerrures()
-    if (!serrures.some((s) => s.type === "motdepasse")) {
-      console.info("[e2ee] pas de sauvegarde par mot de passe sur ce compte.")
-      return 0
-    }
+    const r = await apiRequest<{ serrures?: Serrure[]; refusee?: boolean }>("/api/e2ee/coffre")
+    serrures = r.serrures ?? []
+    refusee = r.refusee === true
+  } catch {
+    return echec
+  }
 
-    if (!(await ouvrir("motdepasse", motDePasse))) {
-      /*
-       * ⚠️ CE CAS DOIT SE VOIR. Le mot de passe du COMPTE et celui de la
-       * SAUVEGARDE peuvent différer — quelqu'un a changé son mot de passe
-       * après avoir créé sa sauvegarde, et la serrure porte encore l'ancien.
-       * Sans cette ligne, l'historique ne revient pas et rien ne dit pourquoi.
-       */
-      console.warn(
-        "[e2ee] la sauvegarde ne s'ouvre pas avec ce mot de passe — " +
-          "il a probablement changé depuis sa création.",
-      )
-      return 0
+  if (serrures.length === 0) {
+    // Pas d'archive : on l'active en silence (décision du 23/09/2026), sauf refus.
+    if (refusee) return rien
+    try {
+      await activerSauvegarde({ motDePasse })
+    } catch (e) {
+      console.error("[e2ee] activation de la sauvegarde impossible :", e)
+      return echec
     }
+    return rien
+  }
 
-    const { messages } = await restaurerTout()
-    for (const m of messages) await ranger(m)
+  // Ce navigateur a peut-être déjà la clé : pas besoin du mot de passe.
+  let cle = await laCle()
+  if (!cle) {
+    if (!serrures.some((s) => s.type === "motdepasse")) return fermee
+    if (!(await ouvrir("motdepasse", motDePasse))) return fermee
+    cle = await laCle()
+    if (!cle) return echec
+  }
+
+  try {
+    const { messages, blocsIllisibles } = await restaurer(cle, suivi)
+    for (const [i, m] of messages.entries()) {
+      if (i % 25 === 0) suivi?.({ etape: "rangement", fait: i, total: messages.length })
+      await ranger(m)
+    }
+    suivi?.({ etape: "rangement", fait: messages.length, total: messages.length })
     console.info(`[e2ee] ${messages.length} message(s) restauré(s) depuis la sauvegarde.`)
-    return messages.length
+    return { issue: "restauree", restaures: messages.length, illisibles: blocsIllisibles }
   } catch (e) {
-    /*
-     * 🔴 ON JOURNALISE, ON N'AVALE PAS. Un `catch` muet ici transforme un
-     * défaut en « l'historique ne revient pas », sans piste — et c'est
-     * exactement ce que j'avais écrit au premier jet.
-     */
     console.error("[e2ee] restauration à la connexion impossible :", e)
-    return 0
+    return echec
   }
 }
 

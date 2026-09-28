@@ -492,6 +492,29 @@ export function subscribeToE2eeArrivee(
 }
 
 /**
+ * Un message CHIFFRÉ d'ici vient d'être relevé par un appareil du destinataire.
+ *
+ * 🐛 UN MESSAGE CHIFFRÉ NE PASSAIT JAMAIS « DISTRIBUÉ » (user, 28/09/2026) : le
+ * serveur ne le faisait pas. Il le fait désormais à l'acquittement de
+ * l'enveloppe (backend d443124) et prévient l'expéditeur par ce verbe — le pont
+ * du serveur n'accepte que les `e2ee_*`, d'où ce nom plutôt que `message_status`.
+ */
+export function subscribeToDistribue(
+  conversationId: string,
+  handler: (messageId: string) => void,
+): () => void {
+  return addListener((event) => {
+    if (
+      event.type === "e2ee_distribue" &&
+      event.convId === conversationId &&
+      typeof event.messageId === "string"
+    ) {
+      handler(event.messageId)
+    }
+  })
+}
+
+/**
  * La sonnette d'un message chiffré, TOUTES conversations confondues.
  *
  * ⚠️ POUR LA LISTE DES CONVERSATIONS. Un message chiffré n'émet pas l'événement

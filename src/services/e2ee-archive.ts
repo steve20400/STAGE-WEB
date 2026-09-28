@@ -23,6 +23,7 @@
  */
 
 import { apiRequest } from "../lib/api-client"
+import type { SuiviRestauration } from "../lib/restauration-progression"
 
 /** Un message, tel qu'il se range dans l'archive. */
 export interface MessageArchive {
@@ -187,6 +188,7 @@ export async function deposerBloc(
  */
 export async function restaurer(
   maitresse: CryptoKey,
+  suivi?: SuiviRestauration,
 ): Promise<{ messages: MessageArchive[]; blocsIllisibles: number }> {
   /*
    * ⚠️ PAGE PAR PAGE, JUSQU'AU BOUT. Le serveur rend au plus 2 000 blocs par
@@ -199,11 +201,19 @@ export async function restaurer(
    */
   const blocs: BlocChiffre[] = []
   let suivant: string | null = null
+  let total: number | undefined
   for (let tour = 0; tour < 50; tour++) {
-    const reponse: { blocs?: BlocChiffre[]; suivant?: string | null } = await apiRequest(
+    const reponse: {
+      blocs?: BlocChiffre[]
+      suivant?: string | null
+      totalArchive?: number
+    } = await apiRequest(
       `/api/e2ee/archive${suivant ? `?apres=${encodeURIComponent(suivant)}` : ""}`,
     )
+    // `totalArchive` : première page seulement, serveur récent (backend 5c1c7e0).
+    total ??= reponse.totalArchive
     blocs.push(...(reponse.blocs ?? []))
+    suivi?.({ etape: "telechargement", fait: blocs.length, total })
     suivant = reponse.suivant ?? null
     if (!suivant) break
   }
@@ -211,7 +221,8 @@ export async function restaurer(
   const messages: MessageArchive[] = []
   let blocsIllisibles = 0
 
-  for (const bloc of blocs) {
+  for (const [i, bloc] of blocs.entries()) {
+    if (i % 25 === 0) suivi?.({ etape: "dechiffrement", fait: i, total: blocs.length })
     try {
       messages.push(...(await dechiffrerBloc(maitresse, bloc)))
     } catch (e) {
