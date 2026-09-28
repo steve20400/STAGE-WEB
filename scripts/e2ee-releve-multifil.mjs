@@ -53,7 +53,10 @@ async function compte(prenom) {
   const hash = await bcrypt.hash(MOT_DE_PASSE, 12);
   const u = await prisma.user.upsert({
     where: { email },
-    update: { passwordHash: hash, emailVerified: true, typeCompte: 0 },
+    // ⚠️ `appareilTotal: 3` : deux NAVIGATEURS par compte (le serveur en laisse
+    // `appareilTotal - 1`). Sans cela, le second navigateur d’Alice (étape ⑩)
+    // évincerait le premier — c’est la règle « un mobile et un poste ».
+    update: { passwordHash: hash, emailVerified: true, typeCompte: 0, appareilTotal: 3 },
     create: {
       email,
       nom: prenom,
@@ -116,7 +119,7 @@ async function connecter(navigateur, qui) {
   // Le portillon du nom d'appareil, à la première connexion d'un navigateur.
   const portillon = page.locator(".pseudo-gate-champ");
   if (await portillon.isVisible().catch(() => false)) {
-    await portillon.fill(`Banc ${qui.prenom}`);
+    await portillon.fill(`Banc ${qui.prenom} ${Date.now().toString(36)}`);
     await page.locator(".pseudo-gate-valider").click();
     await page.waitForSelector(".pseudo-gate-overlay", { state: "detached", timeout: 15000 })
       .catch(() => {});
@@ -401,6 +404,34 @@ async function main() {
     neufs.length > 0 && Math.min(...neufs) > Math.max(...avantPub),
     `min neuf ${Math.min(...neufs)}, max ancien ${Math.max(...avantPub)}`,
   );
+
+  titre("⑩ Mon message se lit aussi sur mon autre appareil");
+  /*
+   * 🐛 LE CLIENT NE CHIFFRAIT QUE POUR LE CORRESPONDANT. Un message écrit
+   * depuis le téléphone n’arrivait pas sur le navigateur du même compte — sauf
+   * plus tard, par l’archive, si elle était ouverte.
+   *
+   * ⚠️ LE SECOND APPAREIL SE CONNECTE AVANT L’ENVOI : la restauration de
+   * l’archive a lieu à la connexion, et l’inverse lui ferait récupérer le
+   * message par là — le contrôle passerait sans rien prouver.
+   */
+  const A2 = await connecter(navigateur, alice);
+  for (let i = 0; i < 20 && (await prisma.e2eeIdentite.count({ where: { userId: alice.id } })) < 2; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  verifie(
+    "Alice a deux appareils publiés",
+    (await prisma.e2eeIdentite.count({ where: { userId: alice.id } })) === 2,
+  );
+  const texteMoi = `Moi-${Date.now().toString(36)}`;
+  const idMoi = await envoyer(A.page, filAlice, texteMoi);
+  const pourMoi = await prisma.e2eeEnveloppe.count({
+    where: { messageId: idMoi, destinataireId: alice.id },
+  });
+  verifie("une enveloppe part vers mon autre appareil", pourMoi === 1, `${pourMoi} enveloppe(s)`);
+  await A2.page.goto(`${WEB}/chats/${filAlice}`, { waitUntil: "networkidle" });
+  verifie("et mon autre appareil l’affiche", await afficheLeTexte(A2.page, texteMoi));
+  A.erreurs.push(...A2.erreurs);
 
   const fatales = [...B.erreurs, ...A.erreurs, ...C.erreurs];
   verifie("aucune erreur JavaScript", fatales.length === 0, fatales.slice(0, 3).join(" | "));
