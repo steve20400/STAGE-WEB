@@ -121,8 +121,20 @@ async function connecter(navigateur, qui) {
   if (await portillon.isVisible().catch(() => false)) {
     await portillon.fill(`Banc ${qui.prenom} ${Date.now().toString(36)}`);
     await page.locator(".pseudo-gate-valider").click();
-    await page.waitForSelector(".pseudo-gate-overlay", { state: "detached", timeout: 15000 })
-      .catch(() => {});
+    /*
+     * ⚠️ ON NE L’AVALE PLUS. Le 28/09/2026, un nom déjà pris par un appareil
+     * d’une exécution précédente laissait ce portillon OUVERT ; l’attente
+     * échouait en silence et la suite du banc tournait sous une fenêtre
+     * modale — d’où un faux « le portillon revient au rechargement ».
+     */
+    const ferme = await page
+      .waitForSelector(".pseudo-gate-overlay", { state: "detached", timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!ferme) {
+      const message = await page.locator(".pseudo-gate-erreur").textContent().catch(() => null);
+      throw new Error(`portillon du nom d’appareil resté ouvert pour ${qui.prenom} : ${message}`);
+    }
   }
   return { contexte, page, erreurs };
 }

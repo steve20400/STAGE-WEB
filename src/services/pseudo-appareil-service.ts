@@ -41,8 +41,17 @@ function mettreEnCache(pseudo: string | null) {
  * Renvoie null quand il n'y en a pas — ce n'est pas une erreur, c'est la
  * reponse normale a la premiere connexion d'un compte sur cet appareil, et
  * c'est elle qui declenche la demande.
+ *
+ * Renvoie `undefined` quand on NE SAIT PAS — reseau coupe, route absente.
+ *
+ * 🐛 LA PANNE RENDAIT `null`, c'est-a-dire « pas de nom ». Un appareil deja
+ * nomme, sans le nom en cache (autre navigateur, cache efface), se voyait
+ * redemander son nom a la premiere requete perdue — frequent sur une liaison
+ * qui perd des paquets. Le commentaire du `catch` disait « on ne bloque pas
+ * l'entree » ; c'etait l'inverse : la fenetre bloque l'ecran. Prouve par
+ * `scripts/pseudo-portillon.mjs` le 28/09/2026.
  */
-export async function lirePseudoServeur(): Promise<string | null> {
+export async function lirePseudoServeur(): Promise<string | null | undefined> {
   try {
     const reponse = await apiRequest<{ nomAgent: string | null }>(
       `/api/appareils/nom-agent?cookiesWebId=${encodeURIComponent(getOrCreateWebDeviceId())}`
@@ -50,8 +59,8 @@ export async function lirePseudoServeur(): Promise<string | null> {
     mettreEnCache(reponse.nomAgent)
     return reponse.nomAgent
   } catch {
-    // Reseau ou route absente : on ne bloque pas l'entree dans l'application.
-    return null
+    // On ne sait pas : on ne demande rien. La prochaine ouverture reessaiera.
+    return undefined
   }
 }
 
@@ -77,5 +86,6 @@ export async function enregistrerPseudo(pseudo: string): Promise<string> {
  */
 export async function pseudoManquant(): Promise<boolean> {
   if (pseudoEnCache()) return false
+  // ⚠️ `=== null` STRICT : `undefined` (panne) ne veut pas dire « manquant ».
   return (await lirePseudoServeur()) === null
 }
