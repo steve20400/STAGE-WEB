@@ -281,6 +281,51 @@ async function main() {
     await afficheLeTexte(B.page, texteAlice),
   );
 
+  titre("⑦ « Transférer » n'est pas proposé sur un message chiffré");
+  /*
+   * Le serveur recopie `content` pour transférer, et un message chiffré n'en a
+   * pas : bulle vide chez le destinataire. Le menu ne doit plus le proposer.
+   *
+   * ⚠️ TÉMOIN DANS LE MÊME FIL : un message SANS enveloppe (donc non chiffré)
+   * garde « Transférer ». Sans lui, un menu cassé passerait ce contrôle.
+   */
+  const texteTemoin = `Temoin-${Date.now().toString(36)}`;
+  await prisma.message.create({
+    data: { convId: filAlice, senderId: alice.id, content: texteTemoin, type: "TEXT", status: "SENT" },
+  });
+  await B.page.reload({ waitUntil: "networkidle" });
+  // ⚠️ Le portillon du nom d’appareil peut revenir au rechargement : il couvre
+  // la page et intercepte le clic. Les étapes précédentes ne cliquaient pas.
+  const portillon = B.page.locator(".pseudo-gate-champ");
+  // ⚠️ `waitFor` et non `isVisible` : celui-ci ne patiente pas, il regarde
+  // l’instant présent — et le portillon s’ouvre une à deux secondes plus tard.
+  if (await portillon.waitFor({ state: "visible", timeout: 8000 }).then(() => true).catch(() => false)) {
+    await portillon.fill(`Banc Bob ${Date.now().toString(36)}`);
+    await B.page.locator(".pseudo-gate-valider").click();
+    await B.page.waitForSelector(".pseudo-gate-overlay", { state: "detached", timeout: 15000 }).catch(() => {});
+  }
+
+  if (process.env.CAPTURE) await B.page.screenshot({ path: process.env.CAPTURE });
+
+  async function proposeTransferer(texte) {
+    await B.page.getByText(texte, { exact: true }).first().click({ button: "right" });
+    const vu = await B.page
+      .getByRole("button", { name: /^Transférer$/ })
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    await B.page.keyboard.press("Escape");
+    await B.page.mouse.click(5, 5);
+    return vu;
+  }
+
+  verifie("témoin : proposé sur un message non chiffré", await afficheLeTexte(B.page, texteTemoin) && (await proposeTransferer(texteTemoin)));
+  verifie(
+    "absent sur le message chiffré d'Alice",
+    !(await proposeTransferer(texteAlice)),
+    "transférer produirait une bulle vide chez le destinataire",
+  );
+
   const fatales = [...B.erreurs, ...A.erreurs, ...C.erreurs];
   verifie("aucune erreur JavaScript", fatales.length === 0, fatales.slice(0, 3).join(" | "));
 
