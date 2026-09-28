@@ -122,6 +122,28 @@ export async function phaseTrois() {
     "une alerte qui se répète cesse d'être lue",
   );
 
+  /* ── ⑤ Un APPAREIL DE PLUS chez un correspondant connu ───────────────── */
+  /*
+   * 🐛 Seul le changement de clé d'un appareil déjà vu alertait. Un serveur
+   * qui AJOUTE un appareil à Bob — dont il détient la clé privée — faisait
+   * chiffrer Alice pour lui sans la moindre alerte.
+   */
+  const magasin = new CoffreE2ee();
+  await magasin.saveIdentity(`${BOB}.2`, CLE_B);
+  verifie(
+    etat,
+    "un second appareil de Bob déclenche l'alerte",
+    identitesChangees().includes(BOB),
+    `obtenu : ${JSON.stringify(identitesChangees())}`,
+  );
+  await magasin.saveIdentity("carole-uuid.7", CLE_A);
+  verifie(
+    etat,
+    "témoin : le PREMIER appareil d'un nouveau contact n'alerte pas",
+    !identitesChangees().includes("carole-uuid"),
+    `obtenu : ${JSON.stringify(identitesChangees())}`,
+  );
+
   await viderCoffre();
   return etat.echecs;
 }

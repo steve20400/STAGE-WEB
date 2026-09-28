@@ -12,6 +12,7 @@ import {
   ecrireSecret,
   lireSecret,
 } from "./coffre-chiffre"
+import { getMyUserId } from "../data/session-user"
 
 /**
  * LE COFFRE DU CLIENT — tout ce que le serveur ne doit jamais voir.
@@ -261,7 +262,32 @@ export class CoffreE2ee implements StorageType {
   async saveIdentity(identifiant: string, cle: ArrayBuffer): Promise<boolean> {
     const avant = lire<string>(`identite.${identifiant}`)
     const apres = versB64(cle)
+
+    /*
+     * 🔴 UN APPAREIL DE PLUS CHEZ UN CORRESPONDANT CONNU SE SIGNALE AUSSI.
+     *
+     * 🐛 SEUL LE CHANGEMENT DE CLÉ D'UN APPAREIL DÉJÀ VU ÉTAIT SIGNALÉ. Or un
+     * serveur qui voudrait lire les messages de Bob n'a pas besoin de changer
+     * sa clé : il lui AJOUTE un appareil, dont il détient la clé privée, et
+     * Alice chiffre désormais aussi pour lui — sans la moindre alerte. Seule
+     * la pastille « vérifié » tombait, et pour un contact jamais vérifié, rien
+     * du tout. C'est aussi ce que montre WhatsApp : le code de sécurité change
+     * quand le correspondant ajoute un appareil.
+     *
+     * ⚠️ PAS AU PREMIER CONTACT : le tout premier appareil d'un correspondant
+     * n'a rien remplacé ni rejoint. Et PAS POUR SOI : mes propres appareils
+     * s'ajoutent de mon fait (lot 5), m'en alerter n'aurait aucun sens.
+     */
+    const compte = identifiant.split(".")[0]
+    const nouvelAppareil =
+      avant === undefined &&
+      compte !== getMyUserId() &&
+      clesSecrets().some(
+        (k) => k.startsWith(`identite.${compte}.`) && k !== `identite.${identifiant}`,
+      )
+
     ecrire(`identite.${identifiant}`, apres)
+    if (nouvelAppareil) noterChangement(identifiant)
     const change = avant !== undefined && avant !== apres
     /*
      * 🔴 C'EST ICI, ET NULLE PART AILLEURS, QUE LE CHANGEMENT EST VISIBLE. Une
