@@ -1,4 +1,6 @@
 import { clearAllData } from "../indexedDB/messageRepository"
+import { viderCoffre } from "./coffre-chiffre"
+import { refermer as refermerSauvegarde } from "./e2ee-sauvegarde"
 
 /**
  * Efface les traces locales d'un compte : caches de lecture rapide et donnees
@@ -78,6 +80,43 @@ export async function purgeLocalAccountData(): Promise<void> {
     localStorage.removeItem(CACHE_OWNER_KEY)
   } catch {
     // idem
+  }
+
+  /*
+   * 🔴 LE COFFRE DE CHIFFREMENT PART AVEC LE COMPTE.
+   *
+   * 🐛 SEULE LA DÉCONNEXION SIMPLE LE VIDAIT. Après une session expirée, un
+   * « déconnecter partout » ou une suppression de compte, le compte SUIVANT
+   * qui se connectait dans ce navigateur reprenait l'identité privée du
+   * précédent — et la publiait comme la sienne —, avec ses sessions et la clé
+   * de son archive. Prouvé par `scripts/e2ee-coffre-compte.mjs` le 29/09/2026.
+   *
+   * ⚠️ ICI, ET PAS SEULEMENT À LA DÉCONNEXION : cette purge est appelée par
+   * toutes les sorties de session (`leaveSessionLocally`) ET par le verrou de
+   * propriétaire quand un autre compte prend la main — le seul chemin qui
+   * couvre la session expirée ou l'onglet fermé sans se déconnecter.
+   *
+   * ⚠️ LA MÊME PERSONNE QUI SE RECONNECTE GARDE SON COFFRE : le verrou ne
+   * purge que si le propriétaire CHANGE. Pas d'alerte « clé changée » chez ses
+   * correspondants pour une simple expiration de session.
+   */
+  // La clé de l'archive, gardée en mémoire par la page, part la première :
+  // sinon le compte suivant archiverait ses messages avec celle du précédent.
+  refermerSauvegarde()
+  try {
+    await viderCoffre()
+  } catch {
+    // IndexedDB refusé : rien d'autre à tenter.
+  }
+  try {
+    const aRetirer: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const cle = localStorage.key(i)
+      if (cle?.startsWith("alanya.e2ee.")) aRetirer.push(cle)
+    }
+    for (const cle of aRetirer) localStorage.removeItem(cle)
+  } catch {
+    // stockage inaccessible
   }
 }
 

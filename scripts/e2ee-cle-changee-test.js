@@ -21,6 +21,7 @@
  */
 
 import { ouvrirCoffre, coffreEcrit, viderCoffre } from "../src/services/coffre-chiffre";
+import { verifierAppareil } from "../src/services/e2ee-empreinte";
 import {
   CoffreE2ee,
   identitesChangees,
@@ -141,6 +142,28 @@ export async function phaseTrois() {
     etat,
     "témoin : le PREMIER appareil d'un nouveau contact n'alerte pas",
     !identitesChangees().includes("carole-uuid"),
+    `obtenu : ${JSON.stringify(identitesChangees())}`,
+  );
+
+  /* ── ⑥ Vérifier UN appareil ne blanchit pas les autres ─────────────── */
+  /*
+   * 🐛 L'ALERTE S'EFFAÇAIT DÈS LA PREMIÈRE COMPARAISON. Bob réinstalle son
+   * téléphone et, au même moment, le serveur lui ajoute un appareil fantôme :
+   * Alice compare le code du vrai téléphone, l'alerte disparaissait, et le
+   * fantôme restait sans vérification ni avertissement.
+   */
+  await verifierAppareil(BOB, 2);
+  verifie(
+    etat,
+    "après un seul appareil vérifié sur deux, l'alerte reste",
+    identitesChangees().includes(BOB),
+    "l'appareil 1 de Bob n'a jamais été comparé",
+  );
+  await verifierAppareil(BOB, 1);
+  verifie(
+    etat,
+    "une fois TOUS les appareils vérifiés, elle s'efface",
+    !identitesChangees().includes(BOB),
     `obtenu : ${JSON.stringify(identitesChangees())}`,
   );
 

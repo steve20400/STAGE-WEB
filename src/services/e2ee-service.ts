@@ -9,7 +9,7 @@ import {
 import { apiRequest } from "../lib/api-client"
 import { getOrCreateWebDeviceId } from "./appareils-service"
 import { CoffreE2ee } from "./e2ee-store"
-import { ouvrirCoffre, viderCoffre, coffreEcrit } from "./coffre-chiffre"
+import { ouvrirCoffre, viderCoffre, coffreEcrit, sousVerrouCoffre } from "./coffre-chiffre"
 
 /**
  * LE CHIFFREMENT DE BOUT EN BOUT — protocole Signal, côté navigateur.
@@ -193,7 +193,20 @@ function depuisB64(b64: string): ArrayBuffer {
  * permet de l'appeler au démarrage sans réfléchir — et ce qui évite la faute la
  * plus coûteuse, une identité neuve à chaque rechargement de page.
  */
-export async function preparerCetAppareil(): Promise<{
+export function preparerCetAppareil(): Promise<{
+  deviceId: number
+  prekeysRestantes: number
+}> {
+  /*
+   * ⚠️ SOUS LE VERROU DES ONGLETS : deux onglets neufs ouverts ensemble
+   * trouvaient chacun un coffre vide et publiaient chacun une identité ; deux
+   * onglets anciens réservaient les mêmes numéros de pré-clés. Voir
+   * `sousVerrouCoffre`.
+   */
+  return sousVerrouCoffre(preparerSousVerrou)
+}
+
+async function preparerSousVerrou(): Promise<{
   deviceId: number
   prekeysRestantes: number
 }> {
@@ -425,7 +438,11 @@ export async function ouvrirSessions(userId: string, exclure?: number): Promise<
  * ⚠️ SERVEUR ANTÉRIEUR : il ignore `?liste=1` et rend directement des
  * paquets. On les traite alors comme avant, plutôt que de ne rien envoyer.
  */
-async function ouvrirSessionsInterne(userId: string, exclure?: number): Promise<number[]> {
+function ouvrirSessionsInterne(userId: string, exclure?: number): Promise<number[]> {
+  return sousVerrouCoffre(() => ouvrirSessionsSousVerrou(userId, exclure))
+}
+
+async function ouvrirSessionsSousVerrou(userId: string, exclure?: number): Promise<number[]> {
   await ouvrirCoffre()
   const base = `/api/e2ee/cles/${encodeURIComponent(userId)}`
   const liste = await apiRequest<{
@@ -531,7 +548,16 @@ export interface EnveloppeSortante {
  * par appareil. Trois appareils = trois chiffrés distincts, chacun illisible
  * par les deux autres.
  */
-export async function chiffrerPour(
+export function chiffrerPour(
+  userId: string,
+  devices: number[],
+  texte: string,
+): Promise<EnveloppeSortante[]> {
+  // ⚠️ Sous verrou : chiffrer AVANCE le cliquet. Voir `sousVerrouCoffre`.
+  return sousVerrouCoffre(() => chiffrerSousVerrou(userId, devices, texte))
+}
+
+async function chiffrerSousVerrou(
   userId: string,
   devices: number[],
   texte: string,
@@ -588,7 +614,12 @@ export interface EnveloppeRecue {
  * envoie chercher le défaut du côté des identités. Le vrai coupable est ce
  * nombre.
  */
-export async function dechiffrer(e: EnveloppeRecue): Promise<string> {
+export function dechiffrer(e: EnveloppeRecue): Promise<string> {
+  // ⚠️ Sous verrou : déchiffrer avance aussi le cliquet, du côté réception.
+  return sousVerrouCoffre(() => dechiffrerSousVerrou(e))
+}
+
+async function dechiffrerSousVerrou(e: EnveloppeRecue): Promise<string> {
   await ouvrirCoffre()
   const adresse = new SignalProtocolAddress(e.expediteurId, e.expediteurDevice)
   const chiffreur = new SessionCipher(coffre, adresse)

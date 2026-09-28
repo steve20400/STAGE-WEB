@@ -1,7 +1,7 @@
 import { FingerprintGenerator } from "@privacyresearch/libsignal-protocol-typescript"
 import { getMyUserId } from "../data/session-user"
 import { idAppareil } from "./e2ee-service"
-import { CoffreE2ee } from "./e2ee-store"
+import { CoffreE2ee, oublierAvertissement } from "./e2ee-store"
 import {
   clesSecrets,
   ecrireSecret,
@@ -159,6 +159,23 @@ export async function marquerVerifie(peerUserId: string, deviceId: number): Prom
   const cle = lireSecret<string>(`identite.${peerUserId}.${deviceId}`)
   if (!cle) return
   ecrireSecret(cleVerification(peerUserId, deviceId), cle)
+}
+
+/**
+ * L'utilisateur a comparé le code d'UN appareil et le déclare vérifié.
+ *
+ * ⚠️ L'AVERTISSEMENT NE S'EFFACE QUE SI TOUS LES APPAREILS LE SONT. La liste
+ * des avertissements retient le COMPTE, pas l'appareil : l'effacer à la
+ * première comparaison blanchissait aussi un appareil jamais comparé.
+ *
+ * 🐛 C'EST CE QUE FAISAIT LE DIALOGUE. Bob réinstalle son téléphone et, au même
+ * moment, le serveur lui ajoute un appareil fantôme ; Alice compare le code du
+ * vrai téléphone, l'alerte disparaissait, et le fantôme restait invisible.
+ * Prouvé par `scripts/e2ee-cle-changee.mjs` ⑥ le 28/09/2026.
+ */
+export async function verifierAppareil(peerUserId: string, deviceId: number): Promise<void> {
+  await marquerVerifie(peerUserId, deviceId)
+  if (estVerifie(peerUserId)) oublierAvertissement(peerUserId)
 }
 
 /** L'utilisateur revient sur sa déclaration. */

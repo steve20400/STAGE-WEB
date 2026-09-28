@@ -14,6 +14,7 @@ import {
   getAllConversations,
   getConversationById,
   upsertMessage,
+  rangerClairRecu,
   saveBulkMessages,
   getMessagesByConversation,
   deleteMessage,
@@ -94,6 +95,14 @@ export async function cacheMessages(messages: CachedMessage[]): Promise<void> {
 /** Sauvegarde un message unique (ex : message WebSocket entrant). */
 export async function cacheMessage(message: CachedMessage): Promise<void> {
   await upsertMessage(message)
+}
+
+/**
+ * Range un texte relevé d'une enveloppe, sans jamais écraser la ligne d'un
+ * autre expéditeur ou d'un autre fil — voir `rangerClairRecu`.
+ */
+export async function cacheClairRecu(message: CachedMessage): Promise<boolean> {
+  return rangerClairRecu(message)
 }
 
 /** Charge les messages d'une conversation depuis IndexedDB (les plus récents). */

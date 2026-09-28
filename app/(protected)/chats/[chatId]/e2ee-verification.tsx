@@ -3,11 +3,10 @@ import QRCode from "qrcode"
 import {
   empreintesPour,
   enGroupes,
-  marquerVerifie,
+  verifierAppareil,
   retirerVerification,
   type Empreinte,
 } from "../../../../src/services/e2ee-empreinte"
-import { oublierAvertissement } from "../../../../src/services/e2ee-store"
 import { useTranslation } from "../../../../src/i18n"
 import "./e2ee-verification.css"
 
@@ -111,18 +110,12 @@ export function E2eeVerification({
     if (e.verifie) {
       await retirerVerification(peerUserId, e.deviceId)
     } else {
-      await marquerVerifie(peerUserId, e.deviceId)
       /*
-       * ⚠️ L'AVERTISSEMENT DE CHANGEMENT DE CLÉ S'EFFACE ICI, et seulement ici.
-       * L'utilisateur vient de faire ce que l'alerte lui demandait : comparer.
-       * Le laisser en place après coup apprendrait à l'ignorer.
-       *
-       * ⚠️ LA LISTE DES AVERTISSEMENTS RETIENT LE COMPTE, PAS L'APPAREIL —
-       * `clesChangees.add(identifiant.split(".")[0])` dans `e2ee-store`. Lui
-       * passer une adresse `compte.appareil` ne retirerait rien, en silence :
-       * l'alerte serait restée affichée après une comparaison réussie.
+       * ⚠️ L'AVERTISSEMENT DE CHANGEMENT DE CLÉ S'EFFACE ICI, et seulement ici —
+       * mais seulement quand TOUS les appareils du correspondant sont vérifiés.
+       * La règle vit dans `verifierAppareil`, où un banc peut l'éprouver.
        */
-      oublierAvertissement(peerUserId)
+      await verifierAppareil(peerUserId, e.deviceId)
     }
     await recharger()
   }
