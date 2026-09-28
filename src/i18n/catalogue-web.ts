@@ -54,7 +54,7 @@ export const WEB_TRANSLATION_KEYS = [
   "e2ee_sauv_cle_titre", "e2ee_sauv_cle_avert", "e2ee_sauv_cle_notee", "e2ee_sauv_copier",
   "e2ee_sauv_serrure_motdepasse", "e2ee_sauv_serrure_recuperation", "e2ee_sauv_serrure_trousseau",
   "e2ee_sauv_secret_label", "e2ee_sauv_secret_place", "e2ee_sauv_mauvais_secret",
-  "e2ee_sauv_restaurer", "e2ee_sauv_restaurer_cle", "e2ee_sauv_nouvelle_cle",
+  "e2ee_sauv_restaurer", "e2ee_sauv_restaurer_cle", "e2ee_sauv_nouvelle_cle", "e2ee_sauv_renouveler_cle",
   "e2ee_sauv_restaure", "e2ee_sauv_illisibles",
   "e2ee_sauv_effacer", "e2ee_sauv_effacer_avert", "e2ee_sauv_effacer_oui",
   // Avant une deconnexion, quand il y a du chiffre et AUCUNE sauvegarde.
@@ -1467,6 +1467,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restaurer avec le mot de passe",
     e2ee_sauv_restaurer_cle: "Restaurer avec la clé",
     e2ee_sauv_nouvelle_cle: "Créer une clé de récupération",
+
+    e2ee_sauv_renouveler_cle: "Remplacer ma clé de récupération",
     e2ee_sauv_restaure: "{n} message(s) restauré(s).",
     e2ee_sauv_illisibles: "{n} bloc(s) n'ont pas pu être lus.",
     e2ee_sauv_effacer: "Supprimer la sauvegarde",
@@ -2900,6 +2902,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restore with password",
     e2ee_sauv_restaurer_cle: "Restore with key",
     e2ee_sauv_nouvelle_cle: "Create a recovery key",
+
+    e2ee_sauv_renouveler_cle: "Replace my recovery key",
     e2ee_sauv_restaure: "{n} message(s) restored.",
     e2ee_sauv_illisibles: "{n} block(s) could not be read.",
     e2ee_sauv_effacer: "Delete backup",
@@ -4319,6 +4323,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restore with password",
     e2ee_sauv_restaurer_cle: "Restore with key",
     e2ee_sauv_nouvelle_cle: "Create a recovery key",
+
+    e2ee_sauv_renouveler_cle: "Replace my recovery key",
     e2ee_sauv_restaure: "{n} message(s) restored.",
     e2ee_sauv_illisibles: "{n} block(s) could not be read.",
     e2ee_sauv_effacer: "Delete backup",
@@ -5745,6 +5751,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restore with password",
     e2ee_sauv_restaurer_cle: "Restore with key",
     e2ee_sauv_nouvelle_cle: "Create a recovery key",
+
+    e2ee_sauv_renouveler_cle: "Replace my recovery key",
     e2ee_sauv_restaure: "{n} message(s) restored.",
     e2ee_sauv_illisibles: "{n} block(s) could not be read.",
     e2ee_sauv_effacer: "Delete backup",
@@ -7184,6 +7192,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restore with password",
     e2ee_sauv_restaurer_cle: "Restore with key",
     e2ee_sauv_nouvelle_cle: "Create a recovery key",
+
+    e2ee_sauv_renouveler_cle: "Replace my recovery key",
     e2ee_sauv_restaure: "{n} message(s) restored.",
     e2ee_sauv_illisibles: "{n} block(s) could not be read.",
     e2ee_sauv_effacer: "Delete backup",
@@ -8610,6 +8620,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restore with password",
     e2ee_sauv_restaurer_cle: "Restore with key",
     e2ee_sauv_nouvelle_cle: "Create a recovery key",
+
+    e2ee_sauv_renouveler_cle: "Replace my recovery key",
     e2ee_sauv_restaure: "{n} message(s) restored.",
     e2ee_sauv_illisibles: "{n} block(s) could not be read.",
     e2ee_sauv_effacer: "Delete backup",
@@ -10029,6 +10041,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restore with password",
     e2ee_sauv_restaurer_cle: "Restore with key",
     e2ee_sauv_nouvelle_cle: "Create a recovery key",
+
+    e2ee_sauv_renouveler_cle: "Replace my recovery key",
     e2ee_sauv_restaure: "{n} message(s) restored.",
     e2ee_sauv_illisibles: "{n} block(s) could not be read.",
     e2ee_sauv_effacer: "Delete backup",
@@ -11406,6 +11420,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restore with password",
     e2ee_sauv_restaurer_cle: "Restore with key",
     e2ee_sauv_nouvelle_cle: "Create a recovery key",
+
+    e2ee_sauv_renouveler_cle: "Replace my recovery key",
     e2ee_sauv_restaure: "{n} message(s) restored.",
     e2ee_sauv_illisibles: "{n} block(s) could not be read.",
     e2ee_sauv_effacer: "Delete backup",
@@ -12827,6 +12843,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     e2ee_sauv_restaurer: "Restore with password",
     e2ee_sauv_restaurer_cle: "Restore with key",
     e2ee_sauv_nouvelle_cle: "Create a recovery key",
+
+    e2ee_sauv_renouveler_cle: "Replace my recovery key",
     e2ee_sauv_restaure: "{n} message(s) restored.",
     e2ee_sauv_illisibles: "{n} block(s) could not be read.",
     e2ee_sauv_effacer: "Delete backup",

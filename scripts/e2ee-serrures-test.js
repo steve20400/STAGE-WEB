@@ -12,6 +12,7 @@ import {
   tirerCleRecuperation,
 } from "../src/services/e2ee-serrures"
 import { chiffrerBloc, dechiffrerBloc } from "../src/services/e2ee-archive"
+import { MOTS_RECUPERATION } from "../src/services/mots-recuperation"
 
 let echecs = 0
 
@@ -189,6 +190,45 @@ export async function scenario() {
   verifie(
     "une saisie en majuscules, mal espacée, ouvre quand même",
     (await dechiffrerBloc(parRecup, bloc)).length === 2,
+  )
+
+  /*
+   * 🐛 12 MOTS PARMI 32 = 60 BITS, sans étirement. La liste passe à 2 048 mots
+   * (BIP39 français sans accents) : 132 bits pour la même chose à recopier.
+   */
+  verifie(
+    "la liste compte 2 048 mots distincts (11 bits chacun)",
+    MOTS_RECUPERATION.length === 2048 && new Set(MOTS_RECUPERATION).size === 2048,
+    `${MOTS_RECUPERATION.length} mots, ${new Set(MOTS_RECUPERATION).size} distincts`,
+  )
+  const liste = new Set(MOTS_RECUPERATION)
+  const tirages = Array.from({ length: 200 }, () => tirerCleRecuperation().split(" "))
+  verifie(
+    "chaque mot tiré vient de la liste",
+    tirages.every((t) => t.length === 12 && t.every((m) => liste.has(m))),
+  )
+  const distincts = new Set(tirages.flat()).size
+  verifie(
+    "et les tirages couvrent bien plus que 32 mots",
+    distincts > 1000,
+    `${distincts} mots distincts sur 2 400 tirés — la liste de 32 est-elle encore branchée ?`,
+  )
+
+  /*
+   * ⚠️ UNE CLÉ À L'ANCIEN FORMAT S'OUVRE TOUJOURS : la serrure dérive sa clé du
+   * TEXTE, pas d'une position dans une liste. Des clés de 32 mots ont été
+   * distribuées ; changer de liste ne doit pas les rendre inutilisables.
+   */
+  const ANCIENNE = "tortue riviere lampe cousin fenetre orage sable guitare renard marbre pluie cerise"
+  const { serrures: sAnc } = await creerArchive({ recuperation: ANCIENNE })
+  verifie(
+    "une clé de l'ancienne liste ouvre toujours sa serrure",
+    (await ouvrirArchive(ANCIENNE, sAnc[0])) !== undefined,
+  )
+  verifie(
+    "une saisie avec accents est ramenée à la forme de la liste",
+    normaliserCleRecuperation("  Abîme  ÉLÈVE ") === "abime eleve",
+    normaliserCleRecuperation("  Abîme  ÉLÈVE "),
   )
 
   /* ── ⑦ LE FORMAT SE DÉFEND DANS LE TEMPS ─────────────────────────── */
