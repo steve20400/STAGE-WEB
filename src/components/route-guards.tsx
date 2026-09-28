@@ -2,6 +2,7 @@ import { type ReactNode } from "react"
 import { Navigate, useLocation } from "react-router-dom"
 import { useAuth } from "./auth-provider"
 import { useTranslation } from "../i18n"
+import { restaurationEnAttente } from "../services/restauration-en-attente"
 
 function RouteGuardFallback() {
   const { t } = useTranslation()
@@ -55,7 +56,9 @@ export function PublicOnlyRoute({ children }: { children: ReactNode }) {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/chats" replace />
+    // ⚠️ Juste après la connexion, l'historique chiffré revient d'abord : ce
+    // garde ne doit pas court-circuiter sa page. Voir `restauration-en-attente.ts`.
+    return <Navigate to={restaurationEnAttente() ? "/restauration" : "/chats"} replace />
   }
 
   return <>{children}</>

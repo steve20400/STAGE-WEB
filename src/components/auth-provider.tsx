@@ -32,10 +32,9 @@ import { claimLocalCaches, purgeLocalAccountData } from "../services/session-res
 import { oublierCetAppareil, preparerCetAppareil } from "../services/e2ee-service"
 import {
   refermer as refermerSauvegarde,
-  activerOuRestaurerALaConnexion,
   vider as viderSauvegarde,
 } from "../services/e2ee-sauvegarde"
-import { cacheMessage } from "../services/indexeddb-cache"
+import { confierMotDePasse } from "../services/restauration-en-attente"
 import {
   deletePrototypeAccount,
   migrateLegacyPrototypeAccounts,
@@ -238,22 +237,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * c'est précisément ce qui rend la serrure « mot de passe » utile malgré
      * sa limite.
      *
-     * ⚠️ `void` : la connexion ne l'attend pas. Restaurer peut prendre
-     * plusieurs secondes — Argon2id à lui seul en prend près d'une — et faire
-     * patienter devant un écran figé pour un historique qui arrivera de toute
-     * façon serait un mauvais échange.
+     * 🔴 LA RESTAURATION A SA PAGE DÉSORMAIS (28/09/2026) : `/restauration`,
+     * entre la connexion et la session, avec sa progression. Elle tournait ici
+     * en fond (`void`) et ses échecs finissaient dans la console — « un
+     * nouveau navigateur ne charge pas l archive ». Le mot de passe lui est
+     * confié EN MÉMOIRE, une fois. Voir `restauration-en-attente.ts`.
      */
-    void activerOuRestaurerALaConnexion(payload.password, async (m) => {
-      await cacheMessage({
-        id: m.id,
-        conversationId: m.convId,
-        senderId: m.expediteurId,
-        content: m.texte,
-        type: "TEXT",
-        status: "SENT",
-        createdAt: m.quand,
-      })
-    })
+    confierMotDePasse(payload.password)
 
     return nextUser
   }, [publierMesCles])
