@@ -492,6 +492,21 @@ export function subscribeToE2eeArrivee(
 }
 
 /**
+ * La sonnette d'un message chiffré, TOUTES conversations confondues.
+ *
+ * ⚠️ POUR LA LISTE DES CONVERSATIONS. Un message chiffré n'émet pas l'événement
+ * `message` (la route REST qui le crée ne diffuse rien) : sans cet abonnement,
+ * la liste ne bougeait qu'au prochain tour de son interrogation, et sans texte.
+ */
+export function subscribeToToutesArriveesE2ee(
+  handler: (convId: string) => void,
+): () => void {
+  return addListener((event) => {
+    if (event.type === "e2ee_arrivee" && typeof event.convId === "string") handler(event.convId)
+  })
+}
+
+/**
  * S'abonne a TOUS les nouveaux messages (toutes conversations).
  * Utilise par la liste des conversations et le dashboard pour se rafraichir en direct.
  */

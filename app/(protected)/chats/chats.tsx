@@ -8,9 +8,11 @@ import {
 } from "../../../src/services/chats-service"
 import {
   subscribeToAllMessages,
+  subscribeToToutesArriveesE2ee,
   subscribeToPresence,
   subscribeToWsConnected,
 } from "../../../src/services/websocket-service"
+import { releverEtRanger } from "../../../src/services/e2ee-releve"
 import { useAuth } from "../../../src/components/auth-provider"
 import { getMyUserId, toInitials } from "../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
@@ -84,7 +86,14 @@ function apercuDernierMessage(conv: ConversationMock): string {
    * ⚠️ AVANT TOUT LE RESTE : le type du dernier message n'a plus de sens ici,
    * la ligne etant vide de toute facon.
    */
-  if (estChiffree(conv.id)) return traduire(langue, "e2ee_apercu")
+  /*
+   * ⚠️ CORRIGÉ LE 28/09/2026 : LE LIBELLÉ N'EST PLUS QU'UN REPLI. Le texte
+   * déchiffré est désormais apporté par l'appareil lui-même
+   * (`dernier-message-local.ts`) : quand on l'a, on l'affiche — c'était la
+   * demande du user. Le libellé ne sert que si cet appareil ne l'a pas (message
+   * reçu ailleurs, jamais relevé ici).
+   */
+  if (estChiffree(conv.id) && !conv.lastMessage) return traduire(langue, "e2ee_apercu")
 
   if (conv.lastMessageType === "contact" || conv.lastMessageType === "location") {
     /*
@@ -361,6 +370,22 @@ export default function ChatsPage() {
       refreshTimer.current = setTimeout(refresh, 400)
     }
     const unsubscribeMessages = subscribeToAllMessages(scheduleRefresh)
+    /*
+     * 🔴 UN MESSAGE CHIFFRÉ N’ÉMET PAS `message`, seulement cette sonnette.
+     * On relève — le texte est déchiffré et rangé dans le cache de son fil, où
+     * la liste ira le chercher (`dernier-message-local.ts`) — puis on recharge
+     * la liste, qui ramène le compteur de non-lus du serveur. Demande du user,
+     * 28/09/2026.
+     *
+     * ⚠️ SANS CONFLIT AVEC LE FIL OUVERT : les relèves passent une par une
+     * (`e2ee-releve.ts`), et le fil ouvert recharge ses messages en relisant
+     * le cache APRÈS sa propre relève — il trouve le texte rangé ici.
+     */
+    const unsubscribeE2ee = subscribeToToutesArriveesE2ee(() => {
+      void releverEtRanger()
+        .catch(() => undefined)
+        .finally(scheduleRefresh)
+    })
     // Et on se resynchronise apres chaque (re)connexion du WebSocket.
     const unsubscribeConnected = subscribeToWsConnected(scheduleRefresh)
 
@@ -387,6 +412,7 @@ export default function ChatsPage() {
     return () => {
       cancelled = true
       unsubscribeMessages()
+      unsubscribeE2ee()
       unsubscribeConnected()
       unsubscribePresence()
       clearInterval(pollId)

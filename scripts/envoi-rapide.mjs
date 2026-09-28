@@ -149,7 +149,8 @@ async function main() {
   await B.goto(`${WEB}/chats/${fil}`, { waitUntil: "networkidle" });
   const positions = [];
   for (const t of textes) {
-    const el = B.getByText(t, { exact: true }).first();
+    // Dans la zone des messages : le dernier texte figure aussi dans la liste.
+    const el = B.locator(".room-body").getByText(t, { exact: true }).first();
     const vu = await el.waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
     positions.push(vu ? (await el.boundingBox())?.y ?? null : null);
   }
