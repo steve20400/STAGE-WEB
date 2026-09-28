@@ -4,6 +4,7 @@ import { type ConversationMock, type MessageType } from "../mocks/chat-data"
 import { getMyUserId, loadSessionUser, toInitials } from "../data/session-user"
 import { apiRequest } from "../lib/api-client"
 import { noteEtatChiffrement } from "./e2ee-fil"
+import { avecDerniersTextesLocaux } from "./dernier-message-local"
 import { langueInitiale, traduire } from "../i18n"
 import {
   cacheConversations,
@@ -238,7 +239,13 @@ export async function fetchChatConversations(): Promise<ConversationListItem[]> 
     const response = await apiRequest<{ conversations: BackendConversation[] }>(
       "/api/conversations"
     )
-    const conversations = (response.conversations ?? []).map(toFrontConversation)
+    /*
+     * ⚠️ LES FILS CHIFFRÉS PRENNENT LEUR DERNIER TEXTE DANS LE CACHE LOCAL : le
+     * serveur ne l’a pas et rend `lastMessage: null`. Voir
+     * `dernier-message-local.ts`.
+     */
+    const brutes = await avecDerniersTextesLocaux(response.conversations ?? [])
+    const conversations = brutes.map(toFrontConversation)
 
     // Persiste en IndexedDB pour le cache-first
     void cacheConversations(
@@ -249,6 +256,9 @@ export async function fetchChatConversations(): Promise<ConversationListItem[]> 
         // froid, la liste relit le cache, ne reconnait plus mes notes et leur
         // rend le titre francais fige au dernier passage sur le reseau.
         isSelf: c.isSelf,
+        // Sans lui, l’affichage depuis le cache ne saurait pas qu’un fil est
+        // chiffré, donc qu’il faut chercher son dernier texte en local.
+        e2eeActif: c.e2eeActif,
         title: c.title,
         avatarUrl: c.avatarUrl,
         members: c.members,
@@ -298,9 +308,11 @@ export async function fetchChatConversationsCacheFirst(
 ): Promise<void> {
   // Étape 1 : lecture cache instantanée
   try {
-    const cached = await loadCachedConversations()
+    const cached = await avecDerniersTextesLocaux(
+      (await loadCachedConversations()) as unknown as BackendConversation[],
+    )
     if (cached.length > 0) {
-      onCached(cached.map((c) => toFrontConversation(c as unknown as BackendConversation)))
+      onCached(cached.map(toFrontConversation))
     }
   } catch {
     // IndexedDB indisponible, on attend le réseau

@@ -323,7 +323,9 @@ async function main() {
   if (process.env.CAPTURE) await B.page.screenshot({ path: process.env.CAPTURE });
 
   async function proposeTransferer(texte) {
-    await B.page.getByText(texte, { exact: true }).first().click({ button: "right" });
+    // ⚠️ DANS LA ZONE DES MESSAGES : depuis que la liste affiche le dernier texte
+    // d’un fil chiffré, le même texte figure aussi dans l’aperçu de la liste.
+    await B.page.locator(".room-body").getByText(texte, { exact: true }).first().click({ button: "right" });
     const vu = await B.page
       .getByRole("button", { name: /^Transférer$/ })
       .first()
