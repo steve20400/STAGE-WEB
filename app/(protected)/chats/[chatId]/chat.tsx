@@ -43,6 +43,7 @@ import {
   estPanneReseau,
   mettreMediaEnFile,
   apercusMediasEnAttente,
+  type SendOptions,
 } from "../../../../src/services/messages-service"
 import {
   activerE2ee,
@@ -751,6 +752,21 @@ function PdfViewer({
     Affichee uniquement sur la bulle terracotta de l'expediteur -> teintes claires. */
 function StatusIcon({ status }: { status: MessageStatus }) {
   const { t } = useTranslation()
+  /*
+   * ⚠️ L'ÉCHEC SE VOIT. Une bulle dont l'envoi avait échoué restait affichée
+   * « en cours » pour toujours, et seul un avis passager disait le contraire.
+   * « Réessayer » est dans le menu de la bulle.
+   */
+  if (status === "failed") {
+    return (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffb4a8" strokeWidth="2.2" strokeLinecap="round">
+        <title>{t("f2_message_not_sent")}</title>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7.5v5.5" />
+        <path d="M12 16.5h.01" />
+      </svg>
+    )
+  }
   if (status === "sending") {
     return (
       <svg
@@ -3438,6 +3454,7 @@ function MessageBubble({
   onOpenImage,
   onDelete,
   onForward,
+  onReessayer,
   onCopy,
   isGroup,
   nbLectures,
@@ -3468,6 +3485,8 @@ function MessageBubble({
   onOpenImage: (url: string, name?: string) => void
   onDelete: (m: Message, scope: "me" | "everyone") => void
   onForward: (m: Message) => void
+  /** « Réessayer » : seulement sur une bulle à moi en échec. */
+  onReessayer?: (m: Message) => void
   onCopy: (m: Message) => void
   isGroup?: boolean
   senderName?: string
@@ -3978,6 +3997,9 @@ function MessageBubble({
                   {/* ⚠️ PAS DE TRANSFERT D'UN MESSAGE CHIFFRÉ : le serveur recopie
                     `content`, qu'il n'a pas — il fabriquait une bulle vide chez
                     le destinataire, et le refuse désormais (`e2ee-clair.mjs`). */}
+                  {isMe && msg.status === "failed" && onReessayer
+                    ? menuItem(t("retry"), () => onReessayer(msg))
+                    : null}
                   {!msg.chiffre ? menuItem(t("forward"), () => onForward(msg)) : null}
                   {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
                   {isMe
@@ -6056,12 +6078,61 @@ export default function ChatRoomPage() {
     }
   }, [chatId, sending])
 
-  // Envoi d'un message — POST /api/chats/{chatId}/messages
-  const sendMessage = useCallback(async () => {
-    const text = input.trim()
-    if (!text || sending) return
+  /*
+   * ══════════════ LA FILE DES ENVOIS DE TEXTE ══════════════
+   *
+   * 🐛 « QUAND ON CLIQUE SUR ENVOYER, ÇA PREND DU TEMPS ET ÇA BLOQUE LE
+   * CHAMP » (user, 28/09/2026). Le texte s'effaçait bien, mais `sending`
+   * restait vrai jusqu'à la réponse du serveur : le bouton était désactivé et
+   * Entrée ne faisait rien. Dans un fil chiffré, c'est quatre à cinq
+   * allers-retours — deux secondes à 300 ms de latence — pendant lesquelles
+   * l'utilisateur tapait sans pouvoir envoyer.
+   *
+   * → Chaque message entre dans une FILE et part en fond ; le champ, le bouton
+   *   et Entrée ne sont plus jamais bloqués par un envoi en cours.
+   *
+   * ⚠️ UNE FILE, PAS DES ENVOIS EN PARALLÈLE : deux messages tapés vite
+   * pourraient sinon créer leur ligne sur le serveur dans le désordre.
+   */
+  const fileEnvoisRef = useRef<Promise<void>>(Promise.resolve())
 
-    const tempId = `tmp-${Date.now()}`
+  const envoyerEnFond = useCallback(
+    (
+      tempId: string,
+      text: string,
+      options: SendOptions,
+    ) => {
+      fileEnvoisRef.current = fileEnvoisRef.current.then(async () => {
+        try {
+          const saved = await sendChatMessage(chatId, text, "text", options)
+          // Replace le message optimiste par celui renvoye par le backend.
+          // Si le broadcast WebSocket est arrive avant (id deja present), on retire juste le tempId.
+          setMessages((prev) => {
+            const alreadyReceived = prev.some((m) => m.id === saved.id)
+            if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
+            return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: m.timestamp } : m))
+          })
+        } catch (err) {
+          /*
+           * ⚠️ « ÉCHEC », PLUS « EN COURS ». L'ancien code remettait le statut à
+           * `sending` : la bulle tournait pour toujours. Elle passe en échec,
+           * garde son texte, et « Réessayer » la renvoie depuis son menu.
+           */
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "failed" } : m)))
+          const message = err instanceof Error ? err.message : t("send_failed")
+          error(t("f2_message_not_sent"), message)
+        }
+      })
+    },
+    [chatId, error, t],
+  )
+
+  // Envoi d'un message — POST /api/chats/{chatId}/messages
+  const sendMessage = useCallback(() => {
+    const text = input.trim()
+    if (!text) return
+
+    const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     const optimistic: Message = {
       id: tempId,
       senderId: "me",
@@ -6072,39 +6143,36 @@ export default function ChatRoomPage() {
       replyTo: replyTo?.id,
     }
 
+    // ⚠️ Les mentions se lisent MAINTENANT, avant qu'on vide l'état : le
+    // message suivant aura les siennes.
+    const options = {
+      replyToId: replyTo?.id,
+      mentions: mentionsAEnvoyer(text),
+      mentionTousLibelle: mentionTousAEnvoyer(text) ?? undefined,
+    }
+
     setMessages((prev) => [...prev, optimistic])
     setInput("")
     setReplyTo(null)
-    setSending(true)
+    setMentionsEnCours([])
+    setMentionTousLibelle(null)
 
     // On a envoye -> on n'ecrit plus
     clearTimeout(typingTimer.current)
     publishTyping(chatId, false)
 
-    try {
-      const saved = await sendChatMessage(chatId, text, "text", {
-        replyToId: replyTo?.id,
-        mentions: mentionsAEnvoyer(text),
-        mentionTousLibelle: mentionTousAEnvoyer(text) ?? undefined,
-      })
-      setMentionsEnCours([])
-    setMentionTousLibelle(null)
-      // Replace le message optimiste par celui renvoye par le backend.
-      // Si le broadcast WebSocket est arrive avant (id deja present), on retire juste le tempId.
-      setMessages((prev) => {
-        const alreadyReceived = prev.some((m) => m.id === saved.id)
-        if (alreadyReceived) return prev.filter((m) => m.id !== tempId)
-        return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: m.timestamp } : m))
-      })
-    } catch (err) {
-      // En cas d'echec, on marque le message comme "non envoye" pour informer l'user
-      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: "sending" } : m)))
-      const message = err instanceof Error ? err.message : t("send_failed")
-      error(t("f2_message_not_sent"), message)
-    } finally {
-      setSending(false)
-    }
-  }, [input, sending, replyTo, chatId, error, t])
+    envoyerEnFond(tempId, text, options)
+  }, [input, replyTo, chatId, envoyerEnFond])
+
+  /** « Réessayer » sur une bulle en échec : même bulle, même texte. */
+  const reessayerEnvoi = useCallback(
+    (msg: Message) => {
+      if (msg.status !== "failed" || !msg.content) return
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, status: "sending" } : m)))
+      envoyerEnFond(msg.id, msg.content, { replyToId: msg.replyTo })
+    },
+    [envoyerEnFond],
+  )
 
   /**
    * Envoi d'une FICHE DE CONTACT.
@@ -7702,6 +7770,7 @@ export default function ChatRoomPage() {
                         })
                       }}
                       onForward={setForwardMsg}
+                      onReessayer={reessayerEnvoi}
                       onCopy={handleCopy}
                       isGroup={chat?.isGroup}
                       senderName={
@@ -7770,6 +7839,7 @@ export default function ChatRoomPage() {
                     onOpenImage={(url, name) => setLightbox({ url, name })}
                     onDelete={handleDelete}
                     onForward={setForwardMsg}
+                    onReessayer={reessayerEnvoi}
                     onCopy={handleCopy}
                     isGroup={chat?.isGroup}
                     nbLectures={compterLectures(msg)}
@@ -8364,7 +8434,6 @@ export default function ChatRoomPage() {
                   <button
                     className="send-btn"
                     onClick={sendMessage}
-                    disabled={sending}
                     aria-label={t("send")}
                   >
                     <svg
