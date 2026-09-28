@@ -495,6 +495,13 @@ export const WEB_TRANSLATION_KEYS = [
   "set_session_closed",
   "set_session_closed_detail",
   "set_disconnect_failed",
+  // « Déconnecter » le téléphone LIÉ le dissocie : un autre téléphone pourra
+  // alors se connecter au compte. Le libellé doit le dire.
+  "set_dissociate",
+  "set_dissociate_confirm",
+  "set_dissociate_confirm_detail",
+  "set_phone_dissociated",
+  "set_phone_dissociated_detail",
   "set_try_again_soon",
   "set_setting_not_saved",
   "set_server_refused",
@@ -1998,6 +2005,13 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_session_closed: "Session fermée",
     set_session_closed_detail: "{appareil} a été déconnecté.",
     set_disconnect_failed: "Déconnexion impossible",
+    set_dissociate: "Dissocier",
+    set_dissociate_confirm: "Dissocier ce téléphone ?",
+    set_dissociate_confirm_detail:
+      "« {appareil} » sera déconnecté et votre compte ne lui sera plus lié. Vous pourrez ensuite vous connecter sur un autre téléphone.",
+    set_phone_dissociated: "Téléphone dissocié",
+    set_phone_dissociated_detail:
+      "« {appareil} » n’est plus lié à votre compte. Vous pouvez vous connecter sur un autre téléphone.",
     set_try_again_soon: "Réessayez dans un instant.",
     set_setting_not_saved: "Réglage non enregistré",
     set_server_refused: "Le serveur n'a pas accepté la modification.",
@@ -3426,6 +3440,13 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     set_session_closed: "Session closed",
     set_session_closed_detail: "{appareil} has been signed out.",
     set_disconnect_failed: "Sign-out failed",
+    set_dissociate: "Unlink",
+    set_dissociate_confirm: "Unlink this phone?",
+    set_dissociate_confirm_detail:
+      "“{appareil}” will be signed out and your account will no longer be linked to it. You can then sign in on another phone.",
+    set_phone_dissociated: "Phone unlinked",
+    set_phone_dissociated_detail:
+      "“{appareil}” is no longer linked to your account. You can sign in on another phone.",
     set_try_again_soon: "Please try again in a moment.",
     set_setting_not_saved: "Setting not saved",
     set_server_refused: "The server rejected the change.",

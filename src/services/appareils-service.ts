@@ -31,6 +31,12 @@ export interface Appareil {
   lastLogin: string | null
   /** Deconnecte a distance. La ligne survit pour garder l'historique. */
   revoked: boolean
+  /**
+   * Le telephone LIE au compte. Le deconnecter le DISSOCIE : le compte redevient
+   * libre et un autre telephone pourra s'y connecter. Absent sur un serveur
+   * anterieur au 28/09/2026 — lu comme faux.
+   */
+  lie?: boolean
 }
 
 interface ListResponse {
@@ -194,12 +200,34 @@ export async function renommerAppareil(appareilId: number, libelle: string): Pro
   return response.appareil
 }
 
-/** DELETE /api/appareils/:id — deconnecte un appareil a distance. */
-export async function deconnecterAppareil(appareilId: number): Promise<Appareil> {
-  const response = await apiRequest<SingleResponse>(`/api/appareils/${appareilId}`, {
+/** Ce que renvoie la deconnexion a distance. */
+export interface ResultatDeconnexion {
+  appareil: Appareil
+  /** Vrai si l'appareil etait le telephone lie : le compte est maintenant libre. */
+  dissocie: boolean
+  /**
+   * Les telephones que le serveur vient de couper, a annoncer au temps reel
+   * avec la raison « dissociation » : l'API ne peut pas le joindre elle-meme.
+   */
+  telephones: string[]
+}
+
+/**
+ * DELETE /api/appareils/:id — deconnecte un appareil a distance.
+ *
+ * Sur le telephone lie, le serveur le DISSOCIE (voir `Appareil.lie`).
+ */
+export async function deconnecterAppareil(appareilId: number): Promise<ResultatDeconnexion> {
+  const response = await apiRequest<
+    SingleResponse & { dissocie?: boolean; telephones?: string[] }
+  >(`/api/appareils/${appareilId}`, {
     method: "DELETE",
   })
-  return response.appareil
+  return {
+    appareil: response.appareil,
+    dissocie: response.dissocie === true,
+    telephones: response.telephones ?? [],
+  }
 }
 
 /** Vrai si l'appareil passe est celui depuis lequel on navigue. */

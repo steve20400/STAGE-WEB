@@ -1856,6 +1856,8 @@ interface SessionAffichee {
   current: boolean
   ts: string
   isMobile: boolean
+  /** Le telephone lie au compte : le deconnecter le DISSOCIE. */
+  lie: boolean
 }
 
 /** Derniere activite en clair : « Maintenant », « Il y a 3 h », puis la date. */
@@ -1936,6 +1938,7 @@ function versSession(a: Appareil): SessionAffichee {
     current: estAppareilCourant(a),
     ts: derniereActivite(a.lastLogin),
     isMobile: a.typeDevice === TYPE_DEVICE.android || a.typeDevice === TYPE_DEVICE.ios,
+    lie: a.lie === true,
   }
 }
 
@@ -1998,8 +2001,23 @@ export default function SettingsPage() {
   const deconnecterSession = useCallback(
     async (appareilId: number, libelle: string, cookiesWebId: string | null) => {
       try {
-        await deconnecterAppareil(appareilId)
+        const resultat = await deconnecterAppareil(appareilId)
         setSessions((prev) => (prev ?? []).filter((s) => s.appareilId !== appareilId))
+        /*
+         * Le telephone LIE vient d etre DISSOCIE, pas seulement deconnecte : le
+         * serveur a coupe tous les telephones du compte. Chacun est annonce avec
+         * la raison « dissociation », pour que le telephone dise a son
+         * utilisateur ce qui s est passe — il se retrouverait sinon devant
+         * l ecran de connexion sans explication.
+         */
+        if (resultat.dissocie) {
+          for (const tel of resultat.telephones) sendSessionRevoked(tel, "dissociation")
+          warning(
+            t("set_phone_dissociated"),
+            t("set_phone_dissociated_detail", { appareil: libelle })
+          )
+          return
+        }
         // Coupe l acces sans attendre l expiration du jeton (15 min) : les
         // autres sessions du compte recoivent l annonce et celle qui se
         // reconnait se deconnecte immediatement.
@@ -3697,9 +3715,29 @@ export default function SettingsPage() {
                     </div>
                     {!s.current && (
                       <button
-                        onClick={() =>
-                          void deconnecterSession(s.appareilId, s.device, s.cookiesWebId)
-                        }
+                        onClick={() => {
+                          /*
+                           * Le telephone lie se DISSOCIE : geste plus lourd
+                           * qu une deconnexion — le compte devient libre pour
+                           * un autre telephone. On le fait confirmer, en disant
+                           * la consequence. Une simple deconnexion reste
+                           * immediate, comme avant.
+                           */
+                          if (!s.lie) {
+                            void deconnecterSession(s.appareilId, s.device, s.cookiesWebId)
+                            return
+                          }
+                          setConfirmState({
+                            title: t("set_dissociate_confirm"),
+                            description: t("set_dissociate_confirm_detail", {
+                              appareil: s.device,
+                            }),
+                            confirmLabel: t("set_dissociate"),
+                            tone: "danger",
+                            onConfirm: () =>
+                              deconnecterSession(s.appareilId, s.device, s.cookiesWebId),
+                          })
+                        }}
                         style={{
                           background: "var(--danger-dim)",
                           border: "1px solid var(--danger-border)",
@@ -3719,7 +3757,7 @@ export default function SettingsPage() {
                           (e.currentTarget.style.background = "var(--danger-dim)")
                         }
                       >
-                        {t("set_disconnect")}
+                        {s.lie ? t("set_dissociate") : t("set_disconnect")}
                       </button>
                     )}
                   </div>
