@@ -46,28 +46,30 @@ function cacheKey(url: string): string {
 }
 
 /**
- * Le proxy same-origin `api/media-proxy` est une fonction serverless du dépôt
- * front : elle n'existe que sur Vercel. En développement (`npm run dev`) ou sur
- * un autre hébergeur, elle répond 404 — on retombe alors sur l'URL backend
- * directe. Le résultat de la première tentative est mémorisé pour ne pas
- * multiplier les allers-retours inutiles.
+ * La lecture « sur notre origine » est-elle disponible ? Mémorisé après la
+ * première tentative, pour ne pas multiplier les allers-retours inutiles.
  */
 let mediaProxyAvailable: boolean | null = null
 
 /**
- * URL du proxy pour un média backend, ou null si l'URL n'en est pas un.
+ * L'adresse qui fait servir le média PAR LE BACKEND LUI-MÊME, sur notre origine
+ * (`?flux=1`), ou null si l'URL n'est pas un média du backend.
  *
- * Le chemin est prefixe par BASE_URL : sous un deploiement en sous-repertoire
- * (`/webapp/`), un chemin absolu `/api/media-proxy/...` viserait la racine du
- * domaine, ou le proxy n'est pas monte.
+ * 🐛 ELLE VISAIT `/webapp/api/media-proxy/<id>`, une fonction prévue pour
+ * Vercel, qui n'existe pas sur le serveur actuel : nginx y répondait la page du
+ * site (200 `text/html`). On retombait alors sur `/api/media/<id>`, qui
+ * REDIRIGE vers Backblaze — une autre origine, que le navigateur refuse de lire
+ * sans en-têtes CORS. Les aperçus de documents échouaient (02/10/2026).
+ *
+ * ⚠️ `?flux=1` EST BORNÉ À 8 MO côté serveur (`api/media/[id]/route.ts`) : au-delà,
+ * il redirige quand même. Ces fichiers-là restent à ouvrir en téléchargement.
  */
 function mediaProxyUrl(url: string): string | null {
   try {
     const parsed = new URL(url, window.location.origin)
-    const match = parsed.pathname.match(/\/api\/media\/([a-zA-Z0-9-]+)$/)
-    if (!match) return null
-    // BASE_URL se termine toujours par "/" (garanti par vite.config.ts).
-    return `${import.meta.env.BASE_URL}api/media-proxy/${match[1]}`
+    if (!/\/api\/media\/[a-zA-Z0-9-]+$/.test(parsed.pathname)) return null
+    parsed.searchParams.set("flux", "1")
+    return parsed.toString()
   } catch {
     return null
   }
@@ -173,7 +175,12 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
         response = proxyResponse
       }
     } catch {
-      mediaProxyAvailable = false
+      /*
+       * ⚠️ PAS DE `mediaProxyAvailable = false` ICI : un fichier de plus de 8 Mo
+       * est redirigé vers Backblaze même avec `flux=1`, et sa lecture échoue. Ce
+       * n'est pas la voie qui manque — la désactiver priverait tous les fichiers
+       * suivants d'une voie qui marche.
+       */
     }
   }
 
@@ -181,10 +188,9 @@ export async function loadPreviewBlob(url: string): Promise<Blob> {
     try {
       response = await fetch(url, { credentials: "same-origin", headers })
     } catch {
-      // Sans proxy same-origin, la redirection du backend vers Backblaze B2 est
-      // cross-origin : le navigateur bloque la lecture si B2 n'envoie pas les
-      // en-tetes CORS. C'est le cas typique quand `api/media-proxy` n'est pas
-      // deploye sur l'hebergement (voir MEDIA_PREVIEW_PROXY.md).
+      // La redirection du backend vers Backblaze B2 est cross-origin : le
+      // navigateur bloque la lecture si B2 n'envoie pas les en-tetes CORS. C'est
+      // le cas d'un fichier de plus de 8 Mo, que `?flux=1` ne sert pas.
       throw new Error(traduire(langueInitiale(), "core_preview_unreadable"))
     }
   }

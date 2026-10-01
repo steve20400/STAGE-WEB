@@ -29,6 +29,21 @@ import react from "@vitejs/plugin-react"
  * HTTP par le serveur. Le nécessaire est écrit dans `docs/CSP-DEPLOIEMENT.md` —
  * sans lui, la protection contre le détournement de clic reste absente.
  */
+/**
+ * Les deux seaux Backblaze où vivent les médias, vers lesquels
+ * `/api/media/<id>` redirige.
+ *
+ * ⚠️ À TENIR ALIGNÉ SUR LE `.env` DU BACKEND : `B2_BUCKET` (fichiers des
+ * conversations, adresse signée) et `B2_PUBLIC_BUCKET` (avatars, adresse
+ * publique), sur l'hôte `B2_ENDPOINT`. Changer de seau ou de région sans
+ * changer cette liste refait disparaître tous les médias du web — en silence,
+ * sauf dans la console.
+ */
+const SEAUX_MEDIAS = [
+  "https://alanyawork.s3.eu-central-003.backblazeb2.com",
+  "https://profilemedia.s3.eu-central-003.backblazeb2.com",
+]
+
 function politiqueSecurite(apiBaseUrl: string, wsUrl: string): string {
   const api = apiBaseUrl.replace(/\/$/, "")
 
@@ -99,11 +114,23 @@ function politiqueSecurite(apiBaseUrl: string, wsUrl: string): string {
     "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
     /*
      * `blob:` sert aux aperçus de fichiers ; `data:` aux avatars encodés. Les
-     * images ne s'exécutent pas — le risque est l'exfiltration par URL, et il
-     * est borné à notre propre origine.
+     * images ne s'exécutent pas — le risque est l'exfiltration par URL.
+     *
+     * 🐛 LES DEUX SEAUX BACKBLAZE MANQUAIENT, DEPUIS LA POSE DE CETTE POLITIQUE
+     * (24/09/2026). `/api/media/<id>` vérifie les droits puis REDIRIGE vers
+     * Backblaze (adresse signée pour les fichiers des conversations, adresse
+     * publique pour les avatars) — et une CSP s'applique AUSSI à la cible d'une
+     * redirection. Photos, vidéos et vocaux ne s'affichaient plus sur le web
+     * (console : « img-src 'self' data: blob: », signalé le 02/10/2026).
+     *
+     * ⚠️ DEUX HÔTES PRÉCIS, PAS `*.backblazeb2.com` : n'importe quel seau
+     * Backblaze, y compris celui d'un tiers, n'a rien à faire ici.
+     * ⚠️ PAS DANS `connect-src` : les lectures par `fetch` (aperçus de
+     * documents) passent par `?flux=1`, sur notre origine — voir
+     * `media-preview-cache.ts`.
      */
-    "img-src": ["'self'", "data:", "blob:"],
-    "media-src": ["'self'", "blob:", "data:"],
+    "img-src": ["'self'", "data:", "blob:", ...SEAUX_MEDIAS],
+    "media-src": ["'self'", "blob:", "data:", ...SEAUX_MEDIAS],
     /*
      * 🔴 LA LIGNE QUI DÉCIDE OÙ LES MESSAGES DÉCHIFFRÉS PEUVENT ALLER. Un script
      * hostile qui lirait le coffre ne pourrait rien en faire sortir ailleurs
