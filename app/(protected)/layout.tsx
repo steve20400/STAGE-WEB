@@ -99,6 +99,47 @@ const Icons = {
       <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
     </svg>
   ),
+  /*
+   * 🐛 ENTREPRISES, COLLÈGUES ET CONTACTS PARTAGEAIENT LA MÊME ICÔNE (deux
+   * silhouettes) : trois entrées du menu indiscernables (signalé le
+   * 02/10/2026). Alignées sur le mobile : un immeuble pour les entreprises
+   * (`Icons.domain`), un badge pour les collègues (`Icons.badge`, celui des
+   * services de l'annuaire).
+   */
+  Entreprises: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 21h18" />
+      <path d="M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16" />
+      <path d="M15 9h2a2 2 0 012 2v10" />
+      <path d="M8 7h4M8 11h4M8 15h4" />
+    </svg>
+  ),
+  Collegues: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="6" width="18" height="15" rx="2" />
+      <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+      <circle cx="9" cy="13" r="2" />
+      <path d="M6 18a3 3 0 016 0M14 12h4M14 15h3" />
+    </svg>
+  ),
   Status: () => (
     <svg
       width="18"
@@ -450,7 +491,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           onClick={onClose}
           title={t("companies")}
         >
-          <Icons.Contacts />
+          <Icons.Entreprises />
           <span className="sb-link-label">{t("companies")}</span>
         </Link>
 
@@ -461,7 +502,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
             onClick={onClose}
             title={t("colleagues")}
           >
-            <Icons.Contacts />
+            <Icons.Collegues />
             <span className="sb-link-label">{t("colleagues")}</span>
           </Link>
         )}

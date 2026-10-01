@@ -130,6 +130,7 @@ import ChatInfoPage from "./chat-info"
 import { CLE_ERREUR, EVENEMENT_ECHEC_AUTO, MessageTranslation } from "./message-translation"
 import { E2eeVerification } from "./e2ee-verification"
 import { estVerifie } from "../../../../src/services/e2ee-empreinte"
+import { oublierAvertissement } from "../../../../src/services/e2ee-store"
 import { PartagerContact } from "./partager-contact"
 import "./chat-room-page.css"
 
@@ -5159,6 +5160,11 @@ export default function ChatRoomPage() {
 
   /** L'ecran de comparaison des codes de securite est-il ouvert ? */
   const [verifOuverte, setVerifOuverte] = useState(false)
+  /*
+   * « Plus tard » sur l'alerte de clé : POUR QUEL correspondant. Un simple
+   * booléen masquerait aussi l'alerte d'un autre fil si l'écran est réutilisé.
+   */
+  const [alerteCleEcartee, setAlerteCleEcartee] = useState<string | null>(null)
 
   /*
    * L'ETAT DU CHIFFREMENT, LU A L'OUVERTURE DE LA CONVERSATION.
@@ -7707,14 +7713,40 @@ export default function ChatRoomPage() {
           CHIFFREMENT : celle-ci informe, celle-là alerte. Leur donner la même
           couleur reviendrait à dire que les deux se valent.
         */}
-        {e2ee?.e2eeActif && peerIdPourCle !== null && cleAChange(peerIdPourCle) && (
-          <div className="e2ee-alerte">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3.5 2.8 19.5h18.4L12 3.5Z" />
-              <path d="M12 10v4" />
-              <path d="M12 17h.01" />
-            </svg>
-            <span>{t("e2ee_cle_changee")}</span>
+        {e2ee?.e2eeActif &&
+          peerIdPourCle !== null &&
+          alerteCleEcartee !== peerIdPourCle &&
+          cleAChange(peerIdPourCle) && (
+          <div className="e2ee-alerte" role="alert">
+            {/*
+              🎨 REFAIT LE 02/10/2026 (« plus beau et professionnel ») : titre,
+              nom du correspondant, ce qui est NORMAL avant ce qui inquiète, et
+              « Plus tard ». Mêmes textes et même ordre que le mobile
+              (`AvertissementCleChangee`, `e2ee_widgets.dart`).
+            */}
+            <span className="e2ee-alerte-pastille" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 3 4.5 6v5.5c0 4.6 3.1 8.6 7.5 9.5 4.4-.9 7.5-4.9 7.5-9.5V6L12 3Z" />
+                <path d="M12 8.5v4" />
+                <path d="M12 15.5h.01" />
+              </svg>
+            </span>
+            <div className="e2ee-alerte-texte">
+              <strong>{t("e2ee_cle_titre")}</strong>
+              <span>{t("e2ee_cle_corps", { nom: chat?.name ?? "" })}</span>
+              <div className="e2ee-alerte-actions">
+                <button
+                  type="button"
+                  className="e2ee-alerte-plus-tard"
+                  onClick={() => {
+                    // Un accusé de lecture, pas un accord — même règle que le
+                    // mobile : l'alerte vue ne revient pas chaque jour.
+                    oublierAvertissement(peerIdPourCle)
+                    setAlerteCleEcartee(peerIdPourCle)
+                  }}
+                >
+                  {t("e2ee_cle_plus_tard")}
+                </button>
             {/*
               🔴 L'ALERTE MENE A L'ACTION, ELLE N'INFORME PLUS SEULEMENT.
 
@@ -7723,13 +7755,15 @@ export default function ChatRoomPage() {
               ignorer la prochaine. Le bouton mene a la seule chose qui
               reponde a la question : comparer le code hors de ce canal.
             */}
-            <button
-              type="button"
-              className="e2ee-alerte-action"
-              onClick={() => setVerifOuverte(true)}
-            >
-              {t("e2ee_verif_ouvrir")}
-            </button>
+                <button
+                  type="button"
+                  className="e2ee-alerte-action"
+                  onClick={() => setVerifOuverte(true)}
+                >
+                  {t("e2ee_cle_verifier")}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

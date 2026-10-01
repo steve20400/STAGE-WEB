@@ -1290,37 +1290,123 @@ textarea.room-textarea::placeholder {
  * cette protection.
  */
 .e2ee-alerte {
+  /*
+   * 🎨 REFAITE LE 02/10/2026 : ambre plutôt que rouge — c'est le plus souvent
+   * une réinstallation, pas une attaque — avec un titre, une pastille et deux
+   * actions, comme le mobile (`AvertissementCleChangee`).
+   */
+  --alerte-fond: #fff6ec;
+  --alerte-bord: #f5d9bc;
+  --alerte-titre: #7c2d12;
+  --alerte-texte: #6b3a1f;
+  --alerte-pastille: #fde7cc;
+  --alerte-icone: #b45309;
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  margin: 12px auto 4px;
-  max-width: 520px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: #fdecea;
-  border: 1px solid #f3c2bd;
-  color: #7a2620;
-  font-size: 12.5px;
+  gap: 12px;
+  margin: 12px auto 6px;
+  max-width: 560px;
+  padding: 14px 16px 12px;
+  border-radius: 14px;
+  background: var(--alerte-fond);
+  border: 1px solid var(--alerte-bord);
+  box-shadow: 0 2px 10px rgba(124, 45, 18, 0.06);
+  color: var(--alerte-texte);
+  font-size: 13px;
   line-height: 1.45;
 }
 
-.e2ee-alerte svg {
-  width: 17px;
-  height: 17px;
+.e2ee-alerte-pastille {
   flex: none;
-  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--alerte-pastille);
+}
+
+.e2ee-alerte-pastille svg {
+  width: 19px;
+  height: 19px;
   fill: none;
-  stroke: #b3261e;
+  stroke: var(--alerte-icone);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
+.e2ee-alerte-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.e2ee-alerte-texte strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--alerte-titre);
+}
+
+.e2ee-alerte-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.e2ee-alerte .e2ee-alerte-plus-tard,
+.e2ee-alerte .e2ee-alerte-action {
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.e2ee-alerte .e2ee-alerte-plus-tard {
+  border: none;
+  background: transparent;
+  color: var(--alerte-texte);
+}
+
+.e2ee-alerte .e2ee-alerte-plus-tard:hover {
+  background: var(--alerte-pastille);
+}
+
+.e2ee-alerte .e2ee-alerte-action {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+}
+
+.e2ee-alerte .e2ee-alerte-action:hover {
+  filter: brightness(1.06);
+}
+
+:root[data-theme="dark"] .e2ee-alerte {
+  --alerte-fond: #2a1d14;
+  --alerte-bord: #4a2e18;
+  --alerte-titre: #fcd9b6;
+  --alerte-texte: #e8c3a3;
+  --alerte-pastille: #4a2e18;
+  --alerte-icone: #fdba74;
+  box-shadow: none;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .e2ee-alerte {
-    background: #2e1a18;
-    border-color: #5a2a26;
-    color: #f0c9c4;
+    --alerte-fond: #2a1d14;
+    --alerte-bord: #4a2e18;
+    --alerte-titre: #fcd9b6;
+    --alerte-texte: #e8c3a3;
+    --alerte-pastille: #4a2e18;
+    --alerte-icone: #fdba74;
+    box-shadow: none;
   }
 }
 
