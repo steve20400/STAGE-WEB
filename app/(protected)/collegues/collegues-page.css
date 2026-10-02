@@ -137,24 +137,74 @@
   padding: 0 18px 12px;
 }
 
-.cl-search input {
+/* Le filtre du service ouvert : meme champ, sans le retrait de l'en-tete. */
+.cl-filtre {
+  padding: 0 0 12px;
+}
+
+/*
+ * LE CHAMP DU MOBILE : loupe a gauche, croix a droite quand il y a du texte.
+ * La loupe dit ce que fait le champ avant qu'on y tape quoi que ce soit.
+ */
+.cl-champ {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.cl-champ input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 10px 38px 10px 38px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-surface);
   color: var(--text-primary);
   font-family: inherit;
   font-size: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.cl-search input::placeholder {
+.cl-champ input::placeholder {
   color: var(--text-muted);
 }
 
-.cl-search input:focus {
+.cl-champ input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.cl-champ-loupe {
+  position: absolute;
+  left: 12px;
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.cl-champ-effacer {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cl-champ-effacer:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.cl-champ-effacer svg {
+  width: 15px;
+  height: 15px;
 }
 
 /* ─────────────────────────────────────────────── Les deux colonnes */
@@ -186,19 +236,23 @@
 }
 
 .cl-liste > li + li {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
+/*
+ * UNE CARTE PAR SERVICE, comme le mobile : pastille a l'icone du badge, nom en
+ * gras, effectif dessous, chevron. Une ligne de texte nue ne disait pas qu'elle
+ * s'ouvrait.
+ */
 .cl-service {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 12px 14px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: none;
+  padding: 11px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
   color: inherit;
   font-family: inherit;
   font-size: 14px;
@@ -206,11 +260,13 @@
   cursor: pointer;
   transition:
     background 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    transform 0.15s;
 }
 
 .cl-service:hover {
   background: var(--bg-elevated);
+  border-color: var(--border-default);
 }
 
 .cl-service:focus-visible {
@@ -222,8 +278,33 @@
    sans cela, deux colonnes cote a cote ne disent plus laquelle a produit
    l'autre. */
 .cl-service.ouvert {
-  background: var(--bg-elevated);
+  background: var(--accent-dim);
   border-color: var(--accent);
+}
+
+/* La pastille ronde du mobile : l'accent a 15 %, l'icone a pleine couleur. */
+.cl-pastille {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.cl-pastille svg {
+  width: 21px;
+  height: 21px;
+}
+
+.cl-service-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .cl-service-nom {
@@ -234,94 +315,191 @@
 }
 
 .cl-service-effectif {
-  flex: none;
   font-size: 12.5px;
   color: var(--text-muted);
 }
 
+.cl-chevron {
+  flex: none;
+  display: grid;
+  color: var(--text-muted);
+}
+
+.cl-chevron svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* ─────────────────────────────────────────────── Fiches des collegues */
 
+/*
+ * LA TUILE DU MOBILE (`TuileCollegue`) : avatar, nom, Alanya ID, agence
+ * precedee de l'immeuble, pastille verte si en ligne — puis les deux gestes
+ * en pleine largeur dessous.
+ */
 .cl-membre {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 13px 13px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+}
+
+/* Assez de membres pour qu'une grille vaille mieux qu'une colonne : sur grand
+   ecran, une tuile etiree sur 900 px eloignait les boutons du nom. */
+.cl-colonne-membres .cl-liste:has(> .cl-membre) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 10px;
+}
+
+.cl-colonne-membres .cl-liste:has(> .cl-membre) > li + li {
+  margin-top: 0;
+}
+
+.cl-membre-haut {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 13px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 11px;
-  background: var(--bg-surface);
+  min-width: 0;
+}
+
+/* L'avatar n'avait AUCUN style : l'image ou les initiales s'affichaient a
+   leur taille brute, sans cercle. */
+.cl-membre-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .cl-membre-texte {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .cl-membre-nom {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cl-membre-num,
-.cl-membre-agence {
-  overflow: hidden;
-  color: var(--text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .cl-membre-num {
-  font-size: 12.5px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .cl-membre-agence {
-  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
-/* Les deux gestes, cote a cote. Ils portent une ICONE en plus du mot : la
-   rangee se retrecit sur telephone, et l'icone survit a la disparition du
-   libelle. */
-.cl-membre-actions {
-  display: flex;
+.cl-membre-agence svg {
   flex: none;
-  gap: 6px;
+  width: 13px;
+  height: 13px;
+}
+
+.cl-membre-agence span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-en-ligne {
+  flex: none;
+  align-self: flex-start;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-dim);
+}
+
+/* Les deux gestes cote a cote, a parts egales, comme le mobile. */
+.cl-membre-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
 .cl-action {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 11px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 9px;
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
   font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition:
     background 0.15s,
     border-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    filter 0.15s;
 }
 
-.cl-action:hover {
+.cl-action span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cl-action:hover:not(:disabled) {
+  background: var(--accent-dim);
   border-color: var(--accent);
-  color: var(--text-primary);
+}
+
+/* « Appeler » est le geste principal : plein, comme le `FilledButton`. */
+.cl-action-pleine {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.cl-action-pleine:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+.cl-action:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .cl-action:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .cl-action svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   flex: none;
 }
 
@@ -403,15 +581,5 @@
   .cl-head,
   .cl-search {
     padding-inline: 16px;
-  }
-
-  /* Le libelle cede la place a l'icone : deux boutons de texte plus un nom
-     plus un avatar ne tiennent pas sur 360 px sans tout comprimer. */
-  .cl-action span {
-    display: none;
-  }
-
-  .cl-action {
-    padding: 8px;
   }
 }

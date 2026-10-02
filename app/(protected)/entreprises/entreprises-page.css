@@ -130,42 +130,430 @@
   padding-inline: 18px;
 }
 
-/* La recherche est CONFINEE au volet gauche — c'est tout le defaut rapporte. */
-.ent-search {
+/*
+ * ═══ RECHERCHE + FILTRE PAYS, SUR UNE RANGEE ═══
+ *
+ * Comme le mobile : le champ prend la place, la pastille du pays se tient a sa
+ * droite. La recherche reste CONFINEE au volet gauche.
+ */
+.ent-outils {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 0 18px 12px;
   flex-shrink: 0;
 }
-.ent-search input {
+
+.ent-champ {
+  position: relative;
   flex: 1;
   min-width: 0;
-  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+}
+.ent-champ > svg {
+  position: absolute;
+  left: 12px;
+  width: 17px;
+  height: 17px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.ent-champ input {
+  width: 100%;
+  padding: 10px 36px 10px 38px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-surface);
   color: var(--text-primary);
   font-family: inherit;
   font-size: 13.5px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.ent-search input::placeholder {
-  color: var(--text-faint);
+.ent-champ input::placeholder {
+  color: var(--text-muted);
 }
-.ent-search input:focus {
+.ent-champ input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
 }
-.ent-search button {
+.ent-champ-effacer {
+  position: absolute;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.ent-champ-effacer:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.ent-champ-effacer svg {
+  width: 15px;
+  height: 15px;
+}
+
+/*
+ * LA PASTILLE DU PAYS — globe, nom, fleche, comme le `PopupMenuButton` du
+ * mobile. Le `<select>` natif est pose dessus, invisible, et recoit les clics :
+ * clavier, lecteur d'ecran et liste du telephone restent ceux du navigateur.
+ */
+.ent-pays {
+  position: relative;
   flex: none;
-  padding: 0 14px;
-  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 150px;
+  height: 40px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ent-pays:hover {
+  border-color: var(--border-default);
+  background: var(--bg-elevated);
+}
+/* Un pays choisi a la main se voit : le filtre ne doit pas s'oublier. */
+.ent-pays.actif {
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+}
+.ent-pays:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.ent-pays > svg {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--accent);
+}
+.ent-pays > svg:last-of-type {
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+}
+.ent-pays-nom {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ent-pays select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ═══ LES CARTES ═══ */
+
+.ent-message {
+  padding: 24px 12px;
+  text-align: center;
+}
+
+.ent-cartes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/*
+ * UNE CARTE PAR LIGNE, comme les `Card` + `ListTile` du mobile : pastille,
+ * libelle en gras, precision dessous, chevron.
+ */
+.ent-carte {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  color: inherit;
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ent-carte:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-default);
+}
+.ent-carte:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* L'entreprise dont la fiche est ouverte a droite reste designee. */
+.ent-carte.ouverte {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.ent-pastille {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.ent-pastille svg {
+  width: 21px;
+  height: 21px;
+}
+.ent-pastille-grande {
+  width: 56px;
+  height: 56px;
+}
+.ent-pastille-grande svg {
+  width: 28px;
+  height: 28px;
+}
+
+.ent-carte-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ent-carte-titre {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ent-carte-sous {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ent-chevron {
+  flex: none;
+  display: grid;
+  color: var(--text-muted);
+}
+.ent-chevron svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Le nombre de centres, eteint a zero. */
+.ent-compte {
+  flex: none;
+  min-width: 26px;
+  padding: 2px 8px;
   border-radius: 10px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.ent-compte.zero {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+/* ═══ LA FICHE ═══ */
+
+.ent-fiche {
+  max-width: 720px;
+}
+
+.ent-fiche-tete {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--bg-surface);
+}
+.ent-fiche-identite {
+  flex: 1;
+  min-width: 0;
+}
+.ent-fiche-identite h2 {
+  margin: 2px 0 6px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.ent-fiche-description {
+  margin: 0 0 10px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.ent-fiche-ligne {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.ent-fiche-ligne svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+}
+
+/* ═══ LES CENTRES ═══ */
+
+/* L'explication, dans l'encadre teinte du mobile. */
+.ent-explication {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 720px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--accent-dim);
+}
+.ent-explication svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+.ent-explication p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.ent-centre {
+  max-width: 720px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+}
+.ent-centre-haut {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ent-centre-icone {
+  flex: none;
+  display: grid;
+  color: var(--accent);
+}
+.ent-centre-icone svg {
+  width: 24px;
+  height: 24px;
+}
+.ent-centre .ent-carte-titre {
+  font-size: 15px;
+}
+
+.ent-touches {
+  margin-top: 12px;
+}
+.ent-touches-titre {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ent-touches ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ent-touches li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+}
+.ent-touche {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.ent-touche-sans-nom {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* « Appeler » en pleine largeur, plein, comme le `FilledButton.icon`. */
+.ent-appeler {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 999px;
   background: var(--accent);
   color: var(--accent-text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: filter 0.15s;
+}
+.ent-appeler:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.ent-appeler:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.ent-appeler:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ent-appeler svg {
+  width: 17px;
+  height: 17px;
 }
 
 /*
@@ -197,6 +585,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.ent-vide-badge svg {
+  width: 34px;
+  height: 34px;
 }
 .ent-vide-titre {
   font-family: "Bricolage Grotesque", sans-serif;

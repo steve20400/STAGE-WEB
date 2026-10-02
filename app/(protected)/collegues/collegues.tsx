@@ -76,6 +76,11 @@ export default function ColleguesPage() {
   const [resultats, setResultats] = useState<Collegue[] | null>(null)
   const [cherche, setCherche] = useState(false)
 
+  /** Filtre LOCAL dans le service ouvert — comme le mobile, au-delà de 5. */
+  const [filtre, setFiltre] = useState("")
+  /** Le collègue dont l'appel ou la conversation est en cours d'ouverture. */
+  const [occupe, setOccupe] = useState<string | null>(null)
+
   const chargerServices = useCallback(async () => {
     setEchec(false)
     try {
@@ -124,6 +129,7 @@ export default function ColleguesPage() {
   async function ouvrirService(nom: string) {
     setServiceOuvert(nom)
     setMembres(null)
+    setFiltre("")
     try {
       setMembres(await membresDuService(nom))
     } catch {
@@ -138,46 +144,67 @@ export default function ColleguesPage() {
   // `createPrivateChat` est IDEMPOTENT côté serveur : il retrouve la
   // conversation existante ou la crée, on n'a donc pas à savoir laquelle des
   // deux situations on est.
+  //
+  // ⚠️ UN SEUL GESTE À LA FOIS : un double clic lançait deux appels vers la
+  // même personne. Le mobile grise déjà ses boutons pendant l'ouverture.
   async function appeler(c: Collegue) {
+    if (occupe) return
+    setOccupe(c.id)
     try {
       const conversation = await createPrivateChat(c.publicNumber)
       const callId = await startOutgoingCall(conversation.id, "audio", c.nom)
       navigate(`/calls/${callId}?type=audio&returnTo=${encodeURIComponent("/collegues")}`)
     } catch (e) {
       error(t("call_failed"), e instanceof Error ? e.message : t("call_start_failed"))
+    } finally {
+      setOccupe(null)
     }
   }
 
   async function ecrire(c: Collegue) {
+    if (occupe) return
+    setOccupe(c.id)
     try {
       const conversation = await createPrivateChat(c.publicNumber)
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
       error(t("error"), e instanceof Error ? e.message : t("server_unreachable"))
+    } finally {
+      setOccupe(null)
     }
   }
+
+  /** Les membres retenus par le filtre local (nom ou Alanya ID). */
+  const membresVisibles = useMemo(() => {
+    if (membres === null) return null
+    const q = filtre.trim().toLowerCase()
+    if (q === "") return membres
+    const chiffres = q.replace(/\D/g, "")
+    return membres.filter(
+      (c) =>
+        c.nom.toLowerCase().includes(q) ||
+        (chiffres !== "" && c.publicNumber.includes(chiffres))
+    )
+  }, [membres, filtre])
 
   const enRecherche = resultats !== null || cherche
 
   /**
-   * Le titre suit ce que la page MONTRE.
-   *
-   * A deux colonnes, les services et les membres sont visibles ENSEMBLE : le
-   * titre redevient celui de la page, et c'est la colonne de droite qui nomme le
-   * service ouvert. Empile, il n'y a qu'une liste a l'ecran, et le titre est le
-   * seul endroit qui puisse dire laquelle.
+   * Le titre du volet gauche : la page, ou la recherche en cours. Le service
+   * ouvert est nomme par l'en-tete du volet droit, a toutes les largeurs.
    */
-  const titre = useMemo(() => {
-    if (enRecherche) return t("colleagues_search_hint")
-    if (deuxColonnes) return t("colleagues")
-    return serviceOuvert ?? t("colleagues")
-  }, [enRecherche, deuxColonnes, serviceOuvert, t])
+  const titre = enRecherche ? t("colleagues_search_hint") : t("colleagues")
 
-  /** Empile seulement : cote a cote, il n'y a nulle part ou revenir. */
-  const montrerRetour = !deuxColonnes && serviceOuvert !== null && !enRecherche
+  /*
+   * 🐛 SUR TELEPHONE, TAPER UNE LETTRE FAISAIT DISPARAITRE LE CHAMP. La
+   * recherche basculait la page en « detail », qui masque le volet gauche —
+   * celui qui porte le champ. Empile, les resultats s'affichent donc SOUS le
+   * champ, a la place des services ; seul un service ouvert passe a droite.
+   */
+  const resultatsAGauche = enRecherche && !deuxColonnes
 
   return (
-    <div className={`cl-page${serviceOuvert || enRecherche ? " detail-ouvert" : ""}`}>
+    <div className={`cl-page${serviceOuvert && !enRecherche ? " detail-ouvert" : ""}`}>
       {/*
         LE VOLET GAUCHE PORTE SON EN-TETE ET SA RECHERCHE.
         Ils vivaient AU-DESSUS des deux colonnes, donc sur toute la largeur de
@@ -187,34 +214,23 @@ export default function ColleguesPage() {
       */}
       <div className="cl-volet-gauche">
       <header className="cl-head">
-        {montrerRetour && (
-          <button
-            type="button"
-            className="cl-back"
-            onClick={() => {
-              setServiceOuvert(null)
-              setMembres(null)
-            }}
-            title={t("back")}
-            aria-label={t("back")}
-          >
-            <FlecheRetour />
-          </button>
-        )}
         <h1>{titre}</h1>
       </header>
 
       <div className="cl-search">
-        <input
-          type="search"
-          value={requete}
-          onChange={(e) => setRequete(e.target.value)}
-          placeholder={t("colleagues_search_hint")}
-          aria-label={t("colleagues_search_hint")}
+        <ChampRecherche
+          valeur={requete}
+          onChange={setRequete}
+          libelle={t("colleagues_search_hint")}
+          effacer={t("search_clear")}
         />
       </div>
 
-        <div className="cl-colonne cl-colonne-services">{rendreServices()}</div>
+        <div className="cl-colonne cl-colonne-services">
+          {resultatsAGauche
+            ? rendreCollegues(cherche ? null : resultats, t("colleagues_no_match"))
+            : rendreServices()}
+        </div>
       </div>
 
       {/* LE VOLET DROIT. Les membres, les resultats de recherche, ou
@@ -228,12 +244,48 @@ export default function ColleguesPage() {
                 {/* Le nom du service EN TETE de sa colonne : a deux colonnes, le
                     titre de page ne le porte plus, et une liste de visages sans
                     en-tete ne dit pas de qui elle parle. */}
-                {deuxColonnes && (
-                  <div className="cl-head" style={{ paddingInline: 0 }}>
-                    <h1>{serviceOuvert}</h1>
+                {/*
+                  🐛 SUR TELEPHONE, CETTE VUE N'AVAIT NI TITRE NI RETOUR. Ils
+                  vivaient dans l'en-tete du volet gauche — que l'empilement
+                  masque des qu'un service est ouvert. On ne pouvait plus revenir
+                  aux services qu'avec le bouton du navigateur.
+                */}
+                <div className="cl-head" style={{ paddingInline: 0 }}>
+                  {!deuxColonnes && (
+                    <button
+                      type="button"
+                      className="cl-back"
+                      onClick={() => {
+                        setServiceOuvert(null)
+                        setMembres(null)
+                      }}
+                      title={t("back")}
+                      aria-label={t("back")}
+                    >
+                      <FlecheRetour />
+                    </button>
+                  )}
+                  <h1>{serviceOuvert}</h1>
+                </div>
+                {/* Le filtre n'apparait qu'a partir d'une poignee de collegues,
+                    comme sur le mobile : au-dessous, la liste se parcourt a
+                    l'oeil et le champ prendrait une place pour rien. */}
+                {membres !== null && membres.length > 5 && (
+                  <div className="cl-filtre">
+                    <ChampRecherche
+                      valeur={filtre}
+                      onChange={setFiltre}
+                      libelle={t("colleagues_filter_hint")}
+                      effacer={t("search_clear")}
+                    />
                   </div>
                 )}
-                {rendreCollegues(membres, t("colleagues_service_empty"))}
+                {/* Deux vides differents, deux messages : un service vide de
+                    naissance n'est pas un filtre qui ne trouve rien. */}
+                {rendreCollegues(
+                  membresVisibles,
+                  filtre.trim() === "" ? t("colleagues_service_empty") : t("colleagues_no_match")
+                )}
               </>
             ) : (
               <div className="cl-vide-droite">
@@ -284,17 +336,26 @@ export default function ColleguesPage() {
               aria-current={serviceOuvert === s.nom ? "true" : undefined}
               onClick={() => void ouvrirService(s.nom)}
             >
-              <span className="cl-service-nom">{s.nom}</span>
-              {/*
-                L'effectif est ANNONCÉ, y compris à zéro : un service configuré
-                mais sans personne est une information, pas une ligne à cacher.
-              */}
-              <span className="cl-service-effectif">
-                {s.effectif === 0
-                  ? t("colleagues_count_none")
-                  : s.effectif === 1
-                    ? t("colleagues_count_one")
-                    : t("colleagues_count_many", { n: s.effectif })}
+              {/* Meme carte que le mobile : pastille, nom, effectif, chevron. */}
+              <span className="cl-pastille">
+                <IconeBadge />
+              </span>
+              <span className="cl-service-texte">
+                <span className="cl-service-nom">{s.nom}</span>
+                {/*
+                  L'effectif est ANNONCÉ, y compris à zéro : un service configuré
+                  mais sans personne est une information, pas une ligne à cacher.
+                */}
+                <span className="cl-service-effectif">
+                  {s.effectif === 0
+                    ? t("colleagues_count_none")
+                    : s.effectif === 1
+                      ? t("colleagues_count_one")
+                      : t("colleagues_count_many", { n: s.effectif })}
+                </span>
+              </span>
+              <span className="cl-chevron">
+                <Chevron />
               </span>
             </button>
           </li>
@@ -311,7 +372,8 @@ export default function ColleguesPage() {
       <ul className="cl-liste">
         {liste.map((c) => (
           <li key={c.id} className="cl-membre">
-            <AvatarCircle avatar={c.avatarUrl} initials={initiales(c.nom)} />
+            <div className="cl-membre-haut">
+            <AvatarCircle avatar={c.avatarUrl} initials={initiales(c.nom)} className="cl-membre-avatar" />
             <div className="cl-membre-texte">
               <div className="cl-membre-nom">{c.nom}</div>
               {/* L'Alanya ID FORMATÉ, comme partout ailleurs : c'est sous cette
@@ -326,19 +388,27 @@ export default function ColleguesPage() {
 
                   Le mobile affiche exactement la même chose au même endroit :
                   les deux clients lisent le même champ du même serveur. */}
-              {c.agence ? <div className="cl-membre-agence">{c.agence}</div> : null}
+              {c.agence ? (
+                <div className="cl-membre-agence">
+                  <IconeAgence />
+                  <span>{c.agence}</span>
+                </div>
+              ) : null}
             </div>
-            {/* Le LIBELLE disparait sur telephone, l'icone reste : deux boutons
-                de texte plus un nom plus un avatar ne tiennent pas sur 360 px.
-                `aria-label` porte le mot dans les deux cas — ce que le lecteur
-                d'ecran annonce ne doit pas dependre de la largeur. */}
+            {/* La pastille verte du mobile : le collegue est connecte. */}
+            {c.isOnline === 1 && (
+              <span className="cl-en-ligne" title={t("online")} aria-label={t("online")} />
+            )}
+            </div>
+            {/* Les deux gestes SOUS la fiche, sur toute sa largeur, comme le
+                mobile : « Appeler » plein, « Message » au trait. Places a
+                droite du nom, ils ecrasaient celui-ci sur un ecran etroit. */}
             <div className="cl-membre-actions">
               <button
                 type="button"
-                className="cl-action"
+                className="cl-action cl-action-pleine"
+                disabled={occupe !== null}
                 onClick={() => void appeler(c)}
-                title={t("call")}
-                aria-label={t("call")}
               >
                 <IconeAppel />
                 <span>{t("call")}</span>
@@ -346,12 +416,13 @@ export default function ColleguesPage() {
               <button
                 type="button"
                 className="cl-action"
+                disabled={occupe !== null}
                 onClick={() => void ecrire(c)}
-                title={t("send_message")}
-                aria-label={t("send_message")}
               >
                 <IconeMessage />
-                <span>{t("send_message")}</span>
+                {/* « Message », le mot du mobile : « Envoyer un message » ne
+                    tenait pas dans une demi-tuile et finissait en « Envoyer u… ». */}
+                <span>{t("colleagues_message")}</span>
               </button>
             </div>
           </li>
@@ -403,6 +474,86 @@ function IconeMessage() {
       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.4 8.4 0 0 1 8.4-9 8.4 8.4 0 0 1 8.6 8.6Z" />
     </svg>
+  )
+}
+
+/** Le badge du mobile (`Icons.badge_outlined`), pastille des services. */
+function IconeBadge() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="6" width="18" height="14" rx="2" />
+      <path d="M9 6V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V6" />
+      <circle cx="9" cy="12" r="2" />
+      <path d="M6 17c.5-1.5 1.6-2.2 3-2.2s2.5.7 3 2.2M15 11h3M15 14h3" />
+    </svg>
+  )
+}
+
+/** L'immeuble du mobile (`Icons.business_outlined`), devant l'agence. */
+function IconeAgence() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h1M14 9h1M9 13h1M14 13h1M10 21v-4h4v4" />
+    </svg>
+  )
+}
+
+function Chevron() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  )
+}
+
+/**
+ * Un champ de recherche avec sa loupe et sa croix, comme le mobile.
+ *
+ * ⚠️ `type="text"` et non `search` : la croix native de Chrome ne suit ni la
+ * couleur ni le theme, et Firefox n'en dessine aucune — deux navigateurs, deux
+ * ecrans differents.
+ */
+function ChampRecherche({
+  valeur,
+  onChange,
+  libelle,
+  effacer,
+}: {
+  valeur: string
+  onChange: (v: string) => void
+  libelle: string
+  effacer: string
+}) {
+  return (
+    <div className="cl-champ">
+      <svg className="cl-champ-loupe" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20 20l-3.5-3.5" />
+      </svg>
+      <input
+        type="text"
+        value={valeur}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onChange("")
+        }}
+        placeholder={libelle}
+        aria-label={libelle}
+      />
+      {valeur !== "" && (
+        <button type="button" className="cl-champ-effacer" onClick={() => onChange("")}
+          title={effacer} aria-label={effacer}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+            strokeLinecap="round" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
   )
 }
 
