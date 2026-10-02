@@ -44,6 +44,24 @@ const SEAUX_MEDIAS = [
   "https://profilemedia.s3.eu-central-003.backblazeb2.com",
 ]
 
+/**
+ * L'hôte des avatars GÉNÉRÉS que la plateforme de l'équipe pose en base pour
+ * ses comptes — agents et standards des entreprises :
+ * `https://api.dicebear.com/7.x/icons/svg?seed=…`.
+ *
+ * 🐛 SANS LUI, LA PHOTO DE PROFIL DE CES COMPTES ÉTAIT CASSÉE SUR LE WEB, ET
+ * SEULEMENT LÀ (signalé par le user le 02/10/2026, compte Chiwen : « rudel »,
+ * « Serveur vocal orange Telecom », « Assistance Réclamation »). La base est
+ * partagée : ce n'est pas notre API qui écrit ces adresses, elle les rend telles
+ * quelles. Le mobile, qui n'a pas de CSP, les affichait (`image_octets.dart`) ;
+ * le navigateur, lui, refusait : « Loading the image 'https://api.dicebear.com/…'
+ * violates … img-src » — mesuré sur la construction de production.
+ *
+ * ⚠️ UN HÔTE PRÉCIS, PAS `https:` EN BLOC, pour la même raison que les seaux :
+ * une image ne s'exécute pas, mais son adresse peut emporter des données.
+ */
+const AVATARS_GENERES = "https://api.dicebear.com"
+
 function politiqueSecurite(apiBaseUrl: string, wsUrl: string): string {
   const api = apiBaseUrl.replace(/\/$/, "")
 
@@ -129,7 +147,7 @@ function politiqueSecurite(apiBaseUrl: string, wsUrl: string): string {
      * documents) passent par `?flux=1`, sur notre origine — voir
      * `media-preview-cache.ts`.
      */
-    "img-src": ["'self'", "data:", "blob:", ...SEAUX_MEDIAS],
+    "img-src": ["'self'", "data:", "blob:", ...SEAUX_MEDIAS, AVATARS_GENERES],
     "media-src": ["'self'", "blob:", "data:", ...SEAUX_MEDIAS],
     /*
      * 🔴 LA LIGNE QUI DÉCIDE OÙ LES MESSAGES DÉCHIFFRÉS PEUVENT ALLER. Un script
