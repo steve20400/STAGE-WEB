@@ -603,8 +603,11 @@ body {
  * (`whatsapp_text.dart`). Voir `src/lib/mise-en-forme.ts`.
  *
  * Le MANUSCRIT est une vraie cursive, Caveat, comme l'application : ni
- * penchee ni espacee, ce qui romprait la liaison entre ses lettres. Un peu
- * plus grande que le texte qui l'entoure, Caveat ayant un petit oeil.
+ * penchee ni espacee, ce qui romprait la liaison entre ses lettres.
+ *
+ * 1,45 FOIS le texte voisin, meme facteur que le mobile (`facteurManuscrit`) :
+ * Caveat a un tres petit oeil, et a 1,22 le user le trouvait trop petit
+ * (02/10/2026).
  */
 .mf-gras {
   font-weight: 700;
@@ -625,6 +628,6 @@ body {
 }
 .mf-manuscrit {
   font-family: "Caveat", cursive;
-  font-size: 1.22em;
+  font-size: 1.45em;
   line-height: 1;
 }
