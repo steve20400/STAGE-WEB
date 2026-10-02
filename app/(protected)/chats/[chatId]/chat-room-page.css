@@ -511,6 +511,60 @@
   background: var(--accent-dim);
 }
 
+/* Bouton ouvert (emojis, mise en forme) : il reste teinte tant que son
+   panneau est affiche, sinon rien ne dit lequel l'a ouvert. */
+.attach-btn.actif {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* Le « A » souligne du mobile (`_iconeFormatA`). */
+.bouton-format span {
+  display: block;
+  width: 17px;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  border-bottom: 2.5px solid currentColor;
+  padding-bottom: 1px;
+}
+
+/*
+ * LA BARRE DE MISE EN FORME, au-dessus du champ, comme sur le mobile. Chaque
+ * bouton s'affiche DANS le style qu'il applique : on voit ce qu'il fait
+ * avant de cliquer.
+ */
+.barre-format {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.barre-format-btn {
+  min-width: 40px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.barre-format-btn:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.barre-format-btn.mf-manuscrit {
+  font-size: 18px;
+  line-height: 1;
+}
+
 .attach-menu {
   position: absolute;
   bottom: 100%;

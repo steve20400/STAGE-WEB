@@ -31,7 +31,7 @@ if (apiKey && projectId && messagingSenderId) {
     if (payload.data && !payload.notification) {
       const title = payload.data.title || 'Nouveau message';
       const options = {
-        body: payload.data.body || 'Vous avez reçu une notification',
+        body: sansMarqueurs(payload.data.body || 'Vous avez reçu une notification'),
         icon: '/alanya-logo.jpeg',
         badge: '/alanya-logo.jpeg',
         data: payload.data // On passe tout le payload pour le clic handler
@@ -42,6 +42,43 @@ if (apiKey && projectId && messagingSenderId) {
   });
 } else {
   console.warn('[sw] Configuration Firebase manquante dans les paramètres d\'URL du Service Worker.');
+}
+
+/*
+ * Retire les marqueurs de mise en forme (*gras*, _italique_, ~barre~,
+ * __souligne__, `manuscrit`) : une notification n'affiche pas de style.
+ *
+ * ⚠️ COPIE de `src/lib/mise-en-forme.ts` (même algorithme, même ordre de
+ * priorité) : un service worker ne peut pas importer les modules de l'appli.
+ * Toute évolution des marqueurs doit être reportée ici.
+ */
+function sansMarqueurs(source) {
+  const codes = ['__', '*', '_', '~', '`'];
+  const analyse = (s, debut, fin) => {
+    let sortie = '';
+    let i = debut;
+    while (i < fin) {
+      let trouve = false;
+      for (const code of codes) {
+        const n = code.length;
+        if (i + n <= fin && s.startsWith(code, i) && i + n + 1 <= fin - n) {
+          let fermeture = -1;
+          for (let j = i + n + 1; j <= fin - n; j++) {
+            if (s.startsWith(code, j)) { fermeture = j; break; }
+          }
+          if (fermeture !== -1) {
+            sortie += analyse(s, i + n, fermeture);
+            i = fermeture + n;
+            trouve = true;
+            break;
+          }
+        }
+      }
+      if (!trouve) { sortie += s[i]; i++; }
+    }
+    return sortie;
+  };
+  return analyse(source, 0, source.length);
 }
 
 // Handler de clic sur la notification

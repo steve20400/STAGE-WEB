@@ -99,6 +99,9 @@ import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media
 import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
 import { appareilCourantId } from "../../../../src/services/appareils-service"
 import { composerMessageSysteme } from "../../../../src/i18n/messages-systeme"
+import { TexteForme } from "../../../../src/components/texte-forme"
+import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
+import { appliquerMarqueur, MARQUEURS, sansMarqueurs } from "../../../../src/lib/mise-en-forme"
 import { lireVerrou, useVerrou } from "../../../../src/hooks/use-verrou"
 import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
 import {
@@ -1274,14 +1277,16 @@ function TexteAvecMentions({
 
 function RichText({ text, isMe }: { text: string; isMe: boolean }) {
   const urls = text.match(URL_REGEX) || []
-  if (urls.length === 0) return <>{text}</>
+  // La mise en forme s'applique aux morceaux de TEXTE, jamais aux liens : un
+  // `_` dans une adresse ne doit pas la couper en italique.
+  if (urls.length === 0) return <TexteForme texte={text} />
 
   const parts: React.ReactNode[] = []
   let remaining = text
   let key = 0
   for (const url of urls) {
     const idx = remaining.indexOf(url)
-    if (idx > 0) parts.push(<span key={key++}>{remaining.slice(0, idx)}</span>)
+    if (idx > 0) parts.push(<TexteForme key={key++} texte={remaining.slice(0, idx)} />)
     parts.push(
       <a
         key={key++}
@@ -1299,7 +1304,7 @@ function RichText({ text, isMe }: { text: string; isMe: boolean }) {
     )
     remaining = remaining.slice(idx + url.length)
   }
-  if (remaining) parts.push(<span key={key++}>{remaining}</span>)
+  if (remaining) parts.push(<TexteForme key={key++} texte={remaining} />)
 
   let domain = ""
   try {
@@ -4152,7 +4157,7 @@ function MessageBubble({
                           </span>
                         </div>
                       ) : (
-                        <span>{quote.content}</span>
+                        <span>{sansMarqueurs(quote.content ?? "")}</span>
                       )}
                     </div>
                   </div>
@@ -5121,6 +5126,10 @@ export default function ChatRoomPage() {
   const [presenceTick, setPresenceTick] = useState(0)
   const [sending, setSending] = useState(false)
   const [showAttach, setShowAttach] = useState(false)
+  /** Le sélecteur d'emojis, au-dessus du champ. */
+  const [emojisOuverts, setEmojisOuverts] = useState(false)
+  /** La barre de mise en forme (B, I, S, U, manuscrit), comme le « A » du mobile. */
+  const [barreFormatOuverte, setBarreFormatOuverte] = useState(false)
   /** Fenetre de choix du contact a envoyer (repertoire ou numero compose). */
   const [partageContact, setPartageContact] = useState(false)
   const [infoPanelOpen, setInfoPanelOpen] = useState(false)
@@ -6321,6 +6330,16 @@ export default function ChatRoomPage() {
 
   // Touche Entree = envoi (Shift+Entree = saut de ligne)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ctrl/Cmd + B, I, U : les raccourcis de tout traitement de texte, mappés
+    // sur les marqueurs du mobile. Barré et manuscrit restent à la barre.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+      const code = { b: "*", i: "_", u: "__" }[e.key.toLowerCase()]
+      if (code) {
+        e.preventDefault()
+        appliquerStyle(code)
+        return
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       sendMessage()
@@ -6420,6 +6439,48 @@ export default function ChatRoomPage() {
    * mention et la liste se rouvre aussitot sur le nom qu'on vient de choisir.
    */
   /** Insere la mention COLLECTIVE. Meme geste que pour une personne. */
+  /**
+   * Remplace le texte du champ et replace la sélection, puis réajuste sa
+   * hauteur — `handleInput` ne voit pas les changements faits par programme.
+   */
+  const majChamp = (texte: string, debut: number, fin: number) => {
+    const champ = inputRef.current
+    setInput(texte)
+    window.requestAnimationFrame(() => {
+      if (!champ) return
+      champ.focus()
+      champ.setSelectionRange(debut, fin)
+      champ.style.height = "auto"
+      champ.style.height = Math.min(champ.scrollHeight, 120) + "px"
+    })
+  }
+
+  /**
+   * Applique (ou retire) un marqueur autour de la sélection — le même calcul
+   * que le mobile (`appliquerMarqueur` = `calculeMarqueur`).
+   *
+   * ⚠️ REFUSÉ SI LE RÉSULTAT DÉPASSE LA LONGUEUR MAXIMALE : le couper ferait
+   * perdre le marqueur fermant, et le texte partirait à moitié mis en forme.
+   */
+  const appliquerStyle = (code: string) => {
+    const champ = inputRef.current
+    const debut = champ?.selectionStart ?? input.length
+    const fin = champ?.selectionEnd ?? input.length
+    const r = appliquerMarqueur(input, debut, fin, code)
+    if (r.texte.length > LONGUEUR_MAX_CONTENU) return
+    majChamp(r.texte, r.debut, r.fin)
+  }
+
+  /** Insère un emoji au curseur (ou à la place de la sélection). */
+  const insereEmoji = (emoji: string) => {
+    const champ = inputRef.current
+    const debut = champ?.selectionStart ?? input.length
+    const fin = champ?.selectionEnd ?? input.length
+    const texte = input.slice(0, debut) + emoji + input.slice(fin)
+    if (texte.length > LONGUEUR_MAX_CONTENU) return
+    majChamp(texte, debut + emoji.length, debut + emoji.length)
+  }
+
   const insereMentionTous = () => {
     const champ = inputRef.current
     const curseur = champ?.selectionStart ?? input.length
@@ -8121,7 +8182,7 @@ export default function ChatRoomPage() {
           <div className="reply-bar-content">
             <div className="reply-bar-label">{t("reply_to")}</div>
             <div className="reply-bar-txt">
-              {hasQuotedMedia(replyTo) ? quotedMediaLabel(replyTo) : replyTo.content}
+              {hasQuotedMedia(replyTo) ? quotedMediaLabel(replyTo) : sansMarqueurs(replyTo.content ?? "")}
             </div>
           </div>
           <button
@@ -8186,12 +8247,39 @@ export default function ChatRoomPage() {
             onChange={handleFileSelect}
           />
 
+          {barreFormatOuverte && !recording && (
+            <div className="barre-format" role="toolbar" aria-label={t("formatting")}>
+              {MARQUEURS.map((m) => (
+                <button
+                  key={m.code}
+                  type="button"
+                  className={`barre-format-btn mf-${m.style}`}
+                  /*
+                   * ⚠️ `onMouseDown` + `preventDefault` : sans lui, cliquer le
+                   * bouton retire le focus du champ, et la sélection qu'on veut
+                   * mettre en forme est perdue avant même le clic.
+                   */
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => appliquerStyle(m.code)}
+                  title={t(m.cle as "format_bold")}
+                  aria-label={t(m.cle as "format_bold")}
+                >
+                  {m.style === "manuscrit" ? "Aa" : m.style === "souligne" ? "U" : m.style === "barre" ? "S" : m.style === "italique" ? "I" : "B"}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div
             ref={attachRef}
             className="room-input-row"
             style={{ position: "relative" }}
             onMouseLeave={() => setShowAttach(false)}
           >
+            {emojisOuverts && (
+              <SelecteurEmojis onChoisir={insereEmoji} onFermer={() => setEmojisOuverts(false)} />
+            )}
+
             {/* Popup attachement */}
             {showAttach && (
               <div className="attach-menu">
@@ -8418,6 +8506,26 @@ export default function ChatRoomPage() {
               </svg>
             </button>
 
+            {!recording && (
+              <button
+                type="button"
+                className={`attach-btn emoji-declencheur${emojisOuverts ? " actif" : ""}`}
+                onClick={() => {
+                  setShowAttach(false)
+                  setEmojisOuverts((v) => !v)
+                }}
+                aria-expanded={emojisOuverts}
+                aria-label={t("emojis")}
+                title={t("emojis")}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M8.5 14.5c.9 1.3 2.1 2 3.5 2s2.6-.7 3.5-2M9 9.5h.01M15 9.5h.01" />
+                </svg>
+              </button>
+            )}
+
             {recording ? (
               <div
                 style={{
@@ -8554,6 +8662,17 @@ export default function ChatRoomPage() {
                  * place permanente pour une limite que la quasi-totalite des
                  * messages n'atteint jamais.
                  */}
+                {/* Le « A » du mobile : ouvre la barre de mise en forme. */}
+                <button
+                  type="button"
+                  className={`attach-btn bouton-format${barreFormatOuverte ? " actif" : ""}`}
+                  onClick={() => setBarreFormatOuverte((v) => !v)}
+                  aria-expanded={barreFormatOuverte}
+                  aria-label={t("formatting")}
+                  title={t("formatting")}
+                >
+                  <span aria-hidden="true">A</span>
+                </button>
                 {LONGUEUR_MAX_CONTENU - input.length <= 50 && (
                   <span
                     className="compteur-longueur"

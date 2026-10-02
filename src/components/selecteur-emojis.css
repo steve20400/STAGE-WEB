@@ -1,0 +1,145 @@
+/*
+ * SELECTEUR D'EMOJIS — panneau ancre au-dessus de la zone de saisie.
+ * Couleurs par jetons de theme uniquement : il suit les quatre themes.
+ */
+.emoji-panneau {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 32px));
+  height: 380px;
+  max-height: 60vh;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  font-family: "DM Sans", sans-serif;
+}
+
+.emoji-recherche {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 10px 10px 6px;
+}
+.emoji-recherche svg {
+  position: absolute;
+  left: 21px;
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.emoji-recherche input {
+  width: 100%;
+  padding: 8px 10px 8px 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+}
+.emoji-recherche input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.emoji-recherche input::placeholder {
+  color: var(--text-muted);
+}
+
+.emoji-onglets {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.emoji-onglet {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 32px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.emoji-onglet svg {
+  width: 18px;
+  height: 18px;
+}
+.emoji-onglet:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.emoji-onglet.actif {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+.emoji-onglet:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.emoji-grille {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 8px 10px;
+}
+.emoji-grille section {
+  /* Les sections hors champ ne sont pas dessinees : 1 800 boutons d'un coup
+     ralentiraient l'ouverture sur une machine modeste. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
+}
+.emoji-grille h3 {
+  position: sticky;
+  top: -4px;
+  z-index: 1;
+  margin: 0;
+  padding: 8px 4px 4px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.emoji-cases {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+}
+.emoji-case {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.1s;
+}
+.emoji-case:hover {
+  background: var(--bg-hover);
+  transform: scale(1.12);
+}
+.emoji-case:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.emoji-vide {
+  padding: 32px 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}

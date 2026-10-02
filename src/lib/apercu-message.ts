@@ -16,6 +16,7 @@
  */
 
 import type { ChatMessageMock as Message } from "../mocks/chat-data"
+import { sansMarqueurs } from "./mise-en-forme"
 
 /** Ce que le catalogue doit savoir traduire pour décrire un message. */
 type Traducteur = (cle: string, params?: Record<string, string | number>) => string
@@ -86,7 +87,9 @@ export function decrireMessage(
   if (structure) return { icone: "", texte: structure }
 
   const type = msg.type
-  const legende = msg.content?.trim()
+  // SANS SES MARQUEURS : cette description tient sur une ligne (citation,
+  // epingle, recherche), ou `*coucou*` montrerait la mecanique au lieu du mot.
+  const legende = msg.content ? sansMarqueurs(msg.content).trim() : undefined
 
   // UNE LÉGENDE PRIME SUR LE TYPE : quelqu'un qui a pris la peine d'écrire sous
   // sa photo a dit mieux que « Photo » ce que la photo montre.

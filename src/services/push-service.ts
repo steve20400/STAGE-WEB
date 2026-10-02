@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app"
+import { sansMarqueurs } from "../lib/mise-en-forme"
 import {
   getMessaging,
   getToken,
@@ -138,7 +139,9 @@ export async function initPushNotifications(): Promise<void> {
         payload.notification?.title ||
         payload.data?.title ||
         traduire(langueInitiale(), "new_message")
-      const body = payload.notification?.body || payload.data?.body || ""
+      // Une notification n'affiche pas de style : on retire les marqueurs
+      // (`*gras*` -> gras) plutot que de les montrer.
+      const body = sansMarqueurs(payload.notification?.body || payload.data?.body || "")
 
       const options: NotificationOptions = {
         body,

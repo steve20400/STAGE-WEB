@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback, type CSSProperties } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
+import { TexteForme } from "../../../src/components/texte-forme"
 import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data"
 import {
   fetchChatConversations,
@@ -785,7 +786,9 @@ function ConvItem({ conv }: { conv: ConversationListItem }) {
           )}
         </div>
         <div className={`conv-preview ${conv.unread > 0 ? "unread" : ""}`}>
-          {apercuDernierMessage(conv)}
+          {/* MIS EN FORME, comme le mobile (`home_screen.dart`) : un dernier
+              message en gras s'affiche en gras, et non avec ses asterisques. */}
+          <TexteForme texte={apercuDernierMessage(conv)} />
         </div>
       </div>
       <div className="conv-right">
