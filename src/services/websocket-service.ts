@@ -1163,6 +1163,30 @@ export function subscribeToMessageDeleted(
   })
 }
 
+/**
+ * VUE UNIQUE : un destinataire l'a ouverte, ou le fichier a ete efface.
+ *
+ * Deux sonnettes d'identifiants, emises par l'API (`vue_unique_*`). La
+ * pastille de la bulle passe a « Ouverte » sans recharger le fil.
+ */
+export function subscribeToVueUnique(
+  conversationId: string,
+  handler: (event: { messageId: string; efface: boolean; userId: string | null }) => void
+): () => void {
+  return addListener((event) => {
+    if (
+      (event.type === "vue_unique_ouverte" || event.type === "vue_unique_effacee") &&
+      event.convId === conversationId
+    ) {
+      handler({
+        messageId: String(event.messageId ?? ""),
+        efface: event.type === "vue_unique_effacee",
+        userId: typeof event.userId === "string" ? event.userId : null,
+      })
+    }
+  })
+}
+
 /** Supprime un message : "me" (masque local) ou "everyone" (efface pour tous). */
 export function sendDeleteMessage(messageId: string, scope: "me" | "everyone") {
   sendRaw({ type: "delete_message", messageId, scope })

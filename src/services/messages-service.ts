@@ -214,6 +214,9 @@ export function toFrontMessage(
     fileName: media?.filename,
     fileSize: formatBytes(media?.sizeBytes),
     isDeleted: Boolean(deletedAt),
+    vueUnique: (m as { vueUnique?: boolean }).vueUnique === true,
+    vueUniqueOuverte: (m as { vueUniqueOuverte?: boolean }).vueUniqueOuverte === true,
+    vueUniqueEffacee: (m as { vueUniqueEffacee?: boolean }).vueUniqueEffacee === true,
     editedAt: dateEditee && !Number.isNaN(dateEditee.getTime()) ? dateEditee : undefined,
   }
 }
@@ -263,6 +266,11 @@ function cacheBackendMessages(backendMessages: BackendMessage[]): void {
        */
       callId: m.callId,
       media: m.media,
+      // Sans eux, une vue unique relue hors ligne redeviendrait une photo
+      // ordinaire, dont la vignette serait refusee par le serveur.
+      vueUnique: (m as { vueUnique?: boolean }).vueUnique,
+      vueUniqueOuverte: (m as { vueUniqueOuverte?: boolean }).vueUniqueOuverte,
+      vueUniqueEffacee: (m as { vueUniqueEffacee?: boolean }).vueUniqueEffacee,
     }))
   )
 }

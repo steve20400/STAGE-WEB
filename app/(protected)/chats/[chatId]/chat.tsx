@@ -110,6 +110,7 @@ import {
   subscribeToDistribue,
   subscribeToE2eeArrivee,
   subscribeToMessageDeleted,
+  subscribeToVueUnique,
   subscribeToMessageEdited,
   subscribeToPresence,
   subscribeToStatus,
@@ -1382,6 +1383,43 @@ function RichText({ text, isMe }: { text: string; isMe: boolean }) {
         </a>
       )}
     </>
+  )
+}
+
+/**
+ * LA PASTILLE D'UN MESSAGE A VUE UNIQUE — jamais le media lui-meme.
+ *
+ * Decision du user (02/10/2026) : le web ne l'ouvre pas. Le visionneur du
+ * telephone bloque la capture d'ecran ; un navigateur ne sait pas le faire,
+ * et une vue unique ouverte ici serait capturable sans obstacle. La pastille
+ * dit donc ce que c'est, ou on en est, et ou l'ouvrir.
+ */
+function PastilleVueUnique({ msg, isMe }: { msg: Message; isMe: boolean }) {
+  const { t } = useTranslation()
+  const mime = msg.mediaMime ?? ""
+  const quoi = mime.startsWith("video/") || msg.type === "video"
+    ? t("vu_video")
+    : mime.startsWith("audio/") || msg.type === "audio"
+      ? t("vu_vocal")
+      : t("vu_photo")
+  const consommee = msg.vueUniqueOuverte || msg.vueUniqueEffacee
+  const etat = isMe
+    ? t(consommee ? "vu_ouverte" : "vu_envoyee")
+    : consommee
+      ? t("vu_ouverte")
+      : t("vu_telephone")
+  return (
+    <span className={`vue-unique${consommee ? " consommee" : ""}`} title={t("vu_titre")}>
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="vue-unique-icone">
+        <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.8"
+          strokeDasharray="3.2 2.4" strokeLinecap="round" />
+        <text x="12" y="16.2" textAnchor="middle" fontSize="11" fontWeight="700" fill="currentColor">1</text>
+      </svg>
+      <span className="vue-unique-texte">
+        <span className="vue-unique-quoi">{quoi}</span>
+        <span className="vue-unique-etat">{etat}</span>
+      </span>
+    </span>
   )
 }
 
@@ -3128,7 +3166,8 @@ function decrireMessageEnLigneSansIcone(msg: {
  */
 function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
   const { t } = useTranslation()
-  const src = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
+  // Une vue unique citee ne montre pas de vignette : l'icone de son type suffit.
+  const src = msg.mediaUrl && !msg.vueUnique ? resolveMediaUrl(msg.mediaUrl) : ""
   const mime = msg.mediaMime ?? ""
   const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
   const isImage = msg.type === "image" || mime.startsWith("image/")
@@ -3272,6 +3311,8 @@ function isAlbumCandidate(msg: Message): boolean {
   return (
     !msg.isDeleted &&
     !msg.replyTo &&
+    // Une vue unique n'entre jamais dans une grille : elle ne montre rien.
+    !msg.vueUnique &&
     Boolean(msg.mediaUrl) &&
     (msg.type === "image" || msg.type === "video" || msg.type === "file")
   )
@@ -3654,7 +3695,10 @@ function MessageBubble({
   // bouton d'actions : on masque ce dernier le temps du geste.
   const actionsShown = (actionsVisible || menuOpen) && dragX === 0
 
-  const mediaSrc = msg.mediaUrl ? resolveMediaUrl(msg.mediaUrl) : ""
+  // 🔴 UNE VUE UNIQUE N'A PAS D'ADRESSE ICI : sans source, aucune balise
+  // <img>, <video> ou <audio> n'est rendue — ni vignette ni prechargement. Le
+  // serveur la refuserait de toute facon (403) a qui ne l'a pas ouverte.
+  const mediaSrc = msg.mediaUrl && !msg.vueUnique ? resolveMediaUrl(msg.mediaUrl) : ""
   const isVideoFile = (msg.mediaMime ?? "").startsWith("video/")
   const canExpandMedia = Boolean(mediaSrc) && !msg.isDeleted
   // La legende d'un lot vit sur l'un de ses messages, pas forcement le premier.
@@ -4009,7 +4053,9 @@ function MessageBubble({
                   {isMe && msg.status === "failed" && onReessayer
                     ? menuItem(t("retry"), () => onReessayer(msg))
                     : null}
-                  {!msg.chiffre ? menuItem(t("forward"), () => onForward(msg)) : null}
+                  {/* Ni transfert pour un fil chiffre, ni pour une vue unique : le
+                      serveur refuse les deux. */}
+                  {!msg.chiffre && !msg.vueUnique ? menuItem(t("forward"), () => onForward(msg)) : null}
                   {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
                   {isMe
                     ? menuItem(t("delete_for_all"), () => onDelete(msg, "everyone"), true)
@@ -4237,6 +4283,7 @@ function MessageBubble({
                 </>
               ) : (
                 <>
+                  {msg.vueUnique && <PastilleVueUnique msg={msg} isMe={isMe} />}
                   {msg.type === "image" && mediaSrc && (
                     <img
                       src={mediaSrc}
@@ -5768,6 +5815,21 @@ export default function ChatRoomPage() {
       if (event.isOnline) setLastPeerActivity(Date.now())
     })
 
+    // Vue unique ouverte ou effacee : la pastille suit. « Ouverte » ne vaut que
+    // pour MES envois, ou si c'est moi qui ai ouvert depuis le telephone.
+    const unsubscribeVueUnique = subscribeToVueUnique(chatId, (event) => {
+      if (cancelled) return
+      const moi = getMyUserId()
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== event.messageId) return m
+          if (event.efface) return { ...m, vueUniqueEffacee: true }
+          if (m.senderId === "me" || event.userId === moi) return { ...m, vueUniqueOuverte: true }
+          return m
+        })
+      )
+    })
+
     // Abonnement aux suppressions de messages (pour moi / pour tous)
     const unsubscribeDeleted = subscribeToMessageDeleted(chatId, (event) => {
       if (cancelled) return
@@ -5865,6 +5927,7 @@ export default function ChatRoomPage() {
       unsubscribeEpingle()
       unsubscribePresence()
       unsubscribeDeleted()
+      unsubscribeVueUnique()
       unsubscribeEdited()
       unsubscribeConnected()
       clearInterval(pollId)

@@ -141,6 +141,17 @@ export interface ChatMessageMock {
    */
   mentionTousLibelle?: string | null
   /**
+   * Photo, video ou vocal A VUE UNIQUE (02/10/2026). Le web ne l'ouvre pas :
+   * il affiche une pastille invitant a l'ouvrir sur le telephone, ou le
+   * visionneur bloque la capture d'ecran. Le serveur refuse d'ailleurs le
+   * media a quiconque ne l'a pas ouvert.
+   */
+  vueUnique?: boolean
+  /** Expediteur : quelqu'un l'a ouverte. Destinataire : je l'ai ouverte. */
+  vueUniqueOuverte?: boolean
+  /** Le fichier a ete efface du stockage. */
+  vueUniqueEffacee?: boolean
+  /**
    * Le statut auquel ce message repond.
    *
    * RECOPIE par le serveur, jamais reference : un statut est purge au bout de

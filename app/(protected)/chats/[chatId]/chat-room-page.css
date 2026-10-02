@@ -1508,3 +1508,38 @@ textarea.room-textarea::placeholder {
     color: #e0cdb5;
   }
 }
+
+/*
+ * VUE UNIQUE — la pastille qui remplace le media dans la bulle. Le « 1 »
+ * cercle de pointilles de WhatsApp, le type, et ou l'on en est.
+ * Grisee une fois ouverte : il n'y a plus rien a voir.
+ */
+.vue-unique {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 190px;
+  padding: 2px 2px 4px;
+}
+.vue-unique-icone {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+.vue-unique.consommee .vue-unique-icone {
+  color: var(--text-muted);
+}
+.vue-unique-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.vue-unique-quoi {
+  font-weight: 600;
+}
+.vue-unique-etat {
+  font-size: 0.82em;
+  opacity: 0.75;
+}
