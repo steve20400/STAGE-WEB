@@ -51,6 +51,19 @@ async function ouvrir(d: DescripteurMedia): Promise<Blob> {
 }
 
 /**
+ * Range le clair d'un média qu'on vient d'ENVOYER : l'expéditeur l'a déjà,
+ * le retélécharger pour le déchiffrer aussitôt serait absurde.
+ */
+export async function garderClair(id: string, blob: Blob): Promise<void> {
+  try {
+    const db = await initIndexedDB()
+    await db.put(MAGASIN, { key: cleCache(id), blob, cachedAt: Date.now() })
+  } catch {
+    /* pas de cache : il sera téléchargé au besoin */
+  }
+}
+
+/**
  * Télécharge le fichier CHIFFRÉ.
  *
  * Décision du user (03/10/2026) : EN DIRECT depuis Backblaze. Le serveur

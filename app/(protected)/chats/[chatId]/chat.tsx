@@ -100,7 +100,9 @@ import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
 import { appareilCourantId } from "../../../../src/services/appareils-service"
 import { composerMessageSysteme } from "../../../../src/i18n/messages-systeme"
 import { TexteForme } from "../../../../src/components/texte-forme"
-import { MediaChiffre, MediaChiffreIndisponible } from "./media-chiffre"
+import { MediaChiffre, MediaChiffreIndisponible, TuileChiffree } from "./media-chiffre"
+import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
+import { envoyerMediaChiffre } from "../../../../src/services/e2ee-media-envoi"
 import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
 import { appliquerMarqueur, MARQUEURS, sansMarqueurs } from "../../../../src/lib/mise-en-forme"
 import { lireVerrou, useVerrou } from "../../../../src/hooks/use-verrou"
@@ -3320,10 +3322,13 @@ function isAlbumCandidate(msg: Message): boolean {
     !msg.replyTo &&
     // Une vue unique n'entre jamais dans une grille : elle ne montre rien.
     !msg.vueUnique &&
-    // Un média chiffré s'affiche par son propre composant (déchiffrement).
-    !msg.medias?.[0]?.chiffre &&
-    Boolean(msg.mediaUrl) &&
-    (msg.type === "image" || msg.type === "video" || msg.type === "file")
+    // Un média CHIFFRÉ entre dans la grille s'il est une photo ou une vidéo
+    // dont on a la clé : ses tuiles le déchiffrent (chapitre 24).
+    (msg.mediaChiffre
+      ? /^(image|video)\//.test(msg.mediaChiffre.mime)
+      : !msg.medias?.[0]?.chiffre &&
+        Boolean(msg.mediaUrl) &&
+        (msg.type === "image" || msg.type === "video" || msg.type === "file"))
   )
 }
 
@@ -3441,8 +3446,12 @@ function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: num
             height: tile,
           }}
         >
-          <QuoteThumbnail msg={item} size={tile} />
-          {(item.mediaMime ?? "").startsWith("video/") && (
+          {item.mediaChiffre ? (
+            <TuileChiffree d={item.mediaChiffre} taille={tile} />
+          ) : (
+            <QuoteThumbnail msg={item} size={tile} />
+          )}
+          {((item.mediaChiffre?.mime ?? item.mediaMime) ?? "").startsWith("video/") && (
             <span
               aria-hidden
               style={{
@@ -4450,6 +4459,10 @@ function MessageBubble({
                   )}
 
                   {msg.type === "file" &&
+                    // 🐛 Un document CHIFFRÉ a sa propre carte (MediaChiffre) : la
+                    // carte ordinaire affichait en plus « chiffre.bin », avec un
+                    // bouton qui aurait téléchargé le fichier illisible.
+                    !msg.medias?.[0]?.chiffre &&
                     (!mediaSrc || !isVideoFile) &&
                     (() => {
                       const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
@@ -6677,6 +6690,62 @@ export default function ChatRoomPage() {
       }
       setMessages((prev) => [...prev, optimistic])
 
+      /*
+       * 🔴 FIL CHIFFRÉ : LE MÉDIA PART CHIFFRÉ DE BOUT EN BOUT (chapitre 24).
+       *
+       * Le serveur ne reçoit qu'un fichier illisible ; la clé, l'aperçu et la
+       * légende voyagent dans l'enveloppe Signal. Rien ne passe par le chemin
+       * ordinaire, et surtout pas la file hors ligne : elle renverrait plus
+       * tard le fichier EN CLAIR.
+       */
+      if (estChiffree(chatId)) {
+        try {
+          const envoi = await envoyerMediaChiffre(chatId, file, {
+            nom: filename,
+            mime,
+            dureeMs: durationMs,
+            legende: caption,
+            replyToId: replyTo?.id,
+          })
+          setReplyTo(null)
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === envoi.id)) return prev.filter((m) => m.id !== tempId)
+            return prev.map((m) =>
+              m.id === tempId
+                ? {
+                    ...m,
+                    id: envoi.id,
+                    status: "sent",
+                    chiffre: true,
+                    content: caption,
+                    // L'adresse locale cède la place au descripteur : la bulle
+                    // affiche le clair gardé en cache, sans rien télécharger.
+                    mediaUrl: undefined,
+                    medias: [
+                      {
+                        id: envoi.descripteur.id,
+                        url: `/api/media/${envoi.descripteur.id}`,
+                        filename: "chiffre.bin",
+                        mimeType: "application/octet-stream",
+                        sizeBytes: 0,
+                        durationMs: null,
+                        chiffre: true,
+                      },
+                    ],
+                    mediaChiffre: envoi.descripteur,
+                  }
+                : m
+            )
+          })
+          URL.revokeObjectURL(localUrl)
+        } catch (err) {
+          setMessages((prev) => prev.filter((m) => m.id !== tempId))
+          URL.revokeObjectURL(localUrl)
+          error(t("f2_file_not_sent"), err instanceof Error ? err.message : t("send_file_failed"))
+        }
+        return
+      }
+
       try {
         const media = await uploadMedia(file, filename, durationMs)
         const saved = await sendChatMessage(chatId, caption, msgType, {
@@ -7370,7 +7439,11 @@ export default function ChatRoomPage() {
    * pour de bon : la frontiere est unique.
    */
   const premierChiffreId = timeline.find(
-    (it) => it.kind === "msg" && it.msg.chiffre === true,
+    (it) =>
+      (it.kind === "msg" && it.msg.chiffre === true) ||
+      // 🐛 Une GRILLE de photos chiffrées (chapitre 24) est un élément à part :
+      // sans elle, la bannière tombait APRÈS les premières photos chiffrées.
+      (it.kind === "album" && it.msgs.some((m) => m.chiffre === true)),
   )
 
   // Grouper par date
@@ -8051,7 +8124,29 @@ export default function ChatRoomPage() {
                         !albumIsMe && chat?.isGroup ? resolveSenderName(head.senderId) : undefined
                       }
                       albumMsgs={lot}
-                      onOpenAlbum={(index) => setGallery({ msgs: lot, index })}
+                      onOpenAlbum={(index) => {
+                        // Un lot chiffré s'ouvre sur ses copies déchiffrées : la
+                        // galerie ne sait lire que des adresses, on lui en donne
+                        // de locales (blob:), jamais le fichier du serveur.
+                        if (!lot.some((m) => m.mediaChiffre)) {
+                          setGallery({ msgs: lot, index })
+                          return
+                        }
+                        void Promise.all(
+                          lot.map(async (m) =>
+                            m.mediaChiffre
+                              ? {
+                                  ...m,
+                                  mediaUrl: URL.createObjectURL(await ouvrirMediaChiffre(m.mediaChiffre)),
+                                  mediaMime: m.mediaChiffre.mime,
+                                  fileName: m.mediaChiffre.nom,
+                                }
+                              : m
+                          )
+                        )
+                          .then((msgs) => setGallery({ msgs, index }))
+                          .catch(() => error(t("e2ee_media_echec")))
+                      }}
                       autoTraduction={autoTraduction}
                       langueSourceDeclaree={langueDeclaree}
                     />
@@ -8368,33 +8463,11 @@ export default function ChatRoomPage() {
             {showAttach && (
               <div className="attach-menu">
                 {/*
-                  🔴 LE FIL EST CHIFFRÉ, LES PIÈCES JOINTES NE LE SONT PAS.
-
-                  Le chiffrement des médias est remis à plus tard (décision du
-                  21/09/2026). En attendant, un fichier envoyé dans un fil
-                  marqué « chiffré » traverse le chemin ORDINAIRE : le serveur
-                  le stocke et peut l'ouvrir.
-
-                  ⚠️ NE PAS LE DIRE SERAIT LE PIRE DES CHOIX. L'utilisateur a
-                  sous les yeux un cadenas et une bannière ; il en déduit,
-                  légitimement, que tout ce qu'il envoie est protégé. Le
-                  silence ici ne cache pas une limite, il fabrique une
-                  croyance fausse — et c'est sur cette croyance que les gens
-                  décident quoi envoyer.
-
-                  ⚠️ ICI ET PAS AILLEURS : au moment de CHOISIR le fichier,
-                  quand l'information peut encore changer la décision. Après
-                  l'envoi, elle ne sert plus à rien.
+                  ✅ LES PIÈCES JOINTES D'UN FIL CHIFFRÉ SONT CHIFFRÉES depuis le
+                  03/10/2026 (chapitre 24) : l'avertissement « les pièces jointes
+                  ne sont pas chiffrées » posé le 21/09 a été retiré — il serait
+                  devenu faux. Voir `envoyerMediaChiffre`.
                 */}
-                {estChiffree(chatId) && (
-                  <div className="attach-avertissement">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M12 9v4M12 17h.01" />
-                      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-                    </svg>
-                    <span>{t("e2ee_medias_clairs")}</span>
-                  </div>
-                )}
                 <button
                   className="attach-opt"
                   onClick={() => {

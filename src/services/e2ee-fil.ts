@@ -178,7 +178,7 @@ interface MessageCree {
  * il chiffre : c'est la différence de fond entre les deux régimes, et elle
  * remonte jusqu'ici.
  */
-async function correspondant(convId: string): Promise<string> {
+export async function correspondant(convId: string): Promise<string> {
   const moi = getMyUserId()
   const r = await apiRequest<{ members: { id: string }[] }>(
     `/api/conversations/${encodeURIComponent(convId)}/members`,

@@ -183,3 +183,37 @@ function telecharger(url: string, nom: string) {
   a.download = nom
   a.click()
 }
+
+/**
+ * UNE TUILE DE GRILLE pour un média chiffré — photos envoyées à la suite,
+ * regroupées à l'affichage (décision du user, 03/10/2026 : un message par
+ * photo, mais une grille à l'écran).
+ *
+ * Photo : déchiffrée et affichée nette ; vidéo : sa première image, venue de
+ * l'enveloppe. En attendant, l'aperçu flouté.
+ */
+export function TuileChiffree({ d, taille }: { d: DescripteurMedia; taille: number }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const image = d.mime.startsWith("image/")
+  useEffect(() => {
+    if (!image) return
+    let vivant = true
+    let cree: string | null = null
+    void ouvrirMediaChiffre(d)
+      .then((blob) => {
+        if (!vivant) return
+        cree = URL.createObjectURL(blob)
+        setUrl(cree)
+      })
+      .catch(() => undefined)
+    return () => {
+      vivant = false
+      if (cree) URL.revokeObjectURL(cree)
+    }
+  }, [d, image])
+  const apercu = d.apercu ? `data:image/jpeg;base64,${d.apercu}` : null
+  const style = { width: taille, height: taille, objectFit: "cover" as const, display: "block" }
+  if (url) return <img src={url} alt="" style={style} />
+  if (apercu) return <img src={apercu} alt="" style={{ ...style, filter: image ? "blur(6px)" : undefined }} />
+  return <span style={{ ...style, background: "var(--bg-elevated)" }} />
+}
