@@ -212,6 +212,18 @@ async function rawRequest(path: string, options: ApiRequestOptions) {
     headers.set("Content-Type", "application/json")
   }
 
+  /*
+   * LA LANGUE CHOISIE DANS L'APPLICATION, et non celle du navigateur.
+   *
+   * Le serveur écrit les courriels (code d'inscription, mot de passe oublié,
+   * nouvelle adresse) dans la langue de cet en-tête. Sans lui, le navigateur
+   * envoie la SIENNE : un utilisateur qui a choisi le russe sur un poste
+   * réglé en français recevrait ses codes en français.
+   */
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", langueInitiale())
+  }
+
   try {
     return await fetch(buildUrl(path), {
       credentials: "same-origin",
