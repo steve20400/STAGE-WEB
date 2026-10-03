@@ -10,7 +10,7 @@ import {
   demarrerPrechargement,
   libererAccueilAdopte,
 } from "./prechargement-accueil"
-import { resolveMediaUrl } from "./media-service"
+import { resolveMediaUrl, urlSonStandard } from "./media-service"
 import { defaultAudioOutput, type AudioOutputMode } from "./audio-output"
 import {
   demarrerEnregistrement,
@@ -1208,7 +1208,8 @@ let ivrAudio: HTMLAudioElement | null = null
 function playIvrAudio(url: string, loop: boolean) {
   stopIvrAudio()
   if (typeof window === "undefined") return
-  const audio = new Audio(url)
+  // Les sons du standard viennent d'un autre serveur : voir `urlSonStandard`.
+  const audio = new Audio(urlSonStandard(url) ?? url)
   audio.loop = loop
   ivrAudio = audio
   // Echec silencieux, et deux raisons de s'y attendre : le fichier peut ne pas

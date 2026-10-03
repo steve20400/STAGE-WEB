@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { IvrSession } from "../services/call-manager"
 import { sendIvrBackToMenu } from "../services/call-manager"
-import { uploadMedia } from "../services/media-service"
+import { uploadMedia, urlSonStandard } from "../services/media-service"
 import { deposerPlainte } from "../services/plaintes-service"
 
 type Etat = "bip" | "enregistrement" | "pause" | "relecture" | "envoi" | "envoye" | "echec"
@@ -96,7 +96,8 @@ export function PlainteRecorder({ session }: { session: IvrSession }) {
     if (!bip) {
       void lancerMicro()
     } else {
-      const audio = new Audio(bip)
+      // Le bip vient du serveur de la plateforme : voir `urlSonStandard`.
+      const audio = new Audio(urlSonStandard(bip) ?? bip)
       audio.onended = () => void lancerMicro()
       // Un bip injoignable ne doit pas bloquer : on demarre quand meme.
       audio.onerror = () => void lancerMicro()

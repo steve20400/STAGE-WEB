@@ -74,6 +74,36 @@ export function resolveMediaUrl(relativeUrl: string, options?: { download?: bool
   return `${base}${sep}token=${encodeURIComponent(token)}${download}`
 }
 
+/**
+ * L'adresse JOUABLE d'un son du standard (invite, musique d'attente, son de
+ * touche, bip de plainte).
+ *
+ * 🐛 « LE WEB NE SUIT AUCUN AUDIO QUAND ON APPELLE UN CENTRE D'APPELS OU UN
+ * CENTRE VOCAL » (user, 03/10/2026). Ces sons vivent sur le serveur de la
+ * plateforme de l'equipe — `https://open.alanya.cloud`, et parfois une
+ * adresse en HTTP clair. La CSP du web (`media-src`) refuse le premier, la
+ * regle du contenu mixte interdit le second a une page HTTPS : le navigateur
+ * se taisait. Le telephone, sans CSP ni contenu mixte, entendait tout.
+ *
+ * ⚠️ UN SON D'UNE AUTRE ORIGINE PASSE PAR LE RELAIS DU SERVEUR
+ * (`/api/ivr/son`), qui ne relaie que les hotes que la plateforme reference
+ * elle-meme. Un son de notre origine, `blob:` ou `data:` reste tel quel.
+ */
+export function urlSonStandard(url: string | null | undefined): string | null {
+  if (!url) return null
+  if (/^(blob:|data:)/.test(url) || url.startsWith("/")) return url
+  let origineSon: string
+  try {
+    origineSon = new URL(url).origin
+  } catch {
+    return url
+  }
+  const nous = new URL(API_BASE_URL || window.location.origin, window.location.origin).origin
+  if (origineSon === nous || origineSon === window.location.origin) return url
+  const token = loadSessionToken() ?? ""
+  return `${API_BASE_URL}/api/ivr/son?u=${encodeURIComponent(url)}&token=${encodeURIComponent(token)}`
+}
+
 /** Duree "mm:ss" a partir de millisecondes. */
 export function formatAudioDuration(durationMs?: number): string {
   if (!durationMs || durationMs <= 0) return "--:--"
