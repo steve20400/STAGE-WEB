@@ -18,7 +18,9 @@ import { isAgent as checkIsAgent } from "../../src/services/queue-service"
 import { avatarDisplaySrc } from "../../src/lib/avatar"
 import { useDrawerSwipe } from "../../src/hooks/use-drawer-swipe"
 import { useTranslation, type Cle } from "../../src/i18n"
-const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
+// Le logo du mobile (`assets/images/logo.png`), a fond transparent : l'ancien
+// JPEG a fond blanc imposait une pastille blanche sur les fonds sombres.
+const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./layout.css"
 import { BrandName } from "../../src/components/brand-name"
 
@@ -399,7 +401,7 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
       <div className="sb-logo">
         <img src={alanyaLogo} alt={t("s2_logo_alt")} className="sb-school-logo" />
         <div className="sb-brand-copy">
-          <BrandName sur="marque" className="sb-logo-txt" />
+          <BrandName className="sb-logo-txt" />
         </div>
         {onToggleCollapse && (
           <button
@@ -640,7 +642,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           <div className="topbar-brand">
             <img src={alanyaLogo} alt={t("s2_logo_alt")} className="topbar-school-logo" />
             <div className="topbar-brand-copy">
-              <BrandName sur="marque" className="topbar-title" />
+              <BrandName className="topbar-title" />
             </div>
           </div>
           <ThemeToggle />

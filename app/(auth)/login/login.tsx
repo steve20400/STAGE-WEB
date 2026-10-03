@@ -9,7 +9,7 @@ import {
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
 import { consommeMessageDeconnexion } from "../../../src/data/session-message"
-const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
+const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./login-page.css"
 import { BrandName } from "../../../src/components/brand-name"
 

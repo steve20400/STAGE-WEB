@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useTranslation } from "../../../src/i18n"
-const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
+const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./forgot-password-page.css"
 import { BrandName } from "../../../src/components/brand-name"
 import {

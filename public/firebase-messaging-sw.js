@@ -32,8 +32,10 @@ if (apiKey && projectId && messagingSenderId) {
       const title = payload.data.title || 'Nouveau message';
       const options = {
         body: sansMarqueurs(payload.data.body || 'Vous avez reçu une notification'),
-        icon: '/alanya-logo.jpeg',
-        badge: '/alanya-logo.jpeg',
+        // Relatif au service, donc sous /webapp/ : '/alanya-logo.jpeg' visait la
+        // racine du domaine, ou l'image n'existe pas.
+        icon: 'icone-192.png',
+        badge: 'icone-192.png',
         data: payload.data // On passe tout le payload pour le clic handler
       };
 

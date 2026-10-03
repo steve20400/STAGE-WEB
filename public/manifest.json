@@ -3,13 +3,13 @@
   "name": "Alanya Work",
   "icons": [
     {
-      "src": "alanya-logo.jpeg",
-      "type": "image/jpeg",
+      "src": "icone-192.png",
+      "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "alanya-logo.jpeg",
-      "type": "image/jpeg",
+      "src": "icone-512.png",
+      "type": "image/png",
       "sizes": "512x512"
     }
   ],

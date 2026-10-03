@@ -58,7 +58,7 @@
   padding: 40px;
   background:
     linear-gradient(var(--motif-overlay), var(--motif-overlay)),
-    url("/motif-bg.png") repeat;
+    var(--motif-image) repeat;
   background-size:
     auto,
     280px auto;

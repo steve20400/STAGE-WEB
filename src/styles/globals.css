@@ -92,7 +92,21 @@ button {
   --brand-strong: #4a2c1a;
   --brand-text: #ffffff;
   /* Voile pose sur le motif africain de fond (sombre ici) */
-  --motif-overlay: rgba(21, 13, 8, 0.95);
+  /*
+   * LE MOTIF DE NUIT DU MOBILE (`motif_nuit_doux.png`), et non plus le motif
+   * clair noyé sous un voile à 95 % : il ne restait de lui qu'une trame
+   * invisible. Même dessin, tracé pour le sombre — traits terre cuite sur fond
+   * nuit. Le voile descend à 82 %, la valeur basse du dégradé du mobile
+   * (`MotifBackground`) : le motif se devine, le texte reste au premier plan.
+   */
+  --motif-image: url("/motif-nuit.png");
+  --motif-overlay: rgba(21, 13, 8, 0.82);
+  /*
+   * L'EN-TÊTE SUIT LE THÈME, comme l'AppBar du mobile (surface du thème). Il
+   * était terracotta dans les quatre thèmes. `--brand` reste la couleur de
+   * marque des autres éléments (avatars, boutons), qui ne changent pas.
+   */
+  --entete-bg: var(--bg-surface);
 }
 
 /* Theme par defaut : clair creme, comme l'app mobile. */
@@ -165,7 +179,10 @@ button {
   --brand-strong: #4a2c1a;
   --brand-text: #ffffff;
   /* Voile creme sur le motif africain (0.90 ~ MotifBackground du mobile) */
+  --motif-image: url("/motif-bg.png");
   --motif-overlay: rgba(245, 239, 230, 0.9);
+  /* Blanc chaud : celui de l'AppBar du thème Clair du mobile (`warmWhite`). */
+  --entete-bg: var(--bg-elevated);
 }
 
 /* Palette technique : double tap sur le bouton de theme */
@@ -205,6 +222,9 @@ button {
   --av-0-bg: #38bdf822;
   --av-0-fg: #38bdf8;
   --scrollbar-thumb: #1e2d47;
+  /* Son propre voile : le chocolat hérité du thème sombre teintait le bleu nuit. */
+  --motif-overlay: rgba(7, 11, 20, 0.82);
+  --entete-bg: var(--bg-surface);
   --skeleton-base: #1e2d47;
   --skeleton-shine: #2b3d5f;
   --dot-color: #38bdf80b;
@@ -246,6 +266,7 @@ button {
   --av-0-bg: #0f4c8118;
   --av-0-fg: #0f4c81;
   --scrollbar-thumb: #bcccdc;
+  --entete-bg: var(--bg-surface);
   --skeleton-base: #d9e2ec;
   --skeleton-shine: #f3f7fc;
   --dot-color: #0f4c810b;
@@ -314,7 +335,7 @@ body {
 /* Fond decoratif : motif africain du mobile sous un voile (MotifBackground). */
 .motif-bg {
   background-image:
-    linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png");
+    linear-gradient(var(--motif-overlay), var(--motif-overlay)), var(--motif-image);
   background-repeat: repeat;
   background-size:
     auto,

@@ -1,7 +1,7 @@
 import { useTranslation } from "../../../src/i18n"
 import { Link } from "react-router-dom"
 import { ThemeToggle } from "../../../src/components/theme-toggle"
-const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
+const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./welcome-page.css"
 import { BrandName } from "../../../src/components/brand-name"
 

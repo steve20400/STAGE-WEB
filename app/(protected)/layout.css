@@ -43,9 +43,10 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* Motif africain du mobile sous un voile creme (MotifBackground) */
+  /* Motif africain du mobile sous le voile du theme (MotifBackground) : motif
+     clair en theme clair, motif de nuit en theme sombre (`--motif-image`). */
   background-image:
-    linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png");
+    linear-gradient(var(--motif-overlay), var(--motif-overlay)), var(--motif-image);
   background-repeat: repeat;
   background-size:
     auto,
@@ -68,23 +69,31 @@
 
 /* --- Logo --- */
 
-/* Bandeau de marque terracotta, comme l'AppBar du mobile */
+/*
+ * L'EN-TETE DE MARQUE SUIT LE THEME, comme l'AppBar du mobile (signale par le
+ * user le 03/10/2026, capture a l'appui). Il restait terracotta dans les quatre
+ * themes : un bandeau brun au-dessus d'un ecran blanc ou bleu nuit.
+ * `--entete-bg` est defini par theme dans globals.css.
+ */
 .sb-logo {
   display: flex;
   align-items: center;
   gap: 9px;
   padding: 20px;
-  background: var(--brand);
-  border-bottom: 1px solid var(--brand-strong);
+  flex-shrink: 0;
+  background: var(--entete-bg);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
+/*
+ * LE LOGO DU MOBILE (`assets/images/logo.png`), a fond TRANSPARENT. L'ancien
+ * etait un JPEG a fond blanc, d'ou la pastille blanche qui le cernait : il se
+ * pose desormais tel quel sur les quatre fonds.
+ */
 .sb-school-logo {
   width: 34px;
   height: 34px;
   object-fit: contain;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 0 1px var(--brand-strong);
   flex-shrink: 0;
 }
 
@@ -99,13 +108,13 @@
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 800;
-  color: var(--brand-text);
+  color: var(--text-primary);
   letter-spacing: -0.5px;
   line-height: 1;
 }
 
 .sb-logo-subtitle {
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--text-muted);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -129,12 +138,12 @@
   }
 }
 
-/* Bouton de repli (dans le bandeau terracotta) */
+/* Bouton de repli (dans l'en-tete) */
 .sb-collapse {
   margin-left: auto;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--bg-hover);
   border: none;
-  color: var(--brand-text);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 6px;
   border-radius: 8px;
@@ -143,7 +152,8 @@
   flex-shrink: 0;
 }
 .sb-collapse:hover {
-  background: rgba(255, 255, 255, 0.26);
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 
 .sb-link-label {
@@ -210,12 +220,45 @@
 
 /* --- Navigation --- */
 
+/*
+ * 🐛 LA BARRE LATERALE NE DEFILAIT PAS (signale par le user le 03/10/2026, sur
+ * Android). `.sb-nav` prenait toute la hauteur restante (`flex: 1`) sans pouvoir
+ * DEFILER : sans `min-height: 0`, un enfant flex refuse de devenir plus petit
+ * que son contenu, et les derniers liens sortaient de l'ecran, hors d'atteinte.
+ * L'en-tete et le pied restent en place ; seuls les liens defilent.
+ *
+ * La barre de defilement est INVISIBLE au repos — de la couleur du fond — et ne
+ * se devine qu'au survol de la liste : on fait defiler au doigt ou a la molette
+ * sans qu'un rail vienne rayer le menu.
+ */
 .sb-nav {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.sb-nav:hover {
+  scrollbar-color: var(--border-subtle) transparent;
+}
+.sb-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.sb-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sb-nav::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 6px;
+}
+.sb-nav:hover::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
 }
 
 /* Titre de section ("Navigation", "Compte") */
@@ -286,6 +329,7 @@
 /* --- Pied de sidebar : profil + deconnexion --- */
 
 .sb-footer {
+  flex-shrink: 0;
   border-top: 1px solid var(--bg-border);
   padding: 14px 12px;
 }
@@ -392,14 +436,14 @@
   transform: translateX(0);
 }
 
-/* Barre superieure mobile : terracotta comme l'AppBar Flutter */
+/* Barre superieure mobile : aux couleurs du theme, comme l'AppBar Flutter */
 .topbar {
   display: none;
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--brand-strong);
-  background: var(--brand);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--entete-bg);
   position: sticky;
   top: 0;
   z-index: 30;
@@ -409,7 +453,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--brand-text);
+  color: var(--text-primary);
   padding: 4px;
   display: flex;
 }
@@ -422,13 +466,11 @@
   min-width: 0;
 }
 
+/* Le logo du mobile, transparent : voir `.sb-school-logo`. */
 .topbar-school-logo {
   width: 30px;
   height: 30px;
   object-fit: contain;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 0 1px var(--brand-strong);
   flex-shrink: 0;
 }
 
@@ -443,13 +485,13 @@
   font-family: var(--font-display);
   font-size: 17px;
   font-weight: 800;
-  color: var(--brand-text);
+  color: var(--text-primary);
   letter-spacing: -0.4px;
   line-height: 1;
 }
 
 .topbar-subtitle {
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--text-muted);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -533,7 +575,7 @@
   color: var(--text-primary);
   background:
     linear-gradient(var(--motif-overlay), var(--motif-overlay)),
-    url("/motif-bg.png") repeat;
+    var(--motif-image) repeat;
   background-size:
     auto,
     180px auto;

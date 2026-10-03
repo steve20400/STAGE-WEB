@@ -5,7 +5,7 @@ import { requestRegistrationOtp } from "../../../src/services/auth-api"
 import { drapeau, listerPays, type Pays } from "../../../src/services/pays-service"
 import { formaterTelephone } from "../../../src/services/telephone"
 import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from "../../../src/i18n"
-const alanyaLogo = `${import.meta.env.BASE_URL}alanya-logo.jpeg`
+const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./signup-page.css"
 import { BrandName } from "../../../src/components/brand-name"
 
