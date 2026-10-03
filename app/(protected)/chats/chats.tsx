@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback, type CSSProperties } from "react"
+import { createPortal } from "react-dom"
 import { NavLink, useNavigate } from "react-router-dom"
 import { TexteForme } from "../../../src/components/texte-forme"
 import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data"
@@ -24,8 +25,12 @@ import {
   listesEnCache,
   parPriorite,
   type ListeContacts,
+  type ResultatEcriture,
 } from "../../../src/services/contact-lists-service"
 import { teinteCss } from "../contacts/contact-lists-affichage"
+import { ContactListModal } from "../contacts/contact-list-modal"
+import { useContacts } from "../../../src/hooks/use-contacts"
+import { useToast } from "../../../src/components/toast"
 import {
 } from "../../../src/services/message-payload"
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
@@ -187,8 +192,42 @@ function stylePastille(teinte: string | null): CSSProperties {
   }
 }
 
+/**
+ * LA FENETRE « NOUVELLE LISTE », ouverte depuis la rangee des filtres.
+ *
+ * C'est LA MEME que celle de la page Contacts (`ContactListModal`) : meme
+ * formulaire, meme enregistrement, memes erreurs. Une seconde fenetre ecrite
+ * pour les discussions finirait par ne plus creer tout a fait la meme liste.
+ *
+ * ⚠️ UN COMPOSANT A PART, MONTE SEULEMENT A L'OUVERTURE : il lit le repertoire
+ * (`useContacts`), dont le chargement n'a rien a faire a chaque affichage de la
+ * liste des discussions.
+ *
+ * ⚠️ RENDUE DANS `body` (portail) : la fenetre se pose par-dessus tout l'ecran,
+ * et aucun conteneur des discussions ne doit pouvoir la decaler ou la rogner.
+ */
+function FenetreNouvelleListe({
+  onFermer,
+  onEnregistre,
+}: {
+  onFermer: () => void
+  onEnregistre: (resultat: ResultatEcriture) => void
+}) {
+  const { contacts } = useContacts()
+  return createPortal(
+    <ContactListModal
+      liste={null}
+      contacts={contacts}
+      onFermer={onFermer}
+      onEnregistre={(resultat) => onEnregistre(resultat)}
+    />,
+    document.body
+  )
+}
+
 export default function ChatsPage() {
   const { t } = useTranslation()
+  const { success, warning } = useToast()
   const navigate = useNavigate()
   const { user: sessionUser } = useAuth()
   const [query, setQuery] = useState("")
@@ -241,6 +280,32 @@ export default function ChatsPage() {
    * des le premier rendu, et le GET ne fait que la corriger.
    */
   const [listes, setListes] = useState<ListeContacts[]>(() => listesEnCache())
+  /** La fenetre de creation d'une liste, ouverte par le « + » de la rangee. */
+  const [creationListe, setCreationListe] = useState(false)
+
+  /**
+   * Une liste vient d'etre creee depuis la rangee.
+   *
+   * MEME SUITE QUE DANS LA PAGE CONTACTS (`contact-lists-section.tsx`) : la
+   * liste rejoint la rangee — a sa place, la rangee etant triee par priorite —,
+   * le succes est annonce, et les numeros qu'aucun compte ne porte sont dits en
+   * UN seul message.
+   */
+  const surListeCreee = (resultat: ResultatEcriture) => {
+    setListes((precedentes) => [
+      ...precedentes.filter((liste) => liste.id !== resultat.liste.id),
+      resultat.liste,
+    ])
+    setCreationListe(false)
+    success(t("clist_created"), resultat.liste.nom)
+    if (resultat.numerosInconnus.length > 0) {
+      warning(
+        t("clist_dial_unknown", {
+          numero: resultat.numerosInconnus.map(formatAlanyaNumber).join(", "),
+        })
+      )
+    }
+  }
   useEffect(() => {
     let annule = false
     void listerListes().then((rendues) => {
@@ -626,6 +691,38 @@ export default function ChatsPage() {
               </button>
             )
           })}
+
+          {/*
+            « + » FERME LA RANGEE : creer une liste sans quitter les
+            discussions, comme sur le mobile et sur WhatsApp (demande du user,
+            03/10/2026). Il fallait jusqu'ici passer par la page Contacts.
+
+            Ce n'est PAS un filtre mais une action : un cercle borde, sans
+            libelle, qui ne s'allume jamais — on ne doit pas le prendre pour
+            une liste qu'on aurait ratee. Le mot est dans `title` et
+            `aria-label`.
+          */}
+          <button
+            type="button"
+            className="filter-ajout"
+            onClick={() => setCreationListe(true)}
+            title={t("clist_new")}
+            aria-label={t("clist_new")}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              aria-hidden
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -709,6 +806,10 @@ export default function ChatsPage() {
           <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
         </svg>
       </button>
+
+      {creationListe && (
+        <FenetreNouvelleListe onFermer={() => setCreationListe(false)} onEnregistre={surListeCreee} />
+      )}
     </div>
   )
 }

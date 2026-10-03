@@ -27,6 +27,9 @@ import {
   sonneriesPour,
 } from "../../../src/services/ringtones"
 import { nomSonnerie, PALETTE_LISTES } from "./contact-lists-affichage"
+// La fenetre porte SA feuille : elle s'ouvre aussi depuis les discussions, et ne
+// doit pas dependre de ce que la page Contacts a deja charge.
+import "./contact-lists.css"
 
 /**
  * Fenetre de creation et de modification d'une liste de contacts : son nom, sa

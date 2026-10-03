@@ -137,6 +137,42 @@
   color: var(--accent);
 }
 
+/*
+ * « + » EN FIN DE RANGEE : cree une liste de contacts sans quitter les
+ * discussions. Un CERCLE de la hauteur des pastilles, et non une pastille de
+ * plus : c'est une action, pas un filtre — meme parti que le mobile
+ * (`_boutonNouvelleListe`). Il prend l'accent du theme au survol, donc ses
+ * quatre couleurs avec lui.
+ */
+.filter-ajout {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: start;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+.filter-ajout:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.filter-ajout:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* liste */
 .ch-list {
   flex: 1;
