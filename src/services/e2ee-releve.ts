@@ -18,6 +18,7 @@
  */
 import { releverEtDechiffrer, type ClairRecu } from "./e2ee-fil"
 import { cacheClairRecu } from "./indexeddb-cache"
+import { entreeCacheDechiffree } from "./e2ee-entree-cache"
 import { archiver } from "./e2ee-sauvegarde"
 
 /**
@@ -36,23 +37,19 @@ async function ranger(recus: ClairRecu[]): Promise<void> {
   for (const r of recus) {
     // ⚠️ Écarté si la ligne existante est d'un autre expéditeur ou d'un autre
     // fil — et alors pas archivé non plus. Voir `rangerClairRecu`.
-    const range = await cacheClairRecu({
-      id: r.messageId,
-      conversationId: r.convId,
-      senderId: r.expediteurId,
-      content: r.texte,
-      type: "TEXT",
-      status: "SENT",
-      createdAt: r.quand,
-    })
-    if (!range) continue
-    archiver({
+    const clair = {
       id: r.messageId,
       convId: r.convId,
       expediteurId: r.expediteurId,
       texte: r.texte,
       quand: r.quand,
-    })
+      // Le média chiffré et SA CLÉ : rangés et archivés avec le texte. C'est
+      // ce qui permet de rouvrir la photo sur un autre appareil (chapitre 23).
+      ...(r.media ? { media: r.media } : {}),
+    }
+    const range = await cacheClairRecu(entreeCacheDechiffree(clair))
+    if (!range) continue
+    archiver(clair)
   }
 }
 

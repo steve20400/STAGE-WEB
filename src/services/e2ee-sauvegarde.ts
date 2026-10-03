@@ -529,7 +529,8 @@ export function archiver(message: MessageArchive): void {
    * message. On accumule sans savoir encore si la clé est là ; `vider` la
    * demandera. Un tampon rempli sans archive se jette sans dommage.
    */
-  if (!message.texte) return
+  // Un média sans légende s'archive aussi : c'est sa clé qui compte.
+  if (!message.texte && !message.media) return
 
   tampon.push(message)
 

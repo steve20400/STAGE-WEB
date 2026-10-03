@@ -24,6 +24,7 @@
 
 import { apiRequest } from "../lib/api-client"
 import type { SuiviRestauration } from "../lib/restauration-progression"
+import type { DescripteurMedia } from "./e2ee-media"
 
 /** Un message, tel qu'il se range dans l'archive. */
 export interface MessageArchive {
@@ -34,14 +35,16 @@ export interface MessageArchive {
   /** Millisecondes. */
   quand: number
   /**
-   * ⚠️ RÉSERVÉ AUX MÉDIAS, VIDE POUR L'INSTANT.
+   * LE MÉDIA CHIFFRÉ du message, et SA CLÉ (cours, chapitre 23).
    *
-   * Le chiffrement des médias est remis (décision du user, 21/09/2026). Mais le
-   * FORMAT doit leur faire place dès maintenant : une archive écrite sans ce
-   * champ devrait être entièrement relue et réécrite le jour où ils arrivent —
-   * chez chaque utilisateur, avec le risque que cela suppose.
+   * 🔴 C'EST LUI QUI REND LE CHANGEMENT D'APPAREIL POSSIBLE. Le fichier
+   * chiffré reste sur le serveur ; sans la clé gardée ici, il serait perdu
+   * pour tout appareil autre que celui qui a reçu l'enveloppe.
+   *
+   * ⚠️ Remplace le champ `medias` réservé le 21/09/2026, que rien n'a jamais
+   * écrit. Un média par message : c'est la règle des fils chiffrés.
    */
-  medias?: { id: string; nom: string; type: string }[]
+  media?: DescripteurMedia
 }
 
 /** Un bloc chiffré, tel qu'il voyage et se range. */

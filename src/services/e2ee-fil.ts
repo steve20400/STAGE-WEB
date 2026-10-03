@@ -2,6 +2,7 @@ import { apiRequest } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
 import { identitesChangees as identitesChangeesInternes } from "./e2ee-store"
 import { ouvrirCoffre } from "./coffre-chiffre"
+import { lireCharge, type DescripteurMedia } from "./e2ee-media"
 import {
   chiffrerPour,
   idAppareil,
@@ -275,6 +276,11 @@ export interface ClairRecu {
   texte: string
   /** Heure du dépôt de l'enveloppe, en millisecondes. */
   quand: number
+  /**
+   * Le média chiffré que porte ce message (charge v2), avec sa clé. Absent
+   * pour un texte. Voir `e2ee-media.ts` et le chapitre 23 du cours.
+   */
+  media?: DescripteurMedia
 }
 
 /**
@@ -309,6 +315,20 @@ export function clairPour(
     return undefined
   }
   return c.texte
+}
+
+/**
+ * Comme `clairPour`, mais rend tout ce que porte l'enveloppe : le texte ET le
+ * média chiffré. Mêmes vérifications — expéditeur et fil.
+ */
+export function chargePour(
+  clairs: Map<string, ClairRecu>,
+  messageId: string,
+  expediteurAffiche: string,
+  convId: string,
+): ClairRecu | undefined {
+  const texte = clairPour(clairs, messageId, expediteurAffiche, convId)
+  return texte === undefined ? undefined : clairs.get(messageId)
 }
 
 /**
@@ -363,12 +383,20 @@ export async function releverEtDechiffrer(
     try {
       const clair = await dechiffrer(e)
       if (e.messageId) {
+        /*
+         * 🔴 LA CHARGE EST LUE ICI, ET VÉRIFIÉE (cours, chapitre 23). Un texte
+         * nu (v1) passe tel quel ; une charge v2 doit annoncer CE message — un
+         * serveur qui l'aurait rattachée à un autre est démasqué, et
+         * l'enveloppe tombe dans le `catch` : illisible, acquittée.
+         */
+        const charge = lireCharge(clair, e.messageId)
         const recu: ClairRecu = {
           messageId: e.messageId,
           convId: e.convId,
           expediteurId: e.expediteurId,
-          texte: clair,
+          texte: charge.texte,
           quand: new Date(e.createdAt).getTime(),
+          ...(charge.media ? { media: charge.media } : {}),
         }
         parMessage.set(e.messageId, recu)
         /*

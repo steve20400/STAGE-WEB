@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from "../lib/api-client"
+import type { DescripteurMedia } from "./e2ee-media"
 import { langueInitiale, traduire } from "../i18n"
 import { type ChatMessageMock, type MessageStatus, type MessageType } from "../mocks/chat-data"
 import { getMyUserId } from "../data/session-user"
@@ -23,7 +24,7 @@ import {
 } from "./indexeddb-cache"
 import { uploadMedia } from "./media-service"
 import {
-  clairPour,
+  chargePour,
   estChiffree,
   etatConnu,
   envoyerChiffre,
@@ -214,6 +215,9 @@ export function toFrontMessage(
     fileName: media?.filename,
     fileSize: formatBytes(media?.sizeBytes),
     isDeleted: Boolean(deletedAt),
+    // Le descripteur d'un média chiffré, quand le cache local le porte : le
+    // fil relu hors ligne sait encore rouvrir la photo.
+    mediaChiffre: (m as { mediaChiffre?: DescripteurMedia }).mediaChiffre,
     vueUnique: (m as { vueUnique?: boolean }).vueUnique === true,
     vueUniqueOuverte: (m as { vueUniqueOuverte?: boolean }).vueUniqueOuverte === true,
     vueUniqueEffacee: (m as { vueUniqueEffacee?: boolean }).vueUniqueEffacee === true,
@@ -328,12 +332,16 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
      * pour le CONTENU d'un message chiffré elle ne sait rien. La laisser
      * gagner ferait perdre le message à chaque rafraîchissement.
      */
-    const enCache = new Map<string, string>()
+    // Le texte ET le média chiffré (sa clé) : un média sans légende n'a pas de
+    // texte, et serait sinon perdu à la relecture (chapitre 23).
+    const enCache = new Map<string, { texte?: string; media?: DescripteurMedia }>()
     try {
       const caches = await loadCachedMessages(chatId, INITIAL_PAGE_SIZE)
       for (const c of caches) {
-        const texte = (c as { id: string; content?: string | null }).content
-        if (texte) enCache.set((c as { id: string }).id, texte)
+        const l = c as { id: string; content?: string | null; mediaChiffre?: DescripteurMedia }
+        if (l.content || l.mediaChiffre) {
+          enCache.set(l.id, { texte: l.content || undefined, media: l.mediaChiffre })
+        }
       }
     } catch {
       // Cache indisponible : on fera sans, et les messages non déchiffrés
@@ -341,10 +349,13 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
     }
 
     for (const m of messages) {
-      const clair =
-        clairPour(clairs, m.id, m.senderId, chatId) ?? (m.chiffre ? enCache.get(m.id) : undefined)
-      if (clair === undefined) continue
-      m.content = clair
+      const recu = chargePour(clairs, m.id, m.senderId, chatId)
+      const cache = m.chiffre ? enCache.get(m.id) : undefined
+      const clair = recu?.texte ?? cache?.texte
+      const media = recu?.media ?? cache?.media
+      if (clair === undefined && !media) continue
+      if (clair !== undefined) m.content = clair
+      if (media) m.mediaChiffre = media
       /*
        * ⚠️ PLUS DE MISE EN CACHE NI D'ARCHIVAGE ICI, et c'est voulu.
        *

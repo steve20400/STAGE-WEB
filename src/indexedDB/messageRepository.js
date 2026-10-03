@@ -70,8 +70,13 @@ const preserveLeTexte = (entrant, existant) => {
     if (!existant) return entrant;
     // Le vide est voulu : l'auteur a supprime son message pour tout le monde.
     if (entrant.deletedAt) return entrant;
-    if (entrant.content || !existant.content) return entrant;
-    return { ...entrant, content: existant.content };
+    const garde = {};
+    if (!entrant.content && existant.content) garde.content = existant.content;
+    // 🔴 LE DESCRIPTEUR D'UN MÉDIA CHIFFRÉ — sa clé — survit de la même façon :
+    // le serveur rend ce message sans lui, et l'écraser rendrait la photo
+    // impossible à rouvrir, l'enveloppe étant déjà acquittée (chapitre 23).
+    if (!entrant.mediaChiffre && existant.mediaChiffre) garde.mediaChiffre = existant.mediaChiffre;
+    return Object.keys(garde).length > 0 ? { ...entrant, ...garde } : entrant;
 };
 
 export const upsertMessage = async (message) => {

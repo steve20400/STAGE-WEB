@@ -24,6 +24,7 @@ import {
 } from "../../../src/services/e2ee-sauvegarde"
 import { reprendreMotDePasse } from "../../../src/services/restauration-en-attente"
 import { cacheMessage } from "../../../src/services/indexeddb-cache"
+import { entreeCacheDechiffree } from "../../../src/services/e2ee-entree-cache"
 import type { MessageArchive } from "../../../src/services/e2ee-archive"
 import {
   compteur,
@@ -42,16 +43,9 @@ let motDePasse: string | null = null
 let derniere: ProgressionRestauration = { etape: "ouverture", fait: 0 }
 const abonnes = new Set<(p: ProgressionRestauration) => void>()
 
-const ranger = (m: MessageArchive) =>
-  cacheMessage({
-    id: m.id,
-    conversationId: m.convId,
-    senderId: m.expediteurId,
-    content: m.texte,
-    type: "TEXT",
-    status: "SENT",
-    createdAt: m.quand,
-  })
+// La même fabrique que la relève : un média restauré se range COMPLET, avec
+// sa clé, et se rouvre donc sur ce nouvel appareil (chapitre 23).
+const ranger = (m: MessageArchive) => cacheMessage(entreeCacheDechiffree(m))
 
 function lancer(mdp: string): Promise<Resultat> {
   derniere = { etape: "ouverture", fait: 0 }

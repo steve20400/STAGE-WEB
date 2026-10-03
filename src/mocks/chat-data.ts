@@ -1,3 +1,5 @@
+import type { DescripteurMedia } from "../services/e2ee-media"
+
 /** Un fichier attache a un message, tel que le backend le decrit. */
 export interface MediaJointe {
   id: string
@@ -6,6 +8,8 @@ export interface MediaJointe {
   mimeType: string
   sizeBytes: number
   durationMs: number | null
+  /** Chiffré de bout en bout : à déchiffrer, JAMAIS à afficher tel quel. */
+  chiffre?: boolean
 }
 
 // `failed` : l’envoi a échoué — la bulle garde son texte et propose « Réessayer ».
@@ -147,6 +151,12 @@ export interface ChatMessageMock {
    * media a quiconque ne l'a pas ouvert.
    */
   vueUnique?: boolean
+  /**
+   * Le média CHIFFRÉ de bout en bout, tel que l'enveloppe l'a livré : sa clé,
+   * son empreinte, son aperçu (chapitre 23). Présent = le fichier du serveur
+   * est illisible, et c'est ce descripteur qui permet de l'ouvrir.
+   */
+  mediaChiffre?: DescripteurMedia
   /** Expediteur : quelqu'un l'a ouverte. Destinataire : je l'ai ouverte. */
   vueUniqueOuverte?: boolean
   /** Le fichier a ete efface du stockage. */

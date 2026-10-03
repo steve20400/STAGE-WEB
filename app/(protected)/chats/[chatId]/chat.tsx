@@ -47,7 +47,7 @@ import {
 } from "../../../../src/services/messages-service"
 import {
   activerE2ee,
-  clairPour,
+  chargePour,
   cleAChange,
   estChiffree,
   lireEtatE2ee,
@@ -100,6 +100,7 @@ import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
 import { appareilCourantId } from "../../../../src/services/appareils-service"
 import { composerMessageSysteme } from "../../../../src/i18n/messages-systeme"
 import { TexteForme } from "../../../../src/components/texte-forme"
+import { MediaChiffre, MediaChiffreIndisponible } from "./media-chiffre"
 import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
 import { appliquerMarqueur, MARQUEURS, sansMarqueurs } from "../../../../src/lib/mise-en-forme"
 import { lireVerrou, useVerrou } from "../../../../src/hooks/use-verrou"
@@ -3167,7 +3168,13 @@ function decrireMessageEnLigneSansIcone(msg: {
 function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
   const { t } = useTranslation()
   // Une vue unique citee ne montre pas de vignette : l'icone de son type suffit.
-  const src = msg.mediaUrl && !msg.vueUnique ? resolveMediaUrl(msg.mediaUrl) : ""
+  // Média chiffré : la vignette vient de l'aperçu reçu dans l'enveloppe, jamais
+  // du fichier du serveur, illisible (chapitre 23).
+  const src = msg.mediaChiffre?.apercu
+    ? `data:image/jpeg;base64,${msg.mediaChiffre.apercu}`
+    : msg.mediaUrl && !msg.vueUnique && !msg.medias?.[0]?.chiffre
+      ? resolveMediaUrl(msg.mediaUrl)
+      : ""
   const mime = msg.mediaMime ?? ""
   const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
   const isImage = msg.type === "image" || mime.startsWith("image/")
@@ -3313,6 +3320,8 @@ function isAlbumCandidate(msg: Message): boolean {
     !msg.replyTo &&
     // Une vue unique n'entre jamais dans une grille : elle ne montre rien.
     !msg.vueUnique &&
+    // Un média chiffré s'affiche par son propre composant (déchiffrement).
+    !msg.medias?.[0]?.chiffre &&
     Boolean(msg.mediaUrl) &&
     (msg.type === "image" || msg.type === "video" || msg.type === "file")
   )
@@ -3698,7 +3707,8 @@ function MessageBubble({
   // 🔴 UNE VUE UNIQUE N'A PAS D'ADRESSE ICI : sans source, aucune balise
   // <img>, <video> ou <audio> n'est rendue — ni vignette ni prechargement. Le
   // serveur la refuserait de toute facon (403) a qui ne l'a pas ouverte.
-  const mediaSrc = msg.mediaUrl && !msg.vueUnique ? resolveMediaUrl(msg.mediaUrl) : ""
+  const mediaSrc =
+    msg.mediaUrl && !msg.vueUnique && !msg.medias?.[0]?.chiffre ? resolveMediaUrl(msg.mediaUrl) : ""
   const isVideoFile = (msg.mediaMime ?? "").startsWith("video/")
   const canExpandMedia = Boolean(mediaSrc) && !msg.isDeleted
   // La legende d'un lot vit sur l'un de ses messages, pas forcement le premier.
@@ -4284,6 +4294,14 @@ function MessageBubble({
               ) : (
                 <>
                   {msg.vueUnique && <PastilleVueUnique msg={msg} isMe={isMe} />}
+                  {/* MÉDIA CHIFFRÉ DE BOUT EN BOUT (chapitre 23) : son aperçu et sa
+                      clé viennent de l'enveloppe. Sans eux — enveloppe jamais
+                      reçue ici —, on le DIT, comme pour un texte. */}
+                  {!msg.vueUnique && msg.mediaChiffre ? (
+                    <MediaChiffre d={msg.mediaChiffre} isMe={isMe} />
+                  ) : !msg.vueUnique && msg.medias?.[0]?.chiffre && !msg.isDeleted ? (
+                    <MediaChiffreIndisponible />
+                  ) : null}
                   {msg.type === "image" && mediaSrc && (
                     <img
                       src={mediaSrc}
@@ -5674,8 +5692,11 @@ export default function ChatRoomPage() {
           setMessages((prev) =>
             prev.map((m) => {
               // ⚠️ Seulement la ligne de CET expéditeur, dans CE fil : voir `clairPour`.
-              const clair = clairPour(clairs, m.id, m.senderId, chatId)
-              return clair === undefined ? m : { ...m, content: clair }
+              const recu = chargePour(clairs, m.id, m.senderId, chatId)
+              if (recu === undefined) return m
+              return recu.media
+                ? { ...m, content: recu.texte, mediaChiffre: recu.media }
+                : { ...m, content: recu.texte }
             }),
           )
         })

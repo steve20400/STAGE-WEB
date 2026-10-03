@@ -139,7 +139,15 @@ function politiqueSecurite(apiBaseUrl: string, wsUrl: string): string {
      * `*.googleapis.com` est nécessaire à l'enregistrement FCM
      * (`fcmregistrations`, `firebaseinstallations`).
      */
-    "connect-src": ["'self'", ...origines, "https://*.googleapis.com"],
+    /*
+     * 🔴 LES DEUX SEAUX BACKBLAZE Y ENTRENT LE 03/10/2026 (chapitre 23) : un
+     * média chiffré se lit par `fetch` — il faut ses octets pour le déchiffrer
+     * — directement depuis Backblaze (décision du user). La barrière tient :
+     * ce sont NOS deux seaux, où rien ne s'écrit sans nos clés, et dont les
+     * journaux ne sont lisibles que par nous. Un script hostile n'y gagne
+     * aucun endroit où déposer ce qu'il aurait lu.
+     */
+    "connect-src": ["'self'", ...origines, "https://*.googleapis.com", ...SEAUX_MEDIAS],
     "worker-src": ["'self'", "blob:"],
     "manifest-src": ["'self'"],
     "form-action": ["'self'"],
