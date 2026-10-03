@@ -269,6 +269,15 @@ function tampon(o: Uint8Array): Uint8Array<ArrayBuffer> {
   return o as Uint8Array<ArrayBuffer>
 }
 
+/**
+ * L'adresse affichable d'un aperçu. Le web l'écrit en JPEG, le téléphone en
+ * PNG (Flutter n'encode pas le JPEG sans dépendance de plus) : on reconnaît le
+ * format à ses premiers octets plutôt que de le supposer.
+ */
+export function urlApercu(b64: string): string {
+  return `data:image/${b64.startsWith("iVBOR") ? "png" : "jpeg"};base64,${b64}`
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Base64
 // ════════════════════════════════════════════════════════════════════════════

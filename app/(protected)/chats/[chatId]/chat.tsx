@@ -103,6 +103,7 @@ import { TexteForme } from "../../../../src/components/texte-forme"
 import { MediaChiffre, MediaChiffreIndisponible, TuileChiffree } from "./media-chiffre"
 import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { envoyerMediaChiffre } from "../../../../src/services/e2ee-media-envoi"
+import { urlApercu } from "../../../../src/services/e2ee-media"
 import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
 import { appliquerMarqueur, MARQUEURS, sansMarqueurs } from "../../../../src/lib/mise-en-forme"
 import { lireVerrou, useVerrou } from "../../../../src/hooks/use-verrou"
@@ -3173,7 +3174,7 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
   // Média chiffré : la vignette vient de l'aperçu reçu dans l'enveloppe, jamais
   // du fichier du serveur, illisible (chapitre 23).
   const src = msg.mediaChiffre?.apercu
-    ? `data:image/jpeg;base64,${msg.mediaChiffre.apercu}`
+    ? urlApercu(msg.mediaChiffre.apercu)
     : msg.mediaUrl && !msg.vueUnique && !msg.medias?.[0]?.chiffre
       ? resolveMediaUrl(msg.mediaUrl)
       : ""

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 
 import { useTranslation } from "../../../../src/i18n"
 import type { DescripteurMedia } from "../../../../src/services/e2ee-media"
-import { FichierInvalide } from "../../../../src/services/e2ee-media"
+import { FichierInvalide, urlApercu } from "../../../../src/services/e2ee-media"
 import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { formatBytes } from "../../../../src/services/messages-service"
 import "./media-chiffre.css"
@@ -63,7 +63,7 @@ export function MediaChiffre({ d, isMe }: { d: DescripteurMedia; isMe: boolean }
     if (url) URL.revokeObjectURL(url)
   }, [url])
 
-  const apercu = d.apercu ? `data:image/jpeg;base64,${d.apercu}` : null
+  const apercu = d.apercu ? urlApercu(d.apercu) : null
   const ratio = d.largeur && d.hauteur ? `${d.largeur} / ${d.hauteur}` : undefined
 
   if (etat === "altere" || etat === "echec") {
@@ -211,7 +211,7 @@ export function TuileChiffree({ d, taille }: { d: DescripteurMedia; taille: numb
       if (cree) URL.revokeObjectURL(cree)
     }
   }, [d, image])
-  const apercu = d.apercu ? `data:image/jpeg;base64,${d.apercu}` : null
+  const apercu = d.apercu ? urlApercu(d.apercu) : null
   const style = { width: taille, height: taille, objectFit: "cover" as const, display: "block" }
   if (url) return <img src={url} alt="" style={style} />
   if (apercu) return <img src={apercu} alt="" style={{ ...style, filter: image ? "blur(6px)" : undefined }} />
