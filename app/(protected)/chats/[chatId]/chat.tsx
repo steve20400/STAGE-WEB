@@ -50,6 +50,7 @@ import {
   chargePour,
   cleAChange,
   estChiffree,
+  etatConnu,
   lireEtatE2ee,
   type EtatE2ee,
 } from "../../../../src/services/e2ee-fil"
@@ -6698,7 +6699,14 @@ export default function ChatRoomPage() {
        * légende voyagent dans l'enveloppe Signal. Rien ne passe par le chemin
        * ordinaire, et surtout pas la file hors ligne : elle renverrait plus
        * tard le fichier EN CLAIR.
+       *
+       * 🔴 ÉTAT INCONNU → ON DEMANDE AVANT DE TÉLÉVERSER (lot D, chapitre 26).
+       * Le serveur refuse désormais un fichier en clair dans un fil chiffré ;
+       * mais il le refuse au moment du MESSAGE, après le téléversement — le
+       * fichier en clair serait déjà sur le stockage. Seul l'expéditeur peut
+       * l'éviter, en sachant avant d'envoyer. Même garde que pour le texte.
        */
+      if (!etatConnu(chatId)) await lireEtatE2ee(chatId).catch(() => undefined)
       if (estChiffree(chatId)) {
         try {
           const envoi = await envoyerMediaChiffre(chatId, file, {

@@ -2,7 +2,7 @@ import { apiRequest } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
 import { identitesChangees as identitesChangeesInternes } from "./e2ee-store"
 import { ouvrirCoffre } from "./coffre-chiffre"
-import { lireCharge, type DescripteurMedia } from "./e2ee-media"
+import { ecrireCharge, lireCharge, type DescripteurMedia } from "./e2ee-media"
 import {
   chiffrerPour,
   idAppareil,
@@ -233,8 +233,22 @@ export async function envoyerChiffre(
     { method: "POST", body: { type: "TEXT", chiffre: true } },
   )
 
-  // 2. Les enveloppes, rattachées à cette ligne.
-  const enveloppes = await chiffrerPour(destinataireId, devices, texte)
+  /*
+   * 2. Les enveloppes, rattachées à cette ligne.
+   *
+   * 🔴 LE TEXTE PART EN CHARGE v2, AVEC L'IDENTIFIANT DU MESSAGE DEDANS
+   * (lot D, chapitre 26). En v1, l'identifiant ne voyageait QU'À CÔTÉ du
+   * chiffré : le serveur pouvait rattacher le texte de Bob à un AUTRE message
+   * de Bob du même fil. Chiffré avec le texte, il est hors de sa portée, et
+   * `lireCharge` refuse une enveloppe rattachée au mauvais message.
+   *
+   * ⚠️ LES DEUX LECTEURS SAVENT LIRE LE v2 DEPUIS LE LOT A (médias) : le web
+   * en production, le téléphone depuis son APK du lot A. Un téléphone plus
+   * ancien afficherait la charge brute — d'où le déploiement APRÈS la mise à
+   * jour des téléphones.
+   */
+  const charge = ecrireCharge(message.id, texte)
+  const enveloppes = await chiffrerPour(destinataireId, devices, charge)
 
   /*
    * 3. Et une pour chacun de MES AUTRES appareils.
@@ -255,7 +269,7 @@ export async function envoyerChiffre(
   if (moi && moi !== destinataireId) {
     try {
       const miens = await ouvrirSessions(moi, idAppareil())
-      if (miens.length > 0) enveloppes.push(...(await chiffrerPour(moi, miens, texte)))
+      if (miens.length > 0) enveloppes.push(...(await chiffrerPour(moi, miens, charge)))
     } catch (err) {
       console.warn("[e2ee] copie vers mes autres appareils impossible :", err)
     }
@@ -294,10 +308,11 @@ export interface ClairRecu {
  *
  * ⚠️ L'EXPÉDITEUR EST SÛR — c'est sa session qui a déchiffré —, donc exiger
  * qu'il soit l'auteur de la ligne suffit à ce qu'on ne fasse parler personne
- * d'autre. Le fil aussi doit correspondre. Ce qui reste possible au serveur
- * (attacher le texte de Bob à un AUTRE message de Bob du même fil) demande de
- * chiffrer l'identifiant avec le texte : une évolution du protocole, à faire
- * des deux côtés ensemble.
+ * d'autre. Le fil aussi doit correspondre. Ce qui restait possible au serveur
+ * (attacher le texte de Bob à un AUTRE message de Bob du même fil) est fermé
+ * par la charge v2 (lot D) : l'identifiant est chiffré avec le texte, et
+ * `lireCharge` le vérifie. Seuls les messages v1 — envoyés par d'anciens
+ * clients — y restent exposés.
  *
  * @param expediteurAffiche l'expéditeur tel que l'écran le porte (« me » pour soi).
  */

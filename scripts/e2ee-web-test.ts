@@ -150,7 +150,16 @@ export async function scenarioFilReception(
    * du rattachement : sans lui, on aurait du texte sans savoir sur quelle
    * ligne du fil le poser.
    */
-  const trouve = [...clairs.values()].includes(attendu)
+  /*
+   * 🐛 CE BANC ÉTAIT ROUGE DEPUIS LE 28/09 SANS QUE PERSONNE LE VOIE : la
+   * relève rend des `ClairRecu` (texte, expéditeur, fil…) et non plus des
+   * chaînes, et `includes(attendu)` ne pouvait plus rien trouver. Relancé au
+   * lot D, où le texte passe en charge v2 : il vérifie aussi que la charge
+   * est décodée et que son identifiant correspond à la ligne.
+   */
+  const trouve = [...clairs.entries()].some(
+    ([id, c]) => c.texte === attendu && c.messageId === id,
+  )
   verifier(trouve, `le texte revient et se rattache : « ${attendu} »`)
   return echecs
 }
