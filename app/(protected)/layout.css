@@ -70,10 +70,10 @@
 /* --- Logo --- */
 
 /*
- * L'EN-TETE DE MARQUE SUIT LE THEME, comme l'AppBar du mobile (signale par le
- * user le 03/10/2026, capture a l'appui). Il restait terracotta dans les quatre
- * themes : un bandeau brun au-dessus d'un ecran blanc ou bleu nuit.
- * `--entete-bg` est defini par theme dans globals.css.
+ * L'EN-TETE DE MARQUE : marron dans les deux themes CLAIRS, surface du theme
+ * dans les deux SOMBRES, comme l'AppBar du mobile (demandes du user,
+ * 03/10/2026). Toutes ses couleurs sont des `--entete-*`, definies par theme
+ * dans globals.css : aucune n'est ecrite ici.
  */
 .sb-logo {
   display: flex;
@@ -82,7 +82,7 @@
   padding: 20px;
   flex-shrink: 0;
   background: var(--entete-bg);
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--entete-bord);
 }
 
 /*
@@ -95,6 +95,16 @@
   height: 34px;
   object-fit: contain;
   flex-shrink: 0;
+  /* Pastille blanche sur le marron des themes clairs, rien en sombre. */
+  border-radius: 50%;
+  background: var(--entete-logo-fond);
+  box-shadow: var(--entete-logo-anneau);
+}
+
+/* « Work » dans la couleur que l'en-tete lui donne (orange sur le marron). */
+.sb-logo .marque-second,
+.topbar .marque-second {
+  color: var(--entete-marque-second);
 }
 
 .sb-brand-copy {
@@ -108,13 +118,13 @@
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 800;
-  color: var(--text-primary);
+  color: var(--entete-texte);
   letter-spacing: -0.5px;
   line-height: 1;
 }
 
 .sb-logo-subtitle {
-  color: var(--text-muted);
+  color: var(--entete-texte-doux);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -126,7 +136,7 @@
   margin-left: auto;
   background: none;
   border: none;
-  color: var(--text-dim);
+  color: var(--entete-texte-doux);
   cursor: pointer;
   padding: 4px;
   display: none;
@@ -141,9 +151,9 @@
 /* Bouton de repli (dans l'en-tete) */
 .sb-collapse {
   margin-left: auto;
-  background: var(--bg-hover);
+  background: var(--entete-bouton);
   border: none;
-  color: var(--text-secondary);
+  color: var(--entete-bouton-texte);
   cursor: pointer;
   padding: 6px;
   border-radius: 8px;
@@ -152,8 +162,8 @@
   flex-shrink: 0;
 }
 .sb-collapse:hover {
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: var(--entete-bouton-survol);
+  color: var(--entete-bouton-survol-texte);
 }
 
 .sb-link-label {
@@ -442,7 +452,7 @@
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--entete-bord);
   background: var(--entete-bg);
   position: sticky;
   top: 0;
@@ -453,7 +463,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-primary);
+  color: var(--entete-texte);
   padding: 4px;
   display: flex;
 }
@@ -472,6 +482,9 @@
   height: 30px;
   object-fit: contain;
   flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--entete-logo-fond);
+  box-shadow: var(--entete-logo-anneau);
 }
 
 .topbar-brand-copy {
@@ -485,13 +498,13 @@
   font-family: var(--font-display);
   font-size: 17px;
   font-weight: 800;
-  color: var(--text-primary);
+  color: var(--entete-texte);
   letter-spacing: -0.4px;
   line-height: 1;
 }
 
 .topbar-subtitle {
-  color: var(--text-muted);
+  color: var(--entete-texte-doux);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;

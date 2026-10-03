@@ -102,11 +102,26 @@ button {
   --motif-image: url("/motif-nuit.png");
   --motif-overlay: rgba(21, 13, 8, 0.82);
   /*
-   * L'EN-TÊTE SUIT LE THÈME, comme l'AppBar du mobile (surface du thème). Il
-   * était terracotta dans les quatre thèmes. `--brand` reste la couleur de
-   * marque des autres éléments (avatars, boutons), qui ne changent pas.
+   * EN THÈME SOMBRE, L'EN-TÊTE PREND LA SURFACE DU THÈME, comme l'AppBar du
+   * mobile : un bandeau terracotta au-dessus d'un écran sombre jurait. Les
+   * thèmes CLAIRS, eux, gardent le marron de la marque (voir leur bloc).
+   * `--brand` reste la couleur des autres éléments (avatars, boutons).
    */
   --entete-bg: var(--bg-surface);
+  --entete-bord: var(--border-subtle);
+  --entete-texte: var(--text-primary);
+  --entete-texte-doux: var(--text-muted);
+  --entete-marque-second: var(--marque-second);
+  --entete-logo-fond: transparent;
+  --entete-logo-anneau: none;
+  --entete-bouton: var(--bg-hover);
+  --entete-bouton-survol: var(--accent-dim);
+  --entete-bouton-texte: var(--text-secondary);
+  --entete-bouton-survol-texte: var(--accent);
+  /* Le bouton rond des discussions : l'orange du FAB mobile. */
+  --fab-bg: #c04d29;
+  --fab-texte: #ffffff;
+  --fab-ombre: #c04d2960;
 }
 
 /* Theme par defaut : clair creme, comme l'app mobile. */
@@ -181,8 +196,26 @@ button {
   /* Voile creme sur le motif africain (0.90 ~ MotifBackground du mobile) */
   --motif-image: url("/motif-bg.png");
   --motif-overlay: rgba(245, 239, 230, 0.9);
-  /* Blanc chaud : celui de l'AppBar du thème Clair du mobile (`warmWhite`). */
-  --entete-bg: var(--bg-elevated);
+  /*
+   * LES DEUX THÈMES CLAIRS GARDENT L'EN-TÊTE MARRON DE LA MARQUE (demande du
+   * user, 03/10/2026) : texte blanc, « Work » orange, logo sur sa pastille
+   * blanche — le vert du logo se perdrait sur le marron. Le thème clair doux
+   * hérite de ce bloc : il ne redéfinit aucune de ces valeurs.
+   */
+  --entete-bg: var(--brand);
+  --entete-bord: var(--brand-strong);
+  --entete-texte: var(--brand-text);
+  --entete-texte-doux: rgba(255, 255, 255, 0.75);
+  --entete-marque-second: #ff8a4c;
+  --entete-logo-fond: #ffffff;
+  --entete-logo-anneau: 0 0 0 1px var(--brand-strong);
+  --entete-bouton: rgba(255, 255, 255, 0.14);
+  --entete-bouton-survol: rgba(255, 255, 255, 0.26);
+  --entete-bouton-texte: var(--brand-text);
+  --entete-bouton-survol-texte: var(--brand-text);
+  --fab-bg: #c04d29;
+  --fab-texte: #ffffff;
+  --fab-ombre: #c04d2960;
 }
 
 /* Palette technique : double tap sur le bouton de theme */
@@ -224,7 +257,10 @@ button {
   --scrollbar-thumb: #1e2d47;
   /* Son propre voile : le chocolat hérité du thème sombre teintait le bleu nuit. */
   --motif-overlay: rgba(7, 11, 20, 0.82);
-  --entete-bg: var(--bg-surface);
+  /* Le bouton rond prend l'accent du thème, comme « Nouvelle discussion ». */
+  --fab-bg: var(--accent);
+  --fab-texte: var(--accent-text);
+  --fab-ombre: #38bdf860;
   --skeleton-base: #1e2d47;
   --skeleton-shine: #2b3d5f;
   --dot-color: #38bdf80b;
@@ -266,7 +302,14 @@ button {
   --av-0-bg: #0f4c8118;
   --av-0-fg: #0f4c81;
   --scrollbar-thumb: #bcccdc;
-  --entete-bg: var(--bg-surface);
+  /*
+   * Le bouton rond prend le BLEU du thème, celui de « Nouvelle discussion »
+   * (demande du user, 03/10/2026). L'en-tête, lui, hérite du marron du thème
+   * clair par défaut.
+   */
+  --fab-bg: var(--accent);
+  --fab-texte: var(--accent-text);
+  --fab-ombre: #0f4c8160;
   --skeleton-base: #d9e2ec;
   --skeleton-shine: #f3f7fc;
   --dot-color: #0f4c810b;

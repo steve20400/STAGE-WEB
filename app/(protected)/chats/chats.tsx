@@ -669,8 +669,11 @@ export default function ChatsPage() {
         )}
       </div>
 
-      {/* Bouton flottant orange -> repertoire des contacts (comme sur mobile).
-          position en CSS (chats-split.css) pour rester dans la colonne de gauche. */}
+      {/* Bouton flottant -> repertoire des contacts (comme sur mobile).
+          position en CSS (chats-split.css) pour rester dans la colonne de gauche.
+          Sa couleur suit le theme (`--fab-*`, globals.css) : orange dans les
+          themes par defaut, l'accent du theme — celui de « Nouvelle
+          discussion » — dans les themes doux. */}
       <button
         className="chats-fab"
         onClick={() => navigate("/contacts")}
@@ -684,13 +687,13 @@ export default function ChatsPage() {
           height: 56,
           borderRadius: "50%",
           border: "none",
-          background: "#c04d29",
-          color: "#fff",
+          background: "var(--fab-bg)",
+          color: "var(--fab-texte)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           cursor: "pointer",
-          boxShadow: "0 10px 28px #c04d2960",
+          boxShadow: "0 10px 28px var(--fab-ombre)",
           zIndex: 100,
         }}
       >
