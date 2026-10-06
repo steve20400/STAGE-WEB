@@ -69,11 +69,54 @@ export interface Charge {
    * démasqué — voir `lireCharge`.
    */
   idAnnonce: string | null
+  /**
+   * Le message AUQUEL CELUI-CI RÉPOND (06/10/2026). Dans le chiffré, comme
+   * l'identifiant : le serveur ne peut pas faire répondre un message à un
+   * autre. Seul l'identifiant voyage — le texte cité est relu sur l'appareil,
+   * parmi les messages déjà déchiffrés.
+   */
+  reponseA?: string
+  /**
+   * Ce que `texte` porte quand ce n'est pas du texte : la fiche JSON d'un
+   * CONTACT ou d'une POSITION (06/10/2026). Absent pour un texte ou un média.
+   */
+  genre?: GenreCharge
 }
 
-/** Construit la charge v2 à chiffrer pour le message `id`. */
-export function ecrireCharge(id: string, texte: string, media?: DescripteurMedia): string {
-  return PREFIXE_CHARGE_V2 + JSON.stringify({ v: 2, id, texte, ...(media ? { media } : {}) })
+/** Les messages STRUCTURÉS qu'une charge peut porter dans `texte`. */
+export type GenreCharge = "CONTACT" | "LOCATION"
+
+/** Ce qu'une charge peut porter EN PLUS du texte et du média. */
+export interface ExtrasCharge {
+  reponseA?: string
+  genre?: GenreCharge
+}
+
+/**
+ * Construit la charge v2 à chiffrer pour le message `id`.
+ *
+ * ⚠️ LES CHAMPS ABSENTS NE S'ÉCRIVENT PAS : une charge sans citation ni genre
+ * reste octet pour octet celle d'avant (`reponseA` et `genre`, 06/10/2026). Un
+ * ancien lecteur ignore ces deux champs — il verrait au pire la fiche d'un
+ * contact en texte, jamais une erreur.
+ */
+export function ecrireCharge(
+  id: string,
+  texte: string,
+  media?: DescripteurMedia,
+  extras: ExtrasCharge = {},
+): string {
+  return (
+    PREFIXE_CHARGE_V2 +
+    JSON.stringify({
+      v: 2,
+      id,
+      texte,
+      ...(media ? { media } : {}),
+      ...(extras.reponseA ? { reponseA: extras.reponseA } : {}),
+      ...(extras.genre ? { genre: extras.genre } : {}),
+    })
+  )
 }
 
 /** Une charge reçue n'est pas recevable : on le dit, on ne devine pas. */
@@ -99,13 +142,28 @@ export function lireCharge(clair: string, messageId: string | null): Charge {
   } catch {
     throw new ChargeInvalide("charge v2 illisible")
   }
-  const c = brut as { v?: unknown; id?: unknown; texte?: unknown; media?: unknown }
+  const c = brut as {
+    v?: unknown
+    id?: unknown
+    texte?: unknown
+    media?: unknown
+    reponseA?: unknown
+    genre?: unknown
+  }
   if (c.v !== 2 || typeof c.id !== "string") throw new ChargeInvalide("charge v2 mal formée")
   if (messageId === null || c.id !== messageId) {
     throw new ChargeInvalide("charge rattachée à un autre message que le sien")
   }
   const media = c.media === undefined ? undefined : descripteurValide(c.media)
-  return { texte: typeof c.texte === "string" ? c.texte : "", media, idAnnonce: c.id }
+  // Un genre inconnu (version future) est ignoré : le texte s'affiche tel quel.
+  const genre = c.genre === "CONTACT" || c.genre === "LOCATION" ? c.genre : undefined
+  return {
+    texte: typeof c.texte === "string" ? c.texte : "",
+    media,
+    idAnnonce: c.id,
+    ...(typeof c.reponseA === "string" && c.reponseA !== "" ? { reponseA: c.reponseA } : {}),
+    ...(genre ? { genre } : {}),
+  }
 }
 
 /**

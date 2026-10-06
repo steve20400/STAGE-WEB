@@ -14,6 +14,7 @@
  */
 import { loadCachedMessages } from "./indexeddb-cache"
 import { chargeRangee } from "./e2ee-media"
+import { apercuStructure } from "./message-payload"
 
 export interface DernierMessage {
   id: string
@@ -84,7 +85,9 @@ export async function derniersTextesLocaux(convs: AvecDernier[]): Promise<Map<st
           if (dernier) {
             locaux.set(c.id, {
               id: dernier.id,
-              content: dernier.content ?? null,
+              // Un contact ou une position chiffrés sont rangés en JSON : la liste
+              // montre leur libellé (« 👤 Jean »), comme le serveur pour un fil clair.
+              content: apercuStructure(dernier.type ?? "", dernier.content) ?? dernier.content ?? null,
               type: dernier.type ?? "TEXT",
               senderId: dernier.senderId ?? "",
               createdAt: new Date(dernier.createdAt ?? 0).toISOString(),

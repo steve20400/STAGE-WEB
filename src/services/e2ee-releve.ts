@@ -46,6 +46,11 @@ async function ranger(recus: ClairRecu[]): Promise<void> {
       // Le média chiffré et SA CLÉ : rangés et archivés avec le texte. C'est
       // ce qui permet de rouvrir la photo sur un autre appareil (chapitre 23).
       ...(r.media ? { media: r.media } : {}),
+      // Le type et la citation, lus DANS la charge : sans eux, un contact
+      // rangé ici redeviendrait du texte JSON, et la réponse perdrait sa
+      // citation dès le rechargement (06/10/2026).
+      ...(r.reponseA ? { reponseA: r.reponseA } : {}),
+      ...(r.genre ? { genre: r.genre } : {}),
     }
     const range = await cacheClairRecu(entreeCacheDechiffree(clair))
     if (!range) continue

@@ -2,7 +2,7 @@ import { apiRequest } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
 import { identitesChangees as identitesChangeesInternes } from "./e2ee-store"
 import { ouvrirCoffre } from "./coffre-chiffre"
-import { ecrireCharge, lireCharge, type DescripteurMedia } from "./e2ee-media"
+import { ecrireCharge, lireCharge, type DescripteurMedia, type GenreCharge } from "./e2ee-media"
 import {
   chiffrerPour,
   idAppareil,
@@ -210,6 +210,13 @@ export async function correspondant(convId: string): Promise<string> {
 export async function envoyerChiffre(
   convId: string,
   texte: string,
+  /**
+   * 🐛 LA RÉPONSE ET LE CONTACT N'EXISTAIENT PAS DANS UN FIL CHIFFRÉ (user,
+   * 06/10/2026). La citation n'était jamais transmise ; un contact partait en
+   * clair et le serveur le refusait. `genre` dit ce que `texte` porte : la
+   * fiche JSON d'un CONTACT, voyagée dans l'enveloppe.
+   */
+  options: { genre?: GenreCharge; replyToId?: string } = {},
 ): Promise<MessageCree> {
   const destinataireId = await correspondant(convId)
 
@@ -230,7 +237,14 @@ export async function envoyerChiffre(
   // 1. La ligne du fil, SANS contenu. Le serveur la refuserait autrement.
   const message = await apiRequest<MessageCree>(
     `/api/conversations/${encodeURIComponent(convId)}/messages`,
-    { method: "POST", body: { type: "TEXT", chiffre: true } },
+    {
+      method: "POST",
+      body: {
+        type: options.genre ?? "TEXT",
+        chiffre: true,
+        ...(options.replyToId ? { replyToId: options.replyToId } : {}),
+      },
+    },
   )
 
   /*
@@ -247,7 +261,10 @@ export async function envoyerChiffre(
    * ancien afficherait la charge brute — d'où le déploiement APRÈS la mise à
    * jour des téléphones.
    */
-  const charge = ecrireCharge(message.id, texte)
+  const charge = ecrireCharge(message.id, texte, undefined, {
+    reponseA: options.replyToId,
+    genre: options.genre,
+  })
   const enveloppes = await chiffrerPour(destinataireId, devices, charge)
 
   /*
@@ -295,6 +312,10 @@ export interface ClairRecu {
    * pour un texte. Voir `e2ee-media.ts` et le chapitre 23 du cours.
    */
   media?: DescripteurMedia
+  /** Le message auquel celui-ci répond, lu DANS la charge (06/10/2026). */
+  reponseA?: string
+  /** CONTACT ou LOCATION : `texte` porte alors la fiche JSON. */
+  genre?: GenreCharge
 }
 
 /**
@@ -412,6 +433,8 @@ export async function releverEtDechiffrer(
           texte: charge.texte,
           quand: new Date(e.createdAt).getTime(),
           ...(charge.media ? { media: charge.media } : {}),
+          ...(charge.reponseA ? { reponseA: charge.reponseA } : {}),
+          ...(charge.genre ? { genre: charge.genre } : {}),
         }
         parMessage.set(e.messageId, recu)
         /*

@@ -557,6 +557,31 @@ function cacheDeliveredMessage(message: BackendMessage | WsMessagePayload): void
 }
 
 /**
+ * Les types qu'un fil chiffré sait porter dans une enveloppe : le texte, et
+ * la fiche JSON d'un contact ou d'une position (06/10/2026).
+ *
+ * 🐛 SEUL LE TEXTE ÉTAIT COUVERT. Un contact prenait le chemin du clair, que
+ * le serveur refuse dans un fil chiffré : il ne partait jamais.
+ */
+function chiffrable(type: MessageType): boolean {
+  return type === "text" || type === "contact" || type === "location"
+}
+
+/** La citation et le genre, sous la forme de l'archive (`MessageArchive`). */
+function optionsArchive(type: MessageType, options: SendOptions) {
+  const { genre, replyToId } = optionsChiffre(type, options)
+  return { ...(genre ? { genre } : {}), ...(replyToId ? { reponseA: replyToId } : {}) }
+}
+
+/** Ce que l'envoi chiffré doit savoir de plus que le texte : genre et citation. */
+function optionsChiffre(type: MessageType, options: SendOptions) {
+  return {
+    genre: type === "contact" ? ("CONTACT" as const) : type === "location" ? ("LOCATION" as const) : undefined,
+    replyToId: options.replyToId,
+  }
+}
+
+/**
  * Envoie un message. On privilegie le WebSocket ({ type: "send" }) car c'est lui
  * qui declenche la diffusion temps reel aux autres participants sur ce backend ;
  * en cas d'echec, on retombe sur le POST REST (persistance sans broadcast).
@@ -602,17 +627,17 @@ export async function sendChatMessage(
    * le serveur le refusait s'il était chiffré… après l'avoir reçu. Voir
    * `etatConnu` dans `e2ee-fil.ts`.
    */
-  if (type === "text" && (content ?? "").trim() !== "" && !etatConnu(chatId)) {
+  if (chiffrable(type) && (content ?? "").trim() !== "" && !etatConnu(chatId)) {
     await lireEtatE2ee(chatId).catch(() => undefined)
   }
 
-  if (estChiffree(chatId) && type === "text" && (content ?? "").trim() !== "") {
+  if (estChiffree(chatId) && chiffrable(type) && (content ?? "").trim() !== "") {
     if (!navigator.onLine) {
       throw new Error(
         "Pas de réseau : un message chiffré ne peut pas être mis en attente.",
       )
     }
-    const cree = await envoyerChiffre(chatId, content)
+    const cree = await envoyerChiffre(chatId, content, optionsChiffre(type, options))
 
     /*
      * 🔴 LE CLAIR EST MIS EN CACHE, COMME N'IMPORTE QUEL MESSAGE — décision du
@@ -639,6 +664,7 @@ export async function sendChatMessage(
       senderId: myId ?? "",
       content,
       type: msgType,
+      ...(options.replyToId ? { replyToId: options.replyToId } : {}),
       status: "SENT",
       createdAt: new Date(cree.createdAt).getTime(),
     })
@@ -660,6 +686,7 @@ export async function sendChatMessage(
       expediteurId: myId ?? "",
       texte: content,
       quand: new Date(cree.createdAt).getTime(),
+      ...optionsArchive(type, options),
     })
 
     return {
@@ -669,6 +696,7 @@ export async function sendChatMessage(
       type,
       status: "sent",
       timestamp: new Date(cree.createdAt),
+      replyTo: options.replyToId,
     }
   }
 
@@ -748,15 +776,16 @@ export async function sendChatMessage(
      * ⚠️ UNE SEULE FOIS. Si le second essai échoue aussi, c'est autre chose —
      * pas de clés, correspondant hors périmètre — et il faut le dire.
      */
-    if (estRefusChiffrement(err) && type === "text" && (content ?? "").trim() !== "") {
+    if (estRefusChiffrement(err) && chiffrable(type) && (content ?? "").trim() !== "") {
       noteEtatChiffrement(chatId, true)
-      const cree = await envoyerChiffre(chatId, content)
+      const cree = await envoyerChiffre(chatId, content, optionsChiffre(type, options))
       void cacheMessage({
         id: cree.id,
         conversationId: chatId,
         senderId: myId ?? "",
         content,
         type: msgType,
+        ...(options.replyToId ? { replyToId: options.replyToId } : {}),
         status: "SENT",
         createdAt: new Date(cree.createdAt).getTime(),
       })
@@ -775,6 +804,7 @@ export async function sendChatMessage(
         expediteurId: myId ?? "",
         texte: content,
         quand: new Date(cree.createdAt).getTime(),
+        ...optionsArchive(type, options),
       })
       return {
         id: cree.id,
@@ -783,6 +813,7 @@ export async function sendChatMessage(
         type,
         status: "sent",
         timestamp: new Date(cree.createdAt),
+        replyTo: options.replyToId,
       }
     }
 

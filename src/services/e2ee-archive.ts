@@ -24,7 +24,7 @@
 
 import { apiRequest } from "../lib/api-client"
 import type { SuiviRestauration } from "../lib/restauration-progression"
-import type { DescripteurMedia } from "./e2ee-media"
+import type { DescripteurMedia, GenreCharge } from "./e2ee-media"
 
 /** Un message, tel qu'il se range dans l'archive. */
 export interface MessageArchive {
@@ -45,6 +45,12 @@ export interface MessageArchive {
    * écrit. Un média par message : c'est la règle des fils chiffrés.
    */
   media?: DescripteurMedia
+  /**
+   * La citation et le genre (06/10/2026) : sans eux, un contact restauré
+   * redeviendrait du texte JSON, et une réponse perdrait sa citation.
+   */
+  reponseA?: string
+  genre?: GenreCharge
 }
 
 /** Un bloc chiffré, tel qu'il voyage et se range. */

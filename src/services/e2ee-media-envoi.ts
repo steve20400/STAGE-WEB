@@ -78,7 +78,7 @@ export async function envoyerMediaChiffre(
 
   // 5. Les enveloppes.
   const legende = o.legende ?? ""
-  const charge = ecrireCharge(message.id, legende, descripteur)
+  const charge = ecrireCharge(message.id, legende, descripteur, { reponseA: o.replyToId })
   const enveloppes = await chiffrerPour(destinataire, appareils, charge)
   const moi = getMyUserId()
   if (moi && moi !== destinataire) {
@@ -93,7 +93,15 @@ export async function envoyerMediaChiffre(
 
   // 6. Ma copie : cache local, clair du fichier, archive.
   const quand = new Date(message.createdAt).getTime() || Date.now()
-  const entree = { id: message.id, convId, expediteurId: moi ?? "", texte: legende, quand, media: descripteur }
+  const entree = {
+    id: message.id,
+    convId,
+    expediteurId: moi ?? "",
+    texte: legende,
+    quand,
+    media: descripteur,
+    ...(o.replyToId ? { reponseA: o.replyToId } : {}),
+  }
   await cacheMessage(entreeCacheDechiffree(entree)).catch(() => undefined)
   await garderClair(descripteur.id, new Blob([clair as Uint8Array<ArrayBuffer>], { type: o.mime }))
   archiver(entree)

@@ -1,4 +1,4 @@
-import type { DescripteurMedia } from "./e2ee-media"
+import type { DescripteurMedia, GenreCharge } from "./e2ee-media"
 
 /**
  * L'ENTRÉE DU CACHE LOCAL pour un message déchiffré — texte, ou média chiffré.
@@ -20,13 +20,16 @@ export function entreeCacheDechiffree(m: {
   texte: string
   quand: number
   media?: DescripteurMedia
+  reponseA?: string
+  genre?: GenreCharge
 }) {
   return {
     id: m.id,
     conversationId: m.convId,
     senderId: m.expediteurId,
     content: m.texte,
-    type: typeDuMessage(m.media),
+    type: m.genre ?? typeDuMessage(m.media),
+    ...(m.reponseA ? { replyToId: m.reponseA } : {}),
     status: "SENT",
     createdAt: m.quand,
     ...(m.media
