@@ -148,7 +148,10 @@
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: var(--bg-elevated);
-  color: inherit;
+  /* 🐛 `inherit` reprenait le BLANC du texte de ma bulle : nom du fichier
+     blanc sur fond clair, invisible (user, 06/10/2026). La carte a son
+     propre fond, elle prend donc la couleur de texte du thème. */
+  color: var(--text-primary);
   font: inherit;
   text-align: left;
   cursor: pointer;
