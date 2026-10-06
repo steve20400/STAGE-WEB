@@ -165,7 +165,15 @@ function politiqueSecurite(apiBaseUrl: string, wsUrl: string): string {
      * journaux ne sont lisibles que par nous. Un script hostile n'y gagne
      * aucun endroit où déposer ce qu'il aurait lu.
      */
-    "connect-src": ["'self'", ...origines, "https://*.googleapis.com", ...SEAUX_MEDIAS],
+    /*
+     * 🐛 `blob:` MANQUAIT : L'APERÇU D'UN PDF ÉTAIT UN CADRE BLANC (user,
+     * 06/10/2026). L'aperçu lit le fichier choisi par `fetch(blob:…)`
+     * (`loadPreviewBlob`) pour le donner à pdf.js ; `connect-src` le refusait,
+     * et le repli `<iframe>` est lui-même interdit par `frame-src 'none'`.
+     * Sans risque : une adresse `blob:` ne désigne que des données créées par
+     * la page elle-même, elle ne fait sortir aucun octet.
+     */
+    "connect-src": ["'self'", "blob:", ...origines, "https://*.googleapis.com", ...SEAUX_MEDIAS],
     "worker-src": ["'self'", "blob:"],
     "manifest-src": ["'self'"],
     "form-action": ["'self'"],
