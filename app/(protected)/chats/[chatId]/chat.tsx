@@ -5228,6 +5228,23 @@ export default function ChatRoomPage() {
   const params = useParams()
   const navigate = useNavigate()
   const chatId = params.chatId as string
+  /*
+   * 🔴 LA CONVERSATION AFFICHÉE À CET INSTANT — pour les réponses qui arrivent
+   * EN RETARD.
+   *
+   * 🐛 DEUX CONVERSATIONS AFFICHAIENT LES MÊMES MESSAGES (Døms et Ibrahim
+   * Traore, captures du user, 06/10/2026). L'écran ne se démonte pas d'une
+   * conversation à l'autre : il vide la liste, puis charge. Un chargement
+   * encore en route pour la conversation PRÉCÉDENTE — lecture du cache, page
+   * du serveur, page plus ancienne — se terminait après ce vidage, et ses
+   * messages étaient fusionnés dans la nouvelle. Les messages affichés ne
+   * portent pas leur conversation : rien ne pouvait les écarter ensuite.
+   *
+   * Chaque chargement retient donc la conversation pour laquelle il est parti,
+   * et son résultat est jeté si on n'y est plus.
+   */
+  const chatIdCourant = useRef(chatId)
+  chatIdCourant.current = chatId
   const returnTo = `/chats/${chatId}`
   const { error, success, info } = useToast()
 
@@ -5651,12 +5668,17 @@ export default function ChatRoomPage() {
   }, [])
 
   const refreshMessages = useCallback(async () => {
+    const pour = chatId
     await fetchMessagesCacheFirst(
       chatId,
       // onCached : affichage instantané depuis IndexedDB (~2ms)
-      (cached) => setMessages((prev) => fusionnerMessages(prev, cached)),
+      (cached) => {
+        if (chatIdCourant.current === pour) setMessages((prev) => fusionnerMessages(prev, cached))
+      },
       // onFresh : mise à jour silencieuse avec les données réseau
-      (fresh) => setMessages((prev) => fusionnerMessages(prev, fresh))
+      (fresh) => {
+        if (chatIdCourant.current === pour) setMessages((prev) => fusionnerMessages(prev, fresh))
+      }
     )
   }, [chatId, fusionnerMessages])
 
@@ -6308,7 +6330,10 @@ export default function ChatRoomPage() {
     const positionAvant = body.scrollTop
 
     try {
+      const pour = chatId
       const older = await fetchOlderMessages(chatId, oldest.id)
+      // Page d'une conversation qu'on a quittée : voir `chatIdCourant`.
+      if (chatIdCourant.current !== pour) return
       if (older.length === 0) {
         setOlderExhausted(true)
         return
