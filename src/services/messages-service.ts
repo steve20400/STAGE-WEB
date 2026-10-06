@@ -1,5 +1,5 @@
 import { ApiError, apiRequest } from "../lib/api-client"
-import type { DescripteurMedia } from "./e2ee-media"
+import { chargeRangee, type DescripteurMedia } from "./e2ee-media"
 import { langueInitiale, traduire } from "../i18n"
 import { type ChatMessageMock, type MessageStatus, type MessageType } from "../mocks/chat-data"
 import { getMyUserId } from "../data/session-user"
@@ -178,10 +178,18 @@ export function toFrontMessage(
   const brutEdite = (m as BackendMessage).editedAt ?? null
   const dateEditee = brutEdite ? new Date(brutEdite) : null
 
+  // Un texte que le cache a rangé en charge v2 BRUTE redevient sa légende et
+  // son média — voir `chargeRangee`. Sans effet sur un texte ordinaire.
+  const rangee = chargeRangee(
+    m.id,
+    m.content,
+    (m as { mediaChiffre?: DescripteurMedia }).mediaChiffre
+  )
+
   return {
     id: m.id,
     senderId: isMine ? "me" : m.senderId,
-    content: m.content ?? "",
+    content: rangee.texte ?? "",
     type: media?.mimeType?.startsWith("video/") ? "video" : mapType(m.type),
     status: mapStatus(m.status),
     // Ce message est chiffre : le serveur le deduit de l existence d une
@@ -217,7 +225,7 @@ export function toFrontMessage(
     isDeleted: Boolean(deletedAt),
     // Le descripteur d'un média chiffré, quand le cache local le porte : le
     // fil relu hors ligne sait encore rouvrir la photo.
-    mediaChiffre: (m as { mediaChiffre?: DescripteurMedia }).mediaChiffre,
+    mediaChiffre: rangee.media,
     vueUnique: (m as { vueUnique?: boolean }).vueUnique === true,
     vueUniqueOuverte: (m as { vueUniqueOuverte?: boolean }).vueUniqueOuverte === true,
     vueUniqueEffacee: (m as { vueUniqueEffacee?: boolean }).vueUniqueEffacee === true,
@@ -339,8 +347,10 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
       const caches = await loadCachedMessages(chatId, INITIAL_PAGE_SIZE)
       for (const c of caches) {
         const l = c as { id: string; content?: string | null; mediaChiffre?: DescripteurMedia }
-        if (l.content || l.mediaChiffre) {
-          enCache.set(l.id, { texte: l.content || undefined, media: l.mediaChiffre })
+        // Même réparation qu'à l'affichage : une charge v2 rangée brute.
+        const r = chargeRangee(l.id, l.content, l.mediaChiffre)
+        if (r.texte || r.media) {
+          enCache.set(l.id, { texte: r.texte || undefined, media: r.media })
         }
       }
     } catch {

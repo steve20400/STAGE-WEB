@@ -13,6 +13,7 @@
  * pour un message chiffré — il sait qu'un message est arrivé, pas ce qu'il dit.
  */
 import { loadCachedMessages } from "./indexeddb-cache"
+import { chargeRangee } from "./e2ee-media"
 
 export interface DernierMessage {
   id: string
@@ -72,7 +73,10 @@ export async function derniersTextesLocaux(convs: AvecDernier[]): Promise<Map<st
             deletedAt?: unknown
           }>
           let dernier: (typeof messages)[number] | undefined
-          for (const m of messages) {
+          for (const brut of messages) {
+            // Une charge v2 rangée brute ne doit pas devenir l'aperçu de la
+            // liste : on n'en garde que la légende (voir `chargeRangee`).
+            const m = { ...brut, content: chargeRangee(brut.id, brut.content).texte }
             if (!m.content || m.deletedAt) continue
             const t = new Date(m.createdAt ?? 0).getTime()
             if (!dernier || t > new Date(dernier.createdAt ?? 0).getTime()) dernier = m

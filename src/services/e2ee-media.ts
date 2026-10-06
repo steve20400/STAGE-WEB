@@ -108,6 +108,37 @@ export function lireCharge(clair: string, messageId: string | null): Charge {
   return { texte: typeof c.texte === "string" ? c.texte : "", media, idAnnonce: c.id }
 }
 
+/**
+ * UN TEXTE RANGÉ EN CHARGE BRUTE, réparé à la lecture.
+ *
+ * 🐛 « A2{"v":2,"id":…,"media":{…}} » S'AFFICHAIT EN TEXTE DANS LA BULLE
+ * (signalé par le user le 06/10/2026, captures à l'appui), la photo marquée
+ * « indisponible sur cet appareil ». Ces messages avaient été relevés par une
+ * version du web antérieure au lot A (03/10/2026), qui ne connaissait pas la
+ * charge v2 : elle l'a prise pour un texte nu et l'a RANGÉE TELLE QUELLE. Un
+ * message chiffré ne se déchiffre qu'une fois — l'enveloppe est acquittée — et
+ * ce rangement était donc tout ce qui restait.
+ *
+ * La charge brute contient tout : la légende ET le média, avec sa clé. On la
+ * relit ici, à chaque lecture du cache, et le message redevient ce qu'il était.
+ *
+ * ⚠️ UNE CHARGE QUI NE SE RELIT PAS NE S'AFFICHE JAMAIS EN CLAIR : elle porte la
+ * clé du média. Elle devient un texte vide, et la bulle dit « indisponible ».
+ */
+export function chargeRangee(
+  id: string,
+  texte: string | null | undefined,
+  media?: DescripteurMedia
+): { texte: string | null | undefined; media?: DescripteurMedia } {
+  if (!texte || !texte.startsWith(PREFIXE_CHARGE_V2)) return { texte, media }
+  try {
+    const charge = lireCharge(texte, id)
+    return { texte: charge.texte, media: media ?? charge.media }
+  } catch {
+    return { texte: "", media }
+  }
+}
+
 function descripteurValide(m: unknown): DescripteurMedia {
   const d = m as Record<string, unknown>
   const chaine = (v: unknown) => typeof v === "string" && v.length > 0

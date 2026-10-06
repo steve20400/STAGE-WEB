@@ -3677,6 +3677,7 @@ function MessageBubble({
   // Les messages systeme se composent dans la langue du lecteur ; `language`
   // est aussi la langue CIBLE de la traduction d'un message.
   const { t, language } = useTranslation()
+  const { error: erreurToast } = useToast()
   /** Le menu deroulant s'ouvre vers le haut sauf s'il n'y a pas la place. */
   const [menuAbove, setMenuAbove] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -3919,6 +3920,50 @@ function MessageBubble({
     link.remove()
   }
 
+  /**
+   * « TÉLÉCHARGER » DANS LE MENU À TROIS POINTS (demande du user, 06/10/2026),
+   * en plus du bouton des lecteurs intégrés : enregistrer un média sans avoir à
+   * l'ouvrir.
+   *
+   * Pour tout média — photo, vidéo, vocal, document —, en clair comme chiffré,
+   * et pour CHAQUE fichier d'un album : le menu d'un lot porte sur le lot.
+   *
+   * ⚠️ UN MÉDIA CHIFFRÉ EST DÉCHIFFRÉ ICI, sur l'appareil, puis enregistré sous
+   * son nom ; le serveur, lui, n'a que des octets illisibles. Une vue unique
+   * n'est jamais proposée : elle ne doit rien laisser derrière elle.
+   */
+  const mediasATelecharger = (albumMsgs ?? [msg]).filter(
+    (m) => !m.isDeleted && !m.vueUnique && Boolean(m.mediaChiffre || m.mediaUrl)
+  )
+  const enregistrerFichier = (href: string, nom: string) => {
+    const lien = document.createElement("a")
+    lien.href = href
+    lien.download = nom
+    lien.rel = "noreferrer"
+    // Une adresse du serveur s'ouvre à part : si elle répondait une erreur au
+    // lieu du fichier, la conversation ne serait pas remplacée par cette page.
+    if (!href.startsWith("blob:")) lien.target = "_blank"
+    document.body.appendChild(lien)
+    lien.click()
+    lien.remove()
+  }
+  const telechargerMedias = async () => {
+    for (const m of mediasATelecharger) {
+      try {
+        if (m.mediaChiffre) {
+          const url = URL.createObjectURL(await ouvrirMediaChiffre(m.mediaChiffre))
+          enregistrerFichier(url, m.mediaChiffre.nom ?? m.fileName ?? t("file"))
+          // Le temps que le navigateur ait copié le fichier.
+          window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+        } else if (m.mediaUrl) {
+          enregistrerFichier(resolveMediaUrl(m.mediaUrl, { download: true }), m.fileName ?? "")
+        }
+      } catch {
+        erreurToast(t("e2ee_media_echec"))
+      }
+    }
+  }
+
   const onPreviewPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== "touch") return
     const now = Date.now()
@@ -4130,11 +4175,14 @@ function MessageBubble({
                     grille entiere, pas sur son premier fichier. */}
                   {albumMsgs && onOpenAlbum
                     ? menuItem(t("f2_enlarge"), () => onOpenAlbum(0))
-                    : canExpandMedia
-                      ? menuItem(t("f2_enlarge"), openExpandedPreview)
-                      : null}
-                  {msg.type === "audio" && mediaSrc
-                    ? menuItem(t("download_audio"), downloadAudio)
+                    : msg.type === "image" && mediaSrc && onOpenGalerie
+                      ? // Une photo s'agrandit dans la galerie, comme au clic.
+                        menuItem(t("f2_enlarge"), () => onOpenGalerie([msg], 0))
+                      : canExpandMedia
+                        ? menuItem(t("f2_enlarge"), openExpandedPreview)
+                        : null}
+                  {mediasATelecharger.length > 0
+                    ? menuItem(t("download"), () => void telechargerMedias())
                     : null}
                   {/* EPINGLER : collectif, visible par toute la conversation.
                     L'API, la base et le mobile le font depuis toujours ; seul le
