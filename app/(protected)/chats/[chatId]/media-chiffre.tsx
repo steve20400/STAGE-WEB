@@ -23,8 +23,28 @@ import "./media-chiffre.css"
  * ⚠️ UN FICHIER ALTÉRÉ LE DIT. Si l'empreinte ou le déchiffrement échoue, on
  * n'affiche ni image cassée ni rien de trompeur : un message dit que le
  * fichier reçu n'est pas celui qui a été envoyé.
+ *
+ * 🐛 UNE PHOTO OU UN DOCUMENT S'OUVRE DANS LE LECTEUR DE L'APPLICATION
+ * (signalé par le user le 06/10/2026). La photo s'ouvrait dans un simple voile
+ * noir, sans bouton pour la télécharger ni pour fermer ; le document, lui, se
+ * téléchargeait d'office sans s'ouvrir. Ce composant ne dessine plus de
+ * visionneuse : il rend le fichier déchiffré à la discussion, qui l'ouvre dans
+ * la MÊME galerie que les albums et la MÊME visionneuse que les documents en
+ * clair.
  */
-export function MediaChiffre({ d, isMe }: { d: DescripteurMedia; isMe: boolean }) {
+export function MediaChiffre({
+  d,
+  isMe,
+  onOuvrirImage,
+  onOuvrirDocument,
+}: {
+  d: DescripteurMedia
+  isMe: boolean
+  /** Ouvre la photo déchiffrée (adresse `blob:`) dans la galerie. */
+  onOuvrirImage: (url: string) => void
+  /** Ouvre le document déchiffré (adresse `blob:`) dans la visionneuse. */
+  onOuvrirDocument: (url: string) => void
+}) {
   const { t } = useTranslation()
   const genre = d.mime.startsWith("image/")
     ? "image"
@@ -36,7 +56,6 @@ export function MediaChiffre({ d, isMe }: { d: DescripteurMedia; isMe: boolean }
 
   const [url, setUrl] = useState<string | null>(null)
   const [etat, setEtat] = useState<"attente" | "chargement" | "pret" | "altere" | "echec">("attente")
-  const [plein, setPlein] = useState(false)
 
   const lancer = () => {
     setEtat("chargement")
@@ -81,24 +100,17 @@ export function MediaChiffre({ d, isMe }: { d: DescripteurMedia; isMe: boolean }
 
   if (genre === "image") {
     return (
-      <>
-        <button
-          type="button"
-          className="mc-visuel"
-          style={{ aspectRatio: ratio }}
-          onClick={() => url && setPlein(true)}
-          aria-label={d.nom ?? t("photo")}
-        >
-          {apercu && <img src={apercu} alt="" className="mc-apercu flou" />}
-          {url && <img src={url} alt="" className="mc-net" />}
-          {etat === "chargement" && <span className="mc-sablier" aria-hidden="true" />}
-        </button>
-        {plein && url && (
-          <div className="mc-plein" role="dialog" onClick={() => setPlein(false)}>
-            <img src={url} alt="" />
-          </div>
-        )}
-      </>
+      <button
+        type="button"
+        className="mc-visuel"
+        style={{ aspectRatio: ratio }}
+        onClick={() => url && onOuvrirImage(url)}
+        aria-label={d.nom ?? t("photo")}
+      >
+        {apercu && <img src={apercu} alt="" className="mc-apercu flou" />}
+        {url && <img src={url} alt="" className="mc-net" />}
+        {etat === "chargement" && <span className="mc-sablier" aria-hidden="true" />}
+      </button>
     )
   }
 
@@ -126,23 +138,25 @@ export function MediaChiffre({ d, isMe }: { d: DescripteurMedia; isMe: boolean }
     )
   }
 
-  // Document : la carte complète, et un clic pour l'ouvrir ou l'enregistrer.
+  // Document : la carte complète, et un clic pour l'OUVRIR dans la visionneuse
+  // — d'où on le télécharge. Il ne part plus d'office dans les téléchargements.
   return (
     <button
       type="button"
       className="mc-document"
       onClick={() => {
         if (url) {
-          telecharger(url, d.nom ?? "document")
+          onOuvrirDocument(url)
           return
         }
+        if (etat === "chargement") return
         setEtat("chargement")
         ouvrirMediaChiffre(d)
           .then((blob) => {
             const u = URL.createObjectURL(blob)
             setUrl(u)
             setEtat("pret")
-            telecharger(u, d.nom ?? "document")
+            onOuvrirDocument(u)
           })
           .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
       }}
@@ -175,13 +189,6 @@ export function MediaChiffreIndisponible() {
 function duree(ms: number): string {
   const s = Math.round(ms / 1000)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
-}
-
-function telecharger(url: string, nom: string) {
-  const a = document.createElement("a")
-  a.href = url
-  a.download = nom
-  a.click()
 }
 
 /**

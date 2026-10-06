@@ -200,17 +200,3 @@
   font-style: normal;
   cursor: pointer;
 }
-.mc-plein {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, 0.9);
-  cursor: zoom-out;
-}
-.mc-plein img {
-  max-width: 95vw;
-  max-height: 95vh;
-  object-fit: contain;
-}

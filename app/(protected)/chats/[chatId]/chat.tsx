@@ -323,6 +323,62 @@ function ViewerFullscreenButton({
   )
 }
 
+/**
+ * L'adresse qui fait ENREGISTRER le fichier sur l'appareil, au lieu de l'ouvrir.
+ *
+ * ⚠️ UNE ADRESSE `blob:` (un média DÉCHIFFRÉ) NE PREND PAS DE PARAMÈTRE : y
+ * coller `?download=1`, comme on le fait pour le serveur, rendait une adresse
+ * qui ne mène nulle part. C'est l'attribut `download` du lien qui l'enregistre,
+ * sous son vrai nom. Le serveur, lui, répond `Content-Disposition: attachment`
+ * à `download=1`.
+ */
+function adresseTelechargement(url: string): string {
+  if (/^(blob:|data:)/.test(url)) return url
+  return url.includes("?") ? `${url}&download=1` : `${url}?download=1`
+}
+
+/**
+ * Le bouton « Télécharger » d'un visionneur : il enregistre le fichier sur
+ * l'appareil, sous son nom. Même place et même dessin dans tous les lecteurs.
+ */
+function ViewerDownloadButton({
+  url,
+  name,
+  color,
+  style,
+}: {
+  url: string
+  name?: string
+  color: string
+  style?: React.CSSProperties
+}) {
+  const { t } = useTranslation()
+  return (
+    <a
+      href={adresseTelechargement(url)}
+      download={name ?? ""}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      aria-label={t("download")}
+      title={t("download")}
+      style={{ color, display: "flex", alignItems: "center", ...style }}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      >
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+      </svg>
+    </a>
+  )
+}
+
 /** Visionneuse intégrée pour documents (texte, code, PDF, image, vidéo, DOC, XLS, PPT). */
 function DocumentViewer({
   url,
@@ -437,6 +493,13 @@ function DocumentViewer({
             {name ?? t("file")}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+            {/* 🐛 IL N'Y AVAIT PAS DE BOUTON POUR TÉLÉCHARGER (signalé par le
+                user le 06/10/2026) : seulement le plein écran et la croix. */}
+            <ViewerDownloadButton
+              url={url}
+              name={name}
+              color={isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)"}
+            />
             <ViewerFullscreenButton
               expanded={expanded}
               onToggle={toggle}
@@ -2463,6 +2526,9 @@ function MediaGallery({
           {shown?.mediaUrl && (
             <a
               href={resolveMediaUrl(shown.mediaUrl, { download: true })}
+              // Pour un média déchiffré (`blob:`), c'est cet attribut qui
+              // l'enregistre sous son nom : sans lui, le lien ouvrait un onglet.
+              download={shown.fileName ?? ""}
               target="_blank"
               rel="noreferrer"
               style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}
@@ -2654,7 +2720,8 @@ function ImageLightbox({
       <div style={{ position: "absolute", top: 16, right: 16, display: "flex", gap: 10 }}>
         <ViewerFullscreenButton expanded={expanded} onToggle={toggle} color="#fff" style={chip} />
         <a
-          href={url.includes("?") ? `${url}&download=1` : url}
+          href={adresseTelechargement(url)}
+          download={name ?? ""}
           target="_blank"
           rel="noreferrer"
           onClick={(e) => e.stopPropagation()}
@@ -3522,6 +3589,7 @@ function MessageBubble({
   onReply,
   onQuickReply,
   onOpenImage,
+  onOpenGalerie,
   onDelete,
   onForward,
   onReessayer,
@@ -3566,6 +3634,15 @@ function MessageBubble({
   /** Lot de medias envoyes ensemble : la bulle affiche une grille au lieu d'un media. */
   albumMsgs?: Message[]
   onOpenAlbum?: (index: number) => void
+  /**
+   * Ouvre des médias dans LA galerie de l'application — celle des albums, avec
+   * son bouton « Télécharger ».
+   *
+   * 🐛 UNE PHOTO SEULE NE S'Y OUVRAIT PAS (signalé par le user le 06/10/2026) :
+   * en clair, une visionneuse à part ; chiffrée, un voile noir sans aucun
+   * bouton. Toute photo, seule ou en lot, passe désormais par ici.
+   */
+  onOpenGalerie?: (msgs: Message[], index: number) => void
   /** Traduction automatique active pour cette discussion (reglage par appareil). */
   autoTraduction: boolean
   /**
@@ -4309,7 +4386,29 @@ function MessageBubble({
                       clé viennent de l'enveloppe. Sans eux — enveloppe jamais
                       reçue ici —, on le DIT, comme pour un texte. */}
                   {!msg.vueUnique && msg.mediaChiffre ? (
-                    <MediaChiffre d={msg.mediaChiffre} isMe={isMe} />
+                    <MediaChiffre
+                      d={msg.mediaChiffre}
+                      isMe={isMe}
+                      // La galerie ne lit que des adresses : on lui donne la
+                      // copie DÉCHIFFRÉE (blob:), jamais le fichier du serveur.
+                      onOuvrirImage={(url) => {
+                        const copie = {
+                          ...msg,
+                          mediaUrl: url,
+                          mediaMime: msg.mediaChiffre?.mime,
+                          fileName: msg.mediaChiffre?.nom ?? msg.fileName,
+                        }
+                        if (onOpenGalerie) onOpenGalerie([copie], 0)
+                        else onOpenImage(url, copie.fileName)
+                      }}
+                      onOuvrirDocument={(url) =>
+                        setViewingDoc({
+                          url,
+                          name: msg.mediaChiffre?.nom ?? msg.fileName,
+                          mime: msg.mediaChiffre?.mime,
+                        })
+                      }
+                    />
                   ) : !msg.vueUnique && msg.medias?.[0]?.chiffre && !msg.isDeleted ? (
                     <MediaChiffreIndisponible />
                   ) : null}
@@ -4317,7 +4416,9 @@ function MessageBubble({
                     <img
                       src={mediaSrc}
                       alt={msg.fileName ?? t("f2_image")}
-                      onClick={() => onOpenImage(mediaSrc, msg.fileName)}
+                      onClick={() =>
+                        onOpenGalerie ? onOpenGalerie([msg], 0) : onOpenImage(mediaSrc, msg.fileName)
+                      }
                       style={{
                         width: "100%",
                         maxWidth: 280,
@@ -8114,6 +8215,7 @@ export default function ChatRoomPage() {
                       onReply={setReplyTo}
                       onQuickReply={sendQuickReplyText}
                       onOpenImage={(url, name) => setLightbox({ url, name })}
+                      onOpenGalerie={(msgs, index) => setGallery({ msgs, index })}
                       // Dedoublonne par id : les tuiles issues d'UN message a
                       // plusieurs medias le partagent, et il ne faut pas
                       // envoyer N suppressions pour un seul message.
@@ -8215,6 +8317,7 @@ export default function ChatRoomPage() {
                     onReply={setReplyTo}
                     onQuickReply={sendQuickReplyText}
                     onOpenImage={(url, name) => setLightbox({ url, name })}
+                    onOpenGalerie={(msgs, index) => setGallery({ msgs, index })}
                     onDelete={handleDelete}
                     onForward={setForwardMsg}
                     onReessayer={reessayerEnvoi}
