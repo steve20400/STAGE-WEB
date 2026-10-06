@@ -27,9 +27,18 @@ export const IMAGE_QUALITE = 0.82
 /** En dessous, le gain ne vaut pas le risque de perte : on garde l'original. */
 const GAIN_MINIMUM = 0.9
 
+/**
+ * Poids au-delà duquel une image DÉJÀ PETITE est quand même ré-encodée.
+ *
+ * Une photo passée par ici pèse 0,1 à 0,3 octet par pixel : elle reste sous ce
+ * seuil, et ne perd donc pas un peu de qualité à chaque transfert. Une image de
+ * 1500 px enregistrée en qualité maximale, elle, en pèse 1 à 2 — elle passe.
+ */
+const OCTETS_PAR_PIXEL_MAX = 0.5
+
 export type RaisonSaut =
   | "trop_petite"
-  | "png"
+  | "transparente"
   | "animee"
   | "vectorielle"
   | "decodage_impossible"
@@ -64,13 +73,18 @@ function intact(file: File, raisonSaut: RaisonSaut): ResultatCompression {
  * retombe volontairement sur `application/octet-stream`. Décider de compresser
  * sur un champ vide reviendrait à décider au hasard.
  */
-async function formatReel(file: File): Promise<"png" | "gif" | "webp-anime" | "svg" | "autre"> {
+async function formatReel(
+  file: File
+): Promise<"jpeg" | "png" | "png-anime" | "gif" | "webp-anime" | "svg" | "autre"> {
   const entete = new Uint8Array(await file.slice(0, 4096).arrayBuffer())
   const octets = (...valeurs: number[]) => valeurs.every((v, i) => entete[i] === v)
 
-  // PNG. Couvre d'un seul test les captures d'écran, la transparence et l'APNG
-  // animé — trois cas qu'un ré-encodage JPEG abîmerait chacun à sa façon.
-  if (octets(0x89, 0x50, 0x4e, 0x47)) return "png"
+  if (octets(0xff, 0xd8, 0xff)) return "jpeg"
+
+  // PNG : une capture d'écran, le plus souvent — à compresser. Mais l'APNG
+  // animé porte la même signature, et un canvas n'en garderait que la première
+  // image : on le reconnaît à son bloc `acTL`.
+  if (octets(0x89, 0x50, 0x4e, 0x47)) return (await pngAnime(file)) ? "png-anime" : "png"
 
   // GIF : animé la plupart du temps, et un canvas n'en garderait que la
   // première image. On rendrait un film fixe.
@@ -89,6 +103,31 @@ async function formatReel(file: File): Promise<"png" | "gif" | "webp-anime" | "s
   }
 
   return "autre"
+}
+
+/**
+ * Ce PNG est-il animé ?
+ *
+ * La norme place `acTL` AVANT le premier `IDAT` : on parcourt les blocs
+ * jusque-là. Si on n'y arrive pas — fichier tronqué, en-têtes démesurés — on
+ * répond « animé » : dans le doute, on ne touche à rien.
+ */
+async function pngAnime(file: File): Promise<boolean> {
+  const vue = new DataView(await file.slice(0, 256 * 1024).arrayBuffer())
+  let position = 8
+  while (position + 8 <= vue.byteLength) {
+    const longueur = vue.getUint32(position)
+    const type = String.fromCharCode(
+      vue.getUint8(position + 4),
+      vue.getUint8(position + 5),
+      vue.getUint8(position + 6),
+      vue.getUint8(position + 7)
+    )
+    if (type === "acTL") return true
+    if (type === "IDAT") return false
+    position += 12 + longueur
+  }
+  return true
 }
 
 /**
@@ -210,6 +249,26 @@ function canvasVraisemblable(ctx: CanvasRenderingContext2D, l: number, h: number
 }
 
 /**
+ * Un pixel au moins est-il transparent ?
+ *
+ * Le JPEG n'a pas de transparence : un logo ou un autocollant détouré
+ * arriverait sur fond noir. Ceux-là partent intacts. Une capture d'écran,
+ * elle, est entièrement opaque même quand son PNG prévoit une couche alpha.
+ */
+function transparente(ctx: CanvasRenderingContext2D, l: number, h: number): boolean {
+  try {
+    const pixels = ctx.getImageData(0, 0, l, h).data
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] < 255) return true
+    }
+    return false
+  } catch {
+    // Illisible : on ne peut pas prouver l'opacité, on ne touche à rien.
+    return true
+  }
+}
+
+/**
  * Compresse une image, ou rend l'original si le moindre doute existe.
  *
  * Ne lève jamais : un envoi ne doit pas échouer parce qu'une optimisation a
@@ -221,8 +280,9 @@ export async function compresserImage(file: File): Promise<ResultatCompression> 
   }
 
   const format = await formatReel(file).catch(() => "autre" as const)
-  if (format === "png") return intact(file, "png")
-  if (format === "gif" || format === "webp-anime") return intact(file, "animee")
+  if (format === "gif" || format === "webp-anime" || format === "png-anime") {
+    return intact(file, "animee")
+  }
   if (format === "svg") return intact(file, "vectorielle")
 
   let bitmap: ImageBitmap
@@ -240,14 +300,30 @@ export async function compresserImage(file: File): Promise<ResultatCompression> 
     const largeurSource = tournee ? bitmap.height : bitmap.width
     const hauteurSource = tournee ? bitmap.width : bitmap.height
 
-    // ⚠️ TEST SUR LES DIMENSIONS, PAS SUR LE POIDS. C'est lui qui empêche de
-    // recompresser indéfiniment une image déjà passée par ici — une photo
-    // reçue puis transférée perdrait un peu de qualité à chaque saut.
-    if (Math.max(largeurSource, hauteurSource) <= IMAGE_BORD_MAX) {
+    const bordLong = Math.max(largeurSource, hauteurSource)
+
+    /*
+     * ⚠️ UNE IMAGE DÉJÀ PETITE ET LÉGÈRE N'EST PAS RECOMPRESSÉE. C'est ce qui
+     * empêche une photo reçue puis transférée de perdre un peu de qualité à
+     * chaque saut. Le PNG n'est jamais dans ce cas : il n'est pas encore passé
+     * par ici, puisque ce module rend du JPEG.
+     *
+     * 🐛 LES CAPTURES D'ÉCRAN PARTAIENT INTACTES (signalé par le user le
+     * 06/10/2026 : « ça ne compresse pas »). Ce module laissait passer TOUT
+     * PNG, au nom de la transparence et de l'APNG. Or le PNG est d'abord le
+     * format des captures — 400 Ko pour un écran de téléphone, cinq fois le
+     * poids du même écran en JPEG. Seuls l'animé et le transparent restent
+     * intacts ; ils sont reconnus un par un, plus haut et plus bas.
+     */
+    if (
+      format !== "png" &&
+      bordLong <= IMAGE_BORD_MAX &&
+      file.size <= largeurSource * hauteurSource * OCTETS_PAR_PIXEL_MAX
+    ) {
       return intact(file, "trop_petite")
     }
 
-    const facteur = IMAGE_BORD_MAX / Math.max(largeurSource, hauteurSource)
+    const facteur = Math.min(1, IMAGE_BORD_MAX / bordLong)
     const largeur = Math.round(largeurSource * facteur)
     const hauteur = Math.round(hauteurSource * facteur)
 
@@ -266,6 +342,9 @@ export async function compresserImage(file: File): Promise<ResultatCompression> 
 
     if (!canvasVraisemblable(ctx, largeur, hauteur)) {
       return intact(file, "decodage_impossible")
+    }
+    if (format !== "jpeg" && transparente(ctx, largeur, hauteur)) {
+      return intact(file, "transparente")
     }
 
     const blob = await new Promise<Blob | null>((resoudre) => {

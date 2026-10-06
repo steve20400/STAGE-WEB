@@ -73,6 +73,11 @@ import {
   type ResultatCompression,
 } from "../../../../src/lib/image-compression"
 import {
+  compresserVideo,
+  videoCompressible,
+  type ResultatCompressionVideo,
+} from "../../../../src/lib/video-compression"
+import {
   contactsDepuisContenu,
   nomAffichable,
   positionDepuisContenu,
@@ -2310,9 +2315,12 @@ interface PendingMedia {
    * legende : au moment d'envoyer, elle est le plus souvent deja finie. La
    * lancer a l'envoi ferait attendre devant un bouton qui ne repond pas.
    *
-   * `null` pour tout ce qui n'est pas une image.
+   * `null` pour ce qui ne se compresse pas : vocal, document — et vidéo
+   * quand le navigateur ne sait pas transcoder.
    */
-  compression: Promise<ResultatCompression> | null
+  compression: Promise<ResultatCompression | ResultatCompressionVideo> | null
+  /** Avancement d'une compression VIDÉO, affiché à l'écran d'envoi. */
+  suivi?: SuiviCompression
   /**
    * L'utilisateur a demande d'envoyer CE fichier tel quel.
    *
@@ -2321,6 +2329,42 @@ interface PendingMedia {
    */
   garderOriginal?: boolean
 }
+
+/**
+ * L'avancement d'une compression vidéo, de 0 à 1.
+ *
+ * Une vidéo se transcode en plusieurs secondes, parfois une minute : sans
+ * chiffre à l'écran, on croirait l'envoi bloqué.
+ */
+interface SuiviCompression {
+  publier: (valeur: number) => void
+  ecouter: (abonne: (valeur: number) => void) => () => void
+}
+
+function creerSuivi(): SuiviCompression {
+  let derniere = 0
+  const abonnes = new Set<(valeur: number) => void>()
+  return {
+    publier: (valeur) => {
+      derniere = valeur
+      abonnes.forEach((abonne) => abonne(valeur))
+    },
+    ecouter: (abonne) => {
+      abonnes.add(abonne)
+      abonne(derniere)
+      return () => {
+        abonnes.delete(abonne)
+      }
+    },
+  }
+}
+
+/**
+ * Jusqu'où une vidéo trop lourde pour le serveur est acceptée, parce qu'elle
+ * sera compressée avant de partir. Une vidéo de 30 s en 1080p (65 à 75 Mo)
+ * en ressort sous les 10 Mo.
+ */
+const TAILLE_VIDEO_A_COMPRESSER_MAX = 1024 * 1024 * 1024
 
 /** Ce dont un apercu plein contenu a besoin, qu'il vienne du disque ou du serveur. */
 interface PreviewSubject {
@@ -2802,7 +2846,7 @@ function MediaComposer({
    * factures, des contrats, des releves. Le cas « ce cliche doit rester
    * lisible » n'est pas marginal, il est quotidien.
    */
-  const [gain, setGain] = useState<ResultatCompression | null>(null)
+  const [gain, setGain] = useState<ResultatCompression | ResultatCompressionVideo | null>(null)
   useEffect(() => {
     let vivant = true
     setGain(null)
@@ -2814,6 +2858,13 @@ function MediaComposer({
     return () => {
       vivant = false
     }
+  }, [current])
+  // Avancement de la compression vidéo en cours, en pour cent.
+  const [avancement, setAvancement] = useState<number | null>(null)
+  useEffect(() => {
+    setAvancement(null)
+    if (!current?.suivi) return undefined
+    return current.suivi.ecouter((v) => setAvancement(Math.round(v * 100)))
   }, [current])
 
   useEffect(() => {
@@ -2989,6 +3040,10 @@ function MediaComposer({
       <div
         style={{
           display: "flex",
+          // 🐛 Sur téléphone, la ligne du gain partageait la rangée du champ de
+          // légende et l'écrasait (« Ajouter une… »). Elle prend désormais
+          // une rangée entière, au-dessus.
+          flexWrap: "wrap",
           alignItems: "flex-end",
           gap: 10,
           padding: "12px 18px 18px",
@@ -3000,13 +3055,18 @@ function MediaComposer({
           Ne parait que si la compression a REELLEMENT reduit quelque chose :
           une ligne « 280 Ko → 280 Ko » serait du bruit.
         */}
+        {current.kind === "video" && current.compression && !gain && !current.garderOriginal && (
+          <div style={{ flexBasis: "100%", fontSize: 12, color: "rgba(255,255,255,0.72)" }} role="status">
+            {t("media_compression_video", { pct: avancement ?? 0 })}
+          </div>
+        )}
         {gain?.compresse && (
           <div
             style={{
               display: "flex",
+              flexBasis: "100%",
               alignItems: "center",
               gap: 10,
-              marginBottom: 8,
               fontSize: 12,
               color: "rgba(255,255,255,0.72)",
             }}
@@ -6845,7 +6905,17 @@ export default function ChatRoomPage() {
       msgType: "image" | "audio" | "file" | "video",
       durationMs?: number,
       /** Legende saisie a l'ecran de confirmation : elle voyage dans le meme message. */
-      caption = ""
+      caption = "",
+      /**
+       * Le fichier COMPRESSÉ, quand il est encore en préparation.
+       *
+       * 🐛 LA BULLE N'APPARAISSAIT QU'APRÈS LA COMPRESSION (06/10/2026). Pour
+       * une photo, l'attente passait inaperçue ; pour une vidéo, qui se
+       * transcode en plusieurs secondes, l'écran restait vide comme si l'envoi
+       * avait échoué. La bulle part maintenant tout de suite, avec l'aperçu
+       * de l'original, et l'on attend la compression ICI.
+       */
+      preparation?: Promise<File>
     ) => {
       const tempId = `tmp-${Date.now()}-${(tempSeqRef.current += 1)}`
       const localUrl = URL.createObjectURL(file)
@@ -6865,6 +6935,30 @@ export default function ChatRoomPage() {
         mediaUrl: localUrl,
       }
       setMessages((prev) => [...prev, optimistic])
+
+      if (preparation) {
+        const pret = await preparation
+        if (pret !== file) {
+          file = pret
+          filename = pret.name
+          mime = pret.type || mime
+        }
+      }
+      // La limite du serveur porte sur ce qui PART. Une vidéo acceptée parce
+      // qu'elle serait compressée peut la dépasser encore : on le dit, avant
+      // de téléverser des mégaoctets pour rien.
+      if (file.size > TAILLE_MEDIA_MAX_OCTETS) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId))
+        URL.revokeObjectURL(localUrl)
+        error(
+          t("f2_files_too_large"),
+          t(preparation ? "media_video_compressee_trop_lourde" : "media_video_trop_lourde", {
+            taille: formatBytes(file.size) ?? "",
+            max: TAILLE_MEDIA_MAX_MO,
+          })
+        )
+        return
+      }
 
       /*
        * 🔴 FIL CHIFFRÉ : LE MÉDIA PART CHIFFRÉ DE BOUT EN BOUT (chapitre 24).
@@ -7067,7 +7161,15 @@ export default function ChatRoomPage() {
     if (!files || files.length === 0) return
     setShowAttach(false)
     const toSend = Array.from(files)
-    const oversized = toSend.filter((f) => f.size > TAILLE_MEDIA_MAX_OCTETS)
+    /*
+     * 🔴 UNE VIDÉO TROP LOURDE PASSE SI ELLE SERA COMPRESSÉE (06/10/2026).
+     * La limite du serveur porte sur ce qui PART : une vidéo de 70 Mo en
+     * ressort sous les 10. Si, même compressée, elle dépasse encore, l'envoi
+     * le dit — voir `sendMediaMessage`.
+     */
+    const compresseeAvant = (f: File) =>
+      mediaKindFromFile(f) === "video" && videoCompressible() && f.size <= TAILLE_VIDEO_A_COMPRESSER_MAX
+    const oversized = toSend.filter((f) => f.size > TAILLE_MEDIA_MAX_OCTETS && !compresseeAvant(f))
     if (oversized.length > 0) {
       /*
        * UN REFUS QUI EXPLIQUE, au lieu d'un refus qui constate.
@@ -7096,7 +7198,7 @@ export default function ChatRoomPage() {
         )
       }
     }
-    const valid = toSend.filter((f) => f.size <= TAILLE_MEDIA_MAX_OCTETS)
+    const valid = toSend.filter((f) => f.size <= TAILLE_MEDIA_MAX_OCTETS || compresseeAvant(f))
     const prepared: PendingMedia[] = []
     for (const file of valid) {
       const kind = mediaKindFromFile(file)
@@ -7106,6 +7208,7 @@ export default function ChatRoomPage() {
       const mime =
         ext === "aac" || ext === "acc" ? "audio/aac" : file.type || "application/octet-stream"
       const durationMs = kind === "audio" ? await readAudioDuration(file) : undefined
+      const suivi = kind === "video" && videoCompressible() ? creerSuivi() : undefined
       prepared.push({
         file,
         url: URL.createObjectURL(file),
@@ -7124,7 +7227,13 @@ export default function ChatRoomPage() {
          * fichiers, et dix bitmaps 12 Mpx decodes ensemble retiennent pres de
          * 500 Mo. La boucle qui nous porte est deja sequentielle.
          */
-        compression: kind === "image" ? compresserImage(file) : null,
+        compression:
+          kind === "image"
+            ? compresserImage(file)
+            : suivi
+              ? compresserVideo(file, suivi.publier)
+              : null,
+        suivi,
       })
     }
     if (prepared.length > 0) {
@@ -7177,17 +7286,18 @@ export default function ChatRoomPage() {
       for (const item of lot) {
         // `compression` ne rejette jamais : elle rend l'original en cas de
         // doute. Le `catch` n'est la que si une refonte future l'oubliait.
-        const pret = item.garderOriginal
-          ? null
-          : await item.compression?.catch(() => null)
-        const fichier = pret?.fichier ?? item.file
+        const preparation =
+          item.garderOriginal || !item.compression
+            ? undefined
+            : item.compression.then((r) => r.fichier).catch(() => item.file)
         await sendMediaMessage(
-          fichier,
-          fichier.name,
-          fichier.type || item.mime,
+          item.file,
+          item.file.name,
+          item.file.type || item.mime,
           item.kind,
           item.durationMs,
-          item.caption.trim()
+          item.caption.trim(),
+          preparation
         )
       }
     })()

@@ -1,10 +1,18 @@
 /*
  * MÉDIAS CHIFFRÉS DANS LES BULLES (chapitre 23). Jetons de thème uniquement.
  */
+/*
+ * 🐛 LA PHOTO DÉBORDAIT DE SA BULLE sur téléphone (signalé par le user le
+ * 06/10/2026). Sa largeur (70 % de l'écran) ignorait la bulle, bornée à 78 % de
+ * la colonne MOINS ses marges intérieures : sur un écran étroit, l'image
+ * dépassait du cadre. `max-width: 100%` la tient dans la bulle, quelle qu'en
+ * soit la largeur ; même règle pour la vidéo, le vocal et le document.
+ */
 .mc-visuel {
   position: relative;
   display: block;
   width: min(260px, 70vw);
+  max-width: 100%;
   max-height: 340px;
   padding: 0;
   overflow: hidden;
@@ -114,6 +122,7 @@
 .mc-video {
   display: block;
   width: min(260px, 70vw);
+  max-width: 100%;
   max-height: 340px;
   border-radius: 10px;
   background: #000;
@@ -122,7 +131,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 200px;
+  min-width: min(200px, 100%);
   padding: 4px 2px;
   border: none;
   background: none;
@@ -137,12 +146,13 @@
 }
 .mc-audio {
   width: min(260px, 70vw);
+  max-width: 100%;
 }
 .mc-document {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 220px;
+  min-width: min(220px, 100%);
   max-width: 280px;
   padding: 6px;
   border: 1px solid var(--border-subtle);
