@@ -3266,6 +3266,9 @@ function apercuStructureTraduit(msg: Message): string | null {
  * et ne decrit rien.
  */
 function quotedMediaLabel(msg: Message): string {
+  /*
+   * Le vrai nom d'un média chiffré : voir `decrireMessageEnLigneSansIcone`.
+   */
   return decrireMessageEnLigneSansIcone(msg)
 }
 
@@ -3278,9 +3281,18 @@ function decrireMessageEnLigneSansIcone(msg: {
   fileName?: string
   durationMs?: number
   isDeleted?: boolean
+  mediaChiffre?: { nom?: string; mime: string }
 }): string {
+  /*
+   * 🐛 « LE REPLY DES FICHIERS AFFICHE chiffre.bin » (user, 07/10/2026). Pour
+   * le serveur, un média chiffré n'a qu'un nom neutre ; le VRAI nom et le
+   * vrai type sont dans le descripteur. On décrit donc ceux-là — comme
+   * WhatsApp : le nom du document, ou « Photo ».
+   */
+  const d = msg.mediaChiffre
+  const source = d ? { ...msg, fileName: d.nom, mediaMime: d.mime } : msg
   return decrireMessage(
-    { ...msg, content: msg.content ?? "" },
+    { ...source, content: source.content ?? "" },
     (cle: string, params?: Record<string, string | number>) =>
       traduire(langueInitiale(), cle as never, params),
     (m: unknown) => apercuStructureTraduit(m as Message)
