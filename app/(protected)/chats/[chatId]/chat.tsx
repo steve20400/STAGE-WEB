@@ -101,6 +101,11 @@ import {
   uploadMedia,
 } from "../../../../src/services/media-service"
 import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
+import {
+  filChiffre,
+  transfererDepuisLAppareil,
+  transfertParLAppareil,
+} from "../../../../src/services/transfert-appareil"
 import { loadPdfThumbnail, videoPosterUrl } from "../../../../src/services/media-thumbnail"
 import { langueInitiale, traduire, useTranslation } from "../../../../src/i18n"
 import { appareilCourantId } from "../../../../src/services/appareils-service"
@@ -4271,9 +4276,13 @@ function MessageBubble({
                   {isMe && msg.status === "failed" && onReessayer
                     ? menuItem(t("retry"), () => onReessayer(msg))
                     : null}
-                  {/* Ni transfert pour un fil chiffre, ni pour une vue unique : le
-                      serveur refuse les deux. */}
-                  {!msg.chiffre && !msg.vueUnique ? menuItem(t("forward"), () => onForward(msg)) : null}
+                  {/* Pas de transfert pour une vue unique : le serveur le refuse.
+                      Un message CHIFFRÉ se transfère depuis ce navigateur
+                      (07/10/2026, `transfert-appareil.ts`) ; seulement s'il
+                      a de quoi être renvoyé — son texte ou son média. */}
+                  {!msg.vueUnique && (!msg.chiffre || Boolean(msg.content) || Boolean(msg.mediaChiffre))
+                    ? menuItem(t("forward"), () => onForward(msg))
+                    : null}
                   {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
                   {isMe
                     ? menuItem(t("delete_for_all"), () => onDelete(msg, "everyone"), true)
@@ -9293,7 +9302,28 @@ export default function ChatRoomPage() {
           onClose={() => setForwardMsg(null)}
           onForward={async (convIds) => {
             try {
-              const count = await forwardChatMessage(forwardMsg.id, convIds)
+              /*
+               * 🔴 DEUX CHEMINS (07/10/2026). Le serveur recopie la ligne entre
+               * deux fils ordinaires ; dès qu'un fil chiffré est en jeu, c'est
+               * ce navigateur qui renvoie le contenu en clair qu'il a — chiffré
+               * si la cible l'est. Voir `transfert-appareil.ts`.
+               */
+              const source = estChiffree(chatId)
+              const parServeur: string[] = []
+              const parAppareil: string[] = []
+              for (const id of convIds) {
+                const cible = await filChiffre(id)
+                ;(transfertParLAppareil(forwardMsg, source, cible) ? parAppareil : parServeur).push(id)
+              }
+              let count = parServeur.length > 0 ? await forwardChatMessage(forwardMsg.id, parServeur) : 0
+              for (const id of parAppareil) {
+                try {
+                  await transfererDepuisLAppareil(forwardMsg, id)
+                  count++
+                } catch (err) {
+                  console.warn("[transfert] échec vers", id, err)
+                }
+              }
               /*
                * ⚠️ ZÉRO TRANSFERT N'EST PAS UN SUCCÈS. Le serveur écarte les fils
                * chiffrés quand le message porte du texte (il y entrerait en
