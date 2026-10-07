@@ -122,10 +122,10 @@ export function formatAudioDuration(durationMs?: number): string {
  * 413. L'utilisateur payait le transfert d'un fichier qui n'avait aucune chance
  * d'etre accepte, et rien ne le lui disait avant la fin.
  *
- * `MEDIA_MAX_SIZE_MB` cote serveur vaut 50 par defaut (`src/lib/env.ts`). Si tu
+ * `MEDIA_MAX_SIZE_MB` cote serveur vaut 250 par defaut depuis le 07/10/2026 (`src/lib/env.ts`, demande du user ; nginx doit suivre : `client_max_body_size`). Si tu
  * la changes la-bas, change-la ICI : les deux bornes doivent rester egales,
  * sinon l'une des deux ment. Refuser un peu tot vaut mieux que refuser trop
  * tard — un fichier refuse a l'ecran ne coute rien.
  */
-export const TAILLE_MEDIA_MAX_MO = 50
+export const TAILLE_MEDIA_MAX_MO = 250
 export const TAILLE_MEDIA_MAX_OCTETS = TAILLE_MEDIA_MAX_MO * 1024 * 1024
