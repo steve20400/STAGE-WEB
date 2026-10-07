@@ -37,6 +37,8 @@ import MeetingRoomPage from "../app/(protected)/meetings/[meetingId]/meeting-roo
 import DeveloperPage from "../app/(protected)/developer/developer"
 import DeveloperLayout from "../app/(protected)/developer/developer-layout"
 import DeveloperAuthPage from "../app/(public)/developer/auth"
+import PartageRecuPage from "../app/(protected)/partage-recu/partage-recu"
+import { assurerServiceWorker } from "./services/partage-recu"
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -108,6 +110,17 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <ProtectedRoute>
                         <ProtectedLayout>
                           <AiAssistantPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Un partage reçu d'une autre application : « dans quelle discussion ? » */}
+                  <Route
+                    path="/partage-recu"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <PartageRecuPage />
                         </ProtectedLayout>
                       </ProtectedRoute>
                     }
@@ -362,3 +375,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </AppErrorBoundary>
   </React.StrictMode>
 )
+
+/*
+ * Le service worker reçoit les partages des autres applications (07/10/2026) :
+ * il doit exister même sans notifications activées. Après le premier rendu,
+ * pour ne pas retarder l'affichage. Voir `services/partage-recu.ts`.
+ */
+void assurerServiceWorker()

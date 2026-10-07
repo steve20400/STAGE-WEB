@@ -1,0 +1,95 @@
+/* « Envoyer dans Alanya Work » — jetons de thème uniquement. */
+.partage-recu {
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 20px 16px 32px;
+  color: var(--text-primary);
+}
+.partage-recu h1 {
+  margin: 0 0 14px;
+  font-size: 20px;
+}
+.partage-recu h2 {
+  margin: 18px 0 8px;
+  font-size: 15px;
+}
+.partage-recu-resume {
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+.partage-recu-fichiers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.partage-recu-nom {
+  overflow: hidden;
+  font-size: 13px;
+  opacity: 0.8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.partage-recu-texte {
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.partage-recu-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.partage-recu-conv {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.partage-recu-conv:hover,
+.partage-recu-conv:focus-visible {
+  background: var(--bg-surface);
+}
+.partage-recu-initiales {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+.partage-recu-nomconv {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.partage-recu-vide {
+  opacity: 0.8;
+}
+.partage-recu-retour {
+  margin-top: 16px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}

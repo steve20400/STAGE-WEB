@@ -8,6 +8,7 @@ import {
   publishRead,
   publishPinMessage,
   sendDeleteMessage,
+  sendEditMessage,
   sendMessageOverSocket,
   type WsMessagePayload,
 } from "./websocket-service"
@@ -29,6 +30,7 @@ import {
   etatConnu,
   envoyerChiffre,
   lireEtatE2ee,
+  modifierChiffre,
   noteEtatChiffrement,
 } from "./e2ee-fil"
 import { releverEtRanger } from "./e2ee-releve"
@@ -1163,6 +1165,48 @@ export async function applyMessageEditToCache(
     // IndexedDB indisponible (navigation privee, quota) : l'etat React reste
     // juste, seul le cache est en retard. Rien a signaler a l'utilisateur.
   }
+}
+
+/**
+ * MODIFIE un de mes messages texte — web, 07/10/2026 (« tu n'as pas mis la
+ * modification des messages sur le web »).
+ *
+ * Deux chemins, comme le mobile :
+ *   - fil ORDINAIRE : la trame `edit_message` ; le serveur enregistre et
+ *     diffuse `message_edited` à tous — mes autres appareils compris ;
+ *   - fil CHIFFRÉ : le serveur date, et le nouveau texte part dans des
+ *     enveloppes (`modifierChiffre`, cours chapitre 29).
+ *
+ * ⚠️ LE CACHE ET L'ARCHIVE SUIVENT, comme à l'envoi : ce qui est affiché doit
+ * être ce qui est sauvegardé. L'archive garde la date d'ENVOI, pour que le
+ * message restauré reprenne sa place dans le fil.
+ *
+ * Lève si le serveur refuse le chemin chiffré (délai de 2 h dépassé, réseau) :
+ * l'appelant remet l'ancien texte. Le refus du chemin ordinaire arrive, lui,
+ * par une trame `error` — voir `subscribeToRefusMessage`.
+ */
+export async function modifierMessage(
+  chatId: string,
+  messageId: string,
+  texte: string,
+  options: { chiffre: boolean; envoyeLe: Date }
+): Promise<Date> {
+  const maintenant = new Date()
+  if (options.chiffre && estChiffree(chatId)) {
+    const date = (await modifierChiffre(chatId, messageId, texte)) ?? maintenant
+    await applyMessageEditToCache(chatId, messageId, texte, date)
+    archiver({
+      id: messageId,
+      convId: chatId,
+      expediteurId: getMyUserId() ?? "",
+      texte,
+      quand: options.envoyeLe.getTime(),
+    })
+    return date
+  }
+  sendEditMessage(messageId, texte)
+  await applyMessageEditToCache(chatId, messageId, texte, maintenant)
+  return maintenant
 }
 
 /* ----------------- Message epingle ----------------- */

@@ -15,6 +15,7 @@ export function deleteConversation(id: string): Promise<void>
 // ─── Messages ───
 export function upsertMessage(message: any): Promise<void>
 export function rangerClairRecu(message: any): Promise<boolean>
+export function remplacerTexteRange(message: any): Promise<"remplace" | "absent" | "ecarte">
 export function saveBulkMessages(messages: any[]): Promise<void>
 export function getMessagesByConversation(conversationId: string, limit?: number): Promise<any[]>
 export function deleteMessage(id: string): Promise<void>

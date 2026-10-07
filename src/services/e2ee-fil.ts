@@ -297,6 +297,52 @@ export async function envoyerChiffre(
   return message
 }
 
+/**
+ * MODIFIE un message chiffré déjà envoyé — cours, chapitre 29.
+ *
+ * Le serveur n'a pas le texte : il ne peut pas le remplacer. Le nouveau texte
+ * part donc comme un message, dans des ENVELOPPES rattachées au MÊME message,
+ * avec `modifie: true` DANS la charge. Le serveur, lui, ne fait que dater la
+ * modification. Même protocole que le mobile (`E2eeFil.modifier`).
+ *
+ * ⚠️ DANS CET ORDRE : la date d'abord, les enveloppes ensuite. Le
+ * destinataire relève dès la sonnette qui suit le dépôt ; la ligne doit déjà
+ * dire « modifié ». Et si le serveur refuse — délai de 2 h dépassé —, aucune
+ * enveloppe n'est partie.
+ *
+ * Rend la date de modification du serveur.
+ */
+export async function modifierChiffre(
+  convId: string,
+  messageId: string,
+  texte: string,
+): Promise<Date | null> {
+  const destinataireId = await correspondant(convId)
+  const devices = await ouvrirSessions(destinataireId)
+  if (devices.length === 0) {
+    throw new Error("Ce correspondant n'a aucun appareil capable de déchiffrer.")
+  }
+  const r = await apiRequest<{ editedAt?: string }>(
+    `/api/conversations/${encodeURIComponent(convId)}/messages/${encodeURIComponent(messageId)}`,
+    { method: "PATCH", body: { chiffre: true } },
+  )
+  const charge = ecrireCharge(messageId, texte, undefined, { modifie: true })
+  const enveloppes = await chiffrerPour(destinataireId, devices, charge)
+  // Mes autres appareils aussi — même règle, et même tolérance, qu'à l'envoi.
+  const moi = getMyUserId()
+  if (moi && moi !== destinataireId) {
+    try {
+      const miens = await ouvrirSessions(moi, idAppareil())
+      if (miens.length > 0) enveloppes.push(...(await chiffrerPour(moi, miens, charge)))
+    } catch (err) {
+      console.warn("[e2ee] copie de la modification vers mes autres appareils impossible :", err)
+    }
+  }
+  await deposer(convId, enveloppes, messageId)
+  const date = r.editedAt ? new Date(r.editedAt) : null
+  return date && !Number.isNaN(date.getTime()) ? date : null
+}
+
 /* ══════════════════ RECEVOIR ══════════════════ */
 
 /** Un message relevé et déchiffré, prêt à être rangé dans SON fil. */
@@ -316,6 +362,8 @@ export interface ClairRecu {
   reponseA?: string
   /** CONTACT ou LOCATION : `texte` porte alors la fiche JSON. */
   genre?: GenreCharge
+  /** Ce texte REMPLACE celui du message (modification, chapitre 29). */
+  modifie?: boolean
 }
 
 /**
@@ -435,6 +483,7 @@ export async function releverEtDechiffrer(
           ...(charge.media ? { media: charge.media } : {}),
           ...(charge.reponseA ? { reponseA: charge.reponseA } : {}),
           ...(charge.genre ? { genre: charge.genre } : {}),
+          ...(charge.modifie ? { modifie: true } : {}),
         }
         parMessage.set(e.messageId, recu)
         /*

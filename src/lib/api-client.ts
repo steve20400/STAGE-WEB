@@ -23,6 +23,8 @@ export class ApiError extends Error {
 
 interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: BodyInit | object | null
+  /** Envoi de fichier : (octets partis, total), au fil de l'envoi. */
+  onUploadProgress?: (envoyes: number, total: number) => void
 }
 
 /**
@@ -32,8 +34,88 @@ interface ApiRequestOptions extends Omit<RequestInit, "body"> {
  */
 const REQUEST_TIMEOUT_MS = 20_000
 
-/** Un envoi de fichier dure legitimement plus longtemps qu'un appel d'API. */
-const UPLOAD_TIMEOUT_MS = 120_000
+/*
+ * 🐛 UN ENVOI DE FICHIER N'A PLUS DE DURÉE MAXIMALE (signalé par le user le
+ * 07/10/2026 : « l'envoi en taille originale échoue à chaque fois »).
+ *
+ * Il était coupé au bout de 2 minutes, quel que soit son avancement. Au débit
+ * d'une connexion mobile au Cameroun — 1 Mbit/s en montée —, 2 minutes font
+ * 15 Mo : toute vidéo d'origine échouait, et repartait de zéro pour échouer
+ * encore. « L'envoi peut durer une heure » : on ne mesure plus la DURÉE mais
+ * le SILENCE. Tant que des octets partent, on attend ; on n'abandonne que si
+ * plus rien ne bouge.
+ */
+/** Aucun octet parti pendant ce temps : la connexion est morte. */
+const ENVOI_SILENCE_MAX_MS = 5 * 60_000
+/**
+ * Fichier entièrement parti, réponse attendue : le serveur le range dans le
+ * stockage, ce qui prend du temps pour 250 Mo.
+ */
+const ENVOI_REPONSE_MAX_MS = 10 * 60_000
+
+/**
+ * Un envoi de fichier par `XMLHttpRequest` plutôt que `fetch` : seul lui dit,
+ * octet par octet, ce qui est PARTI — c'est ce qui permet de distinguer un
+ * envoi lent d'un envoi mort, et d'afficher sa progression.
+ *
+ * Rend une `Response` comme `fetch`, pour que tout le reste — rejeu après
+ * rafraîchissement du jeton, lecture des erreurs — ne change pas. Une coupure
+ * lève une `ApiError` de statut 0, comme une panne réseau de `fetch` : la file
+ * hors ligne la reconnaît et renverra le fichier au retour du réseau.
+ */
+function envoyerFichier(
+  url: string,
+  headers: Headers,
+  body: FormData,
+  onUploadProgress?: (envoyes: number, total: number) => void,
+  signal?: AbortSignal | null
+): Promise<Response> {
+  return new Promise((resoudre, rejeter) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open("POST", url)
+    headers.forEach((valeur, nom) => xhr.setRequestHeader(nom, valeur))
+
+    let dernierSigne = Date.now()
+    let envoiTermine = false
+    const veille = setInterval(() => {
+      const delai = envoiTermine ? ENVOI_REPONSE_MAX_MS : ENVOI_SILENCE_MAX_MS
+      if (Date.now() - dernierSigne > delai) xhr.abort()
+    }, 10_000)
+    const finir = () => {
+      clearInterval(veille)
+      signal?.removeEventListener("abort", interrompre)
+    }
+    const interrompre = () => xhr.abort()
+    signal?.addEventListener("abort", interrompre)
+
+    xhr.upload.onprogress = (e) => {
+      dernierSigne = Date.now()
+      onUploadProgress?.(e.loaded, e.lengthComputable ? e.total : 0)
+    }
+    xhr.upload.onload = () => {
+      envoiTermine = true
+      dernierSigne = Date.now()
+    }
+    xhr.onload = () => {
+      finir()
+      const sansCorps = [101, 204, 205, 304].includes(xhr.status)
+      resoudre(
+        new Response(sansCorps ? null : xhr.responseText, {
+          status: xhr.status,
+          headers: { "Content-Type": xhr.getResponseHeader("Content-Type") ?? "application/json" },
+        })
+      )
+    }
+    const echec = () => {
+      finir()
+      rejeter(new ApiError(traduire(langueInitiale(), "core_server_unreachable"), 0))
+    }
+    xhr.onerror = echec
+    xhr.onabort = echec
+    xhr.ontimeout = echec
+    xhr.send(body)
+  })
+}
 
 function buildUrl(path: string) {
   if (/^https?:\/\//.test(path)) return path
@@ -224,16 +306,20 @@ async function rawRequest(path: string, options: ApiRequestOptions) {
     headers.set("Accept-Language", langueInitiale())
   }
 
+  if (body instanceof FormData && (options.method ?? "GET").toUpperCase() === "POST") {
+    return envoyerFichier(buildUrl(path), headers, body, options.onUploadProgress, options.signal)
+  }
+
+  const { onUploadProgress: _ignore, ...optionsFetch } = options
+  void _ignore
   try {
     return await fetch(buildUrl(path), {
       credentials: "same-origin",
-      ...options,
+      ...optionsFetch,
       headers,
       body,
       // Apres le spread, pour qu'un signal fourni par l'appelant garde la main.
-      signal:
-        options.signal ??
-        AbortSignal.timeout(body instanceof FormData ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS),
+      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
   } catch (error) {
     // Un depassement de delai arrive ici comme une panne reseau, donc en statut

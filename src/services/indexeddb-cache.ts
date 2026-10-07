@@ -15,6 +15,7 @@ import {
   getConversationById,
   upsertMessage,
   rangerClairRecu,
+  remplacerTexteRange,
   saveBulkMessages,
   getMessagesByConversation,
   deleteMessage,
@@ -103,6 +104,17 @@ export async function cacheMessage(message: CachedMessage): Promise<void> {
  */
 export async function cacheClairRecu(message: CachedMessage): Promise<boolean> {
   return rangerClairRecu(message)
+}
+
+/** Une MODIFICATION reçue : le texte change, la date d'envoi non. */
+export async function cacheModificationRecue(message: {
+  id: string
+  conversationId: string
+  senderId: string
+  content: string
+  editedAt: string
+}): Promise<"remplace" | "absent" | "ecarte"> {
+  return remplacerTexteRange(message)
 }
 
 /** Charge les messages d'une conversation depuis IndexedDB (les plus récents). */

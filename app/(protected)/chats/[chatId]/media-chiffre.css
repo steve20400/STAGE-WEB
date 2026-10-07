@@ -148,53 +148,95 @@
   width: min(260px, 70vw);
   max-width: 100%;
 }
+/*
+ * DOCUMENT — le même cadre qu'un document en clair (07/10/2026) : la première
+ * page en grand, puis une ligne type · nom · taille.
+ *
+ * ⚠️ `width` DEMANDE, `max-width: 100%` BORNE. La bulle se dimensionne sur
+ * son contenu : la carte y apporte ses 300 px, et si la bulle n'en a pas
+ * autant, elle se resserre au lieu de déborder.
+ */
 .mc-document {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: min(220px, 100%);
-  max-width: 280px;
-  padding: 6px;
+  flex-direction: column;
+  width: 300px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: var(--bg-elevated);
-  /* 🐛 `inherit` reprenait le BLANC du texte de ma bulle : nom du fichier
-     blanc sur fond clair, invisible (user, 06/10/2026). La carte a son
-     propre fond, elle prend donc la couleur de texte du thème. */
   color: var(--text-primary);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.mc-doc-apercu {
-  flex: none;
-  width: 44px;
-  height: 56px;
-  object-fit: cover;
-  border-radius: 4px;
-  background: #fff;
+.mc-document.moi {
+  border-color: rgba(255, 255, 255, 0.25);
 }
-.mc-doc-icone {
+.mc-doc-page {
+  display: block;
+  height: 200px;
+  overflow: hidden;
+  background: #fff;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.mc-doc-page img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.mc-doc-ligne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+.mc-doc-type {
+  display: flex;
   flex: none;
-  width: 36px;
-  height: 44px;
-  border-radius: 4px;
-  background: var(--accent-dim);
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
 }
 .mc-doc-texte {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-width: 0;
 }
 .mc-doc-nom {
   overflow: hidden;
+  font-size: 13px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .mc-doc-detail {
-  font-size: 0.82em;
-  opacity: 0.75;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.mc-doc-ouvrir {
+  flex: none;
+  opacity: 0.6;
+}
+.mc-doc-attente {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: mc-tourne 0.9s linear infinite;
 }
 .mc-erreur {
   display: block;

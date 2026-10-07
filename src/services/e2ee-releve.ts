@@ -17,7 +17,7 @@
  * `e2ee-fil.ts`. Les réunir ferait une dépendance circulaire.
  */
 import { releverEtDechiffrer, type ClairRecu } from "./e2ee-fil"
-import { cacheClairRecu } from "./indexeddb-cache"
+import { cacheClairRecu, cacheModificationRecue } from "./indexeddb-cache"
 import { entreeCacheDechiffree } from "./e2ee-entree-cache"
 import { archiver } from "./e2ee-sauvegarde"
 
@@ -51,6 +51,25 @@ async function ranger(recus: ClairRecu[]): Promise<void> {
       // citation dès le rechargement (06/10/2026).
       ...(r.reponseA ? { reponseA: r.reponseA } : {}),
       ...(r.genre ? { genre: r.genre } : {}),
+    }
+    /*
+     * UNE MODIFICATION remplace le texte d'un message déjà rangé, sans le
+     * redater (cours, chapitre 29). Si on n'a encore rien de ce message, on la
+     * range comme un message ordinaire : c'est son texte actuel.
+     */
+    if (r.modifie) {
+      const issue = await cacheModificationRecue({
+        id: r.messageId,
+        conversationId: r.convId,
+        senderId: r.expediteurId,
+        content: r.texte,
+        editedAt: new Date(r.quand).toISOString(),
+      })
+      if (issue === "ecarte") continue
+      if (issue === "remplace") {
+        archiver(clair)
+        continue
+      }
     }
     const range = await cacheClairRecu(entreeCacheDechiffree(clair))
     if (!range) continue

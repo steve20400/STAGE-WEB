@@ -35,11 +35,14 @@ import "./media-chiffre.css"
 export function MediaChiffre({
   d,
   isMe,
+  typeFichier,
   onOuvrirImage,
   onOuvrirDocument,
 }: {
   d: DescripteurMedia
   isMe: boolean
+  /** Pastille du type de document (« PDF », « ZIP »…), la même qu'en clair. */
+  typeFichier?: { color: string; label: string }
   /** Ouvre la photo déchiffrée (adresse `blob:`) dans la galerie. */
   onOuvrirImage: (url: string) => void
   /** Ouvre le document déchiffré (adresse `blob:`) dans la visionneuse. */
@@ -138,40 +141,74 @@ export function MediaChiffre({
     )
   }
 
-  // Document : la carte complète, et un clic pour l'OUVRIR dans la visionneuse
-  // — d'où on le télécharge. Il ne part plus d'office dans les téléchargements.
+  /*
+   * DOCUMENT : LE MÊME CADRE QU'UN DOCUMENT EN CLAIR.
+   *
+   * 🐛 « TU AS RÉDUIT LE CADRE DES DOCUMENTS » (signalé par le user le
+   * 07/10/2026). Dans un fil chiffré, un document n'était qu'une petite carte
+   * — vignette de 44 px, la taille d'un message — quand le même PDF en clair
+   * montre sa première page en grand. Les fils étant désormais chiffrés, tous
+   * les documents avaient « rétréci ». La première page arrive dans
+   * l'enveloppe : on l'affiche en grand, sans rien télécharger.
+   *
+   * 🐛 ET LA CARTE DÉBORDAIT DE MA BULLE sur téléphone : elle réclamait 280 px
+   * quelle que soit la place. Elle demande sa largeur, mais `max-width: 100%`
+   * la borne à la bulle — même règle que la photo.
+   *
+   * Un clic l'OUVRE dans la visionneuse, d'où on le télécharge.
+   */
+  const ouvrirDocument = () => {
+    if (url) {
+      onOuvrirDocument(url)
+      return
+    }
+    if (etat === "chargement") return
+    setEtat("chargement")
+    ouvrirMediaChiffre(d)
+      .then((blob) => {
+        const u = URL.createObjectURL(blob)
+        setUrl(u)
+        setEtat("pret")
+        onOuvrirDocument(u)
+      })
+      .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
+  }
+  const type = typeFichier ?? { color: "#6b7280", label: (d.nom?.split(".").pop() ?? "").slice(0, 4).toUpperCase() || "DOC" }
   return (
     <button
       type="button"
-      className="mc-document"
-      onClick={() => {
-        if (url) {
-          onOuvrirDocument(url)
-          return
-        }
-        if (etat === "chargement") return
-        setEtat("chargement")
-        ouvrirMediaChiffre(d)
-          .then((blob) => {
-            const u = URL.createObjectURL(blob)
-            setUrl(u)
-            setEtat("pret")
-            onOuvrirDocument(u)
-          })
-          .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
-      }}
+      className={`mc-document${isMe ? " moi" : ""}`}
+      onClick={ouvrirDocument}
+      aria-label={d.nom ?? t("file")}
     >
-      {apercu ? (
-        <img src={apercu} alt="" className="mc-doc-apercu" />
-      ) : (
-        <span className="mc-doc-icone" aria-hidden="true" />
-      )}
-      <span className="mc-doc-texte">
-        <span className="mc-doc-nom">{d.nom ?? t("file")}</span>
-        <span className="mc-doc-detail">
-          {[formatBytes(d.taille), d.pages ? `${d.pages} p.` : null].filter(Boolean).join(" · ")}
-          {etat === "chargement" ? ` · ${t("loading")}` : ""}
+      {apercu && (
+        <span className="mc-doc-page">
+          <img src={apercu} alt="" />
         </span>
+      )}
+      <span className="mc-doc-ligne">
+        <span
+          className="mc-doc-type"
+          style={{ color: type.color, background: `${type.color}1f` }}
+          aria-hidden="true"
+        >
+          {type.label}
+        </span>
+        <span className="mc-doc-texte">
+          <span className="mc-doc-nom">{d.nom ?? t("file")}</span>
+          <span className="mc-doc-detail">
+            {[formatBytes(d.taille), d.pages ? `${d.pages} p.` : null].filter(Boolean).join(" · ")}
+          </span>
+        </span>
+        {etat === "chargement" ? (
+          <span className="mc-doc-attente" aria-label={t("loading")} />
+        ) : (
+          <svg className="mc-doc-ouvrir" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        )}
       </span>
     </button>
   )

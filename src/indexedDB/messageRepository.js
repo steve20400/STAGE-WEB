@@ -118,6 +118,40 @@ export const rangerClairRecu = async (message) => {
     return true;
 };
 
+/**
+ * Remplace le texte d'un message déjà rangé — une MODIFICATION reçue dans
+ * une enveloppe (cours, chapitre 29).
+ *
+ * ⚠️ LA DATE D'ENVOI NE BOUGE PAS. `rangerClairRecu` daterait la ligne de
+ * l'enveloppe, c'est-à-dire du moment de la modification : le message
+ * sauterait en bas du fil. On ne touche qu'au texte et à `editedAt`.
+ *
+ * Mêmes gardes que `rangerClairRecu` : la ligne doit être de cet expéditeur
+ * et de ce fil.
+ *
+ * Rend « remplace », « absent » (rien de rangé sous cet identifiant) ou
+ * « ecarte ».
+ */
+export const remplacerTexteRange = async (message) => {
+    const db = await initIndexedDB();
+    const tx = db.transaction('messages', 'readwrite');
+    const existant = await tx.store.get(message.id);
+    if (!existant) {
+        await tx.done;
+        return 'absent';
+    }
+    if (
+        existant.senderId !== message.senderId ||
+        existant.conversationId !== message.conversationId
+    ) {
+        await tx.done;
+        return 'ecarte';
+    }
+    await tx.store.put({ ...existant, content: message.content, editedAt: message.editedAt });
+    await tx.done;
+    return 'remplace';
+};
+
 export const saveBulkMessages = async (messages = []) => {
     if (!messages.length) return;
     const db = await initIndexedDB();

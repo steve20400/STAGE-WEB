@@ -90,11 +90,13 @@ self.addEventListener('notificationclick', (event) => {
   const data = event.notification.data;
   if (!data) return;
 
-  let targetUrl = '/chats';
+  // ⚠️ Relatif à la PORTÉE du service worker : sous /webapp/, une adresse
+  // absolue « /chats » menait à la racine du domaine, hors de l'application.
+  let targetUrl = new URL('chats', self.registration.scope).href;
   if (data.type === 'message' && data.convId) {
-    targetUrl = `/chats/${data.convId}`;
+    targetUrl = new URL(`chats/${data.convId}`, self.registration.scope).href;
   } else if (data.type === 'incoming_call' && data.callId) {
-    targetUrl = `/calls/${data.callId}`;
+    targetUrl = new URL(`calls/${data.callId}`, self.registration.scope).href;
   }
 
   // Cherche si un onglet de l'app est déjà ouvert pour le focus, sinon ouvre une nouvelle fenêtre
@@ -110,4 +112,63 @@ self.addEventListener('notificationclick', (event) => {
       return clients.openWindow(targetUrl);
     })
   );
+});
+
+/*
+ * ══════════════ RECEVOIR UN PARTAGE (07/10/2026) ══════════════
+ *
+ * Demande du user : « quand on est dans WhatsApp et qu'on veut partager un
+ * document, Alanya n'apparaît pas dans la liste des applications ». Le
+ * manifeste déclare désormais la web-app comme CIBLE DE PARTAGE
+ * (`share_target`) : une fois installée sur le téléphone, elle figure dans la
+ * feuille de partage du système, à côté de WhatsApp et de Telegram.
+ *
+ * Le système nous ENVOIE alors le partage : un POST multipart vers
+ * `partage-recu`, avec le texte et les fichiers. Aucun serveur ne doit le
+ * recevoir — les fichiers restent sur le téléphone tant que l'utilisateur n'a
+ * pas choisi une discussion. Ce service worker les range dans le cache du
+ * navigateur, puis renvoie vers la page qui demande « dans quelle discussion ? ».
+ *
+ * ⚠️ RIEN D'AUTRE N'EST INTERCEPTÉ. Toute autre requête passe sans
+ * `respondWith`, donc exactement comme sans service worker : ce fichier sert
+ * d'abord aux notifications, et une erreur ici ne doit rien casser d'autre.
+ */
+const CACHE_PARTAGE = 'alanya-partage-recu';
+
+self.addEventListener('fetch', (event) => {
+  const requete = event.request;
+  if (requete.method !== 'POST') return;
+  const adresse = new URL(requete.url);
+  const cible = new URL('partage-recu', self.registration.scope);
+  if (adresse.origin !== cible.origin || adresse.pathname !== cible.pathname) return;
+
+  event.respondWith((async () => {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    try {
+      const formulaire = await requete.formData();
+      const texte = ['title', 'text', 'url']
+        .map((champ) => formulaire.get(champ))
+        .filter((v) => typeof v === 'string' && v.trim() !== '')
+        .join('\n');
+      const fichiers = formulaire.getAll('fichiers').filter((f) => f instanceof File);
+      const cache = await caches.open(CACHE_PARTAGE);
+      const meta = { id, texte, fichiers: [] };
+      for (let i = 0; i < fichiers.length; i += 1) {
+        const f = fichiers[i];
+        const cle = new URL(`partage-recu/${id}/${i}`, self.registration.scope).href;
+        await cache.put(cle, new Response(f, {
+          headers: { 'Content-Type': f.type || 'application/octet-stream' },
+        }));
+        meta.fichiers.push({ cle, nom: f.name, type: f.type || 'application/octet-stream' });
+      }
+      await cache.put(
+        new URL(`partage-recu/${id}/meta`, self.registration.scope).href,
+        new Response(JSON.stringify(meta), { headers: { 'Content-Type': 'application/json' } })
+      );
+    } catch (erreur) {
+      console.warn('[sw] partage reçu illisible :', erreur);
+    }
+    // 303 : le navigateur suit en GET, la page lit le cache.
+    return Response.redirect(new URL(`partage-recu?id=${id}`, self.registration.scope).href, 303);
+  })());
 });

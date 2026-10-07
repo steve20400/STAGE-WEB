@@ -1192,6 +1192,37 @@ export function sendDeleteMessage(messageId: string, scope: "me" | "everyone") {
   sendRaw({ type: "delete_message", messageId, scope })
 }
 
+/**
+ * Modifie un message EN CLAIR. Le serveur le diffuse à tous les participants
+ * par `message_edited` — y compris à mes autres appareils. Un message chiffré
+ * passe par `modifierChiffre` (`e2ee-fil.ts`).
+ */
+export function sendEditMessage(messageId: string, content: string) {
+  sendRaw({ type: "edit_message", messageId, content })
+}
+
+/**
+ * Le serveur REFUSE une action sur un message : délai dépassé (2 h pour
+ * modifier, 24 h pour supprimer pour tous), fil chiffré…
+ *
+ * ⚠️ L'ÉCRAN A DÉJÀ AFFICHÉ L'ACTION. Sans cet écouteur, la modification
+ * resterait affichée ici et nulle part ailleurs — un message qui dit une chose
+ * à son auteur et une autre à ses lecteurs.
+ */
+export function subscribeToRefusMessage(
+  handler: (refus: { code: string; messageId: string; message?: string }) => void
+): () => void {
+  return addListener((event) => {
+    const e = event as { type?: string; code?: unknown; messageId?: unknown; message?: unknown }
+    if (e.type !== "error" || typeof e.code !== "string" || typeof e.messageId !== "string") return
+    handler({
+      code: e.code,
+      messageId: e.messageId,
+      message: typeof e.message === "string" ? e.message : undefined,
+    })
+  })
+}
+
 /* ----------------- Edition de messages ----------------- */
 
 export interface MessageEditedEvent {

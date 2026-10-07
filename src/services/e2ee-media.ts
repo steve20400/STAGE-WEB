@@ -81,6 +81,11 @@ export interface Charge {
    * CONTACT ou d'une POSITION (06/10/2026). Absent pour un texte ou un média.
    */
   genre?: GenreCharge
+  /**
+   * Ce texte REMPLACE celui du message (modification, cours chapitre 29).
+   * Dans le chiffré : seul l'expéditeur réel peut le poser.
+   */
+  modifie?: boolean
 }
 
 /** Les messages STRUCTURÉS qu'une charge peut porter dans `texte`. */
@@ -90,6 +95,8 @@ export type GenreCharge = "CONTACT" | "LOCATION"
 export interface ExtrasCharge {
   reponseA?: string
   genre?: GenreCharge
+  /** Modification d'un message déjà envoyé — même champ que le mobile. */
+  modifie?: boolean
 }
 
 /**
@@ -115,6 +122,7 @@ export function ecrireCharge(
       ...(media ? { media } : {}),
       ...(extras.reponseA ? { reponseA: extras.reponseA } : {}),
       ...(extras.genre ? { genre: extras.genre } : {}),
+      ...(extras.modifie ? { modifie: true } : {}),
     })
   )
 }
@@ -149,6 +157,7 @@ export function lireCharge(clair: string, messageId: string | null): Charge {
     media?: unknown
     reponseA?: unknown
     genre?: unknown
+    modifie?: unknown
   }
   if (c.v !== 2 || typeof c.id !== "string") throw new ChargeInvalide("charge v2 mal formée")
   if (messageId === null || c.id !== messageId) {
@@ -163,6 +172,7 @@ export function lireCharge(clair: string, messageId: string | null): Charge {
     idAnnonce: c.id,
     ...(typeof c.reponseA === "string" && c.reponseA !== "" ? { reponseA: c.reponseA } : {}),
     ...(genre ? { genre } : {}),
+    ...(c.modifie === true ? { modifie: true } : {}),
   }
 }
 

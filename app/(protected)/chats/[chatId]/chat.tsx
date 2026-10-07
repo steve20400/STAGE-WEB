@@ -10,7 +10,7 @@ import {
   type RefObject,
 } from "react"
 import type { PDFDocumentLoadingTask } from "pdfjs-dist"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   CHAT_COLORS,
   type ChatMessageMock,
@@ -28,6 +28,7 @@ import { useToast } from "../../../../src/components/toast"
 import {
   formatBytes,
   applyMessageEditToCache,
+  modifierMessage,
   deleteChatMessage,
   fetchMessages,
   fetchMessagesCacheFirst,
@@ -55,6 +56,15 @@ import {
   type EtatE2ee,
 } from "../../../../src/services/e2ee-fil"
 import { releverEtRanger } from "../../../../src/services/e2ee-releve"
+import { ApiError } from "../../../../src/lib/api-client"
+import {
+  DELAI_MODIFICATION_DEPASSE,
+  DELAI_SUPPRESSION_DEPASSE,
+  peutEncoreModifier,
+  peutEncoreSupprimerPourTous,
+} from "../../../../src/lib/delais-message"
+import { FenetrePartage } from "./partage"
+import { lirePartageRecu, oublierPartageRecu } from "../../../../src/services/partage-recu"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
   langueSourceDe,
@@ -127,6 +137,7 @@ import {
   subscribeToMessageDeleted,
   subscribeToVueUnique,
   subscribeToMessageEdited,
+  subscribeToRefusMessage,
   subscribeToPresence,
   subscribeToStatus,
   subscribeToMessagePinned,
@@ -1067,6 +1078,8 @@ function fileTypeInfo(filename?: string, mime?: string): { color: string; label:
   if (["ppt", "pptx"].includes(ext) || m.includes("presentation"))
     return { color: "#f97316", label: "PPT" }
   if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { color: "#a855f7", label: "ZIP" }
+  if (ext === "apk" || m === "application/vnd.android.package-archive")
+    return { color: "#16a34a", label: "APK" }
   if (["txt", "csv", "log", "md", "tex", "latex", "bib", "sty"].includes(ext))
     return { color: "#6b7280", label: "TXT" }
   if (
@@ -3669,6 +3682,8 @@ function MessageBubble({
   onOpenGalerie,
   onDelete,
   onForward,
+  onEdit,
+  onShare,
   onReessayer,
   onCopy,
   isGroup,
@@ -3700,6 +3715,14 @@ function MessageBubble({
   onOpenImage: (url: string, name?: string) => void
   onDelete: (m: Message, scope: "me" | "everyone") => void
   onForward: (m: Message) => void
+  /**
+   * « Modifier » — absent quand le message ne se modifie pas (pas à moi, pas
+   * du texte, plus de 2 heures). Le parent décide : lui seul sait si le fil
+   * est chiffré.
+   */
+  onEdit?: (m: Message) => void
+  /** « Partager » : dans Alanya Work ou vers une autre application. */
+  onShare?: (m: Message) => void
   /** « Réessayer » : seulement sur une bulle à moi en échec. */
   onReessayer?: (m: Message) => void
   onCopy: (m: Message) => void
@@ -4238,6 +4261,8 @@ function MessageBubble({
                 >
                   {menuItem(t("reply"), () => onReply(msg))}
                   {msg.content ? menuItem(t("copy"), () => onCopy(msg)) : null}
+                  {/* Deux heures pour modifier (décision du user, 07/10/2026). */}
+                  {onEdit ? menuItem(t("msg_modifier"), () => onEdit(msg)) : null}
                   {/* Toujours proposee quand la traduction se fait a la demande,
                     meme si le bouton sous la bulle ne l'est pas : la detection
                     peut se tromper ou n'exister nulle part, l'action doit rester
@@ -4283,8 +4308,17 @@ function MessageBubble({
                   {!msg.vueUnique && (!msg.chiffre || Boolean(msg.content) || Boolean(msg.mediaChiffre))
                     ? menuItem(t("forward"), () => onForward(msg))
                     : null}
+                  {/* PARTAGER (07/10/2026) : mêmes conditions que le transfert,
+                      dont il propose la voie « Dans Alanya Work ». */}
+                  {onShare &&
+                  !msg.vueUnique &&
+                  (Boolean(msg.content) || Boolean(msg.mediaChiffre) || (!msg.chiffre && Boolean(msg.mediaUrl)))
+                    ? menuItem(t("msg_partager"), () => onShare(msg))
+                    : null}
                   {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
-                  {isMe
+                  {/* Vingt-quatre heures pour supprimer pour tous (07/10/2026) ;
+                      « pour moi » reste possible sans délai. */}
+                  {isMe && peutEncoreSupprimerPourTous(msg.timestamp)
                     ? menuItem(t("delete_for_all"), () => onDelete(msg, "everyone"), true)
                     : null}
                 </div>
@@ -4518,6 +4552,7 @@ function MessageBubble({
                     <MediaChiffre
                       d={msg.mediaChiffre}
                       isMe={isMe}
+                      typeFichier={fileTypeInfo(msg.mediaChiffre.nom, msg.mediaChiffre.mime)}
                       // La galerie ne lit que des adresses : on lui donne la
                       // copie DÉCHIFFRÉE (blob:), jamais le fichier du serveur.
                       onOuvrirImage={(url) => {
@@ -5605,6 +5640,20 @@ export default function ChatRoomPage() {
   const [gallery, setGallery] = useState<{ msgs: Message[]; index: number } | null>(null)
   // Message en cours de transfert (ouvre le selecteur de conversations)
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
+  // Message en cours de PARTAGE (Alanya Work ou autre application).
+  const [partageMsg, setPartageMsg] = useState<Message | null>(null)
+  /*
+   * Message en cours de MODIFICATION : le champ de saisie porte son texte, et
+   * « Envoyer » le remplace au lieu d'écrire un nouveau message.
+   */
+  const [edition, setEdition] = useState<Message | null>(null)
+  /*
+   * Ce que l'écran a déjà affiché et que le serveur peut encore REFUSER — une
+   * horloge d'ordinateur en avance, un délai franchi pendant la saisie. On
+   * garde de quoi revenir en arrière jusqu'à sa confirmation.
+   */
+  const modifsEnAttente = useRef(new Map<string, { content: string; editedAt?: Date }>())
+  const suppressionsEnAttente = useRef(new Map<string, Message>())
   // Enregistrement vocal en cours
   const [recording, setRecording] = useState(false)
   const [recordSec, setRecordSec] = useState(0)
@@ -6121,6 +6170,7 @@ export default function ChatRoomPage() {
     // Abonnement aux suppressions de messages (pour moi / pour tous)
     const unsubscribeDeleted = subscribeToMessageDeleted(chatId, (event) => {
       if (cancelled) return
+      suppressionsEnAttente.current.delete(event.messageId)
       // BANDEAU FANTOME : supprimer un message ne detache pas l'epingle cote
       // serveur — `handleDeleteMessage` ne touche pas `pinnedMessageId`. Sans
       // cette ligne, le bandeau resterait sur un message qui n'existe plus, et
@@ -6152,8 +6202,32 @@ export default function ChatRoomPage() {
     // toujours, et le mobile le traite ; c'est le web qui ne l'ecoutait pas. Un
     // message modifie gardait donc son ancien texte jusqu'a ce qu'on rouvre la
     // conversation — le fameux « il faut rafraichir pour voir la modification ».
+    /*
+     * LE SERVEUR REFUSE une modification ou une suppression que l'écran a
+     * déjà affichée : délai dépassé selon SON horloge. On remet l'état d'avant
+     * et on le dit — sinon le message dirait une chose à son auteur et une
+     * autre à ses lecteurs.
+     */
+    const unsubscribeRefus = subscribeToRefusMessage(({ code, messageId }) => {
+      if (cancelled) return
+      const avant = modifsEnAttente.current.get(messageId)
+      if (avant) {
+        modifsEnAttente.current.delete(messageId)
+        revenirAvantModification(messageId, avant)
+        error(code === DELAI_MODIFICATION_DEPASSE ? t("msg_modif_trop_tard") : t("msg_modif_echec"))
+      }
+      const supprime = suppressionsEnAttente.current.get(messageId)
+      if (supprime) {
+        suppressionsEnAttente.current.delete(messageId)
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? supprime : m)))
+        if (code === DELAI_SUPPRESSION_DEPASSE) error(t("msg_suppr_trop_tard"))
+      }
+    })
+
     const unsubscribeEdited = subscribeToMessageEdited(chatId, (event) => {
       if (cancelled) return
+      // Le serveur a enregistré : plus rien à défaire.
+      modifsEnAttente.current.delete(event.messageId)
 
       // Le cache IndexedDB doit suivre, sinon le cache-first repeint l'ancien
       // texte au rechargement suivant avant que le reseau ne le corrige.
@@ -6217,6 +6291,7 @@ export default function ChatRoomPage() {
       unsubscribeDeleted()
       unsubscribeVueUnique()
       unsubscribeEdited()
+      unsubscribeRefus()
       unsubscribeConnected()
       clearInterval(pollId)
       if (typingTimeoutId) clearTimeout(typingTimeoutId)
@@ -6583,7 +6658,116 @@ export default function ChatRoomPage() {
   )
 
   // Envoi d'un message — POST /api/chats/{chatId}/messages
+  /*
+   * ══════════════ MODIFIER UN MESSAGE (web, 07/10/2026) ══════════════
+   *
+   * 🐛 « Tu n'as pas mis la modification des messages sur le web. » Le web
+   * savait AFFICHER une modification reçue, jamais en faire une. Même geste que
+   * WhatsApp : « Modifier » remplit le champ de saisie, un bandeau dit ce qu'on
+   * modifie, « Envoyer » remplace le texte.
+   *
+   * Règles (décision du user) : mes messages TEXTE seulement, et pendant 2
+   * heures après l'envoi. Dans un fil chiffré, seul un message chiffré se
+   * modifie — un ancien message écrit en clair avant l'activation, le serveur
+   * le refuse : son clair a déjà été reçu tel quel.
+   */
+  const peutModifier = useCallback(
+    (m: Message) =>
+      m.senderId === "me" &&
+      m.type === "text" &&
+      !m.isDeleted &&
+      !m.vueUnique &&
+      !m.id.startsWith("tmp-") &&
+      m.status !== "sending" &&
+      m.status !== "failed" &&
+      Boolean(m.content) &&
+      peutEncoreModifier(m.timestamp) &&
+      (!estChiffree(chatId) || Boolean(m.chiffre)),
+    [chatId]
+  )
+
+  const demarrerModification = useCallback((m: Message) => {
+    setEdition(m)
+    setReplyTo(null)
+    setInput(m.content ?? "")
+    window.setTimeout(() => {
+      const champ = inputRef.current
+      if (!champ) return
+      champ.focus()
+      champ.setSelectionRange(champ.value.length, champ.value.length)
+    }, 0)
+  }, [])
+
+  const annulerModification = useCallback(() => {
+    setEdition(null)
+    setInput("")
+  }, [])
+
+  /** Remet le texte d'avant : le serveur a refusé, ou le réseau a cédé. */
+  const revenirAvantModification = useCallback(
+    (messageId: string, avant: { content: string; editedAt?: Date }) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, content: avant.content, editedAt: avant.editedAt } : m))
+      )
+      void applyMessageEditToCache(chatId, messageId, avant.content, avant.editedAt ?? new Date(0))
+    },
+    [chatId]
+  )
+
+  const validerModification = useCallback(() => {
+    const m = edition
+    const texte = input.trim()
+    if (!m || !texte) return
+    setEdition(null)
+    setInput("")
+    if (texte === (m.content ?? "").trim()) return
+    // Le délai a pu passer pendant la saisie : on ne l'apprend pas du serveur.
+    if (!peutEncoreModifier(m.timestamp)) {
+      error(t("msg_modif_trop_tard"))
+      return
+    }
+    const avant = { content: m.content ?? "", editedAt: m.editedAt }
+    const maintenant = new Date()
+    setMessages((prev) =>
+      prev.map((x) => (x.id === m.id ? { ...x, content: texte, editedAt: maintenant } : x))
+    )
+    // Les traductions sont rangées sous l'empreinte du TEXTE : celle de
+    // l'ancien ne correspond plus à rien d'affiché.
+    if (avant.content) void oublierTraductionsDuTexte(avant.content)
+    clearTimeout(typingTimer.current)
+    publishTyping(chatId, false)
+
+    const chiffre = Boolean(m.chiffre) && estChiffree(chatId)
+    if (!chiffre) modifsEnAttente.current.set(m.id, avant)
+    modifierMessage(chatId, m.id, texte, { chiffre, envoyeLe: m.timestamp })
+      .then((date) => {
+        if (chiffre) {
+          setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, editedAt: date } : x)))
+        }
+      })
+      .catch((err) => {
+        modifsEnAttente.current.delete(m.id)
+        revenirAvantModification(m.id, avant)
+        const code = err instanceof ApiError ? (err.payload as { error?: { code?: string } })?.error?.code : undefined
+        error(code === DELAI_MODIFICATION_DEPASSE ? t("msg_modif_trop_tard") : t("msg_modif_echec"))
+      })
+  }, [edition, input, chatId, error, t, revenirAvantModification])
+
+  // Échap annule la modification, comme il annule une réponse.
+  useEffect(() => {
+    if (!edition) return
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key === "Escape") annulerModification()
+    }
+    document.addEventListener("keydown", surTouche)
+    return () => document.removeEventListener("keydown", surTouche)
+  }, [edition, annulerModification])
+
   const sendMessage = useCallback(() => {
+    if (edition) {
+      validerModification()
+      return
+    }
     const text = input.trim()
     if (!text) return
 
@@ -6617,7 +6801,7 @@ export default function ChatRoomPage() {
     publishTyping(chatId, false)
 
     envoyerEnFond(tempId, text, options)
-  }, [input, replyTo, chatId, envoyerEnFond])
+  }, [input, replyTo, chatId, envoyerEnFond, edition, validerModification])
 
   /** « Réessayer » sur une bulle en échec : même bulle, même texte. */
   const reessayerEnvoi = useCallback(
@@ -7181,7 +7365,15 @@ export default function ChatRoomPage() {
     const files = e.target.files
     if (!files || files.length === 0) return
     setShowAttach(false)
-    const toSend = Array.from(files)
+    await preparerFichiers(Array.from(files))
+    e.target.value = ""
+  }
+
+  /**
+   * Prépare des fichiers pour l'écran d'envoi — qu'ils viennent du sélecteur
+   * ou d'un PARTAGE reçu d'une autre application (07/10/2026).
+   */
+  const preparerFichiers = async (toSend: File[]) => {
     /*
      * 🔴 UNE VIDÉO TROP LOURDE PASSE SI ELLE SERA COMPRESSÉE (06/10/2026).
      * La limite du serveur porte sur ce qui PART : une vidéo de 70 Mo en
@@ -7261,8 +7453,44 @@ export default function ChatRoomPage() {
       setPendingMedia(prepared)
       setPendingIndex(0)
     }
-    e.target.value = ""
   }
+
+  /*
+   * UN PARTAGE REÇU arrive ici par `?partage=<id>`, après le choix de la
+   * discussion (`partage-recu.tsx`). Les fichiers ouvrent l'écran d'envoi
+   * ordinaire ; un texte se pose dans le champ. Rien ne part sans un geste.
+   * Le paramètre est retiré aussitôt : revenir en arrière ne doit pas
+   * proposer une seconde fois le même partage.
+   */
+  const [parametres, setParametres] = useSearchParams()
+  const partageId = parametres.get("partage")
+  useEffect(() => {
+    if (!partageId) return
+    setParametres(
+      (p) => {
+        p.delete("partage")
+        return p
+      },
+      { replace: true }
+    )
+    void lirePartageRecu(partageId).then(async (recu) => {
+      if (!recu) return
+      if (recu.fichiers.length > 0) {
+        await preparerFichiers(recu.fichiers)
+        // Avec des fichiers, le texte partagé devient la LÉGENDE du premier,
+        // comme sur WhatsApp ; seul, il se pose dans le champ.
+        if (recu.texte) {
+          setPendingMedia((liste) =>
+            liste.map((item, i) => (i === 0 && !item.caption ? { ...item, caption: recu.texte } : item))
+          )
+        }
+      } else if (recu.texte) {
+        setInput((avant) => (avant ? `${avant}\n${recu.texte}` : recu.texte))
+      }
+      void oublierPartageRecu(partageId)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partageId])
 
   /** Libere les apercus locaux : ils ne servent qu'a l'ecran de confirmation. */
   const closeMediaComposer = useCallback(() => {
@@ -7410,6 +7638,14 @@ export default function ChatRoomPage() {
   }
 
   const handleDelete = (msg: Message, scope: "me" | "everyone") => {
+    // Vingt-quatre heures pour supprimer pour tous (décision du user,
+    // 07/10/2026). Le menu ne le propose plus au-delà ; le délai a pu passer
+    // pendant qu'il était ouvert.
+    if (scope === "everyone" && !peutEncoreSupprimerPourTous(msg.timestamp)) {
+      error(t("msg_suppr_trop_tard"))
+      return
+    }
+    if (scope === "everyone") suppressionsEnAttente.current.set(msg.id, msg)
     deleteChatMessage(msg.id, scope)
     // Meme raison que dans l'abonnement a `message_deleted` : le contenu n'est
     // encore lisible qu'avant la mise a jour optimiste.
@@ -8432,6 +8668,7 @@ export default function ChatRoomPage() {
                         })
                       }}
                       onForward={setForwardMsg}
+                      onShare={setPartageMsg}
                       onReessayer={reessayerEnvoi}
                       onCopy={handleCopy}
                       isGroup={chat?.isGroup}
@@ -8524,6 +8761,8 @@ export default function ChatRoomPage() {
                     onOpenGalerie={(msgs, index) => setGallery({ msgs, index })}
                     onDelete={handleDelete}
                     onForward={setForwardMsg}
+                    onShare={setPartageMsg}
+                    onEdit={peutModifier(msg) ? demarrerModification : undefined}
                     onReessayer={reessayerEnvoi}
                     onCopy={handleCopy}
                     isGroup={chat?.isGroup}
@@ -8656,6 +8895,47 @@ export default function ChatRoomPage() {
           </div>
         )}
       </div>
+
+      {edition && (
+        <div className="reply-bar">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" />
+          </svg>
+          <div className="reply-bar-content">
+            <div className="reply-bar-label">{t("msg_modification_en_cours")}</div>
+            <div className="reply-bar-txt">{sansMarqueurs(edition.content ?? "")}</div>
+          </div>
+          <button
+            className="reply-cancel"
+            onClick={annulerModification}
+            aria-label={t("msg_annuler_modification")}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {replyTo && (
         <div className="reply-bar">
@@ -9294,6 +9574,24 @@ export default function ChatRoomPage() {
 
       {lightbox && (
         <ImageLightbox url={lightbox.url} name={lightbox.name} onClose={() => setLightbox(null)} />
+      )}
+
+      {/* Partager : dans Alanya Work (le transfert) ou vers une autre application. */}
+      {partageMsg && (
+        <FenetrePartage
+          msg={{
+            type: partageMsg.type,
+            content: partageMsg.content,
+            mediaUrl: partageMsg.mediaUrl,
+            mediaMime: partageMsg.mediaMime,
+            fileName: partageMsg.fileName,
+            mediaChiffre: partageMsg.mediaChiffre,
+          }}
+          onFermer={() => setPartageMsg(null)}
+          onDansAlanya={() => setForwardMsg(partageMsg)}
+          onInfo={(texte) => info(texte)}
+          onErreur={(texte) => error(texte)}
+        />
       )}
 
       {/* Selecteur de conversations pour le transfert */}

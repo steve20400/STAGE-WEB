@@ -18,5 +18,23 @@
   "theme_color": "#0B141A",
   "display": "standalone",
   "orientation": "portrait",
-  "gcm_sender_id": "103953800507"
+  "gcm_sender_id": "103953800507",
+  "share_target": {
+    "action": "partage-recu",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "fichiers",
+          "accept": [
+            "*/*"
+          ]
+        }
+      ]
+    }
+  }
 }
