@@ -24,9 +24,11 @@ import {
 import {
   RAISON_EVICTION,
   disconnectRealtime,
+  subscribeToMembreParti,
   subscribeToSessionRevoked,
   subscribeToWsConnected,
 } from "../services/websocket-service"
+import { oublierTrousseau } from "../services/e2ee-groupe-fil"
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
 import { oublierCetAppareil, preparerCetAppareil } from "../services/e2ee-service"
@@ -165,9 +167,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      */
     const stopWs = subscribeToWsConnected(drain)
 
+    /*
+     * Parti ou exclu d'un groupe chiffré : on oublie sa clé, ici même, quel
+     * que soit l'écran ouvert (lot 4, chapitre 34).
+     */
+    const stopParti = subscribeToMembreParti((convId) => {
+      void oublierTrousseau(convId).catch(() => undefined)
+    })
+
     return () => {
       window.removeEventListener("online", drain)
       stopWs()
+      stopParti()
     }
   }, [user])
 

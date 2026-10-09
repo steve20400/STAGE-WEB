@@ -34,12 +34,20 @@ import {
   noteEtatChiffrement,
 } from "./e2ee-fil"
 import { releverEtRanger } from "./e2ee-releve"
+import { lireMessageGroupe, type ChiffreGroupe } from "./e2ee-groupe-fil"
+import { entreeCacheDechiffree } from "./e2ee-entree-cache"
+import { cacheClairRecu, cacheModificationRecue } from "./indexeddb-cache"
 import { archiver } from "./e2ee-sauvegarde"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
   /** Le serveur le deduit de l existence d une enveloppe chiffree. */
   chiffre?: boolean
+  /**
+   * Le chiffré d'un message de GROUPE chiffré (lot 4, chapitre 34) : un seul
+   * pour tous les membres, rendu avec chaque message, jamais consommé.
+   */
+  groupe?: ChiffreGroupe
   id: string
   convId: string
   senderId: string // UUID de l'expediteur
@@ -87,6 +95,63 @@ export interface BackendMessage {
     sizeBytes: number
     durationMs: number | null
   }>
+}
+
+/**
+ * Ouvre les messages de GROUPE chiffrés d'une page, et range leur clair.
+ *
+ * 🔴 À LA DIFFÉRENCE DU TÊTE-À-TÊTE, RIEN NE SE CONSOMME : le chiffré reste
+ * sur le serveur et se relit à chaque chargement, avec le trousseau du coffre.
+ * Le cache n'est donc pas la seule copie — il sert à l'affichage immédiat et
+ * hors ligne, comme pour un message en clair.
+ *
+ * ⚠️ UN ÉCHEC LAISSE LA BULLE VIDE (clé pas encore reçue, signature refusée) :
+ * l'écran affiche « indisponible sur cet appareil ». Jamais de texte deviné.
+ *
+ * Rend les identifiants ouverts : le rapprochement par le cache, plus bas, ne
+ * doit pas les écraser par une version plus ancienne (message modifié).
+ */
+async function eclairerGroupe(
+  chatId: string,
+  backend: BackendMessage[],
+  messages: ChatMessageMock[],
+): Promise<Set<string>> {
+  const ouverts = new Set<string>()
+  const parId = new Map(messages.map((m) => [m.id, m]))
+  for (const b of backend) {
+    if (!b.groupe || b.deletedAt) continue
+    const m = parId.get(b.id)
+    if (!m) continue
+    const r = await lireMessageGroupe(chatId, b.id, b.senderId, b.groupe)
+    if (typeof r === "string") continue
+    m.content = r.texte
+    if (r.media) m.mediaChiffre = r.media
+    ouverts.add(b.id)
+    const quand = b.createdAt ? new Date(b.createdAt).getTime() : Date.now()
+    if (r.modifie) {
+      void cacheModificationRecue({
+        id: b.id,
+        conversationId: chatId,
+        senderId: b.senderId,
+        content: r.texte,
+        editedAt: b.editedAt ?? new Date(quand).toISOString(),
+      }).catch(() => undefined)
+    } else {
+      void cacheClairRecu(
+        entreeCacheDechiffree({
+          id: b.id,
+          convId: chatId,
+          expediteurId: b.senderId,
+          texte: r.texte,
+          quand,
+          ...(r.media ? { media: r.media } : {}),
+          ...(r.reponseA ? { reponseA: r.reponseA } : {}),
+          ...(r.genre ? { genre: r.genre } : {}),
+        }),
+      ).catch(() => undefined)
+    }
+  }
+  return ouverts
 }
 
 interface ListMessagesResponse {
@@ -322,7 +387,9 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
   if (estChiffree(chatId)) {
     // ⚠️ `releverEtRanger` et non `releverEtDechiffrer` : ce qui est relevé
     // pour les AUTRES fils y est rangé aussi — voir `e2ee-releve.ts`.
+    // ⚠️ AVANT les messages de groupe : la relève peut apporter le trousseau.
     const clairs = await releverEtRanger()
+    const ouvertsGroupe = await eclairerGroupe(chatId, backendMessages, messages)
 
     /*
      * 🐛 LES MESSAGES QUE J'AI ÉCRITS REVENAIENT VIDES.
@@ -361,6 +428,7 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
     }
 
     for (const m of messages) {
+      if (ouvertsGroupe.has(m.id)) continue
       const recu = chargePour(clairs, m.id, m.senderId, chatId)
       const cache = m.chiffre ? enCache.get(m.id) : undefined
       const clair = recu?.texte ?? cache?.texte
@@ -410,7 +478,10 @@ export async function fetchOlderMessages(
 
   cacheBackendMessages(backendMessages)
 
-  return backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
+  const messages = backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
+  // Les messages de groupe chiffrés se relisent à chaque page (lot 4).
+  if (estChiffree(chatId)) await eclairerGroupe(chatId, backendMessages, messages)
+  return messages
 }
 
 /**

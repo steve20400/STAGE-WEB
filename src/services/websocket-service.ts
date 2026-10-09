@@ -530,6 +530,19 @@ export function subscribeToToutesArriveesE2ee(
 }
 
 /**
+ * Ce compte a quitté un groupe CHIFFRÉ, ou en a été exclu (lot 2, 09/10/2026).
+ *
+ * Le serveur a déjà effacé sa copie du trousseau ; ce verbe dit à CET
+ * appareil d'effacer la sienne. Les messages déjà lus restent dans le cache,
+ * comme sur WhatsApp (décision du user).
+ */
+export function subscribeToMembreParti(handler: (convId: string) => void): () => void {
+  return addListener((event) => {
+    if (event.type === "e2ee_membre_parti" && typeof event.convId === "string") handler(event.convId)
+  })
+}
+
+/**
  * S'abonne a TOUS les nouveaux messages (toutes conversations).
  * Utilise par la liste des conversations et le dashboard pour se rafraichir en direct.
  */

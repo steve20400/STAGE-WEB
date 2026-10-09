@@ -8,6 +8,7 @@ import { entreeCacheDechiffree, typeDuMessage } from "./e2ee-entree-cache"
 import { cacheMessage } from "./indexeddb-cache"
 import { archiver } from "./e2ee-sauvegarde"
 import { garderClair } from "./e2ee-media-ouverture"
+import { envoyerDansGroupe, estGroupe } from "./e2ee-groupe-fil"
 
 /**
  * ENVOYER UN MÉDIA CHIFFRÉ DE BOUT EN BOUT — cours, chapitre 24 (lot B).
@@ -35,9 +36,15 @@ export async function envoyerMediaChiffre(
   fichier: Blob,
   o: { nom: string; mime: string; dureeMs?: number; legende?: string; replyToId?: string },
 ): Promise<{ id: string; createdAt: string; descripteur: DescripteurMedia }> {
-  const destinataire = await correspondant(convId)
-  const appareils = await ouvrirSessions(destinataire)
-  if (appareils.length === 0) {
+  /*
+   * 🔴 EN GROUPE (lot 4, chapitre 34) : le fichier est chiffré UNE fois avec
+   * sa propre clé, comme à deux ; seul le descripteur (clé, empreinte, aperçu)
+   * part dans le message de groupe, chiffré pour tous avec la clé du groupe.
+   */
+  const groupe = await estGroupe(convId)
+  const destinataire = groupe ? null : await correspondant(convId)
+  const appareils = destinataire ? await ouvrirSessions(destinataire) : []
+  if (destinataire && appareils.length === 0) {
     throw new Error("Ce correspondant n'a aucun appareil capable de déchiffrer.")
   }
 
@@ -62,6 +69,30 @@ export async function envoyerMediaChiffre(
     ...apercu,
   }
 
+  const legende = o.legende ?? ""
+  const moi = getMyUserId()
+
+  // 4-5 (groupe). La ligne et son chiffré, en un seul envoi.
+  if (groupe || !destinataire) {
+    const cree = await envoyerDansGroupe(convId, legende, {
+      media: descripteur,
+      replyToId: o.replyToId,
+      type: typeDuMessage(descripteur),
+    })
+    const entree = {
+      id: cree.id,
+      convId,
+      expediteurId: moi ?? "",
+      texte: legende,
+      quand: new Date(cree.createdAt).getTime() || Date.now(),
+      media: descripteur,
+      ...(o.replyToId ? { reponseA: o.replyToId } : {}),
+    }
+    await cacheMessage(entreeCacheDechiffree(entree)).catch(() => undefined)
+    await garderClair(descripteur.id, new Blob([clair as Uint8Array<ArrayBuffer>], { type: o.mime }))
+    return { id: cree.id, createdAt: cree.createdAt, descripteur }
+  }
+
   // 4. La ligne du message : aucun contenu, le type seulement.
   const message = await apiRequest<{ id: string; createdAt: string }>(
     `/api/conversations/${encodeURIComponent(convId)}/messages`,
@@ -77,10 +108,8 @@ export async function envoyerMediaChiffre(
   )
 
   // 5. Les enveloppes.
-  const legende = o.legende ?? ""
   const charge = ecrireCharge(message.id, legende, descripteur, { reponseA: o.replyToId })
   const enveloppes = await chiffrerPour(destinataire, appareils, charge)
-  const moi = getMyUserId()
   if (moi && moi !== destinataire) {
     try {
       const miens = await ouvrirSessions(moi, idAppareil())

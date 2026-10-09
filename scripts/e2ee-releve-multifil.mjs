@@ -296,10 +296,12 @@ async function main() {
     await afficheLeTexte(B.page, texteAlice),
   );
 
-  titre("⑦ « Transférer » n'est pas proposé sur un message chiffré");
+  titre("⑦ « Transférer » est proposé, y compris sur un message chiffré");
   /*
-   * Le serveur recopie `content` pour transférer, et un message chiffré n'en a
-   * pas : bulle vide chez le destinataire. Le menu ne doit plus le proposer.
+   * ⚠️ RÈGLE CHANGÉE LE 07/10/2026 (`647126a`). Avant, le serveur recopiait
+   * `content` pour transférer — vide pour un message chiffré —, et le menu ne
+   * le proposait pas. Depuis, le NAVIGATEUR renvoie le clair qu'il a déchiffré
+   * (`transfert-appareil.ts`) : le transfert est proposé partout.
    *
    * ⚠️ TÉMOIN DANS LE MÊME FIL : un message SANS enveloppe (donc non chiffré)
    * garde « Transférer ». Sans lui, un menu cassé passerait ce contrôle.
@@ -338,9 +340,8 @@ async function main() {
 
   verifie("témoin : proposé sur un message non chiffré", await afficheLeTexte(B.page, texteTemoin) && (await proposeTransferer(texteTemoin)));
   verifie(
-    "absent sur le message chiffré d'Alice",
-    !(await proposeTransferer(texteAlice)),
-    "transférer produirait une bulle vide chez le destinataire",
+    "proposé aussi sur le message chiffré d'Alice (transfert par le navigateur)",
+    await proposeTransferer(texteAlice),
   );
 
   titre("⑧ Une session sert plus d'un message");

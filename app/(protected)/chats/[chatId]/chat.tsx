@@ -8181,16 +8181,26 @@ export default function ChatRoomPage() {
                         : t("e2ee_actif_definitif")
                       : t("e2ee_bouton")
                   }
-                  disabled={e2eeEnCours || (!e2ee.e2eeActif && !e2ee.activable)}
+                  /*
+                   * ⚠️ UN GROUPE NE S'ACTIVE PAS ENCORE D'ICI (09/10/2026). Le
+                   * serveur l'accepte depuis le lot 2, mais l'activation doit
+                   * tirer la clé et la distribuer à chaque appareil : c'est le
+                   * lot 5. D'ici là, le bouton reste inerte et le dit.
+                   */
+                  disabled={
+                    e2eeEnCours || (!e2ee.e2eeActif && (!e2ee.activable || e2ee.groupe === true))
+                  }
                   title={
                     e2ee.e2eeActif
                       ? peerIdPourCle !== null
                         ? t("e2ee_actif_definitif_verif")
                         : t("e2ee_actif_definitif")
-                      : e2ee.motif === "HORS_PERIMETRE"
-                        ? t("e2ee_hors_perimetre")
-                        : e2ee.motif === "GROUPE_NON_SUPPORTE"
-                          ? t("e2ee_groupe")
+                      : e2ee.groupe === true
+                        ? t("e2ee_groupe")
+                        : e2ee.motif === "HORS_PERIMETRE"
+                          ? t("e2ee_hors_perimetre")
+                          : e2ee.motif === "EMETTEUR_API"
+                            ? t("e2ee_emetteur_api")
                           : e2ee.motif === "CLES_MANQUANTES"
                             ? t("e2ee_cles_manquantes")
                             : t("e2ee_activer")

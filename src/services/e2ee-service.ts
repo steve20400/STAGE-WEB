@@ -532,6 +532,33 @@ async function ouvrirDepuisPaquets(userId: string, paquets: PaquetRecu[]): Promi
   return ouverts
 }
 
+/* ══════════════════ L'IDENTITÉ, POUR LES GROUPES ══════════════════ */
+
+/**
+ * La paire d'identité de cet appareil : la privée SIGNE les messages de groupe
+ * (cours, chapitre 32), la publique est celle que les membres connaissent.
+ */
+export async function maPaireIdentite(): Promise<{ pub: Uint8Array; priv: Uint8Array }> {
+  await ouvrirCoffre()
+  const paire = await coffre.getIdentityKeyPair()
+  if (!paire) throw new Error("Cet appareil n'a pas encore d'identité de chiffrement.")
+  return { pub: new Uint8Array(paire.pubKey), priv: new Uint8Array(paire.privKey) }
+}
+
+/**
+ * La clé d'identité DÉJÀ CONNUE d'un appareil, celle retenue à l'ouverture de
+ * la session à deux. `undefined` si on ne l'a jamais rencontré.
+ *
+ * ⚠️ NE DEMANDE RIEN AU SERVEUR, et c'est tout son intérêt : vérifier une
+ * signature avec une clé que le serveur servirait pour l'occasion ne
+ * prouverait rien (chapitre 32).
+ */
+export async function identiteConnue(userId: string, deviceId: number): Promise<Uint8Array | undefined> {
+  await ouvrirCoffre()
+  const cle = await coffre.loadIdentityKey(new SignalProtocolAddress(userId, deviceId).toString())
+  return cle ? new Uint8Array(cle) : undefined
+}
+
 /* ══════════════════ CHIFFRER / DÉCHIFFRER ══════════════════ */
 
 export interface EnveloppeSortante {

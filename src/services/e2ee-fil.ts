@@ -3,6 +3,14 @@ import { getMyUserId } from "../data/session-user"
 import { identitesChangees as identitesChangeesInternes } from "./e2ee-store"
 import { ouvrirCoffre } from "./coffre-chiffre"
 import { ecrireCharge, lireCharge, type DescripteurMedia, type GenreCharge } from "./e2ee-media"
+import { estChargeTrousseau } from "./e2ee-groupe"
+import {
+  envoyerDansGroupe,
+  estGroupe,
+  modifierDansGroupe,
+  noteGroupe,
+  recevoirTrousseau,
+} from "./e2ee-groupe-fil"
 import {
   chiffrerPour,
   idAppareil,
@@ -142,8 +150,12 @@ export function estChiffree(convId: string): boolean {
 export interface EtatE2ee {
   e2eeActif: boolean
   activable: boolean
-  motif: "HORS_PERIMETRE" | "GROUPE_NON_SUPPORTE" | "CLES_MANQUANTES" | null
+  motif: "HORS_PERIMETRE" | "EMETTEUR_API" | "CLES_MANQUANTES" | null
   sansCles: string[]
+  /** Depuis le lot 2 (09/10/2026) : groupe, version courante, et qui active. */
+  groupe?: boolean
+  cleVersion?: number
+  jePeuxActiver?: boolean
 }
 
 export async function lireEtatE2ee(convId: string): Promise<EtatE2ee> {
@@ -152,6 +164,7 @@ export async function lireEtatE2ee(convId: string): Promise<EtatE2ee> {
     { cache: "no-store" },
   )
   noteEtatChiffrement(convId, r.e2eeActif)
+  if (typeof r.groupe === "boolean") noteGroupe(convId, r.groupe)
   return r
 }
 
@@ -218,6 +231,12 @@ export async function envoyerChiffre(
    */
   options: { genre?: GenreCharge; replyToId?: string } = {},
 ): Promise<MessageCree> {
+  /*
+   * 🔴 UN GROUPE PREND SON PROPRE CHEMIN (lot 4, cours chapitre 34) : un seul
+   * chiffré, signé, envoyé avec la ligne — pas d'enveloppes par appareil.
+   */
+  if (await estGroupe(convId)) return envoyerDansGroupe(convId, texte, options)
+
   const destinataireId = await correspondant(convId)
 
   /*
@@ -317,6 +336,9 @@ export async function modifierChiffre(
   messageId: string,
   texte: string,
 ): Promise<Date | null> {
+  // Groupe : le nouveau chiffré remplace l'ancien sur le serveur.
+  if (await estGroupe(convId)) return modifierDansGroupe(convId, messageId, texte)
+
   const destinataireId = await correspondant(convId)
   const devices = await ouvrirSessions(destinataireId)
   if (devices.length === 0) {
@@ -466,6 +488,15 @@ export async function releverEtDechiffrer(
   for (const e of recues) {
     try {
       const clair = await dechiffrer(e)
+      /*
+       * 🔴 UN TROUSSEAU DE GROUPE, HORS FIL (lot 4). Contrôlé puis rangé dans
+       * le coffre AVANT l'acquittement : c'est la seule copie de ces clés
+       * que cet appareil recevra. Refusé (pas un administrateur, clé déjà
+       * connue autrement), il tombe dans le `catch` : acquitté, ignoré.
+       */
+      if (!e.messageId && estChargeTrousseau(clair)) {
+        await recevoirTrousseau(e.convId, e.expediteurId, clair)
+      }
       if (e.messageId) {
         /*
          * 🔴 LA CHARGE EST LUE ICI, ET VÉRIFIÉE (cours, chapitre 23). Un texte
