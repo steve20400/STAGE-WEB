@@ -134,6 +134,7 @@ import {
   subscribeToConversation,
   subscribeToDistribue,
   subscribeToE2eeArrivee,
+  subscribeToTrousseau,
   subscribeToMessageDeleted,
   subscribeToVueUnique,
   subscribeToMessageEdited,
@@ -5183,7 +5184,8 @@ function MessageBubble({
                           fontSize: "0.86em",
                         }}
                       >
-                        {t("e2ee_indisponible")}
+                        {/* Groupe : la clé arrive (lot 7) — ce n'est pas une perte. */}
+                        {msg.attenteCle ? t("e2ee_attente_cle_groupe") : t("e2ee_indisponible")}
                       </span>
                     )}
 
@@ -5929,6 +5931,15 @@ export default function ChatRoomPage() {
      * dont le message arrive, seulement le MOMENT : maintenant, au lieu de
      * quand la personne veut bien agir.
      */
+    /*
+     * La clé de CE groupe vient d'arriver (lot 7) : les bulles « en attente de
+     * la clé » se rouvrent sans qu'on ait à quitter le fil.
+     */
+    const unsubscribeTrousseau = subscribeToTrousseau((convId) => {
+      if (cancelled || convId !== chatId) return
+      void refreshMessages().catch(() => undefined)
+    })
+
     const unsubscribeSonnette = subscribeToE2eeArrivee(chatId, () => {
       if (cancelled) return
       void refreshMessages()
@@ -6284,6 +6295,7 @@ export default function ChatRoomPage() {
       cancelled = true
       unsubscribeMessages()
       unsubscribeSonnette()
+      unsubscribeTrousseau()
       unsubscribeTyping()
       unsubscribeStatus()
       unsubscribeDistribue()

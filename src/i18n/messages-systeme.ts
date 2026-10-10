@@ -82,6 +82,13 @@ export function composerMessageSysteme(
       // Un depart volontaire ne nomme personne d'autre : pas d'auteur.
       return t("system_member_left").replace("{target}", texte(charge.target))
 
+    // Groupes chiffres (lot 7, chapitre 36).
+    case "e2ee_active":
+      return t("system_e2ee_active").replace("{actor}", texte(charge.actor))
+
+    case "e2ee_cle_changee":
+      return t("system_e2ee_cle_changee").replace("{actor}", texte(charge.actor))
+
     default:
       // Code inconnu — client plus ancien que le serveur. On n'invente pas de
       // phrase : on ne montre rien plutot qu'un JSON brut.

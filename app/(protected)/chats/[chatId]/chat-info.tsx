@@ -25,6 +25,7 @@ import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { getMyUserId } from "../../../../src/data/session-user"
 import { estChiffree } from "../../../../src/services/e2ee-fil"
 import { changerCle } from "../../../../src/services/e2ee-groupe-admin"
+import { E2eeVerification } from "./e2ee-verification"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
 import {
   LANGUAGE_CODES,
@@ -261,6 +262,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const { t, language: langueLecture } = useTranslation()
   const [members, setMembers] = useState<Member[]>(conv.members)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+  /*
+   * VÉRIFIER UN MEMBRE D'UN GROUPE CHIFFRÉ (lot 7) : le même écran qu'en
+   * tête-à-tête, avec ce membre. C'est la seule parade contre un appareil
+   * glissé par le serveur dans le compte d'un membre (chapitre 31).
+   */
+  const [membreAVerifier, setMembreAVerifier] = useState<{ id: string; name: string } | null>(null)
   const [showAddMember, setShowAddMember] = useState(false)
 
   const color = COLORS[conv.color]
@@ -969,6 +976,30 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                           compact
                         />
                       )}
+                      {!isMe && conv.isGroup && estChiffree(conv.id) && (
+                        <div className="m-actions">
+                          <button
+                            className="m-action"
+                            title={t("e2ee_verifier_membre")}
+                            aria-label={t("e2ee_verifier_membre")}
+                            onClick={() => setMembreAVerifier({ id: member.id, name: member.name })}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                              <path d="M9 12l2 2 4-4" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
                       {!isMe && isAdmin && (
                         <div className="m-actions">
                           {member.role !== "admin" && (
@@ -1272,6 +1303,13 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
         </div>
       </div>
 
+      {membreAVerifier && (
+        <E2eeVerification
+          peerUserId={membreAVerifier.id}
+          peerName={membreAVerifier.name}
+          onClose={() => setMembreAVerifier(null)}
+        />
+      )}
       {pendingAction && (
         <div className="cip-confirm-overlay" onClick={() => setPendingAction(null)}>
           <div

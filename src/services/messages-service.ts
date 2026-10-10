@@ -123,7 +123,10 @@ async function eclairerGroupe(
     const m = parId.get(b.id)
     if (!m) continue
     const r = await lireMessageGroupe(chatId, b.id, b.senderId, b.groupe)
-    if (typeof r === "string") continue
+    if (typeof r === "string") {
+      if (r === "CLE_ABSENTE") m.attenteCle = true
+      continue
+    }
     m.content = r.texte
     if (r.media) m.mediaChiffre = r.media
     ouverts.add(b.id)

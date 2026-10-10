@@ -25,10 +25,12 @@ import {
   RAISON_EVICTION,
   disconnectRealtime,
   subscribeToMembreParti,
+  subscribeToTrousseau,
   subscribeToSessionRevoked,
   subscribeToWsConnected,
 } from "../services/websocket-service"
 import { oublierTrousseau } from "../services/e2ee-groupe-fil"
+import { releverEtRanger } from "../services/e2ee-releve"
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
 import { oublierCetAppareil, preparerCetAppareil } from "../services/e2ee-service"
@@ -175,10 +177,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void oublierTrousseau(convId).catch(() => undefined)
     })
 
+    // Une clé de groupe m'attend : relevée tout de suite, écran ouvert ou non.
+    const stopTrousseau = subscribeToTrousseau(() => {
+      void releverEtRanger().catch(() => undefined)
+    })
+
     return () => {
       window.removeEventListener("online", drain)
       stopWs()
       stopParti()
+      stopTrousseau()
     }
   }, [user])
 

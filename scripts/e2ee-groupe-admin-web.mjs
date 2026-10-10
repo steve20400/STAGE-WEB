@@ -11,6 +11,8 @@
  *   ④ EXCLUSION de Carole : version 2, distribuée aux restants seulement ;
  *     Carole oublie la clé ; le message suivant est en version 2 ;
  *   ⑤ CHANGEMENT MANUEL : refusé à un membre, accepté pour Alice (version 3) ;
+ *   ⑥bis LOT 7 : les avis s'affichent ; une bulle « en attente de la clé du
+ *     groupe » se remplit seule quand la clé arrive (sonnette e2ee_trousseau) ;
  *   ⑥ LOT 6 : chacun a déposé sa copie chiffrée ; le serveur ne lit rien ;
  *     Bob se connecte sur un NOUVEAU navigateur, sans aucune clé locale, et
  *     relit tout l'historique grâce à sa copie.
@@ -283,6 +285,47 @@ async function main() {
     verifie("accepté pour Alice : version 3", r3?.version === 3, JSON.stringify(r3))
     verifie("Bob reçoit la 3", JSON.stringify(await attendreVersions(B.page, G, [1, 2, 3])) === "[1,2,3]")
 
+    titre("⑥bis Lot 7 : l'écran")
+    await B.page.goto(`${WEB}/chats/${G}`, { waitUntil: "networkidle" })
+    await fermerPortillon(B.page, "Bob")
+    const avisActive = await B.page.getByText(/a activé le chiffrement de bout en bout/).first()
+      .waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false)
+    verifie("l'avis « a activé le chiffrement » s'affiche", avisActive)
+    verifie("l'avis « a changé la clé du groupe » s'affiche",
+      await B.page.getByText(/a changé la clé du groupe/).first().isVisible().catch(() => false))
+
+    // Une version 4 qu'Alice a, et que Bob n'a pas encore.
+    const v4 = await A.page.evaluate(async (c) => {
+      const g = await import("/src/services/e2ee-groupe.ts")
+      const gf = await import("/src/services/e2ee-groupe-fil.ts")
+      const cle = g.genererCleGroupe()
+      await gf.rangerTrousseau(c, [{ n: 4, cle, creeLe: Date.now() }], { deposerCopie: false })
+      return btoa(String.fromCharCode(...cle))
+    }, G)
+    await prisma.e2eeCleVersion.create({
+      data: { convId: G, version: 4, creePar: alice.id, creeParAppareil: (await prisma.e2eeIdentite.findFirst({ where: { userId: alice.id } })).deviceId, motif: "MANUEL" },
+    })
+    await prisma.conversation.update({ where: { id: G }, data: { cleVersion: 4 } })
+    const texte4 = `En version 4 ${Date.now().toString(36)}`
+    await envoyer(A.page, G, texte4)
+    await B.page.reload({ waitUntil: "networkidle" })
+    await fermerPortillon(B.page, "Bob")
+    const attente = await B.page.getByText("Message chiffré — en attente de la clé du groupe.").first()
+      .waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false)
+    verifie("la bulle dit « en attente de la clé du groupe »", attente)
+    // Alice distribue la version 4 : la sonnette e2ee_trousseau rouvre le fil de Bob.
+    await A.page.evaluate(
+      async ([c, cle, dest]) => {
+        const admin = await import("/src/services/e2ee-groupe-admin.ts")
+        const gf = await import("/src/services/e2ee-groupe-fil.ts")
+        return admin.distribuerTrousseau(c, "MANUEL", await gf.trousseauLocal(c), dest)
+      },
+      [G, v4, [bob.id, dave.id]],
+    )
+    const rempli = await B.page.getByText(texte4, { exact: true }).first()
+      .waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false)
+    verifie("la clé arrive : la bulle se remplit sans recharger", rempli)
+
     titre("⑥ Lot 6 : la copie personnelle, et un nouvel appareil")
     let copies = []
     for (let i = 0; i < 20; i++) {
@@ -299,7 +342,7 @@ async function main() {
       const t = await gf.trousseauLocal(c)
       return t.map((v) => btoa(String.fromCharCode(...v.cle)))
     }, G)
-    verifie("la copie ne contient aucune clé en clair", cles.length === 3 && cles.every((k) => !copieBob.includes(k)) &&
+    verifie("la copie ne contient aucune clé en clair", cles.length === 4 && cles.every((k) => !copieBob.includes(k)) &&
       !copieBob.includes("trousseau"))
 
     const B2 = await connecter(navigateur, bob)
@@ -308,10 +351,10 @@ async function main() {
     let repris = []
     for (let i = 0; i < 30; i++) {
       repris = await versionsLocales(B2.page, G)
-      if (repris.length === 3) break
+      if (repris.length === 4) break
       await pause(500)
     }
-    verifie("il reprend les trois versions depuis sa copie", JSON.stringify(repris) === "[1,2,3]", JSON.stringify(repris))
+    verifie("il reprend les quatre versions depuis sa copie", JSON.stringify(repris) === "[1,2,3,4]", JSON.stringify(repris))
     fil = await charger(B2.page, G)
     verifie("il relit tout l'historique", fil.find((m) => m.id === id1)?.content === texte1 &&
       fil.find((m) => m.id === id2)?.content === texte2)

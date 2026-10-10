@@ -157,6 +157,12 @@ export interface ChatMessageMock {
    * est illisible, et c'est ce descripteur qui permet de l'ouvrir.
    */
   mediaChiffre?: DescripteurMedia
+  /**
+   * Message de GROUPE chiffré dont la clé (cette version) n'est pas encore sur
+   * cet appareil (lot 7) : la bulle dit « en attente de la clé du groupe »
+   * plutôt que « indisponible ». Elle arrivera par la relève.
+   */
+  attenteCle?: boolean
   /** Expediteur : quelqu'un l'a ouverte. Destinataire : je l'ai ouverte. */
   vueUniqueOuverte?: boolean
   /** Le fichier a ete efface du stockage. */

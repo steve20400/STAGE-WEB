@@ -530,6 +530,16 @@ export function subscribeToToutesArriveesE2ee(
 }
 
 /**
+ * Une clé de groupe attend cet appareil (`e2ee_trousseau`, lot 7) : on relève,
+ * et un fil ouvert sur ce groupe se rouvre avec elle.
+ */
+export function subscribeToTrousseau(handler: (convId: string) => void): () => void {
+  return addListener((event) => {
+    if (event.type === "e2ee_trousseau" && typeof event.convId === "string") handler(event.convId)
+  })
+}
+
+/**
  * Ce compte a quitté un groupe CHIFFRÉ, ou en a été exclu (lot 2, 09/10/2026).
  *
  * Le serveur a déjà effacé sa copie du trousseau ; ce verbe dit à CET
