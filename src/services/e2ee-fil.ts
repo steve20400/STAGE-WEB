@@ -496,6 +496,14 @@ export async function releverEtDechiffrer(
        */
       if (!e.messageId && estChargeTrousseau(clair)) {
         await recevoirTrousseau(e.convId, e.expediteurId, clair)
+        /*
+         * 🐛 LE FIL N'ÉTAIT PAS RETENU CHIFFRÉ (banc du lot 5) : un membre
+         * tout juste ajouté avait la clé, mais son navigateur ne savait pas
+         * encore que ce fil était chiffré — il n'avait pas rechargé la liste —
+         * et n'ouvrait donc aucun message. Recevoir la clé d'un groupe, c'est
+         * savoir qu'il est chiffré.
+         */
+        noteEtatChiffrement(e.convId, true)
       }
       if (e.messageId) {
         /*

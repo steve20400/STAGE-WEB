@@ -3,7 +3,8 @@ import { loadLocalGroups, toConversationMock } from "../data/local-groups"
 import { type ConversationMock, type MessageType } from "../mocks/chat-data"
 import { getMyUserId, loadSessionUser, toInitials } from "../data/session-user"
 import { apiRequest } from "../lib/api-client"
-import { noteEtatChiffrement } from "./e2ee-fil"
+import { estChiffree, noteEtatChiffrement } from "./e2ee-fil"
+import { changerCle, partagerApresAjout, type BilanDistribution } from "./e2ee-groupe-admin"
 import { avecDerniersTextesLocaux } from "./dernier-message-local"
 import { langueInitiale, traduire } from "../i18n"
 import {
@@ -411,17 +412,50 @@ export async function fetchConversationById(
  * POST /api/conversations/:id/members — Ajoute des membres a un groupe existant.
  * Envoie les numeros Alanya des nouveaux membres.
  */
-export async function addMembersToGroup(convId: string, memberNumbers: string[]): Promise<void> {
+export async function addMembersToGroup(
+  convId: string,
+  memberNumbers: string[],
+): Promise<BilanDistribution | null> {
   await apiRequest<void>(`/api/conversations/${convId}/members`, {
     method: "POST",
     body: { publicNumbers: memberNumbers },
   })
+  /*
+   * 🔴 GROUPE CHIFFRÉ (lot 5, chapitre 35) : sans le trousseau, le nouveau
+   * membre verrait un groupe muet. C'est l'appareil de l'administrateur qui
+   * l'envoie — le serveur n'a pas la clé.
+   *
+   * ⚠️ L'AJOUT EST FAIT, QUOI QU'IL ARRIVE ENSUITE : un échec du partage ne
+   * l'annule pas. Il est dit, et « changer la clé » le rattrape.
+   */
+  if (!estChiffree(convId)) return null
+  try {
+    return await partagerApresAjout(convId, memberNumbers)
+  } catch (err) {
+    console.warn("[e2ee] trousseau non partagé avec les nouveaux membres :", err)
+    return null
+  }
 }
 
 export async function removeGroupMember(convId: string, userId: string) {
-  return apiRequest(`/api/conversations/${convId}/members?userId=${encodeURIComponent(userId)}`, {
-    method: "DELETE",
-  })
+  const r = await apiRequest(
+    `/api/conversations/${convId}/members?userId=${encodeURIComponent(userId)}`,
+    { method: "DELETE" },
+  )
+  /*
+   * 🔴 EXCLUSION D'UN GROUPE CHIFFRÉ (décision du user) : l'exclu connaît la
+   * clé actuelle. Une nouvelle version, distribuée aux membres RESTANTS, rend
+   * illisible tout ce qui s'écrira ensuite. Un départ volontaire, lui, passe
+   * par `leaveGroup` et ne change pas la clé.
+   */
+  if (estChiffree(convId) && userId !== getMyUserId()) {
+    try {
+      await changerCle(convId, "EXCLUSION")
+    } catch (err) {
+      console.warn("[e2ee] nouvelle clé non créée après l'exclusion :", err)
+    }
+  }
+  return r
 }
 export async function setGroupMemberRole(convId: string, userId: string, role: "ADMIN" | "MEMBER") {
   return apiRequest(`/api/conversations/${convId}/members`, {

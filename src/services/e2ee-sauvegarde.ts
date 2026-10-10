@@ -121,6 +121,51 @@ async function laCle(): Promise<CryptoKey | null> {
   maitresse = await relire()
   return maitresse
 }
+/**
+ * Chiffre un clair avec la clé maîtresse de l'archive — pour la copie
+ * personnelle du trousseau d'un groupe (lot 6, chapitre 35).
+ *
+ * Forme : base64( 0x01 | nonce 12 | AES-256-GCM(clair, `aad`) ). Le jumeau
+ * mobile (`e2ee_trousseau_perso.dart`) écrit et lit exactement la même.
+ *
+ * Rend `null` si l'archive n'est pas ouverte sur cet appareil : rien à faire,
+ * la copie sera déposée par un appareil qui l'a.
+ */
+export async function chiffrerPourArchive(clair: string, aad: Uint8Array): Promise<string | null> {
+  const cle = await laCle()
+  if (!cle) return null
+  const nonce = crypto.getRandomValues(new Uint8Array(12))
+  const chiffre = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: nonce, additionalData: aad as Uint8Array<ArrayBuffer> },
+      cle,
+      new TextEncoder().encode(clair),
+    ),
+  )
+  const tout = new Uint8Array(1 + nonce.length + chiffre.length)
+  tout[0] = 0x01
+  tout.set(nonce, 1)
+  tout.set(chiffre, 1 + nonce.length)
+  return versB64Local(tout.buffer)
+}
+
+/**
+ * L'inverse. `null` si l'archive n'est pas ouverte ; LÈVE si le chiffré est
+ * altéré ou d'une autre archive (GCM refuse).
+ */
+export async function dechiffrerDepuisArchive(corps: string, aad: Uint8Array): Promise<string | null> {
+  const cle = await laCle()
+  if (!cle) return null
+  const brut = new Uint8Array(depuisB64Local(corps))
+  if (brut.length < 1 + 12 + 16 || brut[0] !== 0x01) throw new Error("copie de trousseau mal formée")
+  const clair = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: brut.slice(1, 13), additionalData: aad as Uint8Array<ArrayBuffer> },
+    cle,
+    brut.slice(13),
+  )
+  return new TextDecoder().decode(clair)
+}
+
 let tampon: MessageArchive[] = []
 let minuteur: ReturnType<typeof setTimeout> | null = null
 

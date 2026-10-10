@@ -384,6 +384,13 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
    * un appel réseau à chaque ouverture de conversation, pour rien dans
    * l'immense majorité des cas.
    */
+  /*
+   * ⚠️ UN CHIFFRÉ DE GROUPE DANS LA RÉPONSE SUFFIT À SAVOIR QUE LE FIL EST
+   * CHIFFRÉ : on ne laisse pas un état local en retard (membre tout juste
+   * ajouté) empêcher de l'ouvrir.
+   */
+  if (backendMessages.some((b) => b.groupe)) noteEtatChiffrement(chatId, true)
+
   if (estChiffree(chatId)) {
     // ⚠️ `releverEtRanger` et non `releverEtDechiffrer` : ce qui est relevé
     // pour les AUTRES fils y est rangé aussi — voir `e2ee-releve.ts`.
@@ -480,7 +487,7 @@ export async function fetchOlderMessages(
 
   const messages = backendMessages.map((m) => toFrontMessage(m, myId)).reverse()
   // Les messages de groupe chiffrés se relisent à chaque page (lot 4).
-  if (estChiffree(chatId)) await eclairerGroupe(chatId, backendMessages, messages)
+  if (backendMessages.some((b) => b.groupe)) await eclairerGroupe(chatId, backendMessages, messages)
   return messages
 }
 

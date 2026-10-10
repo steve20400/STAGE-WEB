@@ -145,6 +145,7 @@ import {
   subscribeToWsConnected,
 } from "../../../../src/services/websocket-service"
 import { getMyUserId } from "../../../../src/data/session-user"
+import { activerGroupe } from "../../../../src/services/e2ee-groupe-admin"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { fetchCallsForConversation, type CallRecord } from "../../../../src/services/calls-service"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
@@ -8182,20 +8183,22 @@ export default function ChatRoomPage() {
                       : t("e2ee_bouton")
                   }
                   /*
-                   * ⚠️ UN GROUPE NE S'ACTIVE PAS ENCORE D'ICI (09/10/2026). Le
-                   * serveur l'accepte depuis le lot 2, mais l'activation doit
-                   * tirer la clé et la distribuer à chaque appareil : c'est le
-                   * lot 5. D'ici là, le bouton reste inerte et le dit.
+                   * ⚠️ EN GROUPE, SEUL UN ADMINISTRATEUR ACTIVE (lot 5) : son
+                   * appareil tire la clé et la distribue à chaque appareil de
+                   * chaque membre (`activerGroupe`). Les autres membres voient
+                   * le bouton inerte, et pourquoi.
                    */
                   disabled={
-                    e2eeEnCours || (!e2ee.e2eeActif && (!e2ee.activable || e2ee.groupe === true))
+                    e2eeEnCours ||
+                    (!e2ee.e2eeActif &&
+                      (!e2ee.activable || (e2ee.groupe === true && e2ee.jePeuxActiver !== true)))
                   }
                   title={
                     e2ee.e2eeActif
                       ? peerIdPourCle !== null
                         ? t("e2ee_actif_definitif_verif")
                         : t("e2ee_actif_definitif")
-                      : e2ee.groupe === true
+                      : e2ee.groupe === true && e2ee.jePeuxActiver !== true
                         ? t("e2ee_groupe")
                         : e2ee.motif === "HORS_PERIMETRE"
                           ? t("e2ee_hors_perimetre")
@@ -8226,7 +8229,10 @@ export default function ChatRoomPage() {
                     }
                     if (!e2ee.activable) return
                     setE2eeEnCours(true)
-                    void activerE2ee(chatId)
+                    void (e2ee.groupe === true
+                      ? activerGroupe(chatId).then(() => success(t("e2ee_groupe_active")))
+                      : activerE2ee(chatId)
+                    )
                       .then(() => setE2ee({ ...e2ee, e2eeActif: true }))
                       .catch(() => undefined)
                       .finally(() => setE2eeEnCours(false))

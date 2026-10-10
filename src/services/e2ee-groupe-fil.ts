@@ -69,15 +69,79 @@ export async function trousseauLocal(convId: string): Promise<VersionCle[]> {
  * trousseau ne peut ni rendre illisible ce qu'on lit, ni faire accepter une
  * clé détenue par un autre sous un numéro existant.
  */
-export async function rangerTrousseau(convId: string, recues: VersionCle[]): Promise<VersionCle[]> {
+export async function rangerTrousseau(
+  convId: string,
+  recues: VersionCle[],
+  o: { deposerCopie?: boolean } = {},
+): Promise<VersionCle[]> {
   const connues = await trousseauLocal(convId)
   const fusion = fusionnerTrousseau(connues, recues)
+  if (fusion.length === connues.length) return fusion
   ecrireSecret(
     cleCoffre(convId),
     fusion.map((v) => ({ n: v.n, cle: versB64(v.cle), creeLe: v.creeLe })),
   )
   await coffreEcrit()
+  /*
+   * 🔴 LA COPIE PERSONNELLE SUIT CHAQUE CHANGEMENT (lot 6, chapitre 35) : une
+   * version reçue et pas recopiée serait perdue au changement de téléphone.
+   * Import différé : la copie dépend de l'archive, qui dépend du fil.
+   */
+  if (o.deposerCopie !== false) {
+    void import("./e2ee-trousseau-perso").then((m) => m.deposerCopie(convId, fusion))
+  }
   return fusion
+}
+
+/** Dernière tentative de restauration, par groupe — pour ne pas boucler. */
+const restaurations = new Map<string, number>()
+const REPOS_RESTAURATION_MS = 30_000
+
+/**
+ * Le trousseau local, COMPLÉTÉ PAR MA COPIE quand il manque quelque chose
+ * (lot 6) : rien du tout (nouveau téléphone), ou la version [voulue].
+ *
+ * ⚠️ UNE TENTATIVE PAR GROUPE ET PAR DEMI-MINUTE : une copie qui n'a pas la
+ * version cherchée ne doit pas déclencher une requête par message affiché.
+ */
+export async function trousseauAvecRepli(convId: string, voulue?: number): Promise<VersionCle[]> {
+  const local = await trousseauLocal(convId)
+  const manque = local.length === 0 || (voulue !== undefined && !local.some((v) => v.n === voulue))
+  if (!manque) return local
+  const derniere = restaurations.get(convId) ?? 0
+  if (Date.now() - derniere < REPOS_RESTAURATION_MS) return local
+  restaurations.set(convId, Date.now())
+  try {
+    const { lireCopie } = await import("./e2ee-trousseau-perso")
+    const copie = await lireCopie(convId)
+    if (!copie) return local
+    // La copie vient de moi : pas la peine de la redéposer telle quelle.
+    return await rangerTrousseau(convId, copie, { deposerCopie: false })
+  } catch (err) {
+    console.warn(`[e2ee] restauration du trousseau de ${convId.slice(0, 8)} impossible :`, err)
+    return local
+  }
+}
+
+/**
+ * Nouvel appareil : reprend TOUTES mes copies d'un coup (après l'ouverture de
+ * l'archive). Rend le nombre de groupes repris.
+ */
+export async function restaurerTousLesTrousseaux(): Promise<number> {
+  const { lireToutesLesCopies } = await import("./e2ee-trousseau-perso")
+  let n = 0
+  for (const [convId, versions] of await lireToutesLesCopies()) {
+    try {
+      await rangerTrousseau(convId, versions, { deposerCopie: false })
+      noteGroupe(convId, true)
+      // Import différé : `e2ee-fil` importe ce module.
+      ;(await import("./e2ee-fil")).noteEtatChiffrement(convId, true)
+      n++
+    } catch (err) {
+      console.warn(`[e2ee] copie du trousseau de ${convId.slice(0, 8)} non reprise :`, err)
+    }
+  }
+  return n
 }
 
 /**
@@ -147,7 +211,7 @@ export async function envoyerDansGroupe(
     type?: string
   } = {},
 ): Promise<MessageGroupeCree> {
-  const versions = await trousseauLocal(convId)
+  const versions = await trousseauAvecRepli(convId)
   const courante = versions[versions.length - 1]
   if (!courante) throw new CleGroupeAbsente()
   const moi = getMyUserId()
@@ -194,7 +258,7 @@ export async function modifierDansGroupe(
   messageId: string,
   texte: string,
 ): Promise<Date | null> {
-  const versions = await trousseauLocal(convId)
+  const versions = await trousseauAvecRepli(convId)
   const courante = versions[versions.length - 1]
   if (!courante) throw new CleGroupeAbsente()
   const moi = getMyUserId()
@@ -278,7 +342,7 @@ export async function lireMessageGroupe(
   expediteurId: string,
   g: ChiffreGroupe,
 ): Promise<ClairGroupe | EchecGroupe> {
-  const versions = await trousseauLocal(convId)
+  const versions = await trousseauAvecRepli(convId, g.version)
   const version = versions.find((v) => v.n === g.version)
   if (!version) return "CLE_ABSENTE"
   const cle = await cleSignataire(expediteurId, g.expediteurAppareil)

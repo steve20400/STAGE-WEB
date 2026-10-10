@@ -23,6 +23,8 @@ import {
 } from "../../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { getMyUserId } from "../../../../src/data/session-user"
+import { estChiffree } from "../../../../src/services/e2ee-fil"
+import { changerCle } from "../../../../src/services/e2ee-groupe-admin"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
 import {
   LANGUAGE_CODES,
@@ -285,6 +287,25 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
             warning(t("cinfo_member_removed", { name: member.name }))
           })
           .catch(() => warning(t("cinfo_remove_failed")))
+      },
+    })
+  }
+
+  /*
+   * CHANGER LA CLÉ DU GROUPE (lot 5, chapitre 35) — administrateur d'un groupe
+   * chiffré. Pour une clé qu'on soupçonne volée, ou pour rattraper une
+   * distribution manquée : une nouvelle version, envoyée aux membres actuels.
+   */
+  const changerLaCle = () => {
+    setPendingAction({
+      title: t("e2ee_changer_cle"),
+      description: t("e2ee_changer_cle_detail"),
+      confirmLabel: t("e2ee_changer_cle"),
+      tone: "warning",
+      onConfirm: () => {
+        void changerCle(conv.id, "MANUEL")
+          .then(() => success(t("e2ee_cle_groupe_changee")))
+          .catch(() => warning(t("e2ee_cle_changee_echec")))
       },
     })
   }
@@ -1037,6 +1058,27 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                   {t("cinfo_add_members_cta")}
+                </button>
+              )}
+              {conv.isGroup && isAdmin && estChiffree(conv.id) && (
+                <button
+                  style={{
+                    width: "100%",
+                    marginTop: 8,
+                    background: "transparent",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 9,
+                    padding: "9px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                    cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}
+                  onClick={changerLaCle}
+                  aria-label={t("e2ee_changer_cle")}
+                >
+                  {t("e2ee_changer_cle")}
                 </button>
               )}
             </div>

@@ -25,6 +25,7 @@ import {
 import { reprendreMotDePasse } from "../../../src/services/restauration-en-attente"
 import { cacheMessage } from "../../../src/services/indexeddb-cache"
 import { entreeCacheDechiffree } from "../../../src/services/e2ee-entree-cache"
+import { restaurerTousLesTrousseaux } from "../../../src/services/e2ee-groupe-fil"
 import type { MessageArchive } from "../../../src/services/e2ee-archive"
 import {
   compteur,
@@ -56,6 +57,16 @@ function lancer(mdp: string): Promise<Resultat> {
   enCours = tour
   void tour.finally(() => {
     if (enCours === tour) enCours = null
+  })
+  /*
+   * 🔴 ET LES CLÉS DES GROUPES CHIFFRÉS (lot 6, chapitre 35) : l'archive est
+   * ouverte, mes copies de trousseau s'ouvrent avec elle. Sans attendre — le
+   * fil les reprendrait de toute façon à la demande (`trousseauAvecRepli`).
+   */
+  void tour.then((r) => {
+    if (r.issue === "restauree" || r.issue === "rienARestaurer") {
+      void restaurerTousLesTrousseaux().catch(() => undefined)
+    }
   })
   return tour
 }
