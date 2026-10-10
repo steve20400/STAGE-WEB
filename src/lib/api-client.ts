@@ -6,7 +6,12 @@ import {
   saveRefreshToken,
   saveSessionToken,
 } from "../data/session-auth"
-import { MESSAGE_EVICTION, MESSAGE_REJEU, poseMessageDeconnexion } from "../data/session-message"
+import {
+  MESSAGE_EVICTION,
+  MESSAGE_JETON_PERDU,
+  MESSAGE_REJEU,
+  poseMessageDeconnexion,
+} from "../data/session-message"
 import { langueInitiale, traduire } from "../i18n"
 
 export class ApiError extends Error {
@@ -218,6 +223,7 @@ export async function tryRefreshTokens(): Promise<ResultatRafraichissement> {
             code = corps?.error?.code
             if (code === "SESSION_EVINCEE") poseMessageDeconnexion(MESSAGE_EVICTION)
             if (code === "JETON_REJOUE") poseMessageDeconnexion(MESSAGE_REJEU)
+            if (code === "JETON_DEJA_TOURNE") poseMessageDeconnexion(MESSAGE_JETON_PERDU)
           } catch {
             // Corps illisible : on reste sur un échec sans explication.
           }
@@ -234,8 +240,13 @@ export async function tryRefreshTokens(): Promise<ResultatRafraichissement> {
            * session etait detruite.
            *
            * `BAD_REFRESH` veut desormais dire « reessaie », pas « c'est fini ».
-           * Seuls ces quatre codes ferment une session, et ce sont quatre
+           * Seuls ces cinq codes ferment une session, et ce sont cinq
            * DECISIONS que le serveur prend et nomme.
+           *
+           * `JETON_DEJA_TOURNE` (10/10/2026) : la reponse d'une rotation s'est
+           * perdue pour de bon. Avant lui, ce cas recevait `BAD_REFRESH` et le
+           * client reessayait SANS FIN (vu sur Android : ~1 200 requetes en dix
+           * minutes, toutes en 401).
            *
            * ⚠️ MEME LISTE QUE `codesSessionFermee` DANS L'APPLICATION MOBILE
            * (`auth_controller.dart`). Les deux clients parlent au meme serveur :
@@ -247,6 +258,7 @@ export async function tryRefreshTokens(): Promise<ResultatRafraichissement> {
             "JETON_REJOUE",
             "SESSION_REVOQUEE",
             "SESSION_EXPIREE",
+            "JETON_DEJA_TOURNE",
           ]
           if (code && CODES_SESSION_FERMEE.includes(code)) return "refuse"
 

@@ -27,6 +27,14 @@ export const MESSAGE_EVICTION = "Votre compte a été ouvert sur un autre appare
  */
 export const MESSAGE_REJEU = "Session fermée par sécurité. Reconnectez-vous."
 
+/**
+ * La réponse de la dernière rotation du jeton s'est perdue pour de bon (onglet
+ * ou application fermés à cet instant précis) : le serveur refuse l'ancien
+ * jeton (`JETON_DEJA_TOURNE`). Ni une éviction, ni un incident : il suffit de
+ * se reconnecter.
+ */
+export const MESSAGE_JETON_PERDU = "Votre session doit être rouverte. Reconnectez-vous."
+
 export function poseMessageDeconnexion(message: string): void {
   try {
     sessionStorage.setItem(CLE, message)
