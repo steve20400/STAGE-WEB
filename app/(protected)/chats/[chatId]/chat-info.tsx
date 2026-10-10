@@ -26,6 +26,7 @@ import { getMyUserId } from "../../../../src/data/session-user"
 import { estChiffree } from "../../../../src/services/e2ee-fil"
 import { changerCle } from "../../../../src/services/e2ee-groupe-admin"
 import { E2eeVerification } from "./e2ee-verification"
+import { FichiersPartages } from "./fichiers-partages"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
 import {
   LANGUAGE_CODES,
@@ -60,14 +61,6 @@ interface Member {
   alanyaId?: string
 }
 
-interface SharedFile {
-  id: string
-  name: string
-  size: string
-  type: "pdf" | "image" | "audio" | "other"
-  ts: string
-  sender: string
-}
 
 interface ConvInfo {
   id: string
@@ -85,7 +78,6 @@ interface ConvInfo {
   description?: string
   members: Member[]
   createdAt: string
-  files: SharedFile[]
   online?: boolean
   statusMsg?: string
   /** Alanya ID de l'interlocuteur, pour une conversation a deux. */
@@ -108,52 +100,6 @@ const COLORS: Record<string, { bg: string; fg: string }> = {
   rose: { bg: "var(--av-4-bg)", fg: "var(--av-4-fg)" },
 }
 
-function FileIcon({ type }: { type: SharedFile["type"] }) {
-  const paths: Record<SharedFile["type"], ReactNode> = {
-    pdf: <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />,
-    image: (
-      <>
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <polyline points="21 15 16 10 5 21" />
-      </>
-    ),
-    audio: (
-      <>
-        <path d="M9 18V5l12-2v13" />
-        <circle cx="6" cy="18" r="3" />
-        <circle cx="18" cy="16" r="3" />
-      </>
-    ),
-    other: (
-      <>
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-      </>
-    ),
-  }
-
-  const colors: Record<SharedFile["type"], string> = {
-    pdf: "var(--danger)",
-    image: "#a78bfa",
-    audio: "var(--success)",
-    other: "var(--text-secondary)",
-  }
-
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={colors[type]}
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    >
-      {paths[type]}
-    </svg>
-  )
-}
 
 interface ConvInfoPanelProps {
   convId?: string
@@ -167,6 +113,8 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const conv = propInfo
 
   const [tab, setTab] = useState<"membres" | "fichiers">("membres")
+  // Nombre de fichiers partagés, connu quand le panneau a fini de les relever.
+  const [nbFichiers, setNbFichiers] = useState<number | null>(null)
 
   /*
    * ARRIVEE PAR UNE MENTION COLLECTIVE : « #membres » dans l'adresse.
@@ -906,14 +854,15 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 className={`cip-tab ${tab === "fichiers" ? "on" : ""}`}
                 onClick={() => setTab("fichiers")}
               >
-                {t("cinfo_tab_files", { count: conv.files.length })}
+                {t("cinfo_tab_files", { count: nbFichiers ?? "…" })}
               </button>
             </div>
           )}
 
-          {(tab === "membres" || !conv.isGroup) && (
+          {/* Groupe seulement : en tête-à-tête, cette section ne portait que le
+              titre « Fichiers partagés », en double avec la vraie liste. */}
+          {conv.isGroup && tab === "membres" && (
             <div className="cip-section" data-section-membres>
-              {!conv.isGroup && <div className="cip-section-title">{t("cinfo_shared_files")}</div>}
               {conv.isGroup &&
                 members.map((member) => {
                   const memberColor = COLORS[member.color]
@@ -1118,48 +1067,17 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           {(tab === "fichiers" || !conv.isGroup) && (
             <div className="cip-section">
               {!conv.isGroup && <div className="cip-section-title">{t("cinfo_shared_files")}</div>}
-              {conv.files.map((file) => (
-                <div
-                  className="file-item"
-                  key={file.id}
-                  onClick={() => info(t("cinfo_download_title"), file.name)}
-                >
-                  <div className="f-icon">
-                    <FileIcon type={file.type} />
-                  </div>
-                  <div className="f-info">
-                    <div className="f-name">{file.name}</div>
-                    <div className="f-meta">
-                      {file.size} · {file.sender} · {file.ts}
-                    </div>
-                  </div>
-                  <button className="f-dl" aria-label={t("download")}>
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    >
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-              {conv.files.length === 0 && (
-                <div
-                  style={{
-                    textAlign: "center",
-                    color: "var(--text-ghost)",
-                    fontSize: 12,
-                    padding: "20px 0",
-                  }}
-                >
-                  {t("cinfo_no_shared_file")}
-                </div>
-              )}
+              {/* 🐛 La liste était initialisée à vide, en dur, et jamais remplie
+                  (user, 10/10/2026). Voir `fichiers-partages.tsx`. */}
+              <FichiersPartages
+                convId={conv.id}
+                nomDe={(id) =>
+                  id === "me" || id === getMyUserId()
+                    ? t("you")
+                    : (members.find((m) => m.id === id)?.name ?? conv.name)
+                }
+                onCompte={setNbFichiers}
+              />
             </div>
           )}
 
@@ -1415,7 +1333,6 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
       color: colorName,
       isGroup: true,
       members,
-      files: [],
       createdAt: "",
       // L'etat REEL de la sourdine, celui du serveur. L'interrupteur partait de
       // « non » a chaque ouverture, quel que soit le reglage enregistre.
@@ -1455,7 +1372,6 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
         alanyaId: alanyaIdPair,
       },
     ],
-    files: [],
     createdAt: "",
   }
 }
@@ -1493,7 +1409,6 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
           alanyaId: contact?.phone ?? "",
         }
       }),
-      files: [],
       // La date se lit : le mois s'ecrit en toutes lettres, donc dans la langue
       // choisie et non en francais fige.
       createdAt: new Date(group.createdAt).toLocaleDateString(langueInitiale(), {
@@ -1529,7 +1444,6 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
         alanyaId: contact.phone,
       },
     ],
-    files: [],
     createdAt: traduire(langueInitiale(), "cinfo_unknown_date"),
   }
 }

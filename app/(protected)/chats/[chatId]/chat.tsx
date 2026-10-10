@@ -403,7 +403,8 @@ function ViewerDownloadButton({
 }
 
 /** Visionneuse intégrée pour documents (texte, code, PDF, image, vidéo, DOC, XLS, PPT). */
-function DocumentViewer({
+/** Exportée pour la page Infos (onglet Fichiers) : la MÊME visionneuse partout. */
+export function DocumentViewer({
   url,
   name,
   mime,
