@@ -254,6 +254,22 @@ async function main() {
       JSON.stringify(recu))
     verifie("le fichier est marqué chiffré sur le serveur",
       (await prisma.mediaFile.findUnique({ where: { id: media.media } }))?.chiffre === true)
+    // La preuve complète : Bob TÉLÉCHARGE le chiffré (il n'a rien en cache,
+    // il n'est pas l'expéditeur) et l'ouvre avec la clé reçue dans le chiffré
+    // de groupe.
+    const ouvert = await B.page.evaluate(async ([c, id]) => {
+      const ms = await import("/src/services/messages-service.ts")
+      const o = await import("/src/services/e2ee-media-ouverture.ts")
+      const m = (await ms.fetchMessages(c)).find((x) => x.id === id)
+      const blob = await o.ouvrirMediaChiffre(m.mediaChiffre)
+      return { texte: await blob.text(), type: blob.type, nom: m.mediaChiffre.nom }
+    }, [G, media.id])
+    verifie("Bob télécharge le fichier et l'ouvre, octet pour octet",
+      ouvert.texte === "contenu du fichier du banc" && ouvert.type === "text/plain" && ouvert.nom === "banc.txt",
+      JSON.stringify(ouvert))
+    const ligneMedia = await prisma.message.findUnique({ where: { id: media.id } })
+    verifie("le serveur n'a ni la légende ni le nom du fichier en clair",
+      !JSON.stringify(ligneMedia).includes("une pièce jointe") && !JSON.stringify(ligneMedia).includes("banc.txt"))
 
     titre("⑥ Les trousseaux refusés")
     await distribuer(C.page, G, [bob.id], [{ n: 2, cle: cleAleatoire(), creeLe: Date.now() }])

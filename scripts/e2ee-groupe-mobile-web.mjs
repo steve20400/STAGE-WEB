@@ -9,7 +9,9 @@
  *
  *   ① Mia ACTIVE depuis le mobile : la clé arrive dans le navigateur ;
  *   ② Mia écrit : le WEB LIT LE MOBILE (et l'écran du fil l'affiche) ;
- *   ③ Wes répond : le MOBILE LIT LE WEB ;
+ *   ②bis Mia envoie un FICHIER : le navigateur le télécharge et l'ouvre ;
+ *   ③ Wes répond : le MOBILE LIT LE WEB — un texte, puis un fichier, que le
+ *     téléphone télécharge et ouvre ;
  *   ④ Mia CHANGE LA CLÉ : la version 2 arrive dans le navigateur, et le
  *     message suivant, en version 2, s'y lit.
  *
@@ -206,6 +208,8 @@ async function main() {
 
     const t1 = `DuMobile-${Date.now().toString(36)}`
     const t2 = `DuMobileV2-${Date.now().toString(36)}`
+    const contenuMobile = `Fichier du téléphone ${Date.now().toString(36)} — accents éèà`
+    const contenuWeb = `Fichier du navigateur ${Date.now().toString(36)} — accents ùç`
     const mobile = lancerMobile({
       E2EE_API: API,
       E2EE_JETON: jeton,
@@ -214,6 +218,7 @@ async function main() {
       E2EE_WEB: wes.id,
       E2EE_T1: t1,
       E2EE_T2: t2,
+      E2EE_FICHIER: contenuMobile,
     })
 
     titre("① Mia active depuis le mobile")
@@ -253,11 +258,38 @@ async function main() {
     verifie("… avec l'avis « a activé le chiffrement »",
       await W.page.getByText(/a activé le chiffrement de bout en bout/).first().isVisible().catch(() => false))
 
+    titre("②bis Un fichier du mobile, ouvert par le web")
+    const idFichier = await mobile.attendre("ENVOYE_FICHIER")
+    verifie("le mobile a envoyé un fichier chiffré", idFichier !== null)
+    const ligneFichier = idFichier ? await prisma.message.findUnique({ where: { id: idFichier } }) : null
+    verifie("le serveur n'en a ni la légende ni le nom",
+      ligneFichier !== null && !JSON.stringify(ligneFichier).includes("fichier du téléphone") &&
+        !JSON.stringify(ligneFichier).includes("du-telephone.txt"))
+    const ouvert = await W.page.evaluate(async ([c, id]) => {
+      const ms = await import("/src/services/messages-service.ts")
+      const o = await import("/src/services/e2ee-media-ouverture.ts")
+      const m = (await ms.fetchMessages(c)).find((x) => x.id === id)
+      if (!m?.mediaChiffre) return { erreur: JSON.stringify(m ?? null) }
+      const blob = await o.ouvrirMediaChiffre(m.mediaChiffre)
+      return { texte: await blob.text(), nom: m.mediaChiffre.nom, legende: m.content }
+    }, [G, idFichier])
+    verifie("Wes télécharge le fichier du téléphone et l'ouvre, octet pour octet",
+      ouvert.texte === contenuMobile && ouvert.nom === "du-telephone.txt" && ouvert.legende === "fichier du téléphone",
+      JSON.stringify(ouvert))
+
     titre("③ Le mobile lit le web")
     const t3 = `DuWeb-${Date.now().toString(36)}`
     await W.page.evaluate(async ([c, t]) => (await import("/src/services/e2ee-fil.ts")).envoyerChiffre(c, t), [G, t3])
+    await W.page.evaluate(async ([c, t]) => {
+      const env = await import("/src/services/e2ee-media-envoi.ts")
+      await env.envoyerMediaChiffre(c, new Blob([t], { type: "text/plain" }),
+        { nom: "du-navigateur.txt", mime: "text/plain", legende: "fichier du navigateur" })
+    }, [G, contenuWeb])
     const lu = await mobile.attendre("LU")
     verifie("Mia lit la réponse de Wes", lu === t3, String(lu))
+    const fichierLu = await mobile.attendre("FICHIER_LU")
+    verifie("Mia télécharge le fichier du navigateur et l'ouvre, octet pour octet",
+      fichierLu === `du-navigateur.txt|${contenuWeb}`, String(fichierLu))
 
     titre("④ Mia change la clé depuis le mobile")
     const cle = await mobile.attendre("CLE_CHANGEE")
