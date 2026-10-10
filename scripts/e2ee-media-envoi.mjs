@@ -254,7 +254,12 @@ async function main() {
   const doc = B.page.locator(".mc-document").first();
   verifie("le PDF : sa carte, avec son vrai nom", (await doc.innerText().catch(() => "")).includes("rapport.pdf"));
   verifie("… son nombre de pages", (await doc.innerText().catch(() => "")).includes("1 p."));
-  verifie("… et sa première page en aperçu", (await B.page.locator(".mc-doc-apercu").count()) > 0);
+  // ⚠️ `.mc-doc-page` depuis 98db89c (« documents chiffrés en grand ») : le banc
+  // cherchait encore `.mc-doc-apercu`, et signalait à tort un aperçu absent.
+  verifie(
+    "… et sa première page en aperçu",
+    (await B.page.locator(".mc-document .mc-doc-page img").count()) > 0,
+  );
   verifie("la vidéo : sa première image, sans téléchargement", (await B.page.locator(".mc-visuel img.mc-apercu").count()) > 0);
   verifie(
     "aucun « chiffre.bin » à l'écran (le nom neutre du serveur ne se montre pas)",
