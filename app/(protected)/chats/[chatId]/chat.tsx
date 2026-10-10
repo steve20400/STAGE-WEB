@@ -3338,15 +3338,29 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
     : msg.mediaUrl && !msg.vueUnique && !msg.medias?.[0]?.chiffre
       ? resolveMediaUrl(msg.mediaUrl)
       : ""
-  const mime = msg.mediaMime ?? ""
-  const ext = (msg.fileName ?? "").split(".").pop()?.toLowerCase() ?? ""
+  // Média chiffré : le vrai nom et le vrai type sont dans le descripteur — le
+  // message, lui, ne porte que « chiffre.bin », et la pastille affichait « BIN ».
+  const nomFichier = msg.mediaChiffre?.nom ?? msg.fileName
+  const mime = msg.mediaChiffre?.mime ?? msg.mediaMime ?? ""
+  const ext = (nomFichier ?? "").split(".").pop()?.toLowerCase() ?? ""
   const isImage = msg.type === "image" || mime.startsWith("image/")
   const isVideo = msg.type === "video" || mime.startsWith("video/")
   const isPdf = mime === "application/pdf" || ext === "pdf"
+  /*
+   * 🐛 LA CITATION D'UN DOCUMENT CHIFFRÉ RESTAIT SANS VIGNETTE (signalé par le
+   * user le 10/10/2026 : « le petit preview ne s'affiche pas » pour un PDF,
+   * alors que les photos l'avaient). L'aperçu d'un média chiffré est TOUJOURS
+   * UNE IMAGE — photo floutée, première image d'une vidéo, première page d'un
+   * document —, quel que soit le type du fichier. On le donnait pourtant à
+   * pdf.js comme s'il était le PDF lui-même (échec, puis une pastille presque
+   * invisible sur la bulle brune), et à un lecteur vidéo pour une vidéo
+   * (carré noir). Il s'affiche désormais tel quel, comme sur le mobile.
+   */
+  const apercuChiffre = msg.mediaChiffre?.apercu && !msg.vueUnique ? src : ""
   const [pdfThumb, setPdfThumb] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isPdf || !src) return
+    if (!isPdf || !src || apercuChiffre) return
     let cancelled = false
     void loadPdfThumbnail(src).then((dataUrl) => {
       if (!cancelled) setPdfThumb(dataUrl)
@@ -3354,7 +3368,7 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
     return () => {
       cancelled = true
     }
-  }, [isPdf, src])
+  }, [isPdf, src, apercuChiffre])
 
   const box = {
     width: size,
@@ -3363,6 +3377,17 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
     flexShrink: 0,
     display: "block",
   } as const
+
+  if (apercuChiffre) {
+    return (
+      <img
+        src={apercuChiffre}
+        alt=""
+        // Fond blanc : la première page d'un document est une feuille.
+        style={{ ...box, objectFit: "cover", background: "#fff", objectPosition: "top" }}
+      />
+    )
+  }
 
   if (isImage && src) return <img src={src} alt="" style={{ ...box, objectFit: "cover" }} />
   if (isVideo && src)
@@ -3378,7 +3403,7 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
   if (isPdf && pdfThumb)
     return <img src={pdfThumb} alt="" style={{ ...box, objectFit: "cover", background: "#fff" }} />
 
-  const fti = fileTypeInfo(msg.fileName, msg.mediaMime)
+  const fti = fileTypeInfo(nomFichier, mime)
 
   // En grand (tuile d'album), un aplat de couleur se lit mal a cote d'une vraie
   // miniature : la tuile prend l'aspect d'une feuille, avec son icone, son type
@@ -3416,7 +3441,7 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
         <span style={{ fontSize: 9, fontWeight: 800, color: fti.color, letterSpacing: 0.5 }}>
           {fti.label}
         </span>
-        {msg.fileName && (
+        {nomFichier && (
           <span
             style={{
               fontSize: 8,
@@ -3428,7 +3453,7 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
               whiteSpace: "nowrap",
             }}
           >
-            {msg.fileName}
+            {nomFichier}
           </span>
         )}
       </div>
@@ -3439,7 +3464,11 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
     <div
       style={{
         ...box,
-        background: `${fti.color}20`,
+        // Une feuille claire, lisible sur la bulle brune comme sur la blanche :
+        // l'aplat teinté à 12 % disparaissait sur le brun de mes messages.
+        background: "#fbfbfd",
+        border: `1px solid ${fti.color}55`,
+        boxSizing: "border-box",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
