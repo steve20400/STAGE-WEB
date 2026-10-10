@@ -22,7 +22,10 @@
  *     de 64 Ko par enveloppe), découpées, et la copie personnelle les garde ;
  *   ⑨ CLÉ PERDUE : Dave n'a plus ni clé ni copie, et un seul appareil ; il
  *     redemande, l'ADMINISTRATRICE la lui renvoie (défaut constaté le 10/10 :
- *     un téléphone resté sur l'ancienne application avait perdu sa clé).
+ *     un téléphone resté sur l'ancienne application avait perdu sa clé) ;
+ *   ⑩ AUCUN ADMINISTRATEUR EN LIGNE (chapitre 39) : la page d'Alice est
+ *     FERMÉE ; Dave perd encore sa clé, et la retrouve dans sa BOÎTE
+ *     permanente, sans personne pour la lui renvoyer.
  *
  * Usage : node scripts/e2ee-groupe-admin-web.mjs
  *         (backend :3000, WebSocket :3001 et web :5173 démarrés)
@@ -435,6 +438,9 @@ async function main() {
     titre("⑨ Clé perdue : l'administratrice la renvoie")
     await D.page.evaluate(async (c) => (await import("/src/services/e2ee-groupe-fil.ts")).oublierTrousseau(c), G)
     await prisma.e2eeTrousseau.deleteMany({ where: { convId: G, userId: dave.id } })
+    // Ni boîte (un appareil apparu après la distribution) : c'est le chemin de
+    // la demande à l'administratrice qu'on éprouve ici ; ⑩ éprouve la boîte.
+    await prisma.e2eeBoite.deleteMany({ where: { convId: G, userId: dave.id } })
     verifie("Dave n'a plus aucune clé, ni copie, ni autre appareil",
       (await versionsLocales(D.page, G)).length === 0 &&
         (await prisma.e2eeIdentite.count({ where: { userId: dave.id } })) === 1)
@@ -449,7 +455,28 @@ async function main() {
     fil = await charger(D.page, G)
     verifie("et Dave relit l'historique", fil.find((m) => m.id === id1)?.content === texte1)
 
-    const erreurs = [...A.erreurs, ...B.erreurs, ...C.erreurs, ...D.erreurs, ...B2.erreurs, ...B3.erreurs]
+    titre("⑩ Aucun administrateur en ligne : la boîte permanente")
+    verifie("Dave a une boîte permanente sur le serveur",
+      (await prisma.e2eeBoite.count({ where: { convId: G, userId: dave.id } })) >= 1)
+    const erreursAlice = [...A.erreurs]
+    await A.contexte.close() // Alice, seule administratrice, n'est plus là
+    await D.page.evaluate(async (c) => (await import("/src/services/e2ee-groupe-fil.ts")).oublierTrousseau(c), G)
+    await prisma.e2eeTrousseau.deleteMany({ where: { convId: G, userId: dave.id } })
+    verifie("Dave n'a plus de clé ni de copie", (await versionsLocales(D.page, G)).length === 0)
+    const enveloppesAvant = await prisma.e2eeEnveloppe.count({ where: { convId: G, destinataireId: dave.id } })
+    // ⚠️ Le repos de 30 s entre deux restaurations d'un même groupe court
+    // encore depuis ⑨ : on le laisse passer, sinon la boîte ne serait pas relue.
+    await pause(31_000)
+    await charger(D.page, G) // une clé manque : la boîte est relue
+    const deLaBoite = await versionsLocales(D.page, G)
+    verifie("ses 1 000 versions viennent de la boîte", deLaBoite.length === 1000, `${deLaBoite.length} versions`)
+    fil = await charger(D.page, G)
+    verifie("il relit l'historique avec elles", fil.find((m) => m.id === id1)?.content === texte1,
+      JSON.stringify(fil.find((m) => m.id === id1)))
+    verifie("… et aucune enveloppe n'a été nécessaire",
+      (await prisma.e2eeEnveloppe.count({ where: { convId: G, destinataireId: dave.id } })) === enveloppesAvant)
+
+    const erreurs = [...erreursAlice, ...B.erreurs, ...C.erreurs, ...D.erreurs, ...B2.erreurs, ...B3.erreurs]
     verifie("aucune erreur de page", erreurs.length === 0, erreurs.join(" | "))
   } finally {
     if (G) await prisma.conversation.delete({ where: { id: G } }).catch(() => undefined)

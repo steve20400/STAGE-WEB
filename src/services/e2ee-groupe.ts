@@ -373,3 +373,134 @@ export function fusionnerTrousseau(connu: VersionCle[], recu: VersionCle[]): Ver
   }
   return [...parN.values()].sort((a, b) => a.n - b.n)
 }
+
+/* ══════════════════ LA BOÎTE PERMANENTE (chapitre 39) ══════════════════ */
+
+/**
+ * La BOÎTE : le trousseau d'un groupe, scellé pour UN appareil, et gardé par le
+ * serveur. L'appareil la relit quand il veut — sans qu'aucun administrateur soit
+ * en ligne (décision du user, 10/10/2026).
+ *
+ *   corps = base64( 0x01 | éphémère 33 | nonce 12 | AES-256-GCM(clair) | signature 64 )
+ *
+ *   · SCELLÉE : clé = HKDF-SHA256( X25519(éphémère, identité du destinataire),
+ *     sel = 32 zéros, info = « alanya-boite-v1 » ) — seul l'appareil qui a la
+ *     clé privée d'identité l'ouvre ;
+ *   · LIÉE À SA PLACE : les données associées portent le groupe, le
+ *     destinataire, son appareil, l'expéditeur et son appareil ;
+ *   · SIGNÉE par l'appareil expéditeur (XEdDSA) sur données | éphémère | nonce |
+ *     chiffré : le destinataire la vérifie AVANT d'ouvrir, avec une identité
+ *     qu'il connaît déjà — le serveur ne peut ni la lire ni en glisser une.
+ *
+ * ⚠️ JUMEAU DE `alanya/lib/services/e2ee/e2ee_groupe.dart` (vecteurs croisés :
+ * `scripts/e2ee-boite-vecteur.mjs`).
+ */
+export const FORMAT_BOITE = 0x01
+const INFO_BOITE = "alanya-boite-v1"
+const TAILLE_PUBLIQUE = 33
+
+export interface ContexteBoite {
+  convId: string
+  destinataireId: string
+  destinataireDevice: number
+  expediteurId: string
+  expediteurDevice: number
+}
+
+export function donneesBoite(c: ContexteBoite): Uint8Array<ArrayBuffer> {
+  for (const v of [c.convId, c.destinataireId, c.expediteurId]) {
+    if (!v || v.includes("\n")) throw new GroupeInvalide("contexte de boîte mal formé")
+  }
+  for (const n of [c.destinataireDevice, c.expediteurDevice]) {
+    if (!Number.isInteger(n) || n < 0) throw new GroupeInvalide("appareil invalide")
+  }
+  return utf8.encode(
+    `${INFO_BOITE}\n${c.convId}\n${c.destinataireId}\n${c.destinataireDevice}\n${c.expediteurId}\n${c.expediteurDevice}`,
+  ) as Uint8Array<ArrayBuffer>
+}
+
+async function cleDeBoite(partage: Uint8Array): Promise<CryptoKey> {
+  const base = await crypto.subtle.importKey("raw", tampon(partage), "HKDF", false, ["deriveKey"])
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: utf8.encode(INFO_BOITE) },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  )
+}
+
+/**
+ * Scelle [clair] pour l'appareil dont la clé publique d'identité est
+ * [clePubliqueDestinataire] (33 octets), et signe avec [clePriveeExpediteur].
+ * [impose] : pour les vecteurs seulement.
+ */
+export async function scellerBoite(
+  clair: string,
+  clePubliqueDestinataire: Uint8Array,
+  contexte: ContexteBoite,
+  clePriveeExpediteur: Uint8Array,
+  impose?: { ephemere?: { pub: Uint8Array; priv: Uint8Array }; nonce?: Uint8Array },
+): Promise<string> {
+  const c = await laCourbe()
+  const ephemere =
+    impose?.ephemere ??
+    (() => {
+      const k = c.generateKeyPair()
+      return { pub: new Uint8Array(k.pubKey), priv: new Uint8Array(k.privKey) }
+    })()
+  const partage = new Uint8Array(c.calculateAgreement(tampon(clePubliqueDestinataire), tampon(ephemere.priv)))
+  const cle = await cleDeBoite(partage)
+  const nonce = impose?.nonce ?? crypto.getRandomValues(new Uint8Array(TAILLE_NONCE))
+  const aad = donneesBoite(contexte)
+  const chiffre = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: tampon(nonce), additionalData: aad }, cle, utf8.encode(clair)),
+  )
+  const signature = await signer(clePriveeExpediteur, concat(aad, ephemere.pub, nonce, chiffre))
+  return versB64(concat(new Uint8Array([FORMAT_BOITE]), ephemere.pub, nonce, chiffre, signature))
+}
+
+/**
+ * Ouvre une boîte : signature d'abord (avec la clé d'identité DÉJÀ connue de
+ * l'appareil expéditeur), déchiffrement ensuite. Lève `GroupeInvalide`.
+ */
+export async function ouvrirBoite(
+  corps: string,
+  clePriveeDestinataire: Uint8Array,
+  contexte: ContexteBoite,
+  clePubliqueExpediteur: Uint8Array,
+): Promise<string> {
+  let brut: Uint8Array<ArrayBuffer>
+  try {
+    brut = depuisB64(corps)
+  } catch {
+    throw new GroupeInvalide("boîte illisible")
+  }
+  const min = 1 + TAILLE_PUBLIQUE + TAILLE_NONCE + TAILLE_ETIQUETTE + TAILLE_SIGNATURE
+  if (brut.length < min || brut[0] !== FORMAT_BOITE) throw new GroupeInvalide("boîte mal formée")
+  const ephemere = brut.slice(1, 1 + TAILLE_PUBLIQUE)
+  const nonce = brut.slice(1 + TAILLE_PUBLIQUE, 1 + TAILLE_PUBLIQUE + TAILLE_NONCE)
+  const chiffre = brut.slice(1 + TAILLE_PUBLIQUE + TAILLE_NONCE, brut.length - TAILLE_SIGNATURE)
+  const signature = brut.slice(brut.length - TAILLE_SIGNATURE)
+  const aad = donneesBoite(contexte)
+  if (!(await signatureValide(clePubliqueExpediteur, concat(aad, ephemere, nonce, chiffre), signature))) {
+    throw new GroupeInvalide("boîte : signature invalide")
+  }
+  const c = await laCourbe()
+  let partage: Uint8Array
+  try {
+    partage = new Uint8Array(c.calculateAgreement(tampon(ephemere), tampon(clePriveeDestinataire)))
+  } catch {
+    throw new GroupeInvalide("boîte : clé éphémère invalide")
+  }
+  try {
+    const clair = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: tampon(nonce), additionalData: aad },
+      await cleDeBoite(partage),
+      tampon(chiffre),
+    )
+    return new TextDecoder().decode(clair)
+  } catch {
+    throw new GroupeInvalide("boîte : déchiffrement refusé")
+  }
+}

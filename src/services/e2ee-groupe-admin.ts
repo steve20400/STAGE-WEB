@@ -1,7 +1,21 @@
 import { apiRequest, ApiError } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
-import { chiffrerPour, deposer, idAppareil, ouvrirSessions, type EnveloppeSortante } from "./e2ee-service"
-import { ecrireChargeTrousseau, genererCleGroupe, type MotifTrousseau, type VersionCle } from "./e2ee-groupe"
+import {
+  chiffrerPour,
+  deposer,
+  identiteConnue,
+  idAppareil,
+  maPaireIdentite,
+  ouvrirSessions,
+  type EnveloppeSortante,
+} from "./e2ee-service"
+import {
+  ecrireChargeTrousseau,
+  genererCleGroupe,
+  scellerBoite,
+  type MotifTrousseau,
+  type VersionCle,
+} from "./e2ee-groupe"
 import { noteGroupe, rangerTrousseau, trousseauAvecRepli } from "./e2ee-groupe-fil"
 import { noteEtatChiffrement } from "./e2ee-fil"
 
@@ -49,8 +63,10 @@ export function decouperVersions(versions: VersionCle[], taille = VERSIONS_PAR_C
 }
 
 export interface BilanDistribution {
-  /** Combien d'appareils ont reçu le trousseau. */
+  /** Combien d'enveloppes sont parties (une par appareil et par morceau). */
   appareils: number
+  /** Combien de boîtes permanentes ont été déposées (une par appareil). */
+  boites: number
   /** Les membres sans aucun appareil chiffré : ils ne recevront rien. */
   sansAppareil: string[]
   /** Les membres pour qui l'ouverture de session a échoué. */
@@ -77,15 +93,41 @@ export async function distribuerTrousseau(
     ecrireChargeTrousseau({ convId, motif, versions: morceau }),
   )
   const enveloppes: EnveloppeSortante[] = []
-  const bilan: BilanDistribution = { appareils: 0, sansAppareil: [], echecs: [] }
+  const bilan: BilanDistribution = { appareils: 0, boites: 0, sansAppareil: [], echecs: [] }
+  /*
+   * 🔴 ET UNE BOÎTE PERMANENTE PAR APPAREIL (chapitre 39). L'enveloppe est à
+   * usage unique : un appareil qui la rate (ancienne application, relève
+   * perdue) n'aurait plus que l'administrateur pour la lui renvoyer. La boîte,
+   * scellée pour son identité et signée par la mienne, reste sur le serveur :
+   * il la relit quand il veut, sans personne en ligne. Elle porte le trousseau
+   * ENTIER (pas de plafond de 64 Ko pour elle), et remplace la précédente.
+   */
+  const chargeEntiere = ecrireChargeTrousseau({ convId, motif, versions })
+  const { priv } = await maPaireIdentite()
+  const monAppareil = idAppareil()
+  const boites: { destinataireId: string; destinataireDevice: number; corps: string }[] = []
   for (const uid of new Set(destinataires)) {
     try {
-      const appareils = await ouvrirSessions(uid, uid === moi ? idAppareil() : undefined)
+      const appareils = await ouvrirSessions(uid, uid === moi ? monAppareil : undefined)
       if (appareils.length === 0) {
         if (uid !== moi) bilan.sansAppareil.push(uid)
         continue
       }
       for (const charge of charges) enveloppes.push(...(await chiffrerPour(uid, appareils, charge)))
+      for (const d of appareils) {
+        const cle = await identiteConnue(uid, d)
+        if (!cle || !moi) continue
+        boites.push({
+          destinataireId: uid,
+          destinataireDevice: d,
+          corps: await scellerBoite(
+            chargeEntiere,
+            cle,
+            { convId, destinataireId: uid, destinataireDevice: d, expediteurId: moi, expediteurDevice: monAppareil },
+            priv,
+          ),
+        })
+      }
     } catch (err) {
       console.warn(`[e2ee] trousseau non chiffré pour ${uid.slice(0, 8)} :`, err)
       bilan.echecs.push(uid)
@@ -95,6 +137,25 @@ export async function distribuerTrousseau(
     await deposer(convId, enveloppes.slice(i, i + PAR_DEPOT))
   }
   bilan.appareils = enveloppes.length
+  /*
+   * ⚠️ PAR LOTS D'ENVIRON 4 Mo : une boîte porte le trousseau entier, et un
+   * groupe de 300 membres à deux appareils en dépose 600.
+   */
+  let lot: typeof boites = []
+  let taille = 0
+  const envoyerLot = async () => {
+    if (lot.length === 0) return
+    await apiRequest("/api/e2ee/boites", { method: "PUT", body: { convId, deviceId: monAppareil, boites: lot } })
+    bilan.boites += lot.length
+    lot = []
+    taille = 0
+  }
+  for (const b of boites) {
+    if (lot.length >= PAR_DEPOT || taille + b.corps.length > 4_000_000) await envoyerLot()
+    lot.push(b)
+    taille += b.corps.length
+  }
+  await envoyerLot()
   return bilan
 }
 

@@ -62,6 +62,8 @@ async function compte(prenom) {
 
 async function connecter(navigateur, qui) {
   const contexte = await navigateur.newContext()
+  // Les polices Google ne servent pas au banc (et peuvent bloquer « networkidle »).
+  await contexte.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort())
   const page = await contexte.newPage()
   const erreurs = []
   page.on("pageerror", (e) => erreurs.push(String(e.message)))
@@ -219,7 +221,21 @@ async function main() {
     verifie("le mobile a activé le groupe", active !== null && active.includes("deja=false"), String(active))
     const conv = await prisma.conversation.findUnique({ where: { id: G } })
     verifie("le serveur : chiffré, version 1", conv?.e2eeActif === true && conv.cleVersion === 1)
-    verifie("la clé du mobile arrive dans le navigateur", JSON.stringify(await attendreVersions(W.page, G, [1])) === "[1]")
+    /*
+     * 🔴 LA BOÎTE DU MOBILE, OUVERTE PAR LE WEB (chapitre 39). On supprime
+     * l'enveloppe à usage unique de Wes : il ne lui reste que la boîte
+     * permanente déposée par le téléphone de Mia.
+     */
+    verifie("le mobile a déposé une boîte permanente pour le navigateur",
+      (await prisma.e2eeBoite.count({ where: { convId: G, userId: wes.id } })) >= 1)
+    await prisma.e2eeEnveloppe.deleteMany({ where: { convId: G, destinataireId: wes.id } })
+    // Le navigateur, en ligne, a pu relever l'enveloppe avant sa suppression :
+    // on lui retire aussi la clé, pour que la boîte soit SA SEULE source.
+    await W.page.evaluate(async (c) => (await import("/src/services/e2ee-groupe-fil.ts")).oublierTrousseau(c), G)
+    await prisma.e2eeTrousseau.deleteMany({ where: { convId: G, userId: wes.id } })
+    verifie("… enveloppe, clé locale et copie supprimées : seule la boîte reste",
+      (await prisma.e2eeEnveloppe.count({ where: { convId: G, destinataireId: wes.id } })) === 0 &&
+        (await versionsLocales(W.page, G)).length === 0)
 
     titre("② Le web lit le mobile")
     const idT1 = await mobile.attendre("ENVOYE_T1")
@@ -227,7 +243,9 @@ async function main() {
     const ligne = idT1 ? await prisma.message.findUnique({ where: { id: idT1 }, include: { groupe: true } }) : null
     verifie("le serveur n'a qu'un chiffré, aucun texte", ligne?.content === null && ligne?.groupe?.version === 1)
     let fil = await charger(W.page, G)
-    verifie("Wes lit T1", fil.find((m) => m.id === idT1)?.content === t1, JSON.stringify(fil.find((m) => m.id === idT1)))
+    verifie("Wes lit T1, grâce à la boîte du mobile", fil.find((m) => m.id === idT1)?.content === t1,
+      JSON.stringify(fil.find((m) => m.id === idT1)))
+    verifie("la clé venue de la boîte est rangée", JSON.stringify(await versionsLocales(W.page, G)) === "[1]")
     await W.page.goto(`${WEB}/chats/${G}`, { waitUntil: "networkidle" })
     await fermerPortillon(W.page, "Wes")
     verifie("… et l'écran du fil l'affiche",

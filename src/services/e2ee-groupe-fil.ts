@@ -14,6 +14,7 @@ import {
   dechiffrerMessageGroupe,
   ecrireDemandeTrousseau,
   fusionnerTrousseau,
+  ouvrirBoite,
   GroupeInvalide,
   lireChargeTrousseau,
   lireDemandeTrousseau,
@@ -120,6 +121,18 @@ export async function trousseauAvecRepli(convId: string, voulue?: number): Promi
   const derniere = restaurations.get(convId) ?? 0
   if (Date.now() - derniere < REPOS_RESTAURATION_MS) return local
   restaurations.set(convId, Date.now())
+  /*
+   * 🔴 D'ABORD MA BOÎTE PERMANENTE (chapitre 39) : déposée par l'administrateur
+   * pour CET appareil, elle se relit sans personne en ligne.
+   */
+  try {
+    await releverBoites(convId)
+    const apres = await trousseauLocal(convId)
+    const ok = apres.length > 0 && (voulue === undefined || apres.some((v) => v.n === voulue))
+    if (ok) return apres
+  } catch (err) {
+    console.warn(`[e2ee] boîte du groupe ${convId.slice(0, 8)} illisible :`, err)
+  }
   try {
     const { lireCopie } = await import("./e2ee-trousseau-perso")
     const copie = await lireCopie(convId)
@@ -241,10 +254,57 @@ export async function repondreADemande(
 }
 
 /**
+ * Relit MES boîtes permanentes (toutes, ou celles d'un groupe), et range les
+ * trousseaux qu'elles portent. Rend le nombre de boîtes acceptées.
+ *
+ * 🔴 MÊMES CONTRÔLES QU'UNE ENVELOPPE : la signature avec l'identité DÉJÀ
+ * connue de l'appareil déposant (session ouverte d'abord s'il est inconnu),
+ * le groupe écrit dans le clair = celui de la boîte, et le déposant doit
+ * ADMINISTRER le groupe, ou être moi. Une boîte refusée est ignorée.
+ */
+export async function releverBoites(convId?: string): Promise<number> {
+  const moi = getMyUserId()
+  if (!moi) return 0
+  const appareil = idAppareil()
+  const r = await apiRequest<{
+    boites: { convId: string; expediteurId: string; expediteurDevice: number; corps: string }[]
+  }>(`/api/e2ee/boites?deviceId=${appareil}${convId ? `&convId=${encodeURIComponent(convId)}` : ""}`, {
+    cache: "no-store",
+  })
+  const { priv } = await maPaireIdentite()
+  let n = 0
+  for (const b of r.boites ?? []) {
+    try {
+      const signataire = await cleSignataire(b.expediteurId, b.expediteurDevice)
+      if (!signataire) continue
+      const clair = await ouvrirBoite(
+        b.corps,
+        priv,
+        {
+          convId: b.convId,
+          destinataireId: moi,
+          destinataireDevice: appareil,
+          expediteurId: b.expediteurId,
+          expediteurDevice: b.expediteurDevice,
+        },
+        signataire,
+      )
+      await recevoirTrousseau(b.convId, b.expediteurId, clair)
+      ;(await import("./e2ee-fil")).noteEtatChiffrement(b.convId, true)
+      n++
+    } catch (err) {
+      console.warn(`[e2ee] boîte du groupe ${b.convId.slice(0, 8)} refusée :`, err)
+    }
+  }
+  return n
+}
+
+/**
  * Nouvel appareil : reprend TOUTES mes copies d'un coup (après l'ouverture de
- * l'archive). Rend le nombre de groupes repris.
+ * l'archive), puis toutes mes boîtes. Rend le nombre de groupes repris.
  */
 export async function restaurerTousLesTrousseaux(): Promise<number> {
+  await releverBoites().catch((err) => console.warn("[e2ee] boîtes illisibles :", err))
   const { lireToutesLesCopies } = await import("./e2ee-trousseau-perso")
   let n = 0
   for (const [convId, versions] of await lireToutesLesCopies()) {
