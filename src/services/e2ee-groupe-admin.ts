@@ -29,6 +29,25 @@ import { noteEtatChiffrement } from "./e2ee-fil"
 /** Plafond d'un dépôt côté serveur (`ENVELOPPES_MAX`). */
 const PAR_DEPOT = 1000
 
+/**
+ * Versions par charge « trousseau » (chapitre 38).
+ *
+ * 🔴 PAS DE LIMITE AU NOMBRE DE CLÉS (décision du user, 10/10/2026). Une
+ * enveloppe ne dépasse pas 64 Ko côté serveur ; un trousseau entier y tenait
+ * jusqu'à ~560 versions, au-delà la distribution échouait. On le DÉCOUPE :
+ * 400 versions font ~34 Ko de clair, ~46 Ko d'enveloppe. Chaque morceau est un
+ * trousseau valide, et la réception les fusionne (`fusionnerTrousseau`).
+ */
+export const VERSIONS_PAR_CHARGE = 400
+
+/** Découpe les versions en morceaux de [taille], dans l'ordre. */
+export function decouperVersions(versions: VersionCle[], taille = VERSIONS_PAR_CHARGE): VersionCle[][] {
+  const tries = [...versions].sort((a, b) => a.n - b.n)
+  const morceaux: VersionCle[][] = []
+  for (let i = 0; i < tries.length; i += taille) morceaux.push(tries.slice(i, i + taille))
+  return morceaux
+}
+
 export interface BilanDistribution {
   /** Combien d'appareils ont reçu le trousseau. */
   appareils: number
@@ -54,7 +73,9 @@ export async function distribuerTrousseau(
   destinataires: string[],
 ): Promise<BilanDistribution> {
   const moi = getMyUserId()
-  const charge = ecrireChargeTrousseau({ convId, motif, versions })
+  const charges = decouperVersions(versions).map((morceau) =>
+    ecrireChargeTrousseau({ convId, motif, versions: morceau }),
+  )
   const enveloppes: EnveloppeSortante[] = []
   const bilan: BilanDistribution = { appareils: 0, sansAppareil: [], echecs: [] }
   for (const uid of new Set(destinataires)) {
@@ -64,7 +85,7 @@ export async function distribuerTrousseau(
         if (uid !== moi) bilan.sansAppareil.push(uid)
         continue
       }
-      enveloppes.push(...(await chiffrerPour(uid, appareils, charge)))
+      for (const charge of charges) enveloppes.push(...(await chiffrerPour(uid, appareils, charge)))
     } catch (err) {
       console.warn(`[e2ee] trousseau non chiffré pour ${uid.slice(0, 8)} :`, err)
       bilan.echecs.push(uid)

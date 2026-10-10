@@ -17,7 +17,9 @@
  *     Bob se connecte sur un NOUVEAU navigateur, sans aucune clé locale, et
  *     relit tout l'historique grâce à sa copie ;
  *   ⑦ REPLI APPAREIL : sans aucune copie, un TROISIÈME navigateur de Bob
- *     demande la clé à ses autres navigateurs, qui la lui renvoient.
+ *     demande la clé à ses autres navigateurs, qui la lui renvoient ;
+ *   ⑧ PAS DE LIMITE DE CLÉS : 1 000 versions passent le vrai serveur (plafond
+ *     de 64 Ko par enveloppe), découpées, et la copie personnelle les garde.
  *
  * Usage : node scripts/e2ee-groupe-admin-web.mjs
  *         (backend :3000, WebSocket :3001 et web :5173 démarrés)
@@ -68,6 +70,9 @@ async function compte(prenom) {
 
 async function connecter(navigateur, qui) {
   const contexte = await navigateur.newContext()
+  // Les polices Google ne servent pas au banc, et un réseau qui les bloque
+  // empêche « networkidle » d'arriver (constaté le 10/10/2026) : on les coupe.
+  await contexte.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort())
   const page = await contexte.newPage()
   const erreurs = []
   page.on("pageerror", (e) => erreurs.push(String(e.message)))
@@ -382,6 +387,39 @@ async function main() {
     verifie("et il relit l'historique", fil.find((m) => m.id === id1)?.content === texte1)
     // Le refus d'une demande venue d'un AUTRE compte est prouvé côté mobile
     // (test Dart) : ici, Carole exclue n'a de toute façon plus accès au groupe.
+
+    titre("⑧ Pas de limite de clés : 1 000 versions")
+    const bilanMille = await A.page.evaluate(
+      async ([c, dest]) => {
+        const gf = await import("/src/services/e2ee-groupe-fil.ts")
+        const admin = await import("/src/services/e2ee-groupe-admin.ts")
+        const neuves = []
+        for (let n = 5; n <= 1000; n++) {
+          neuves.push({ n, cle: crypto.getRandomValues(new Uint8Array(32)), creeLe: n })
+        }
+        const toutes = await gf.rangerTrousseau(c, neuves, { deposerCopie: false })
+        return admin.distribuerTrousseau(c, "MANUEL", toutes, dest)
+      },
+      [G, [bob.id]],
+    )
+    verifie("le vrai serveur accepte la distribution (aucun échec)",
+      bilanMille.echecs.length === 0 && bilanMille.appareils >= 3, JSON.stringify(bilanMille))
+    let mille = []
+    for (let i = 0; i < 30; i++) {
+      await relever(B.page)
+      mille = await versionsLocales(B.page, G)
+      if (mille.length === 1000) break
+      await pause(500)
+    }
+    verifie("Bob reçoit les 1 000 versions", mille.length === 1000 && mille[999] === 1000, String(mille.length))
+    let copieMille = null
+    for (let i = 0; i < 20; i++) {
+      copieMille = await prisma.e2eeTrousseau.findUnique({ where: { userId_convId: { userId: bob.id, convId: G } } })
+      if (copieMille && copieMille.corps.length > 100_000) break
+      await pause(400)
+    }
+    verifie("sa copie personnelle les garde toutes",
+      (copieMille?.corps.length ?? 0) > 100_000, String(copieMille?.corps.length))
 
     const erreurs = [...A.erreurs, ...B.erreurs, ...C.erreurs, ...D.erreurs, ...B2.erreurs, ...B3.erreurs]
     verifie("aucune erreur de page", erreurs.length === 0, erreurs.join(" | "))
