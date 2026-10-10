@@ -9,6 +9,7 @@ import { cacheMessage } from "./indexeddb-cache"
 import { archiver } from "./e2ee-sauvegarde"
 import { garderClair } from "./e2ee-media-ouverture"
 import { envoyerDansGroupe, estGroupe } from "./e2ee-groupe-fil"
+import { empreinteHex, televerser } from "./envoi-morceaux"
 
 /**
  * ENVOYER UN MÉDIA CHIFFRÉ DE BOUT EN BOUT — cours, chapitre 24 (lot B).
@@ -34,7 +35,15 @@ import { envoyerDansGroupe, estGroupe } from "./e2ee-groupe-fil"
 export async function envoyerMediaChiffre(
   convId: string,
   fichier: Blob,
-  o: { nom: string; mime: string; dureeMs?: number; legende?: string; replyToId?: string },
+  o: {
+    nom: string
+    mime: string
+    dureeMs?: number
+    legende?: string
+    replyToId?: string
+    /** Avancement du téléversement, de 0 à 1 (chapitre 46). */
+    onProgression?: (fraction: number) => void
+  },
 ): Promise<{ id: string; createdAt: string; descripteur: DescripteurMedia }> {
   /*
    * 🔴 EN GROUPE (lot 4, chapitre 34) : le fichier est chiffré UNE fois avec
@@ -53,11 +62,19 @@ export async function envoyerMediaChiffre(
   const apercu = await fabriquerApercu(fichier, o.mime, o.dureeMs)
   const f = await chiffrerFichier(clair)
 
-  // 3. Le fichier chiffré.
-  const form = new FormData()
-  form.append("file", new Blob([f.chiffre as Uint8Array<ArrayBuffer>], { type: "application/octet-stream" }), "chiffre.bin")
-  form.append("chiffre", "1")
-  const media = await apiRequest<{ id: string }>("/api/media", { method: "POST", body: form })
+  // 3. Le fichier chiffré — en morceaux au-delà d'un mébioctet (chapitre 46).
+  // L'empreinte du chiffré, déjà dans le descripteur, sert aussi au serveur à
+  // vérifier l'assemblage.
+  const media = await televerser(
+    new Blob([f.chiffre as Uint8Array<ArrayBuffer>], { type: "application/octet-stream" }),
+    {
+      nom: "chiffre.bin",
+      mime: "application/octet-stream",
+      chiffre: true,
+      empreinteHex: await empreinteHex(f.chiffre),
+      onProgression: o.onProgression,
+    },
+  )
 
   const descripteur: DescripteurMedia = {
     id: media.id,

@@ -110,6 +110,11 @@ export interface MentionMessage {
 
 export interface ChatMessageMock {
   /**
+   * Avancement de l'ENVOI d'un média, de 0 à 1, tant que le message est
+   * « sending » (chapitre 46). Absent une fois le message parti.
+   */
+  progressionEnvoi?: number
+  /**
    * Ce message est-il chiffre de bout en bout ?
    *
    * ⚠️ IL VIENT DU SERVEUR, qui le deduit de l existence d une enveloppe — pas

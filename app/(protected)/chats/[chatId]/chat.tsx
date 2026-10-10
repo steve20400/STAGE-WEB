@@ -108,7 +108,6 @@ import {
   TAILLE_MEDIA_MAX_MO,
   TAILLE_MEDIA_MAX_OCTETS,
   resolveMediaUrl,
-  uploadMedia,
 } from "../../../../src/services/media-service"
 import { loadPreviewBlob } from "../../../../src/services/media-preview-cache"
 import {
@@ -124,6 +123,7 @@ import { TexteForme } from "../../../../src/components/texte-forme"
 import { MediaChiffre, MediaChiffreIndisponible, TuileChiffree } from "./media-chiffre"
 import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { envoyerMediaChiffre } from "../../../../src/services/e2ee-media-envoi"
+import { televerser } from "../../../../src/services/envoi-morceaux"
 import { urlApercu } from "../../../../src/services/e2ee-media"
 import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
 import { appliquerMarqueur, MARQUEURS, sansMarqueurs } from "../../../../src/lib/mise-en-forme"
@@ -5336,6 +5336,10 @@ function MessageBubble({
                   {isMe && isGroup && nbLectures !== undefined && nbLectures > 0 && (
                     <span style={{ opacity: 0.9 }}>{t("chat_read_count", { n: nbLectures })}</span>
                   )}
+                  {isMe && msg.status === "sending" && typeof msg.progressionEnvoi === "number" && (
+                    // « 18 % », arrondi VERS LE BAS : jamais 100 % avant la fin.
+                    <span style={{ opacity: 0.9 }}>{Math.floor(msg.progressionEnvoi * 100)} %</span>
+                  )}
                   {isMe && <StatusIcon status={msg.status} />}
                 </span>
               )}
@@ -7223,6 +7227,20 @@ export default function ChatRoomPage() {
        * l'éviter, en sachant avant d'envoyer. Même garde que pour le texte.
        */
       if (!etatConnu(chatId)) await lireEtatE2ee(chatId).catch(() => undefined)
+
+      /*
+       * LE POURCENTAGE DE L'ENVOI (demande du user, 10/10/2026) : « 18 % » à
+       * côté de l'horloge de la bulle. Rafraîchi au changement de pour cent
+       * seulement — un rendu par paquet réseau redessinerait tout le fil.
+       */
+      let dernierPourcent = -1
+      const progression = (fraction: number) => {
+        const p = Math.floor(fraction * 100)
+        if (p === dernierPourcent) return
+        dernierPourcent = p
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, progressionEnvoi: fraction } : m)))
+      }
+
       if (estChiffree(chatId)) {
         try {
           const envoi = await envoyerMediaChiffre(chatId, file, {
@@ -7231,6 +7249,7 @@ export default function ChatRoomPage() {
             dureeMs: durationMs,
             legende: caption,
             replyToId: replyTo?.id,
+            onProgression: progression,
           })
           setReplyTo(null)
           setMessages((prev) => {
@@ -7272,7 +7291,13 @@ export default function ChatRoomPage() {
       }
 
       try {
-        const media = await uploadMedia(file, filename, durationMs)
+        // En morceaux au-delà d'un mébioctet (chapitre 46).
+        const media = await televerser(file, {
+          nom: filename,
+          mime,
+          dureeMs: durationMs,
+          onProgression: progression,
+        })
         const saved = await sendChatMessage(chatId, caption, msgType, {
           mediaId: media.id,
           replyToId: replyTo?.id,
