@@ -198,7 +198,12 @@ export async function deposerBloc(
 export async function restaurer(
   maitresse: CryptoKey,
   suivi?: SuiviRestauration,
-): Promise<{ messages: MessageArchive[]; blocsIllisibles: number }> {
+  /**
+   * Le RATTRAPAGE : ne lire que les blocs déposés APRÈS celui-ci (voir
+   * `rattraperDepuisArchive`). `null` ou absent : toute l'archive.
+   */
+  depuis?: string | null,
+): Promise<{ messages: MessageArchive[]; blocsIllisibles: number; dernier: string | null }> {
   /*
    * ⚠️ PAGE PAR PAGE, JUSQU'AU BOUT. Le serveur rend au plus 2 000 blocs par
    * appel et donne `suivant` quand il en reste. On ne lisait que la première
@@ -209,13 +214,19 @@ export async function restaurer(
    * même `suivant` ferait tourner la boucle sans fin. 50 pages = 100 000 blocs.
    */
   const blocs: BlocChiffre[] = []
-  let suivant: string | null = null
+  let suivant: string | null = depuis ?? null
   let total: number | undefined
+  /*
+   * Le curseur à retenir : le dernier bloc rendu (serveur du 10/10/2026). Sans
+   * bloc nouveau, il reste celui d'où l'on partait.
+   */
+  let dernier: string | null = depuis ?? null
   for (let tour = 0; tour < 50; tour++) {
     const reponse: {
       blocs?: BlocChiffre[]
       suivant?: string | null
       totalArchive?: number
+      dernier?: string | null
     } = await apiRequest(
       `/api/e2ee/archive${suivant ? `?apres=${encodeURIComponent(suivant)}` : ""}`,
     )
@@ -223,6 +234,7 @@ export async function restaurer(
     total ??= reponse.totalArchive
     blocs.push(...(reponse.blocs ?? []))
     suivi?.({ etape: "telechargement", fait: blocs.length, total })
+    if (reponse.dernier) dernier = reponse.dernier
     suivant = reponse.suivant ?? null
     if (!suivant) break
   }
@@ -252,5 +264,6 @@ export async function restaurer(
   return {
     messages: [...parId.values()].sort((a, b) => a.quand - b.quand),
     blocsIllisibles,
+    dernier,
   }
 }

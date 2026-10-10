@@ -818,7 +818,9 @@ export async function restaurerALaConnexionSuivie(
   }
 
   try {
-    const { messages, blocsIllisibles } = await restaurer(cle, suivi)
+    const { messages, blocsIllisibles, dernier } = await restaurer(cle, suivi)
+    // Le rattrapage repartira d'ici : tout ce qui précède vient d'être rangé.
+    ecrireCurseur(dernier)
     for (const [i, m] of messages.entries()) {
       if (i % 25 === 0) suivi?.({ etape: "rangement", fait: i, total: messages.length })
       await ranger(m)
@@ -830,6 +832,111 @@ export async function restaurerALaConnexionSuivie(
     console.error("[e2ee] restauration à la connexion impossible :", e)
     return echec
   }
+}
+
+/* ══════════════════ LE RATTRAPAGE (10/10/2026) ══════════════════ */
+
+/*
+ * 🐛 « JE N'ARRIVE PAS À VOIR CERTAINS MESSAGES CHIFFRÉS » (user, 10/10/2026,
+ * fil Toti → steve). Cinq messages, dont une vidéo, envoyés pendant que le seul
+ * navigateur de steve dormait ; il ouvre ensuite un NOUVEAU navigateur (son
+ * téléphone), qui n'existait pas à l'envoi : aucune enveloppe pour lui. Ce
+ * n'était ni le mot de passe ni la reprise par jeton — la clé de l'archive est
+ * bien relue du coffre.
+ *
+ * ⚠️ L'ARCHIVE NE SE LISAIT QU'UNE FOIS, À LA CONNEXION. Quand un autre
+ * appareil du compte relève ces messages et les archive, ce navigateur-ci ne
+ * l'apprenait jamais : « indisponible » pour toujours.
+ *
+ * 🔴 D'OÙ LE RATTRAPAGE : un fil ouvert qui montre des messages indisponibles
+ * relit les blocs déposés DEPUIS la dernière lecture (un curseur, le dernier
+ * bloc lu), range tout ce qu'ils portent, et rend ce qu'il a trouvé.
+ */
+
+/**
+ * Le curseur : le dernier bloc d'archive lu par cet appareil.
+ *
+ * ⚠️ EN `localStorage`, SOUS LE PRÉFIXE `alanya.e2ee.` : ce n'est pas un
+ * secret (un identifiant de bloc), et ce préfixe est vidé à la déconnexion et
+ * au changement de compte — un curseur ne survit pas à son compte.
+ */
+const CLE_CURSEUR = "alanya.e2ee.archive.curseur"
+
+function lireCurseur(): string | null {
+  try {
+    return localStorage.getItem(CLE_CURSEUR)
+  } catch {
+    return null
+  }
+}
+
+function ecrireCurseur(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(CLE_CURSEUR, id)
+    else localStorage.removeItem(CLE_CURSEUR)
+  } catch {
+    // Sans stockage, le prochain rattrapage relira tout : plus lent, pas faux.
+  }
+}
+
+/** Entre deux rattrapages : un fil rechargé à chaque message n'en lance pas un à chaque fois. */
+const RATTRAPAGE_REPOS_MS = 20_000
+let dernierRattrapage = 0
+let rattrapageEnCours: Promise<Map<string, MessageArchive>> | null = null
+
+/**
+ * Relit les blocs d'archive nouveaux, range leurs messages, et les rend par
+ * identifiant.
+ *
+ * ⚠️ RANGE TOUT, pas seulement ce que le fil ouvert attend : les autres fils
+ * en profitent, et le curseur avance d'un coup.
+ *
+ * ⚠️ UN CURSEUR INCONNU DU SERVEUR (archive effacée puis recréée) : on repart
+ * du début, une fois.
+ *
+ * ⚠️ NE LÈVE JAMAIS. Sans archive ouverte, sans réseau : une carte vide, et le
+ * message reste « indisponible », comme avant.
+ */
+export function rattraperDepuisArchive(
+  ranger: (m: MessageArchive) => Promise<void>,
+): Promise<Map<string, MessageArchive>> {
+  if (rattrapageEnCours) return rattrapageEnCours
+  if (Date.now() - dernierRattrapage < RATTRAPAGE_REPOS_MS) return Promise.resolve(new Map())
+  dernierRattrapage = Date.now()
+
+  rattrapageEnCours = (async () => {
+    const trouves = new Map<string, MessageArchive>()
+    const cle = await laCle()
+    if (!cle) return trouves
+    let lu: Awaited<ReturnType<typeof restaurer>>
+    try {
+      lu = await restaurer(cle, undefined, lireCurseur())
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status !== 400) return trouves
+      ecrireCurseur(null)
+      try {
+        lu = await restaurer(cle)
+      } catch {
+        return trouves
+      }
+    }
+    for (const m of lu.messages) {
+      try {
+        await ranger(m)
+        trouves.set(m.id, m)
+      } catch {
+        // Un rangement raté n'empêche pas les autres.
+      }
+    }
+    ecrireCurseur(lu.dernier)
+    if (lu.messages.length > 0) {
+      console.info(`[e2ee] rattrapage : ${lu.messages.length} message(s) relu(s) dans l'archive.`)
+    }
+    return trouves
+  })().finally(() => {
+    rattrapageEnCours = null
+  })
+  return rattrapageEnCours
 }
 
 /* ══════════════════ TOUT EFFACER ══════════════════ */

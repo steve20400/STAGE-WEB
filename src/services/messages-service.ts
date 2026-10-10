@@ -37,7 +37,7 @@ import { releverEtRanger } from "./e2ee-releve"
 import { lireMessageGroupe, type ChiffreGroupe } from "./e2ee-groupe-fil"
 import { entreeCacheDechiffree } from "./e2ee-entree-cache"
 import { cacheClairRecu, cacheModificationRecue } from "./indexeddb-cache"
-import { archiver } from "./e2ee-sauvegarde"
+import { archiver, rattraperDepuisArchive } from "./e2ee-sauvegarde"
 
 /** Message tel que renvoye par le backend Next.js (REST et WebSocket). */
 export interface BackendMessage {
@@ -459,6 +459,30 @@ export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> 
        * messages, soit trois blocs de doublons par ouverture — autant de pris
        * sur la limite de lecture de l'archive côté serveur.
        */
+    }
+
+    /*
+     * 🔴 LE RATTRAPAGE PAR L'ARCHIVE (10/10/2026) — voir
+     * `rattraperDepuisArchive`. Un message en tête-à-tête resté sans texte ni
+     * média n'avait pas d'enveloppe pour CET appareil (navigateur ouvert après
+     * l'envoi) : un autre appareil du compte l'a peut-être lu et archivé
+     * depuis. Les messages de groupe ne sont pas concernés : leur chiffré se
+     * relit sur le serveur.
+     */
+    const deGroupe = new Set(backendMessages.filter((b) => b.groupe).map((b) => b.id))
+    const manquants = messages.filter(
+      (m) => m.chiffre && !m.isDeleted && !m.content && !m.mediaChiffre && !deGroupe.has(m.id),
+    )
+    if (manquants.length > 0) {
+      const trouves = await rattraperDepuisArchive(async (a) => {
+        await cacheClairRecu(entreeCacheDechiffree(a))
+      })
+      for (const m of manquants) {
+        const a = trouves.get(m.id)
+        if (!a || a.convId !== chatId || a.expediteurId !== m.senderId) continue
+        if (a.texte) m.content = a.texte
+        if (a.media) m.mediaChiffre = a.media
+      }
     }
   }
 
