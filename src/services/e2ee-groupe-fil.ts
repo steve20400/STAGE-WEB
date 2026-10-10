@@ -1,13 +1,22 @@
 import { apiRequest, ApiError } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
 import { ouvrirCoffre, lireSecret, ecrireSecret, effacerSecret, coffreEcrit } from "./coffre-chiffre"
-import { identiteConnue, idAppareil, maPaireIdentite, ouvrirSessions } from "./e2ee-service"
+import {
+  chiffrerPour,
+  deposer,
+  identiteConnue,
+  idAppareil,
+  maPaireIdentite,
+  ouvrirSessions,
+} from "./e2ee-service"
 import {
   chiffrerMessageGroupe,
   dechiffrerMessageGroupe,
+  ecrireDemandeTrousseau,
   fusionnerTrousseau,
   GroupeInvalide,
   lireChargeTrousseau,
+  lireDemandeTrousseau,
   type VersionCle,
 } from "./e2ee-groupe"
 import { ecrireCharge, lireCharge, type DescripteurMedia, type GenreCharge } from "./e2ee-media"
@@ -114,13 +123,86 @@ export async function trousseauAvecRepli(convId: string, voulue?: number): Promi
   try {
     const { lireCopie } = await import("./e2ee-trousseau-perso")
     const copie = await lireCopie(convId)
-    if (!copie) return local
     // La copie vient de moi : pas la peine de la redéposer telle quelle.
-    return await rangerTrousseau(convId, copie, { deposerCopie: false })
+    const repris = copie ? await rangerTrousseau(convId, copie, { deposerCopie: false }) : local
+    const encoreManquant =
+      repris.length === 0 || (voulue !== undefined && !repris.some((v) => v.n === voulue))
+    /*
+     * 🔴 LE REPLI « APPAREIL » (chapitre 37) : pas de copie (archive fermée,
+     * jamais ouverte ici), ou une copie en retard. On demande à MES AUTRES
+     * appareils ; leur réponse arrive par la relève, et la sonnette
+     * `e2ee_trousseau` rouvre le fil.
+     */
+    if (encoreManquant) void demanderAMesAppareils(convId)
+    return repris
   } catch (err) {
     console.warn(`[e2ee] restauration du trousseau de ${convId.slice(0, 8)} impossible :`, err)
+    void demanderAMesAppareils(convId)
     return local
   }
+}
+
+/* ══════════════════ LE REPLI « APPAREIL » ══════════════════ */
+
+/** Dernière demande envoyée, et dernière réponse donnée, par groupe. */
+const demandes = new Map<string, number>()
+const reponses = new Map<string, number>()
+const REPOS_DEMANDE_MS = 60_000
+
+/**
+ * Demande le trousseau de ce groupe à MES AUTRES appareils (hors fil).
+ *
+ * ⚠️ UNE DEMANDE PAR GROUPE ET PAR MINUTE : un fil plein de bulles « en
+ * attente » ne doit pas en envoyer une par bulle. Rend `false` sans rien faire
+ * si je n'ai aucun autre appareil.
+ */
+export async function demanderAMesAppareils(convId: string): Promise<boolean> {
+  const moi = getMyUserId()
+  if (!moi) return false
+  const derniere = demandes.get(convId) ?? 0
+  if (Date.now() - derniere < REPOS_DEMANDE_MS) return false
+  demandes.set(convId, Date.now())
+  try {
+    const miens = await ouvrirSessions(moi, idAppareil())
+    if (miens.length === 0) return false
+    await deposer(convId, await chiffrerPour(moi, miens, ecrireDemandeTrousseau(convId)))
+    return true
+  } catch (err) {
+    console.warn(`[e2ee] demande du trousseau de ${convId.slice(0, 8)} impossible :`, err)
+    return false
+  }
+}
+
+/**
+ * Un de MES appareils me demande le trousseau d'un groupe : je le lui envoie
+ * (motif APPAREIL), s'il est bien de mon compte et si je l'ai.
+ *
+ * 🔴 SEUL MON COMPTE PEUT DEMANDER. L'expéditeur est sûr — c'est sa session
+ * Signal qui a déchiffré la demande. Un membre du groupe qui demanderait la
+ * clé à ma place serait refusé ici ; un appareil glissé par le serveur dans
+ * MON compte, lui, passerait — comme il recevrait déjà tout ce que j'écris :
+ * c'est la limite que seule la vérification du code de sécurité lève.
+ *
+ * ⚠️ UNE RÉPONSE PAR GROUPE ET PAR DEMI-MINUTE.
+ */
+export async function repondreADemande(
+  convIdEnveloppe: string,
+  expediteurId: string,
+  clair: string,
+): Promise<boolean> {
+  if (expediteurId !== getMyUserId()) {
+    throw new GroupeInvalide("demande de trousseau venue d'un autre compte")
+  }
+  const convId = lireDemandeTrousseau(clair, convIdEnveloppe)
+  const versions = await trousseauLocal(convId)
+  if (versions.length === 0) return false
+  const derniere = reponses.get(convId) ?? 0
+  if (Date.now() - derniere < REPOS_RESTAURATION_MS) return false
+  reponses.set(convId, Date.now())
+  // Import différé : le module d'administration importe celui-ci.
+  const { distribuerTrousseau } = await import("./e2ee-groupe-admin")
+  await distribuerTrousseau(convId, "APPAREIL", versions, [expediteurId])
+  return true
 }
 
 /**

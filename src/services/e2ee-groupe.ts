@@ -269,6 +269,43 @@ export function estChargeTrousseau(clair: string): boolean {
   return clair.startsWith(PREFIXE_TROUSSEAU)
 }
 
+/* ══════════════════ LA DEMANDE DE TROUSSEAU (repli APPAREIL) ══════════════════ */
+
+/**
+ * Préfixe d'une DEMANDE de trousseau, envoyée par un appareil à SES AUTRES
+ * appareils quand une clé lui manque (cours, chapitre 37). Distinct de
+ * `\u0000G1` : une demande ne doit jamais être prise pour un trousseau.
+ */
+export const PREFIXE_DEMANDE = "\u0000GD"
+
+export function ecrireDemandeTrousseau(convId: string): string {
+  return PREFIXE_DEMANDE + JSON.stringify({ v: 1, type: "demande-trousseau", convId })
+}
+
+export function estDemandeTrousseau(clair: string): boolean {
+  return clair.startsWith(PREFIXE_DEMANDE)
+}
+
+/**
+ * Lit une demande et rend le groupe visé — qui doit être celui de
+ * l'enveloppe, comme pour un trousseau.
+ */
+export function lireDemandeTrousseau(clair: string, convIdEnveloppe: string): string {
+  if (!estDemandeTrousseau(clair)) throw new GroupeInvalide("pas une demande de trousseau")
+  let brut: unknown
+  try {
+    brut = JSON.parse(clair.slice(PREFIXE_DEMANDE.length))
+  } catch {
+    throw new GroupeInvalide("demande illisible")
+  }
+  const d = brut as { v?: unknown; type?: unknown; convId?: unknown }
+  if (d.v !== 1 || d.type !== "demande-trousseau") throw new GroupeInvalide("demande mal formée")
+  if (typeof d.convId !== "string" || d.convId !== convIdEnveloppe) {
+    throw new GroupeInvalide("demande rattachée à un autre groupe que le sien")
+  }
+  return d.convId
+}
+
 /**
  * Lit et VÉRIFIE une charge trousseau.
  *

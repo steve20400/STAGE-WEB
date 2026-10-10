@@ -15,7 +15,9 @@
  *     groupe » se remplit seule quand la clé arrive (sonnette e2ee_trousseau) ;
  *   ⑥ LOT 6 : chacun a déposé sa copie chiffrée ; le serveur ne lit rien ;
  *     Bob se connecte sur un NOUVEAU navigateur, sans aucune clé locale, et
- *     relit tout l'historique grâce à sa copie.
+ *     relit tout l'historique grâce à sa copie ;
+ *   ⑦ REPLI APPAREIL : sans aucune copie, un TROISIÈME navigateur de Bob
+ *     demande la clé à ses autres navigateurs, qui la lui renvoient.
  *
  * Usage : node scripts/e2ee-groupe-admin-web.mjs
  *         (backend :3000, WebSocket :3001 et web :5173 démarrés)
@@ -359,7 +361,29 @@ async function main() {
     verifie("il relit tout l'historique", fil.find((m) => m.id === id1)?.content === texte1 &&
       fil.find((m) => m.id === id2)?.content === texte2)
 
-    const erreurs = [...A.erreurs, ...B.erreurs, ...C.erreurs, ...D.erreurs, ...B2.erreurs]
+    titre("⑦ Repli APPAREIL : pas de copie, un autre appareil répond")
+    await prisma.e2eeTrousseau.deleteMany({ where: { convId: G, userId: bob.id } })
+    const B3 = await connecter(navigateur, bob)
+    verifie("troisième navigateur de Bob : clés publiées", await attendreCles(bob, 3))
+    await attendreArchive(B3.page)
+    verifie("il n'a aucune clé, et aucune copie ne l'attend",
+      (await versionsLocales(B3.page, G)).length === 0 &&
+        (await prisma.e2eeTrousseau.count({ where: { convId: G, userId: bob.id } })) === 0)
+    await charger(B3.page, G) // une clé manque : la demande part
+    let recues = []
+    for (let i = 0; i < 40; i++) {
+      recues = await versionsLocales(B3.page, G)
+      if (recues.length === 4) break
+      await pause(500)
+    }
+    verifie("ses autres navigateurs lui renvoient les quatre versions", JSON.stringify(recues) === "[1,2,3,4]",
+      JSON.stringify(recues))
+    fil = await charger(B3.page, G)
+    verifie("et il relit l'historique", fil.find((m) => m.id === id1)?.content === texte1)
+    // Le refus d'une demande venue d'un AUTRE compte est prouvé côté mobile
+    // (test Dart) : ici, Carole exclue n'a de toute façon plus accès au groupe.
+
+    const erreurs = [...A.erreurs, ...B.erreurs, ...C.erreurs, ...D.erreurs, ...B2.erreurs, ...B3.erreurs]
     verifie("aucune erreur de page", erreurs.length === 0, erreurs.join(" | "))
   } finally {
     if (G) await prisma.conversation.delete({ where: { id: G } }).catch(() => undefined)

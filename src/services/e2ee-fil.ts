@@ -3,13 +3,14 @@ import { getMyUserId } from "../data/session-user"
 import { identitesChangees as identitesChangeesInternes } from "./e2ee-store"
 import { ouvrirCoffre } from "./coffre-chiffre"
 import { ecrireCharge, lireCharge, type DescripteurMedia, type GenreCharge } from "./e2ee-media"
-import { estChargeTrousseau } from "./e2ee-groupe"
+import { estChargeTrousseau, estDemandeTrousseau } from "./e2ee-groupe"
 import {
   envoyerDansGroupe,
   estGroupe,
   modifierDansGroupe,
   noteGroupe,
   recevoirTrousseau,
+  repondreADemande,
 } from "./e2ee-groupe-fil"
 import {
   chiffrerPour,
@@ -494,6 +495,10 @@ export async function releverEtDechiffrer(
        * que cet appareil recevra. Refusé (pas un administrateur, clé déjà
        * connue autrement), il tombe dans le `catch` : acquitté, ignoré.
        */
+      // Un autre de MES appareils demande une clé (repli APPAREIL, chapitre 37).
+      if (!e.messageId && estDemandeTrousseau(clair)) {
+        await repondreADemande(e.convId, e.expediteurId, clair)
+      }
       if (!e.messageId && estChargeTrousseau(clair)) {
         await recevoirTrousseau(e.convId, e.expediteurId, clair)
         /*
