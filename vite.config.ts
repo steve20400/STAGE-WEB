@@ -42,6 +42,17 @@ import react from "@vitejs/plugin-react"
 const SEAUX_MEDIAS = [
   "https://alanyawork.s3.eu-central-003.backblazeb2.com",
   "https://profilemedia.s3.eu-central-003.backblazeb2.com",
+  /*
+   * 🔴 LE SEAU PRIVÉ CHEZ CLOUDFLARE R2 (10/10/2026). Le backend y bascule les
+   * fichiers des conversations quand `STOCKAGE_PRIVE=r2` ; `/api/media/<id>`
+   * redirige alors vers une adresse signée de cet hôte. Présent AVANT la
+   * bascule, pour que le web soit prêt le jour où l'on change l'interrupteur —
+   * et sans effet tant qu'on ne l'a pas changé.
+   *
+   * ⚠️ L'HÔTE EXACT DU SEAU (`<seau>.<compte>.r2.cloudflarestorage.com`), pas
+   * `*.r2.cloudflarestorage.com` : le seau d'un tiers n'a rien à faire ici.
+   */
+  "https://alanyawork.e53d325a4f33b8e8b855ce6753faab6c.r2.cloudflarestorage.com",
 ]
 
 /**
