@@ -19,7 +19,10 @@
  *   ⑦ REPLI APPAREIL : sans aucune copie, un TROISIÈME navigateur de Bob
  *     demande la clé à ses autres navigateurs, qui la lui renvoient ;
  *   ⑧ PAS DE LIMITE DE CLÉS : 1 000 versions passent le vrai serveur (plafond
- *     de 64 Ko par enveloppe), découpées, et la copie personnelle les garde.
+ *     de 64 Ko par enveloppe), découpées, et la copie personnelle les garde ;
+ *   ⑨ CLÉ PERDUE : Dave n'a plus ni clé ni copie, et un seul appareil ; il
+ *     redemande, l'ADMINISTRATRICE la lui renvoie (défaut constaté le 10/10 :
+ *     un téléphone resté sur l'ancienne application avait perdu sa clé).
  *
  * Usage : node scripts/e2ee-groupe-admin-web.mjs
  *         (backend :3000, WebSocket :3001 et web :5173 démarrés)
@@ -315,11 +318,19 @@ async function main() {
     await prisma.conversation.update({ where: { id: G }, data: { cleVersion: 4 } })
     const texte4 = `En version 4 ${Date.now().toString(36)}`
     await envoyer(A.page, G, texte4)
+    /*
+     * ⚠️ DEPUIS LE 10/10, BOB REDEMANDE AUSSITÔT LA CLÉ AUX ADMINISTRATEURS, et
+     * Alice la renvoie en un instant : la bulle « en attente » ne durerait pas
+     * assez pour être vue. On bloque ses dépôts le temps de la regarder.
+     */
+    const bloquerDepots = (r) => (r.request().method() === "POST" ? r.abort() : r.continue())
+    await B.page.route("**/api/e2ee/enveloppes", bloquerDepots)
     await B.page.reload({ waitUntil: "networkidle" })
     await fermerPortillon(B.page, "Bob")
     const attente = await B.page.getByText("Message chiffré — en attente de la clé du groupe.").first()
       .waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false)
     verifie("la bulle dit « en attente de la clé du groupe »", attente)
+    await B.page.unroute("**/api/e2ee/enveloppes", bloquerDepots)
     // Alice distribue la version 4 : la sonnette e2ee_trousseau rouvre le fil de Bob.
     await A.page.evaluate(
       async ([c, cle, dest]) => {
@@ -420,6 +431,23 @@ async function main() {
     }
     verifie("sa copie personnelle les garde toutes",
       (copieMille?.corps.length ?? 0) > 100_000, String(copieMille?.corps.length))
+
+    titre("⑨ Clé perdue : l'administratrice la renvoie")
+    await D.page.evaluate(async (c) => (await import("/src/services/e2ee-groupe-fil.ts")).oublierTrousseau(c), G)
+    await prisma.e2eeTrousseau.deleteMany({ where: { convId: G, userId: dave.id } })
+    verifie("Dave n'a plus aucune clé, ni copie, ni autre appareil",
+      (await versionsLocales(D.page, G)).length === 0 &&
+        (await prisma.e2eeIdentite.count({ where: { userId: dave.id } })) === 1)
+    await charger(D.page, G) // une clé manque : la demande part, aussi vers l'administratrice
+    let rendues = []
+    for (let i = 0; i < 40; i++) {
+      rendues = await versionsLocales(D.page, G)
+      if (rendues.length === 1000) break
+      await pause(500)
+    }
+    verifie("l'administratrice lui renvoie tout le trousseau", rendues.length === 1000, String(rendues.length))
+    fil = await charger(D.page, G)
+    verifie("et Dave relit l'historique", fil.find((m) => m.id === id1)?.content === texte1)
 
     const erreurs = [...A.erreurs, ...B.erreurs, ...C.erreurs, ...D.erreurs, ...B2.erreurs, ...B3.erreurs]
     verifie("aucune erreur de page", erreurs.length === 0, erreurs.join(" | "))

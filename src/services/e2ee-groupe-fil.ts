@@ -150,11 +150,18 @@ const reponses = new Map<string, number>()
 const REPOS_DEMANDE_MS = 60_000
 
 /**
- * Demande le trousseau de ce groupe à MES AUTRES appareils (hors fil).
+ * Demande le trousseau de ce groupe à MES AUTRES appareils ET AUX
+ * ADMINISTRATEURS du groupe (hors fil).
+ *
+ * 🐛 POURQUOI AUSSI LES ADMINISTRATEURS (10/10/2026, constaté par le user). Un
+ * téléphone resté sur l'ANCIENNE application à l'activation a reçu la clé…
+ * et l'a rangée comme un message : elle était perdue. Ses autres appareils,
+ * anciens, ne répondaient pas ; il redemandait chaque minute, sans fin. Les
+ * administrateurs ont la clé, et c'est eux qui l'auraient envoyée à l'ajout :
+ * ils peuvent la renvoyer à un membre qui l'a perdue.
  *
  * ⚠️ UNE DEMANDE PAR GROUPE ET PAR MINUTE : un fil plein de bulles « en
- * attente » ne doit pas en envoyer une par bulle. Rend `false` sans rien faire
- * si je n'ai aucun autre appareil.
+ * attente » ne doit pas en envoyer une par bulle.
  */
 export async function demanderAMesAppareils(convId: string): Promise<boolean> {
   const moi = getMyUserId()
@@ -163,9 +170,24 @@ export async function demanderAMesAppareils(convId: string): Promise<boolean> {
   if (Date.now() - derniere < REPOS_DEMANDE_MS) return false
   demandes.set(convId, Date.now())
   try {
+    const demande = ecrireDemandeTrousseau(convId)
+    const enveloppes = []
     const miens = await ouvrirSessions(moi, idAppareil())
-    if (miens.length === 0) return false
-    await deposer(convId, await chiffrerPour(moi, miens, ecrireDemandeTrousseau(convId)))
+    if (miens.length > 0) enveloppes.push(...(await chiffrerPour(moi, miens, demande)))
+    const r = await apiRequest<{ members: { id: string; role?: string; joinedAt?: string }[] }>(
+      `/api/conversations/${encodeURIComponent(convId)}/members`,
+    )
+    for (const m of r.members ?? []) {
+      if (m.id === moi || !estAdministrateur(r.members, m.id)) continue
+      try {
+        const appareils = await ouvrirSessions(m.id)
+        if (appareils.length > 0) enveloppes.push(...(await chiffrerPour(m.id, appareils, demande)))
+      } catch {
+        // Un administrateur injoignable n'empêche pas de demander aux autres.
+      }
+    }
+    if (enveloppes.length === 0) return false
+    await deposer(convId, enveloppes)
     return true
   } catch (err) {
     console.warn(`[e2ee] demande du trousseau de ${convId.slice(0, 8)} impossible :`, err)
@@ -174,34 +196,47 @@ export async function demanderAMesAppareils(convId: string): Promise<boolean> {
 }
 
 /**
- * Un de MES appareils me demande le trousseau d'un groupe : je le lui envoie
- * (motif APPAREIL), s'il est bien de mon compte et si je l'ai.
+ * Quelqu'un me demande le trousseau d'un groupe. Je le lui envoie si :
  *
- * 🔴 SEUL MON COMPTE PEUT DEMANDER. L'expéditeur est sûr — c'est sa session
- * Signal qui a déchiffré la demande. Un membre du groupe qui demanderait la
- * clé à ma place serait refusé ici ; un appareil glissé par le serveur dans
- * MON compte, lui, passerait — comme il recevrait déjà tout ce que j'écris :
- * c'est la limite que seule la vérification du code de sécurité lève.
+ *   · c'est un de MES appareils (motif APPAREIL) ;
+ *   · OU je suis ADMINISTRATEUR du groupe et il en est MEMBRE ACTIF (motif
+ *     AJOUT) — exactement ce que j'aurais fait en l'ajoutant.
  *
- * ⚠️ UNE RÉPONSE PAR GROUPE ET PAR DEMI-MINUTE.
+ * 🔴 L'EXPÉDITEUR EST SÛR — c'est sa session Signal qui a déchiffré la
+ * demande. Un simple membre ne répond qu'à ses propres appareils ; un ancien
+ * membre (parti, exclu) n'obtient rien. La liste des membres vient du serveur,
+ * comme pour l'ajout : c'est la limite du chapitre 31, que la vérification du
+ * code de sécurité lève.
+ *
+ * ⚠️ UNE RÉPONSE PAR DEMANDEUR, PAR GROUPE ET PAR DEMI-MINUTE.
  */
 export async function repondreADemande(
   convIdEnveloppe: string,
   expediteurId: string,
   clair: string,
 ): Promise<boolean> {
-  if (expediteurId !== getMyUserId()) {
-    throw new GroupeInvalide("demande de trousseau venue d'un autre compte")
-  }
+  const moi = getMyUserId()
   const convId = lireDemandeTrousseau(clair, convIdEnveloppe)
+  if (expediteurId !== moi) {
+    const r = await apiRequest<{ members: { id: string; role?: string; joinedAt?: string }[] }>(
+      `/api/conversations/${encodeURIComponent(convId)}/members`,
+    )
+    if (!moi || !estAdministrateur(r.members ?? [], moi)) {
+      throw new GroupeInvalide("demande de trousseau d'un autre compte, et je n'administre pas le groupe")
+    }
+    if (!(r.members ?? []).some((m) => m.id === expediteurId)) {
+      throw new GroupeInvalide("demande de trousseau d'un compte qui n'est pas membre")
+    }
+  }
   const versions = await trousseauLocal(convId)
   if (versions.length === 0) return false
-  const derniere = reponses.get(convId) ?? 0
+  const cle = `${convId}:${expediteurId}`
+  const derniere = reponses.get(cle) ?? 0
   if (Date.now() - derniere < REPOS_RESTAURATION_MS) return false
-  reponses.set(convId, Date.now())
+  reponses.set(cle, Date.now())
   // Import différé : le module d'administration importe celui-ci.
   const { distribuerTrousseau } = await import("./e2ee-groupe-admin")
-  await distribuerTrousseau(convId, "APPAREIL", versions, [expediteurId])
+  await distribuerTrousseau(convId, expediteurId === moi ? "APPAREIL" : "AJOUT", versions, [expediteurId])
   return true
 }
 
