@@ -53,6 +53,21 @@ const SEAUX_MEDIAS = [
    * `*.r2.cloudflarestorage.com` : le seau d'un tiers n'a rien à faire ici.
    */
   "https://alanyawork.e53d325a4f33b8e8b855ce6753faab6c.r2.cloudflarestorage.com",
+  /*
+   * 🔴 LES DEUX SEAUX PUBLICS CHEZ CLOUDFLARE R2 (11/10/2026), par leur adresse
+   * publique `r2.dev` — celle de `R2_PUBLIC_URL` et `R2_PROFIL_URL` dans le
+   * `.env` du backend. Si l'une change (passage à un sous-domaine), la changer
+   * ICI AUSSI, le même jour.
+   *
+   *   · `profilemedia`  — accueils de répondeur, sonneries (`STOCKAGE_PUBLIC=r2`) ;
+   *   · `alanyaprofile` — photos de profil et de groupe (`STOCKAGE_PROFIL=r2`) :
+   *     `/api/avatars/<id>` renvoie vers lui. Absent d'ici, chaque photo de
+   *     profil du web disparaîtrait, le mobile n'ayant pas de CSP.
+   *
+   * ⚠️ L'HÔTE EXACT, pas `*.r2.dev` : n'importe qui peut ouvrir un seau r2.dev.
+   */
+  "https://pub-b6b5b3d84ceb453c84791a974cec15dc.r2.dev",
+  "https://pub-c88dbb88deb1457294bc23ee31719f87.r2.dev",
 ]
 
 /**
