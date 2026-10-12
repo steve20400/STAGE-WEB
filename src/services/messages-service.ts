@@ -359,9 +359,19 @@ function cacheBackendMessages(backendMessages: BackendMessage[]): void {
 
 /** GET /api/conversations/{id}/messages — historique (renvoye du plus recent au plus ancien).
  *  Persiste les messages dans IndexedDB pour le cache-first. */
-export async function fetchMessages(chatId: string): Promise<ChatMessageMock[]> {
+export async function fetchMessages(
+  chatId: string,
+  /**
+   * Combien de messages demander. Par défaut une page d'écran.
+   *
+   * ⚠️ LA LISTE DES CONVERSATIONS EN DEMANDE TRÈS PEU : elle ne veut qu'un
+   * aperçu, et charger trente messages par groupe sur une connexion lente
+   * coûterait cher pour une ligne de texte (voir `dernier-message-local.ts`).
+   */
+  limite: number = INITIAL_PAGE_SIZE
+): Promise<ChatMessageMock[]> {
   const response = await apiRequest<ListMessagesResponse>(
-    `/api/conversations/${chatId}/messages?limit=${INITIAL_PAGE_SIZE}`
+    `/api/conversations/${chatId}/messages?limit=${limite}`
   )
   const myId = getMyUserId()
   const backendMessages = response.messages ?? []

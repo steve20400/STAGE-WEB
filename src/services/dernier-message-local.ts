@@ -27,8 +27,20 @@ export interface DernierMessage {
 interface AvecDernier {
   id: string
   e2eeActif?: boolean
+  isGroup?: boolean
   lastMessage?: DernierMessage | null
 }
+
+/**
+ * Combien de GROUPES chiffrés sans aperçu local on va ouvrir en silence, au
+ * plus, à chaque affichage de la liste.
+ *
+ * ⚠️ UNE BORNE, PARCE QUE C'EST UNE REQUÊTE PAR GROUPE. Quelqu'un qui aurait
+ * trente groupes chiffrés et un téléphone neuf ferait trente appels d'un coup
+ * sur une connexion lente. Les premiers de la liste sont ceux qu'il regarde ;
+ * les autres se rempliront au prochain affichage, ou à l'ouverture.
+ */
+const GROUPES_A_ECLAIRER_MAX = 8
 
 /**
  * Remplace l'aperçu des fils CHIFFRÉS par le dernier texte connu localement.
@@ -101,8 +113,64 @@ export async function derniersTextesLocaux(convs: AvecDernier[]): Promise<Map<st
   return locaux
 }
 
+/**
+ * LES GROUPES CHIFFRÉS QUE PERSONNE N'A ENCORE OUVERTS ICI.
+ *
+ * 🐛 UN GROUPE CHIFFRÉ N'AVAIT AUCUN APERÇU DANS LA LISTE tant qu'on ne
+ * l'avait pas ouvert sur CET appareil (trouvé le 12/10/2026 en vérifiant, à la
+ * demande du user, que le chiffrement des groupes n'avait rien cassé).
+ *
+ * 🔴 LA CAUSE : un message de tête-à-tête voyage dans une ENVELOPPE, et la
+ * relève de fond les ramène toutes, quel que soit le fil affiché — le cache se
+ * remplit donc tout seul. Le corps d'un message de GROUPE, lui, est posé sur le
+ * message lui-même et ne se déchiffre qu'en chargeant les messages de ce fil.
+ * Sans ouverture, rien n'arrive dans le cache, et la liste n'a rien à montrer.
+ *
+ * ⚠️ ON NE CHARGE QUE CE QU'IL FAUT, ET PAS PLUS : les groupes chiffrés QUI
+ * N'ONT PAS d'aperçu local. Un groupe déjà ouvert une fois n'en a pas besoin,
+ * et un fil de tête-à-tête encore moins.
+ *
+ * ⚠️ NE LÈVE JAMAIS, et ne bloque pas la liste : c'est un complément. Un
+ * groupe qui échoue garde l'aperçu qu'il avait, c'est-à-dire aucun.
+ */
+async function eclairerGroupesJamaisOuverts(
+  convs: AvecDernier[],
+  locaux: Map<string, DernierMessage>,
+): Promise<void> {
+  const aFaire = convs
+    .filter((c) => c.e2eeActif && c.isGroup && !locaux.has(c.id))
+    .slice(0, GROUPES_A_ECLAIRER_MAX)
+  if (aFaire.length === 0) return
+
+  // Séquentiel : huit requêtes lancées ensemble sur une connexion mobile se
+  // ralentissent l'une l'autre, et la liste est déjà affichée.
+  for (const c of aFaire) {
+    try {
+      // `fetchMessages` déchiffre les messages de groupe et les range dans le
+      // cache (`eclairerGroupe`) : c'est tout ce qu'on lui demande ici.
+      const { fetchMessages } = await import("./messages-service")
+      // Cinq : de quoi tomber sur un message qui porte du texte, même si les
+      // derniers sont des photos ou des messages effacés.
+      await fetchMessages(c.id, 5)
+    } catch {
+      /* Hors ligne, clé pas encore reçue : la liste reste comme elle était. */
+    }
+  }
+}
+
 /** Les deux à la suite — à appliquer à TOUTE liste affichée. */
 export async function avecDerniersTextesLocaux<T extends AvecDernier>(convs: T[]): Promise<T[]> {
   if (!convs.some((c) => c.e2eeActif)) return convs
+  const locaux = await derniersTextesLocaux(convs)
+
+  /*
+   * Les groupes jamais ouverts ici sont éclairés APRÈS une première lecture du
+   * cache, et la liste est recalculée ensuite : on affiche tout de suite ce
+   * qu'on sait, puis on complète.
+   */
+  const manquants = convs.some((c) => c.e2eeActif && c.isGroup && !locaux.has(c.id))
+  if (!manquants) return appliquerDerniersTextes(convs, locaux)
+
+  await eclairerGroupesJamaisOuverts(convs, locaux)
   return appliquerDerniersTextes(convs, await derniersTextesLocaux(convs))
 }
