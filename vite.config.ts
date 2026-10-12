@@ -1,4 +1,6 @@
-import { defineConfig, loadEnv, type Plugin } from "vite"
+import { realpathSync } from "node:fs"
+import { resolve } from "node:path"
+import { defineConfig, loadEnv, searchForWorkspaceRoot, type Plugin } from "vite"
 import react from "@vitejs/plugin-react"
 
 /**
@@ -246,6 +248,16 @@ function greffonCsp(apiBaseUrl: string, wsUrl: string): Plugin {
   }
 }
 
+/** Le vrai chemin de `node_modules`, lien suivi (le dossier lui-même s'il n'en est pas un). */
+function vraiNodeModules(): string {
+  const chemin = resolve(process.cwd(), "node_modules")
+  try {
+    return realpathSync(chemin)
+  } catch {
+    return chemin
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "")
   const base = env.VITE_APP_BASE_PATH || "/"
@@ -255,5 +267,23 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), greffonCsp(api, ws)],
     base: base.endsWith("/") ? base : `${base}/`,
+    /*
+     * 🐛 L'APERÇU PDF ÉCHOUAIT EN DÉVELOPPEMENT (12/10/2026), et seulement là.
+     *
+     * Le worker de PDF.js est demandé par son adresse dans `node_modules`. Quand
+     * ce dossier est un LIEN vers celui d'une autre copie du dépôt (cas des
+     * arbres de travail git : `STAGE-WEB-appels/node_modules` → `STAGE-WEB/`),
+     * son vrai chemin sort du projet, et Vite refuse de le servir : 403, « worker
+     * PDF indisponible », un PDF envoyé sans nombre de pages ni première page.
+     * En production, le worker est un fichier du build : jamais concerné.
+     *
+     * ⚠️ LA RACINE DU PROJET RESTE AUTORISÉE : une liste explicite REMPLACE celle
+     * par défaut. On n'ouvre que le vrai `node_modules`, rien d'autre.
+     */
+    server: {
+      fs: {
+        allow: [searchForWorkspaceRoot(process.cwd()), vraiNodeModules()],
+      },
+    },
   }
 })
