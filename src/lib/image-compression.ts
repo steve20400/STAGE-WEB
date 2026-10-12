@@ -17,12 +17,47 @@
  * quand il est trop tard.
  */
 
+/**
+ * LES DEUX NIVEAUX DE QUALITÉ À L'ENVOI — décision du user, 12/10/2026.
+ *
+ * 🔴 ILS REMPLACENT LE BOUTON « ENVOYER L'ORIGINAL ». Envoyer l'original,
+ * c'était envoyer 5 Mo pour une photo et 30 à 200 Mo pour une vidéo : sur une
+ * connexion lente et payée au volume, c'est un envoi qui n'aboutit pas. Les
+ * deux niveaux bornent ce qui part, le haut restant bien plus près de
+ * l'original que le normal.
+ *
+ * ⚠️ IL VIT ICI, et non dans le module vidéo, parce que celui-ci importe déjà
+ * celui-là : l'inverse ferait un import circulaire.
+ */
+export type NiveauQualite = "normal" | "haute"
+
 /** Bord le plus long après réduction. Repère WhatsApp ; un grand téléphone
  *  affiche environ 1290 px physiques. */
 export const IMAGE_BORD_MAX = 1600
 
 /** Même valeur que `AVATAR_QUALITY` — déjà éprouvée dans ce dépôt. */
 export const IMAGE_QUALITE = 0.82
+
+/**
+ * LE NIVEAU HAUT — ce que le bouton « Meilleure qualité » demande.
+ *
+ * 🔴 IL REMPLACE « ENVOYER L'ORIGINAL » (décision du user, 12/10/2026). Une
+ * photo de 12 Mpx pèse 4 à 6 Mo ; sur une connexion lente, c'est un envoi qui
+ * n'aboutit pas. À 2560 px et en qualité 0,90, la même photo pèse 1 à 2 Mo et
+ * reste lisible à la loupe — un reçu, une ordonnance, un plan.
+ *
+ * ⚠️ 2560 px EST UN PLAFOND, PAS UNE CIBLE : on n'agrandit jamais. Une photo de
+ * 2000 px reste à 2000 px, simplement ré-encodée plus finement.
+ */
+export const IMAGE_BORD_MAX_HAUTE = 2560
+export const IMAGE_QUALITE_HAUTE = 0.9
+
+/** Le plafond et la qualité d'un niveau donné. */
+export function reglagesImage(niveau: NiveauQualite): { bordMax: number; qualite: number } {
+  return niveau === "haute"
+    ? { bordMax: IMAGE_BORD_MAX_HAUTE, qualite: IMAGE_QUALITE_HAUTE }
+    : { bordMax: IMAGE_BORD_MAX, qualite: IMAGE_QUALITE }
+}
 
 /** En dessous, le gain ne vaut pas le risque de perte : on garde l'original. */
 const GAIN_MINIMUM = 0.9
@@ -53,6 +88,14 @@ export interface ResultatCompression {
   raisonSaut?: RaisonSaut
   tailleAvant: number
   tailleApres: number
+  /**
+   * Le niveau haut donnerait-il vraiment mieux ?
+   *
+   * 🔴 SERT À NE PAS PROPOSER UN CHOIX QUI NE CHANGE RIEN. On n'agrandit
+   * jamais : une photo de 1200 px n'a pas un pixel de plus à offrir, et un
+   * bouton « Meilleure qualité » serait un mensonge.
+   */
+  niveauSuperieurPossible?: boolean
 }
 
 function intact(file: File, raisonSaut: RaisonSaut): ResultatCompression {
@@ -274,7 +317,11 @@ function transparente(ctx: CanvasRenderingContext2D, l: number, h: number): bool
  * Ne lève jamais : un envoi ne doit pas échouer parce qu'une optimisation a
  * échoué.
  */
-export async function compresserImage(file: File): Promise<ResultatCompression> {
+export async function compresserImage(
+  file: File,
+  niveau: NiveauQualite = "normal"
+): Promise<ResultatCompression> {
+  const { bordMax, qualite } = reglagesImage(niveau)
   if (typeof document === "undefined" || typeof createImageBitmap !== "function") {
     return intact(file, "canvas_indisponible")
   }
@@ -315,15 +362,21 @@ export async function compresserImage(file: File): Promise<ResultatCompression> 
      * poids du même écran en JPEG. Seuls l'animé et le transparent restent
      * intacts ; ils sont reconnus un par un, plus haut et plus bas.
      */
+    /*
+     * ⚠️ LE PLAFOND DU NIVEAU DEMANDÉ, pas celui du niveau normal : au niveau
+     * haut, une photo de 2000 px n'est plus « trop petite », elle est ré-encodée
+     * à sa taille, plus finement.
+     */
     if (
       format !== "png" &&
-      bordLong <= IMAGE_BORD_MAX &&
+      bordLong <= bordMax &&
       file.size <= largeurSource * hauteurSource * OCTETS_PAR_PIXEL_MAX
     ) {
-      return intact(file, "trop_petite")
+      return { ...intact(file, "trop_petite"), niveauSuperieurPossible: bordLong > IMAGE_BORD_MAX }
     }
 
-    const facteur = Math.min(1, IMAGE_BORD_MAX / bordLong)
+    // ⚠️ JAMAIS AGRANDIR : le facteur est plafonné à 1.
+    const facteur = Math.min(1, bordMax / bordLong)
     const largeur = Math.round(largeurSource * facteur)
     const hauteur = Math.round(hauteurSource * facteur)
 
@@ -348,7 +401,7 @@ export async function compresserImage(file: File): Promise<ResultatCompression> 
     }
 
     const blob = await new Promise<Blob | null>((resoudre) => {
-      canvas.toBlob(resoudre, "image/jpeg", IMAGE_QUALITE)
+      canvas.toBlob(resoudre, "image/jpeg", qualite)
     })
     if (!blob || blob.type !== "image/jpeg") return intact(file, "decodage_impossible")
     if (blob.size >= file.size * GAIN_MINIMUM) return intact(file, "sans_gain")
@@ -367,6 +420,7 @@ export async function compresserImage(file: File): Promise<ResultatCompression> 
       compresse: true,
       tailleAvant: file.size,
       tailleApres: blob.size,
+      niveauSuperieurPossible: bordLong > IMAGE_BORD_MAX,
     }
   } catch {
     return intact(file, "decodage_impossible")

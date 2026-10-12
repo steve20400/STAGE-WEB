@@ -80,6 +80,7 @@ import {
 } from "../../../../src/components/panneau-membre"
 import {
   compresserImage,
+  type NiveauQualite,
   type ResultatCompression,
 } from "../../../../src/lib/image-compression"
 import {
@@ -2343,12 +2344,18 @@ interface PendingMedia {
   /** Avancement d'une compression VIDÉO, affiché à l'écran d'envoi. */
   suivi?: SuiviCompression
   /**
-   * L'utilisateur a demande d'envoyer CE fichier tel quel.
+   * Le niveau de qualité demandé POUR CE FICHIER.
    *
-   * Par fichier et non par conversation : dans un meme lot, on envoie souvent
-   * trois photos ordinaires et un contrat photographie.
+   * Par fichier et non par conversation : dans un même lot, on envoie souvent
+   * trois photos ordinaires et un contrat photographié.
+   *
+   * 🔴 IL A REMPLACÉ « GARDER L'ORIGINAL » (décision du user, 12/10/2026).
+   * L'original partait tel quel — 5 Mo pour une photo, 30 à 200 Mo pour une
+   * vidéo — et sur une connexion lente, cet envoi n'aboutissait pas. Le niveau
+   * haut borne ce qui part (1080p, 2560 px) en restant bien plus près de
+   * l'original que le normal.
    */
-  garderOriginal?: boolean
+  niveau?: NiveauQualite
 }
 
 /**
@@ -2842,7 +2849,7 @@ function MediaComposer({
   onRemove,
   onCancel,
   onSend,
-  onBasculerOriginal,
+  onBasculerNiveau,
 }: {
   items: PendingMedia[]
   index: number
@@ -2851,7 +2858,7 @@ function MediaComposer({
   onRemove: (index: number) => void
   onCancel: () => void
   onSend: () => void
-  onBasculerOriginal: (index: number) => void
+  onBasculerNiveau: (index: number) => void
 }) {
   const { t } = useTranslation()
   const current = items[index]
@@ -3076,12 +3083,23 @@ function MediaComposer({
           Ne parait que si la compression a REELLEMENT reduit quelque chose :
           une ligne « 280 Ko → 280 Ko » serait du bruit.
         */}
-        {current.kind === "video" && current.compression && !gain && !current.garderOriginal && (
+        {current.kind === "video" && current.compression && !gain && (
           <div style={{ flexBasis: "100%", fontSize: 12, color: "rgba(255,255,255,0.72)" }} role="status">
             {t("media_compression_video", { pct: avancement ?? 0 })}
           </div>
         )}
-        {gain?.compresse && (
+        {/*
+          🐛 LA LIGNE DISPARAISSAIT AVEC LE CHEMIN DU RETOUR. Au niveau haut,
+          une vidéo déjà en 1080p et déjà légère n'est PAS recompressée :
+          `compresse` est faux, la ligne s'effaçait — et le bouton « Envoyer en
+          720p » avec elle. L'utilisateur se retrouvait enfermé dans le niveau
+          qu'il venait de choisir, sans moyen d'en sortir.
+
+          On garde donc la ligne dès qu'un niveau a été demandé, même sans gain
+          à annoncer : elle dit alors le poids, sans flèche, puisque rien n'a
+          changé.
+        */}
+        {gain && (gain.compresse || current.niveau === "haute") && (
           <div
             style={{
               display: "flex",
@@ -3093,27 +3111,44 @@ function MediaComposer({
             }}
           >
             <span>
-              {current.garderOriginal
-                ? formatBytes(gain.tailleAvant)
-                : `${formatBytes(gain.tailleAvant)} → ${formatBytes(gain.tailleApres)}`}
+              {gain.compresse
+                ? `${formatBytes(gain.tailleAvant)} → ${formatBytes(gain.tailleApres)}`
+                : formatBytes(gain.tailleAvant)}
             </span>
-            <button
-              type="button"
-              onClick={() => onBasculerOriginal(index)}
-              style={{
-                border: 0,
-                borderRadius: 7,
-                padding: "3px 9px",
-                fontFamily: "inherit",
-                fontSize: 11.5,
-                fontWeight: 600,
-                cursor: "pointer",
-                background: current.garderOriginal ? "var(--accent)" : "rgba(255,255,255,0.16)",
-                color: current.garderOriginal ? "var(--accent-text)" : "#fff",
-              }}
-            >
-              {t("media_qualite_originale")}
-            </button>
+            {/*
+              LE BOUTON N'APPARAÎT QUE S'IL CHANGE QUELQUE CHOSE (demande du
+              user : « quand les deux boutons donneraient la même chose,
+              n'affiche qu'une ligne »). On n'agrandit jamais : pour une photo
+              de 1200 px ou une vidéo filmée en 720p, le niveau haut rendrait
+              EXACTEMENT le même fichier, et le proposer serait un mensonge.
+            */}
+            {(gain.niveauSuperieurPossible || current.niveau === "haute") && (
+              <button
+                type="button"
+                onClick={() => onBasculerNiveau(index)}
+                style={{
+                  border: 0,
+                  borderRadius: 7,
+                  padding: "3px 9px",
+                  fontFamily: "inherit",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: current.niveau === "haute" ? "var(--accent)" : "rgba(255,255,255,0.16)",
+                  color: current.niveau === "haute" ? "var(--accent-text)" : "#fff",
+                }}
+              >
+                {t(
+                  current.kind === "video"
+                    ? current.niveau === "haute"
+                      ? "media_envoyer_720p"
+                      : "media_envoyer_1080p"
+                    : current.niveau === "haute"
+                      ? "media_qualite_normale"
+                      : "media_meilleure_qualite"
+                )}
+              </button>
+            )}
           </div>
         )}
         <textarea
@@ -7603,10 +7638,9 @@ export default function ChatRoomPage() {
       for (const item of lot) {
         // `compression` ne rejette jamais : elle rend l'original en cas de
         // doute. Le `catch` n'est la que si une refonte future l'oubliait.
-        const preparation =
-          item.garderOriginal || !item.compression
-            ? undefined
-            : item.compression.then((r) => r.fichier).catch(() => item.file)
+        const preparation = item.compression
+          ? item.compression.then((r) => r.fichier).catch(() => item.file)
+          : undefined
         await sendMediaMessage(
           item.file,
           item.file.name,
@@ -9600,11 +9634,34 @@ export default function ChatRoomPage() {
           onRemove={removePendingMedia}
           onCancel={closeMediaComposer}
           onSend={sendPendingMedia}
-          onBasculerOriginal={(index) =>
+          /*
+           * CHANGER DE NIVEAU RELANCE LA COMPRESSION, et il n'y a pas d'autre
+           * voie : le résultat de l'autre niveau n'existe pas encore. On ne
+           * garde pas les deux en mémoire — dix vidéos transcodées deux fois
+           * feraient tomber l'onglet — et on ne les calcule pas d'avance, ce
+           * qui doublerait le travail pour un bouton rarement touché.
+           *
+           * ⚠️ UN SUIVI NEUF À CHAQUE FOIS : l'ancien a déjà publié 100 %, et
+           * le réutiliser afficherait une compression finie avant de commencer.
+           */
+          onBasculerNiveau={(index) =>
             setPendingMedia((prev) =>
-              prev.map((item, i) =>
-                i === index ? { ...item, garderOriginal: !item.garderOriginal } : item
-              )
+              prev.map((item, i) => {
+                if (i !== index) return item
+                const niveau: NiveauQualite = item.niveau === "haute" ? "normal" : "haute"
+                const suivi = item.kind === "video" && videoCompressible() ? creerSuivi() : undefined
+                return {
+                  ...item,
+                  niveau,
+                  suivi,
+                  compression:
+                    item.kind === "image"
+                      ? compresserImage(item.file, niveau)
+                      : item.kind === "video" && suivi
+                        ? compresserVideo(item.file, suivi.publier, niveau)
+                        : item.compression,
+                }
+              })
             )
           }
         />

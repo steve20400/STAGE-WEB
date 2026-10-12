@@ -23,10 +23,41 @@
  * non-événement ; une vidéo muette ou tronquée est un défaut que
  * l'utilisateur découvre chez son correspondant.
  */
-import type { ResultatCompression } from "./image-compression"
+import type { NiveauQualite, ResultatCompression } from "./image-compression"
+
+export type { NiveauQualite }
+
+/**
+ * LES DEUX NIVEAUX DE QUALITÉ — décision du user, 12/10/2026.
+ *
+ * 🔴 LE BOUTON « ENVOYER L'ORIGINAL » EST DEVENU « ENVOYER EN 1080p ». Envoyer
+ * l'original, c'était envoyer 30, 60, parfois 200 Mo tels quels : au Cameroun,
+ * sur une connexion lente et payée au volume, c'est un envoi qui n'aboutit pas.
+ * Le niveau haut borne donc ce qui part, tout en restant bien plus près de
+ * l'original que le niveau normal.
+ *
+ * 🔴 POURQUOI 1080p ET NON « 720p AVEC PLUS DE DÉBIT ». À 720p, les pixels
+ * perdus sont perdus : aucun débit ne les ramène. Or ce qui déclenche la
+ * demande, c'est une vidéo de COURS — un tableau, des diapositives. Là, c'est
+ * la définition qui rend le texte lisible, pas le débit.
+ *
+ * ⚠️ SEULE LA DÉFINITION CHANGE D'UN NIVEAU À L'AUTRE. Le débit suit la même
+ * formule pour les deux (voir [debitPour]) : il est proportionnel à la surface,
+ * donc du 1080p reçoit 3,6 Mbit/s là où du 720p reçoit 1,6. Deux formules
+ * auraient pu se croiser — le niveau « haut » rendant alors MOINS de débit que
+ * le normal à dimensions égales, ce qui serait l'inverse de la promesse.
+ */
 
 /** Bord court visé, en pixels. */
 export const VIDEO_BORD_COURT = 720
+
+/** Bord court visé au niveau haut : du 1080p. */
+export const VIDEO_BORD_COURT_HAUTE = 1080
+
+/** Le bord court visé pour un niveau donné. */
+export function bordCourtVise(niveau: NiveauQualite): number {
+  return niveau === "haute" ? VIDEO_BORD_COURT_HAUTE : VIDEO_BORD_COURT
+}
 
 /** Débit vidéo visé pour du 720p. Repère WhatsApp : 1,2 à 1,6 Mbit/s. */
 const DEBIT_720P = 1_600_000
@@ -58,6 +89,18 @@ function intact(file: File, raisonSaut: RaisonSautVideo): ResultatCompressionVid
 }
 
 /**
+ * Le niveau haut donnerait-il vraiment mieux que le niveau normal ?
+ *
+ * 🔴 SERT À NE PAS PROPOSER UN CHOIX QUI NE CHANGE RIEN (demande du user :
+ * « quand les deux boutons donneraient la même chose, n'affiche qu'une ligne »).
+ * On n'agrandit JAMAIS : une vidéo filmée en 720p ou moins n'a pas un pixel de
+ * plus à offrir, et le bouton « 1080p » serait un mensonge.
+ */
+function hautePlusFine(bordCourtSource: number): boolean {
+  return bordCourtSource > VIDEO_BORD_COURT
+}
+
+/**
  * Le navigateur sait-il transcoder ? Sans WebCodecs (Firefox ancien, Safari
  * avant la 16.4), la vidéo part telle quelle.
  */
@@ -80,9 +123,10 @@ let fileAttente: Promise<unknown> = Promise.resolve()
  */
 export function compresserVideo(
   file: File,
-  onProgression?: (p: number) => void
+  onProgression?: (p: number) => void,
+  niveau: NiveauQualite = "normal"
 ): Promise<ResultatCompressionVideo> {
-  const tour = fileAttente.then(() => convertir(file, onProgression))
+  const tour = fileAttente.then(() => convertir(file, onProgression, niveau))
   fileAttente = tour.catch(() => undefined)
   return tour.catch(() => intact(file, "conversion_impossible"))
 }
@@ -97,7 +141,8 @@ interface Cible {
 
 async function convertir(
   file: File,
-  onProgression?: (p: number) => void
+  onProgression?: (p: number) => void,
+  niveau: NiveauQualite = "normal"
 ): Promise<ResultatCompressionVideo> {
   if (!videoCompressible()) return intact(file, "webcodecs_indisponible")
 
@@ -120,11 +165,14 @@ async function convertir(
       (await input.getDurationFromMetadata().catch(() => null)) ??
       (await input.computeDuration().catch(() => 0))
     const debit = duree > 0 ? (file.size * 8) / duree : Infinity
-    if (court <= VIDEO_BORD_COURT && debit <= DEBIT_DEJA_LEGER) {
-      return intact(file, "deja_legere")
+    const vise = bordCourtVise(niveau)
+    if (court <= vise && debit <= DEBIT_DEJA_LEGER) {
+      return { ...intact(file, "deja_legere"), niveauSuperieurPossible: hautePlusFine(court) }
     }
 
-    const facteur = Math.min(1, VIDEO_BORD_COURT / court)
+    // ⚠️ JAMAIS AGRANDIR : le facteur est plafonné à 1. Une vidéo plus petite
+    // que l'objectif garde ses dimensions et ne voit baisser que son débit.
+    const facteur = Math.min(1, vise / court)
     // Le H.264 veut des dimensions paires.
     const pair = (n: number) => Math.max(2, 2 * Math.round(n / 2))
     const cible: Cible = {
@@ -134,6 +182,17 @@ async function convertir(
     }
     // Une vidéo plus petite que du 720p n'a pas besoin du débit d'un 720p.
     cible.debit = Math.max(400_000, Math.round((DEBIT_720P * cible.largeur * cible.hauteur) / (1280 * 720)))
+
+    /*
+     * ⚠️ RIEN À GAGNER : ON S'ABSTIENT PLUTÔT QUE DE TRANSCODER POUR RIEN. Au
+     * niveau haut, une vidéo déjà en 1080p peut avoir un débit INFÉRIEUR à
+     * celui qu'on viserait : la recompresser l'alourdirait. La règle du gain
+     * minimum, plus bas, rendrait bien l'original — mais après avoir fait
+     * tourner l'encodeur une minute pour rien.
+     */
+    if (cible.debit >= debit) {
+      return { ...intact(file, "deja_legere"), niveauSuperieurPossible: hautePlusFine(court) }
+    }
 
     /*
      * La voie rapide ne fait que du H.264 dans du MP4 : c'est ce qu'elle a de
@@ -162,6 +221,7 @@ async function convertir(
       compresse: true,
       tailleAvant: file.size,
       tailleApres: octets.byteLength,
+      niveauSuperieurPossible: hautePlusFine(court),
     }
   } catch {
     return intact(file, "conversion_impossible")
