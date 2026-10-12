@@ -150,6 +150,14 @@ export function estChiffree(convId: string): boolean {
 
 export interface EtatE2ee {
   e2eeActif: boolean
+  /**
+   * Le réglage du COMPTE — chiffrer, ou non, les nouvelles conversations.
+   *
+   * 🔴 C'EST LUI QUI A REMPLACÉ LE BOUCLIER DE L'EN-TÊTE (12/10/2026). Absent
+   * d'une réponse de serveur plus ancien : on chiffre, parce que le défaut
+   * protège.
+   */
+  chiffrementActif?: boolean
   activable: boolean
   motif: "HORS_PERIMETRE" | "EMETTEUR_API" | "CLES_MANQUANTES" | null
   sansCles: string[]

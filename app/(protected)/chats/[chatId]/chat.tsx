@@ -5588,7 +5588,6 @@ export default function ChatRoomPage() {
    * professionnels et les correspondants sans clés.
    */
   const [e2ee, setE2ee] = useState<EtatE2ee | null>(null)
-  const [e2eeEnCours, setE2eeEnCours] = useState(false)
 
   /*
    * Le correspondant, pour l'avertissement de changement de clé.
@@ -5628,12 +5627,46 @@ export default function ChatRoomPage() {
     if (!chatId) return
     let vivant = true
     void lireEtatE2ee(chatId)
-      .then((r) => {
-        if (vivant) setE2ee(r)
+      .then(async (r) => {
+        if (!vivant) return
+        setE2ee(r)
+
+        /*
+         * ══════ L'ACTIVATION SILENCIEUSE ══════
+         *
+         * 🔴 PLUS PERSONNE N'ACTIVE À LA MAIN (décision du user, 12/10/2026).
+         * Le bouclier de l'en-tête a disparu : c'est ici que le chiffrement
+         * s'allume, tout seul, à l'ouverture de la conversation.
+         *
+         * ⚠️ TOUTES LES CONDITIONS DU SERVEUR SONT RESPECTÉES, et c'est lui
+         * qui les donne : hors périmètre, émetteur API, clés manquantes, ou
+         * groupe dont je ne suis pas administrateur. On ne force rien — une
+         * conversation qui ne PEUT pas être chiffrée reste en clair, comme
+         * avant.
+         *
+         * ⚠️ ET SANS UN MOT. Un échec ne dit rien : l'utilisateur n'a rien
+         * demandé, il n'a donc rien à comprendre. C'est toute la différence
+         * avec le bouton, qui devait expliquer pourquoi il était grisé.
+         */
+        if (
+          r.e2eeActif ||
+          r.chiffrementActif === false ||
+          !r.activable ||
+          (r.groupe === true && r.jePeuxActiver !== true)
+        ) {
+          return
+        }
+        try {
+          if (r.groupe === true) await activerGroupe(chatId)
+          else await activerE2ee(chatId)
+          if (vivant) setE2ee({ ...r, e2eeActif: true })
+        } catch {
+          /* Pas chiffrée aujourd'hui : on réessaiera à la prochaine ouverture. */
+        }
       })
       .catch(() => {
         // Serveur trop ancien, ou route indisponible : on se tait. Le fil
-        // fonctionne exactement comme avant, sans bouton.
+        // fonctionne exactement comme avant.
         if (vivant) setE2ee(null)
       })
     return () => {
@@ -8246,137 +8279,25 @@ export default function ChatRoomPage() {
                   l'actionne pour savoir — et on eteint ce qu'on voulait
                   verifier. */}
               {/*
-                ══════ LE CADENAS DU CHIFFREMENT ══════
+                ══════ LE BOUCLIER DU CHIFFREMENT A ÉTÉ RETIRÉ ══════
 
-                🔴 TROIS ÉTATS, ET CHACUN DOIT SE LIRE SANS CLIQUER :
-                  · chiffrée      → cadenas plein, bouton inerte (c'est à sens
-                    unique, il n'y a rien à défaire) ;
-                  · activable     → cadenas ouvert, on peut appuyer ;
-                  · impossible    → cadenas barré, et le TITRE dit pourquoi.
+                🔴 DÉCISION DU USER, 12/10/2026 : « ce bouton ne doit pas être
+                présent, ça encombre pour rien ; par défaut le chiffrement doit
+                être activé, et si quelqu'un veut, il le désactive pour toute
+                l'application depuis les paramètres ».
 
-                ⚠️ LE MOTIF VIENT DU SERVEUR. Un bouton grisé sans explication
-                fait ouvrir un ticket ; « les groupes ne sont pas couverts »
-                clôt la question sur place.
+                Il avait raison sur le fond : c'était un bouton qu'on actionne
+                UNE fois et qui occupait ensuite la barre pour toujours — et il
+                demandait à chacun de comprendre ce qu'est le chiffrement avant
+                d'en profiter. Le chiffrement s'active maintenant TOUT SEUL dès
+                que c'est possible (voir l'effet `activation silencieuse`).
+
+                ⚠️ LA VÉRIFICATION DU CODE DE SÉCURITÉ N'EST PAS PERDUE : elle
+                vivait derrière ce bouton une fois la conversation chiffrée, et
+                elle est dans la page « Infos de la discussion » (`chat-info`),
+                ainsi que derrière l'alerte de changement de clé — les deux
+                endroits où l'on va justement quand on se pose la question.
               */}
-              {/*
-                🐛 PLUS D'`aria-pressed` — signalé par le user le 24/09/2026 :
-                « j'ai l'impression qu'une fois activé il est impossible de le
-                désactiver ».
-
-                C'est exact, et c'est voulu : le chiffrement ne se retire pas.
-                Mais `aria-pressed` annonce un INTERRUPTEUR — un lecteur
-                d'écran disait « bouton, enfoncé », ce qui promet qu'on peut le
-                relâcher. Le fond du défaut n'était pas le comportement :
-                c'était la PROMESSE que faisait le bouton.
-
-                ⚠️ L'ÉTAT PASSE DONC PAR LE LIBELLÉ, qui le dit en toutes
-                lettres — « le chiffrement ne se retire pas » — plutôt que par
-                un attribut qui suggère l'inverse.
-              */}
-              {e2ee !== null && (
-                <button
-                  className="action-btn"
-                  aria-label={
-                    e2ee.e2eeActif
-                      ? peerIdPourCle !== null
-                        ? t("e2ee_actif_definitif_verif")
-                        : t("e2ee_actif_definitif")
-                      : t("e2ee_bouton")
-                  }
-                  /*
-                   * ⚠️ EN GROUPE, SEUL UN ADMINISTRATEUR ACTIVE (lot 5) : son
-                   * appareil tire la clé et la distribue à chaque appareil de
-                   * chaque membre (`activerGroupe`). Les autres membres voient
-                   * le bouton inerte, et pourquoi.
-                   */
-                  disabled={
-                    e2eeEnCours ||
-                    (!e2ee.e2eeActif &&
-                      (!e2ee.activable || (e2ee.groupe === true && e2ee.jePeuxActiver !== true)))
-                  }
-                  title={
-                    e2ee.e2eeActif
-                      ? peerIdPourCle !== null
-                        ? t("e2ee_actif_definitif_verif")
-                        : t("e2ee_actif_definitif")
-                      : e2ee.groupe === true && e2ee.jePeuxActiver !== true
-                        ? t("e2ee_groupe")
-                        : e2ee.motif === "HORS_PERIMETRE"
-                          ? t("e2ee_hors_perimetre")
-                          : e2ee.motif === "EMETTEUR_API"
-                            ? t("e2ee_emetteur_api")
-                          : e2ee.motif === "CLES_MANQUANTES"
-                            ? t("e2ee_cles_manquantes")
-                            : t("e2ee_activer")
-                  }
-                  onClick={() => {
-                    /*
-                     * ⚠️ UNE FOIS CHIFFRE, LE CADENAS MENE A LA VERIFICATION.
-                     *
-                     * Il etait inerte — le chiffrement ne se defait pas, il
-                     * n'y avait rien a faire. Mais un bouton mort a l'endroit
-                     * exact ou l'on va chercher « l'etat du chiffrement » est
-                     * une place gachee : c'est LA que l'utilisateur regarde,
-                     * et c'est donc la que doit vivre la seule action qui lui
-                     * reste — comparer le code hors de ce canal.
-                     *
-                     * ⚠️ PAS EN GROUPE : il n'y a pas d'identite unique a
-                     * comparer, et proposer l'ecran laisserait croire le
-                     * contraire.
-                     */
-                    if (e2ee.e2eeActif) {
-                      if (peerIdPourCle !== null) setVerifOuverte(true)
-                      return
-                    }
-                    if (!e2ee.activable) return
-                    setE2eeEnCours(true)
-                    void (e2ee.groupe === true
-                      ? activerGroupe(chatId).then(() => success(t("e2ee_groupe_active")))
-                      : activerE2ee(chatId)
-                    )
-                      .then(() => setE2ee({ ...e2ee, e2eeActif: true }))
-                      .catch(() => undefined)
-                      .finally(() => setE2eeEnCours(false))
-                  }}
-                  style={
-                    e2ee.e2eeActif
-                      ? { background: "var(--accent)", color: "var(--accent-text)" }
-                      : undefined
-                  }
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    {/*
-                      🔴 UN BOUCLIER, PAS UN CADENAS — signalé par le user le
-                      23/09/2026 : « on confond avec l'autre icône ».
-
-                      Le cadenas sert DÉJÀ trois fois dans cet écran, pour la
-                      RÉSERVATION de la conversation : le bouton juste à côté,
-                      le bandeau, et le badge de la liste. Deux cadenas
-                      voisins, chacun avec un état ouvert et un état fermé,
-                      faisaient quatre combinaisons pour deux formes
-                      identiques.
-
-                      ⚠️ C'EST LE CHIFFREMENT QUI CHANGE, ET NON LA
-                      RÉSERVATION, parce que le cadenas décrit mieux celle-ci :
-                      elle s'ouvre et se referme. Le chiffrement, lui, ne se
-                      défait pas — un cadenas qu'on ne peut pas rouvrir est
-                      une métaphore qui ment.
-                    */}
-                    <path d="M12 2.8 4.5 6v6c0 4.6 3.1 8.2 7.5 9.2 4.4-1 7.5-4.6 7.5-9.2V6L12 2.8z" />
-                    {e2ee.e2eeActif && <path d="m8.8 11.8 2.3 2.3 4.1-4.4" />}
-                  </svg>
-                </button>
-              )}
-
               <button
                 className="action-btn"
                 aria-label={t("trad_globale_titre")}

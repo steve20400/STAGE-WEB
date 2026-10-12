@@ -3935,6 +3935,32 @@ export default function SettingsPage() {
             <>
               <div className="s-page-title">{t("settings_privacy")}</div>
               <p className="s-page-sub">{t("privacy_sub")}</p>
+              {/*
+                ══════ LE SEUL ENDROIT OÙ L'ON PARLE DU CHIFFREMENT ══════
+
+                🔴 DÉCISION DU USER, 12/10/2026 : le bouclier qui encombrait
+                l'en-tête de CHAQUE discussion a disparu, le chiffrement est
+                actif par défaut, et il se coupe ici — pour toute l'application,
+                pas pour une conversation.
+
+                ⚠️ LA DESCRIPTION DIT CE QUE LE RÉGLAGE NE FAIT PAS : le couper
+                n'ouvre pas les conversations déjà chiffrées, car le chiffrement
+                ne se défait pas. Laisser croire le contraire serait le pire des
+                malentendus — on se croirait en clair alors qu'on ne l'est pas,
+                ou l'inverse.
+              */}
+              <div className="s-card">
+                <div className="s-card-title">{t("e2ee_reglage_titre")}</div>
+                <Toggle
+                  value={privacy.chiffrementActif}
+                  onChange={(v) => void updatePrivacy({ chiffrementActif: v })}
+                  label={t("e2ee_reglage_label")}
+                  description={t(
+                    privacy.chiffrementActif ? "e2ee_reglage_on" : "e2ee_reglage_off"
+                  )}
+                />
+              </div>
+
               <div className="s-card">
                 <div className="s-card-title">{t("set_visibility")}</div>
                 <Toggle
