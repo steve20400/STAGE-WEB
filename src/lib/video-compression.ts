@@ -135,9 +135,18 @@ async function convertir(
     // Une vidéo plus petite que du 720p n'a pas besoin du débit d'un 720p.
     cible.debit = Math.max(400_000, Math.round((DEBIT_720P * cible.largeur * cible.hauteur) / (1280 * 720)))
 
-    const octets =
-      (await transcoderRapide(mb, input, piste, cible, duree, onProgression).catch(() => null)) ??
-      (await transcoderParConversion(mb, input, cible, onProgression).catch(() => null))
+    /*
+     * La voie rapide ne fait que du H.264 dans du MP4 : c'est ce qu'elle a de
+     * plus rapide, et ce qui passe partout. La voie lente la rattrape, et
+     * rattrape aussi les navigateurs qui n'ont pas de H.264 du tout.
+     */
+    const rapide = await transcoderRapide(mb, input, piste, cible, duree, onProgression).catch(
+      () => null
+    )
+    const produit: VideoTranscodee | null = rapide
+      ? { octets: rapide, conteneur: "mp4", mime: "video/mp4" }
+      : await transcoderParConversion(mb, input, cible, onProgression).catch(() => null)
+    const octets = produit?.octets
     if (!octets || octets.byteLength === 0) return intact(file, "conversion_impossible")
     if (octets.byteLength >= file.size * GAIN_MINIMUM) return intact(file, "sans_gain")
 
@@ -147,9 +156,9 @@ async function convertir(
      * `.webm` converti qui garderait son nom serait servi plus tard avec le
      * mauvais en-tête.
      */
-    const nom = file.name.replace(/\.[^.]+$/, "") + ".mp4"
+    const nom = file.name.replace(/\.[^.]+$/, "") + "." + produit!.conteneur
     return {
-      fichier: new File([octets], nom, { type: "video/mp4", lastModified: file.lastModified }),
+      fichier: new File([octets], nom, { type: produit!.mime, lastModified: file.lastModified }),
       compresse: true,
       tailleAvant: file.size,
       tailleApres: octets.byteLength,
@@ -373,24 +382,62 @@ async function transcoderRapide(
 }
 
 /**
+ * LES CODECS ESSAYÉS, DANS L'ORDRE, ET LE CONTENEUR DE CHACUN.
+ *
+ * 🐛 « SUR CERTAINS NAVIGATEURS LA COMPRESSION NE MARCHE PAS » (user,
+ * 12/10/2026 : « j'ai ouvert sur Chrome, sur Edge, ça marchait »). Les deux
+ * voies de ce module ne demandaient que du H.264 — `configurationAvc` pour la
+ * voie rapide, `canEncodeVideo("avc")` pour la voie lente. Or AVOIR WebCodecS
+ * NE VEUT PAS DIRE SAVOIR ENCODER EN H.264 : Firefox expose `VideoEncoder`
+ * mais n'embarque pas d'encodeur H.264, le format étant breveté. Les deux
+ * voies renonçaient donc, la vidéo partait entière, et rien ne le disait.
+ *
+ * 🔴 L'ORDRE EST CELUI DE LA COMPATIBILITÉ CHEZ LE DESTINATAIRE, pas celui de
+ * la qualité. Le H.264 passe partout — vieux téléphones, vieux navigateurs,
+ * lecteurs de bureau — et reste donc le premier choix. Le VP9 et le VP8 ne
+ * servent qu'aux navigateurs qui ne savent pas faire de H.264 : là, le choix
+ * n'est pas « WebM ou MP4 », c'est « WebM ou 30 Mo envoyés tels quels ».
+ *
+ * ⚠️ LE CONTENEUR SUIT LE CODEC, et ce n'est pas un détail de forme : un MP4
+ * n'accepte pas de VP8, et un WebM n'accepte ni H.264 ni AAC. Se tromper
+ * produit un fichier que personne n'ouvre.
+ */
+const CODECS_VIDEO = [
+  { codec: "avc", conteneur: "mp4", mime: "video/mp4" },
+  { codec: "vp9", conteneur: "webm", mime: "video/webm" },
+  { codec: "vp8", conteneur: "webm", mime: "video/webm" },
+] as const
+
+export interface VideoTranscodee {
+  octets: ArrayBuffer
+  /** L'extension à donner au fichier, sans le point. */
+  conteneur: "mp4" | "webm"
+  mime: string
+}
+
+/**
  * LA VOIE LENTE, mais générale : la conversion complète de `mediabunny`, qui
  * sait ré-encoder le son et réduire par un canvas. Elle ne sert que si la voie
- * rapide a renoncé.
+ * rapide a renoncé — et c'est elle qui rattrape les navigateurs sans H.264,
+ * en repassant sur du VP9 puis du VP8.
  */
 async function transcoderParConversion(
   mb: Mediabunny,
   input: InstanceType<Mediabunny["Input"]>,
   cible: Cible,
   onProgression?: (p: number) => void
-): Promise<ArrayBuffer | null> {
+): Promise<VideoTranscodee | null> {
   const qualite = new mb.Quality({ bitrate: cible.debit })
-  if (!(await mb.canEncodeVideo("avc", { width: cible.largeur, height: cible.hauteur, quality: qualite }))) {
-    return null
-  }
+  const choix = await premierCodecPossible(mb, cible, qualite)
+  if (!choix) return null
+
   const output = new mb.Output({
-    // `in-memory` place l'index en tête du fichier : la lecture commence
-    // avant la fin du téléchargement, chez le correspondant.
-    format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }),
+    format:
+      choix.conteneur === "mp4"
+        ? // `in-memory` place l'index en tête du fichier : la lecture commence
+          // avant la fin du téléchargement, chez le correspondant.
+          new mb.Mp4OutputFormat({ fastStart: "in-memory" })
+        : new mb.WebMOutputFormat(),
     target: new mb.BufferTarget(),
   })
   const rotation = await (await input.getPrimaryVideoTrack())?.getRotation().catch(() => 0)
@@ -405,10 +452,10 @@ async function transcoderParConversion(
     video: {
       // Un seul bord est imposé : l'autre suit les proportions.
       ...(ecranL <= ecranH ? { width: ecranL } : { height: ecranH }),
-      codec: "avc",
+      codec: choix.codec,
       quality: qualite,
     },
-    // Le son est recopié quand le MP4 l'accepte, ré-encodé sinon.
+    // Le son est recopié quand le conteneur l'accepte, ré-encodé sinon.
     audio: {},
     showWarnings: false,
   })
@@ -421,5 +468,30 @@ async function transcoderParConversion(
   if (onProgression) conversion.onProgress = (p) => onProgression(p)
   await conversion.execute()
   const tampon = (output.target as InstanceType<Mediabunny["BufferTarget"]>).buffer
-  return tampon ?? null
+  return tampon ? { octets: tampon, conteneur: choix.conteneur, mime: choix.mime } : null
+}
+
+/**
+ * Le premier codec de [CODECS_VIDEO] que CE navigateur sait vraiment encoder.
+ *
+ * ⚠️ ON DEMANDE AU NAVIGATEUR, ON NE DEVINE PAS d'après son nom. Les versions
+ * se suivent, les encodeurs matériels diffèrent d'une machine à l'autre, et un
+ * même Firefox n'a pas les mêmes codecs sur Linux et sur Windows.
+ */
+async function premierCodecPossible(
+  mb: Mediabunny,
+  cible: Cible,
+  qualite: InstanceType<Mediabunny["Quality"]>
+): Promise<(typeof CODECS_VIDEO)[number] | null> {
+  for (const choix of CODECS_VIDEO) {
+    const possible = await mb
+      .canEncodeVideo(choix.codec, {
+        width: cible.largeur,
+        height: cible.hauteur,
+        quality: qualite,
+      })
+      .catch(() => false)
+    if (possible) return choix
+  }
+  return null
 }
