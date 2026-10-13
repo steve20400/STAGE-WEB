@@ -31,6 +31,63 @@
  */
 export type NiveauQualite = "normal" | "haute"
 
+/**
+ * L'ESCALIER DES PALIERS — décision du user, 13/10/2026, même règle que la
+ * vidéo (voir `video-compression.ts`).
+ *
+ * 🐛 UNE PHOTO DÉJÀ SOUS 1600 px NE SE COMPRESSAIT PLUS : on visait 1600 et
+ * elle y était déjà. La nouvelle règle descend toujours d'une marche.
+ *
+ *   · plus de 1600 px → 1600
+ *   · 1001 à 1600     → 1000
+ *   · 641 à 1000      → 640
+ *   · 640 ou moins    → on ne touche plus à rien
+ *
+ * ⚠️ LE NIVEAU HAUT N'A PAS D'ESCALIER : le bouton « meilleure qualité » garde
+ * son plafond à 2560 px et ne réduit que ce qui le dépasse.
+ */
+/**
+ * Poids au-delà duquel une image est ré-encodée même si elle est déjà petite.
+ *
+ * Une photo passée par ici pèse 0,1 à 0,3 octet par pixel : elle reste sous ce
+ * seuil. Une image de 1500 px enregistrée en qualité maximale, elle, en pèse 1
+ * à 2 — elle passe.
+ */
+const OCTETS_PAR_PIXEL_MAX = 0.5
+
+export const PALIERS_IMAGE = [1600, 1000, 640] as const
+
+/** Le plus petit palier : en dessous, on ne réduit plus. */
+export const IMAGE_PALIER_PLANCHER = PALIERS_IMAGE[PALIERS_IMAGE.length - 1]
+
+/**
+ * Le palier visé pour une photo dont le bord long mesure [long], ou `null`
+ * quand il n'y a plus rien à faire.
+ */
+export function palierImage(long: number): number | null {
+  if (long <= IMAGE_PALIER_PLANCHER) return null
+  for (const p of PALIERS_IMAGE) {
+    if (long > p) return p
+  }
+  return null
+}
+
+/**
+ * CETTE PHOTO EST-ELLE DÉJÀ SORTIE DE CHEZ NOUS ?
+ *
+ * 🔴 LA GARDE CONTRE LA CASCADE, jumelle de `dejaUnPalierAlanya` côté vidéo.
+ * Sans elle, une photo reçue, enregistrée dans la galerie puis renvoyée
+ * perdrait une marche à chaque tour — jusqu'à 640 px.
+ *
+ * ⚠️ DEUX CONDITIONS, ET LES DEUX COMPTENT : le bord long doit être EXACTEMENT
+ * un de nos paliers, et le poids par pixel doit être celui d'une de nos
+ * sorties. Une photo de 1000 px lourde comme une brute n'est pas la nôtre.
+ */
+export function dejaUnPalierImageAlanya(long: number, octets: number, pixels: number): boolean {
+  if (!PALIERS_IMAGE.includes(long as (typeof PALIERS_IMAGE)[number])) return false
+  return pixels > 0 && octets <= pixels * OCTETS_PAR_PIXEL_MAX
+}
+
 /** Bord le plus long après réduction. Repère WhatsApp ; un grand téléphone
  *  affiche environ 1290 px physiques. */
 export const IMAGE_BORD_MAX = 1600
@@ -61,15 +118,6 @@ export function reglagesImage(niveau: NiveauQualite): { bordMax: number; qualite
 
 /** En dessous, le gain ne vaut pas le risque de perte : on garde l'original. */
 const GAIN_MINIMUM = 0.9
-
-/**
- * Poids au-delà duquel une image DÉJÀ PETITE est quand même ré-encodée.
- *
- * Une photo passée par ici pèse 0,1 à 0,3 octet par pixel : elle reste sous ce
- * seuil, et ne perd donc pas un peu de qualité à chaque transfert. Une image de
- * 1500 px enregistrée en qualité maximale, elle, en pèse 1 à 2 — elle passe.
- */
-const OCTETS_PAR_PIXEL_MAX = 0.5
 
 export type RaisonSaut =
   | "trop_petite"
@@ -363,20 +411,51 @@ export async function compresserImage(
      * intacts ; ils sont reconnus un par un, plus haut et plus bas.
      */
     /*
-     * ⚠️ LE PLAFOND DU NIVEAU DEMANDÉ, pas celui du niveau normal : au niveau
-     * haut, une photo de 2000 px n'est plus « trop petite », elle est ré-encodée
-     * à sa taille, plus finement.
+     * ══════ OÙ L'ON DESCEND, ET DE COMBIEN ══════
+     *
+     * Au niveau NORMAL, l'escalier des paliers : on descend d'une marche, et
+     * l'on s'arrête à 640 px. Au niveau HAUT, un simple plafond à 2560 px.
+     *
+     * ⚠️ LE PNG N'EST JAMAIS « DÉJÀ SORTI DE CHEZ NOUS » : ce module rend du
+     * JPEG. Une capture d'écran en PNG passe donc toujours, et c'est ce qui a
+     * corrigé « ça ne compresse pas » le 06/10/2026.
      */
-    if (
-      format !== "png" &&
-      bordLong <= bordMax &&
-      file.size <= largeurSource * hauteurSource * OCTETS_PAR_PIXEL_MAX
-    ) {
-      return { ...intact(file, "trop_petite"), niveauSuperieurPossible: bordLong > IMAGE_BORD_MAX }
+    let cible: number
+    if (niveau === "haute") {
+      if (
+        format !== "png" &&
+        bordLong <= bordMax &&
+        file.size <= largeurSource * hauteurSource * OCTETS_PAR_PIXEL_MAX
+      ) {
+        return { ...intact(file, "trop_petite"), niveauSuperieurPossible: bordLong > IMAGE_BORD_MAX }
+      }
+      cible = bordMax
+    } else {
+      // La garde contre la cascade : déjà un de nos paliers, et déjà léger.
+      if (
+        format !== "png" &&
+        dejaUnPalierImageAlanya(bordLong, file.size, largeurSource * hauteurSource)
+      ) {
+        return { ...intact(file, "trop_petite"), niveauSuperieurPossible: bordLong > IMAGE_BORD_MAX }
+      }
+      const palier = palierImage(bordLong)
+      /*
+       * 🐛 UNE PETITE CAPTURE PNG SERAIT REPARTIE INTACTE. L'escalier s'arrête
+       * à 640 px ; mais pour un PNG, l'essentiel du gain ne vient pas de la
+       * taille — il vient du PASSAGE EN JPEG, qui divise le poids par cinq.
+       * Une capture de 500 px repartait donc entière, et c'est exactement le
+       * défaut corrigé le 06/10/2026 (« ça ne compresse pas »).
+       *
+       * En dessous du plancher, un PNG est donc ré-encodé À SA TAILLE.
+       */
+      if (palier === null && format !== "png") {
+        return { ...intact(file, "trop_petite"), niveauSuperieurPossible: false }
+      }
+      cible = palier ?? bordLong
     }
 
     // ⚠️ JAMAIS AGRANDIR : le facteur est plafonné à 1.
-    const facteur = Math.min(1, bordMax / bordLong)
+    const facteur = Math.min(1, cible / bordLong)
     const largeur = Math.round(largeurSource * facteur)
     const hauteur = Math.round(hauteurSource * facteur)
 

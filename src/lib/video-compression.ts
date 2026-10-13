@@ -54,6 +54,104 @@ export const VIDEO_BORD_COURT = 720
 /** Bord court visé au niveau haut : du 1080p. */
 export const VIDEO_BORD_COURT_HAUTE = 1080
 
+/**
+ * L'ESCALIER DES PALIERS — décision du user, 13/10/2026.
+ *
+ * 🐛 « SI LA TAILLE DE LA VIDÉO EST INFÉRIEURE À 720, ON NE COMPRESSE PLUS.
+ * Ce n'est pas bon du tout. » Une vidéo déjà en 720p ou moins, et déjà légère,
+ * repartait telle quelle : on visait 720 et elle y était déjà.
+ *
+ * 🔴 LA NOUVELLE RÈGLE : ON DESCEND TOUJOURS D'UNE MARCHE.
+ *
+ *   · plus grand que 720  → 720
+ *   · 361 à 720           → 360
+ *   · 241 à 360           → 240
+ *   · 240 ou moins        → on ne touche plus à rien
+ *
+ * ⚠️ CE QU'ELLE COÛTE, ET IL FAUT LE SAVOIR : une vidéo PERD UNE MARCHE À
+ * CHAQUE PARTAGE. Envoyée en 1080p elle arrive en 720p ; transférée, 360p ;
+ * transférée encore, 240p. C'est la contrepartie assumée de « on compresse
+ * toujours » — le plancher à 240 l'empêche de descendre indéfiniment.
+ *
+ * ⚠️ LE NIVEAU HAUT N'A PAS D'ESCALIER : c'est le bouton « meilleure qualité »,
+ * le faire descendre d'une marche serait l'inverse de ce qu'il promet. Il garde
+ * son plafond à 1080 et ne réduit que ce qui le dépasse.
+ */
+export const PALIERS_VIDEO = [720, 360, 240] as const
+
+/** Le plus petit palier : en dessous, on ne convertit plus. */
+export const VIDEO_PALIER_PLANCHER = PALIERS_VIDEO[PALIERS_VIDEO.length - 1]
+
+/**
+ * Le débit de chaque palier, en bits par seconde.
+ *
+ * ⚠️ DES VALEURS EXPLICITES, PAS UNE RÈGLE DE TROIS. Le débit nécessaire ne
+ * suit pas la surface : une petite image a besoin de PLUS de bits par pixel
+ * qu'une grande pour rester regardable. Un 240p calculé au prorata d'un 720p
+ * tomberait à 180 kbit/s et serait une bouillie.
+ */
+export const DEBIT_PALIER: Record<number, number> = {
+  720: 1_600_000,
+  360: 600_000,
+  240: 300_000,
+}
+
+/**
+ * Le palier visé pour une vidéo dont le petit côté mesure [court], ou `null`
+ * quand il n'y a plus rien à faire.
+ *
+ * 🔴 ON DESCEND D'UNE MARCHE, JAMAIS PLUS : une vidéo en 1080p ne part pas
+ * directement en 240p. Et jamais vers le haut — une 480p ne devient pas 720p.
+ */
+export function palierVideo(court: number): number | null {
+  if (court <= VIDEO_PALIER_PLANCHER) return null
+  for (const p of PALIERS_VIDEO) {
+    if (court > p) return p
+  }
+  return null
+}
+
+/**
+ * CE QUE LE SON AJOUTE AU DÉBIT MESURÉ — et pourquoi la marge est ADDITIVE.
+ *
+ * Le débit qu'on mesure est celui du FICHIER : image plus son plus conteneur.
+ * Une piste audio pèse autour de 128 kbit/s, quelle que soit la taille de
+ * l'image. Une marge en POURCENTAGE serait donc trop large à 720p et trop
+ * étroite à 240p, où le son représente près de la moitié du fichier.
+ */
+const MARGE_SON = 250_000
+
+/**
+ * CE FICHIER EST-IL DÉJÀ SORTI DE CHEZ NOUS ?
+ *
+ * 🔴 C'EST LA GARDE CONTRE LA CASCADE (demande du user, 13/10/2026 : « si on
+ * décide de renvoyer un fichier déjà compressé par l'application, ça ne
+ * compresse plus »).
+ *
+ * L'escalier des paliers descend d'une marche à CHAQUE passage. Transférer un
+ * message ne recompresse rien — le serveur recopie la ligne et garde le même
+ * fichier — mais enregistrer une vidéo reçue dans sa galerie puis la renvoyer
+ * en refait un envoi neuf. Sans cette garde, trois allers-retours suffisaient
+ * à transformer une vidéo de cours en bouillie.
+ *
+ * 🔴 ON LA RECONNAÎT À SA FORME, ET NON À UNE MARQUE. Un marqueur posé dans le
+ * message ne survit pas au passage par la galerie ; un marqueur posé dans le
+ * fichier demanderait d'écrire des métadonnées que les deux transcodeurs ne
+ * savent pas produire de la même façon. La forme, elle, voyage toujours : un
+ * fichier sorti d'ici a EXACTEMENT un de nos paliers pour petit côté, et son
+ * débit ne dépasse pas celui de ce palier.
+ *
+ * ⚠️ UN FAUX POSITIF EST SANS CONSÉQUENCE, et c'est ce qui rend la méthode
+ * sûre : une vidéo venue d'ailleurs qui aurait exactement 360 de petit côté et
+ * 600 kbit/s est déjà aussi légère que ce que nous produirions. Ne pas la
+ * toucher ne coûte rien à personne.
+ */
+export function dejaUnPalierAlanya(court: number, debit: number): boolean {
+  const attendu = DEBIT_PALIER[court]
+  if (attendu === undefined) return false
+  return debit <= attendu + MARGE_SON
+}
+
 /** Le bord court visé pour un niveau donné. */
 export function bordCourtVise(niveau: NiveauQualite): number {
   return niveau === "haute" ? VIDEO_BORD_COURT_HAUTE : VIDEO_BORD_COURT
@@ -62,13 +160,14 @@ export function bordCourtVise(niveau: NiveauQualite): number {
 /** Débit vidéo visé pour du 720p. Repère WhatsApp : 1,2 à 1,6 Mbit/s. */
 const DEBIT_720P = 1_600_000
 
-/**
- * Au-dessous de ce débit, une vidéo déjà en 720p n'est pas retouchée. C'est ce
- * qui empêche une vidéo reçue puis transférée de perdre un peu de qualité à
- * chaque saut — une vidéo sortie d'ici tourne autour de 1,8 Mbit/s, son
- * compris.
+/*
+ * ⚠️ `DEBIT_DEJA_LEGER` A DISPARU (13/10/2026). C'était un seuil unique —
+ * « 720p sous 2,5 Mbit/s, on n'y touche pas » — qui épargnait TOUTE vidéo déjà
+ * sous 720p et déjà légère : c'est précisément ce que le user a signalé (« si
+ * la taille est inférieure à 720, on ne compresse plus, ce n'est pas bon »).
+ * Son rôle de garde contre la cascade est repris, en mieux, par
+ * `dejaUnPalierAlanya` : un seuil PAR PALIER plutôt qu'un seuil unique.
  */
-const DEBIT_DEJA_LEGER = 2_500_000
 
 /** En dessous, le gain ne vaut pas le risque de perte : on garde l'original. */
 const GAIN_MINIMUM = 0.9
@@ -165,13 +264,36 @@ async function convertir(
       (await input.getDurationFromMetadata().catch(() => null)) ??
       (await input.computeDuration().catch(() => 0))
     const debit = duree > 0 ? (file.size * 8) / duree : Infinity
-    const vise = bordCourtVise(niveau)
-    if (court <= vise && debit <= DEBIT_DEJA_LEGER) {
-      return { ...intact(file, "deja_legere"), niveauSuperieurPossible: hautePlusFine(court) }
+
+    /*
+     * ══════ OÙ L'ON DESCEND, ET DE COMBIEN ══════
+     *
+     * Au niveau NORMAL, l'escalier des paliers (voir [palierVideo]) : on
+     * descend toujours d'une marche, et l'on ne s'arrête qu'à 240.
+     *
+     * Au niveau HAUT, pas d'escalier : un plafond à 1080, et rien d'autre. Le
+     * bouton promet mieux, le faire descendre serait l'inverse.
+     */
+    let vise: number
+    if (niveau === "haute") {
+      vise = Math.min(court, VIDEO_BORD_COURT_HAUTE)
+    } else {
+      /*
+       * ⚠️ DÉJÀ SORTIE DE CHEZ NOUS : ON NE DESCEND PAS D'UNE MARCHE DE PLUS.
+       * C'est la garde contre la cascade — voir `dejaUnPalierAlanya`.
+       */
+      if (dejaUnPalierAlanya(court, debit)) {
+        return { ...intact(file, "deja_legere"), niveauSuperieurPossible: hautePlusFine(court) }
+      }
+      const palier = palierVideo(court)
+      if (palier === null) {
+        // 240p ou moins : l'escalier s'arrête là.
+        return { ...intact(file, "deja_legere"), niveauSuperieurPossible: hautePlusFine(court) }
+      }
+      vise = palier
     }
 
-    // ⚠️ JAMAIS AGRANDIR : le facteur est plafonné à 1. Une vidéo plus petite
-    // que l'objectif garde ses dimensions et ne voit baisser que son débit.
+    // ⚠️ JAMAIS AGRANDIR : le facteur est plafonné à 1.
     const facteur = Math.min(1, vise / court)
     // Le H.264 veut des dimensions paires.
     const pair = (n: number) => Math.max(2, 2 * Math.round(n / 2))
@@ -180,8 +302,14 @@ async function convertir(
       hauteur: pair(hauteur * facteur),
       debit: 0,
     }
-    // Une vidéo plus petite que du 720p n'a pas besoin du débit d'un 720p.
-    cible.debit = Math.max(400_000, Math.round((DEBIT_720P * cible.largeur * cible.hauteur) / (1280 * 720)))
+    /*
+     * Le débit du palier au niveau normal ; au prorata de la surface au niveau
+     * haut, qui n'a pas de palier.
+     */
+    cible.debit =
+      niveau === "haute"
+        ? Math.max(400_000, Math.round((DEBIT_720P * cible.largeur * cible.hauteur) / (1280 * 720)))
+        : DEBIT_PALIER[vise]
 
     /*
      * ⚠️ RIEN À GAGNER : ON S'ABSTIENT PLUTÔT QUE DE TRANSCODER POUR RIEN. Au
