@@ -7,6 +7,7 @@ import {
 } from "../../../src/services/dashboard-service"
 import { subscribeToAllMessages } from "../../../src/services/websocket-service"
 import "./dashboard-page.css"
+import { BadgeCompteImage } from "../../../src/components/badge-compte"
 import { useTranslation, type Cle, type LanguageCode } from "../../../src/i18n"
 
 // TYPES
@@ -214,6 +215,7 @@ export default function DashboardPage() {
                 <div className="chat-meta">
                   <div className="chat-name">
                     {chat.name}
+                    {chat.badge && <BadgeCompteImage badge={chat.badge} />}
                     {chat.isGroup && <span className="group-pill">{t("set_about_group")}</span>}
                   </div>
                   <div className="chat-preview">{chat.lastMessage}</div>

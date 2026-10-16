@@ -56,6 +56,8 @@ export interface ConversationMock {
    * serveur ; absent = non. L'ecran remplace alors la saisie par un bandeau.
    */
   officiel?: boolean
+  /** Le badge a cote du nom, decide par le serveur ; absent = aucun. */
+  badge?: { type: string; image: string; libelle: string } | null
   members?: string[]
   membersInfo?: Array<{
     id: string

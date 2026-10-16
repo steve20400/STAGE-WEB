@@ -97,6 +97,7 @@ import {
 // La fiche de contact a quitte ce fichier : elle n'est plus une vignette de
 // rendu mais un objet qui agit (repertoire, appel, conversation).
 import { FicheContact } from "../../../../src/components/fiche-contact"
+import { BadgeCompteImage } from "../../../../src/components/badge-compte"
 import {
   fetchChatConversations,
   fetchConversationById,
@@ -8198,7 +8199,10 @@ export default function ChatRoomPage() {
         </div>
 
         <div className="room-info">
-          <div className="room-name">{chat.name}</div>
+          <div className="room-name">
+            {chat.name}
+            {backendChat?.badge && <BadgeCompteImage badge={backendChat.badge} taille={17} />}
+          </div>
           <div
             className="room-sub"
             style={{

@@ -56,6 +56,8 @@ interface BackendConversation {
   e2eeActif?: boolean
   /** Fil avec le compte officiel « Alanya Work » (on n'y repond pas). Absent = non. */
   officiel?: boolean
+  /** Le badge a cote du nom, decide par le serveur (`src/lib/badges.ts`). */
+  badge?: { type: string; image: string; libelle: string } | null
   title: string | null
   /**
    * Vrai pour la conversation du compte avec lui-meme (non-groupe, un seul
@@ -216,6 +218,7 @@ function toFrontConversation(c: BackendConversation): ConversationListItem {
     id: c.id,
     isSelf,
     officiel: c.officiel === true,
+    badge: c.badge ?? null,
     name,
     initials: toInitials(name),
     colorIdx: pickColorIdx(c.id),
@@ -265,6 +268,7 @@ export async function fetchChatConversations(): Promise<ConversationListItem[]> 
         e2eeActif: c.e2eeActif,
         // Sans lui, un demarrage a froid proposerait la saisie au compte officiel.
         officiel: c.officiel,
+        badge: c.badge,
         title: c.title,
         avatarUrl: c.avatarUrl,
         members: c.members,
