@@ -85,6 +85,7 @@ import {
 } from "../../../../src/lib/image-compression"
 import {
   compresserVideo,
+  VIDEO_BORD_COURT_HAUTE,
   videoCompressible,
   type ResultatCompressionVideo,
 } from "../../../../src/lib/video-compression"
@@ -2888,6 +2889,14 @@ function MediaComposer({
       vivant = false
     }
   }, [current])
+  /*
+   * LA DÉFINITION QUE L'AUTRE NIVEAU DONNERAIT, pour que le bouton dise ce
+   * qu'il va faire. Seule la vidéo la renseigne : l'étiquette des photos reste
+   * générique, « Meilleure qualité » ne promettant aucun nombre.
+   */
+  const definitionAutre =
+    gain && "definitionAutreNiveau" in gain ? gain.definitionAutreNiveau : undefined
+
   // Avancement de la compression vidéo en cours, en pour cent.
   const [avancement, setAvancement] = useState<number | null>(null)
   useEffect(() => {
@@ -3139,15 +3148,25 @@ function MediaComposer({
                   color: current.niveau === "haute" ? "var(--accent-text)" : "#fff",
                 }}
               >
-                {t(
-                  current.kind === "video"
-                    ? current.niveau === "haute"
-                      ? "media_envoyer_720p"
-                      : "media_envoyer_1080p"
-                    : current.niveau === "haute"
-                      ? "media_qualite_normale"
-                      : "media_meilleure_qualite"
-                )}
+                {/*
+                  🐛 L'ÉTIQUETTE ANNONÇAIT « Envoyer en 1080p » QUOI QU'IL
+                  ARRIVE. C'était faux dès que la source faisait moins : une
+                  vidéo filmée en 720p ne peut pas rendre du 1080p, on
+                  n'agrandit jamais. Le bouton dit maintenant la définition
+                  qu'il va réellement produire.
+                */}
+                {current.kind === "video"
+                  ? t(
+                      current.niveau === "haute"
+                        ? "media_revenir_definition"
+                        : "media_envoyer_definition",
+                      { def: String(definitionAutre ?? VIDEO_BORD_COURT_HAUTE) }
+                    )
+                  : t(
+                      current.niveau === "haute"
+                        ? "media_qualite_normale"
+                        : "media_meilleure_qualite"
+                    )}
               </button>
             )}
           </div>

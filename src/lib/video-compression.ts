@@ -91,7 +91,7 @@ export const VIDEO_PALIER_PLANCHER = PALIERS_VIDEO[PALIERS_VIDEO.length - 1]
  * tomberait à 180 kbit/s et serait une bouillie.
  */
 export const DEBIT_PALIER: Record<number, number> = {
-  720: 1_600_000,
+  720: 1_200_000,
   360: 600_000,
   240: 300_000,
 }
@@ -122,34 +122,45 @@ export function palierVideo(court: number): number | null {
 const MARGE_SON = 250_000
 
 /**
- * CE FICHIER EST-IL DÉJÀ SORTI DE CHEZ NOUS ?
+ * LE DÉCLENCHEUR : AU DÉBIT, ET NON À LA DÉFINITION.
  *
- * 🔴 C'EST LA GARDE CONTRE LA CASCADE (demande du user, 13/10/2026 : « si on
- * décide de renvoyer un fichier déjà compressé par l'application, ça ne
- * compresse plus »).
+ * 🔴 DEMANDE DU PROFESSEUR, VALIDÉE PAR LE USER LE 16/10/2026 : « tout ce qui
+ * est au-dessus de 1,2 Mbit/s, on compresse ». Avant, on déclenchait sur la
+ * DÉFINITION : une vidéo en 720p à 1 Mbit/s — déjà parfaitement légère —
+ * descendait quand même en 360p, parce que l'escalier voulait sa marche.
  *
- * L'escalier des paliers descend d'une marche à CHAQUE passage. Transférer un
- * message ne recompresse rien — le serveur recopie la ligne et garde le même
- * fichier — mais enregistrer une vidéo reçue dans sa galerie puis la renvoyer
- * en refait un envoi neuf. Sans cette garde, trois allers-retours suffisaient
- * à transformer une vidéo de cours en bouillie.
+ * LE DÉBIT EST LA BONNE VARIABLE, et c'est de l'arithmétique : le poids d'un
+ * fichier vaut débit × durée. La définition ne fait que plafonner le détail que
+ * ce débit peut porter. Un fichier déjà sous le seuil ne gagnerait presque rien
+ * à être transcodé, et perdrait des pixels pour de bon.
  *
- * 🔴 ON LA RECONNAÎT À SA FORME, ET NON À UNE MARQUE. Un marqueur posé dans le
- * message ne survit pas au passage par la galerie ; un marqueur posé dans le
- * fichier demanderait d'écrire des métadonnées que les deux transcodeurs ne
- * savent pas produire de la même façon. La forme, elle, voyage toujours : un
- * fichier sorti d'ici a EXACTEMENT un de nos paliers pour petit côté, et son
- * débit ne dépasse pas celui de ce palier.
+ * ⚠️ LE SEUIL PORTE SUR LE DÉBIT DU FICHIER, et non sur celui de l'image seule :
+ * c'est ce qu'on sait mesurer sans décoder (taille ÷ durée), et c'est ce qui
+ * voyage sur le réseau. Il vaut donc le débit visé à 720p PLUS ce que le son
+ * ajoute.
  *
- * ⚠️ UN FAUX POSITIF EST SANS CONSÉQUENCE, et c'est ce qui rend la méthode
- * sûre : une vidéo venue d'ailleurs qui aurait exactement 360 de petit côté et
- * 600 kbit/s est déjà aussi légère que ce que nous produirions. Ne pas la
- * toucher ne coûte rien à personne.
+ * 🔴 CETTE SEULE RÈGLE REMPLACE LA GARDE CONTRE LA CASCADE. L'ancienne
+ * (13/10/2026) reconnaissait nos propres fichiers À LEUR FORME — petit côté
+ * exactement sur un palier, débit sous celui du palier — pour qu'une vidéo
+ * enregistrée dans la galerie puis renvoyée ne perde pas une marche à chaque
+ * tour. Elle n'a plus lieu d'être : AUCUNE de nos sorties ne dépasse le seuil,
+ * donc aucune ne redéclenche la compression. C'est l'invariant que vérifie le
+ * banc mobile `test/compression_video_test.dart` :
+ *
+ *     pour chaque palier p :  DEBIT_PALIER[p] + MARGE_SON ≤ SEUIL_DEBIT
+ *
+ * 🔴 ET IL TIENT PAR CONSTRUCTION, non par vigilance : le seuil est DÉFINI
+ * comme le débit du palier 720p plus la marge du son. Baisser ou relever le
+ * palier déplace le seuil avec lui, et la cascade ne peut pas se rouvrir par
+ * distraction. ⚠️ Il reste une chose à vérifier à la main : qu'aucun palier
+ * INFÉRIEUR ne dépasse `SEUIL_DEBIT - MARGE_SON`, ce qui serait de toute façon
+ * absurde (une petite image ne demande pas plus de débit qu'une grande).
  */
-export function dejaUnPalierAlanya(court: number, debit: number): boolean {
-  const attendu = DEBIT_PALIER[court]
-  if (attendu === undefined) return false
-  return debit <= attendu + MARGE_SON
+export const SEUIL_DEBIT = DEBIT_PALIER[720] + MARGE_SON
+
+/** Ce fichier est-il déjà assez léger pour qu'on n'y touche pas ? */
+export function dejaAssezLegere(debit: number): boolean {
+  return debit <= SEUIL_DEBIT
 }
 
 /** Le bord court visé pour un niveau donné. */
@@ -157,16 +168,22 @@ export function bordCourtVise(niveau: NiveauQualite): number {
   return niveau === "haute" ? VIDEO_BORD_COURT_HAUTE : VIDEO_BORD_COURT
 }
 
-/** Débit vidéo visé pour du 720p. Repère WhatsApp : 1,2 à 1,6 Mbit/s. */
-const DEBIT_720P = 1_600_000
+/**
+ * Débit visé pour du 720p : c'est le repère du palier, et la base du prorata du
+ * niveau haut. Un seul nombre, pour qu'ils ne puissent plus se contredire.
+ */
+const DEBIT_720P = DEBIT_PALIER[720]
 
 /*
- * ⚠️ `DEBIT_DEJA_LEGER` A DISPARU (13/10/2026). C'était un seuil unique —
- * « 720p sous 2,5 Mbit/s, on n'y touche pas » — qui épargnait TOUTE vidéo déjà
- * sous 720p et déjà légère : c'est précisément ce que le user a signalé (« si
- * la taille est inférieure à 720, on ne compresse plus, ce n'est pas bon »).
- * Son rôle de garde contre la cascade est repris, en mieux, par
- * `dejaUnPalierAlanya` : un seuil PAR PALIER plutôt qu'un seuil unique.
+ * ⚠️ DEUX RÈGLES ONT VÉCU ICI AVANT LE SEUIL AU DÉBIT, et l'histoire explique
+ * le choix actuel :
+ *   · `DEBIT_DEJA_LEGER` (jusqu'au 13/10/2026) — « 720p sous 2,5 Mbit/s, on n'y
+ *     touche pas ». Il épargnait TOUTE vidéo sous 720p, même lourde : c'est ce
+ *     que le user a signalé (« si la taille est inférieure à 720, on ne
+ *     compresse plus, ce n'est pas bon »).
+ *   · `dejaUnPalierAlanya` (13 au 16/10/2026) — un seuil PAR PALIER, reconnu à
+ *     la forme du fichier. Juste, mais il fallait deux règles pour décider.
+ * `SEUIL_DEBIT` fait le travail des deux avec un seul nombre : voir sa note.
  */
 
 /** En dessous, le gain ne vaut pas le risque de perte : on garde l'original. */
@@ -181,6 +198,24 @@ export type RaisonSautVideo =
 
 export interface ResultatCompressionVideo extends Omit<ResultatCompression, "raisonSaut"> {
   raisonSaut?: RaisonSautVideo
+  /**
+   * La définition, en pixels de petit côté, que l'AUTRE niveau donnerait.
+   *
+   * 🔴 L'ÉTIQUETTE DU BOUTON NE PEUT PAS ÊTRE ÉCRITE EN DUR. Elle annonçait
+   * « Envoyer en 1080p », ce qui était faux dès que la source faisait moins :
+   * pour une vidéo filmée en 720p, le niveau haut rend du 720p, pas du 1080p.
+   * Le bouton dit donc ce qu'il va vraiment faire.
+   */
+  definitionAutreNiveau?: number
+  /**
+   * Durée du transcodage, en millisecondes.
+   *
+   * 🔴 POUR MESURER AU LIEU DE SUPPOSER. Le user trouve l'envoi trop lent
+   * (16/10/2026) et le temps se répartit entre trois phases — encodage,
+   * chiffrement, téléversement — dont une seule se mesure ici. Sans ce nombre,
+   * on optimiserait au hasard.
+   */
+  msEncodage?: number
 }
 
 function intact(file: File, raisonSaut: RaisonSautVideo): ResultatCompressionVideo {
@@ -263,7 +298,18 @@ async function convertir(
     const duree =
       (await input.getDurationFromMetadata().catch(() => null)) ??
       (await input.computeDuration().catch(() => 0))
+    /*
+     * ⚠️ DURÉE INCONNUE ⇒ DÉBIT INFINI, donc on compresse. C'est le bon défaut :
+     * un fichier dont on ne sait rien doit passer par l'escalier, pas être
+     * épargné par un seuil qu'on n'a pas pu mesurer.
+     */
     const debit = duree > 0 ? (file.size * 8) / duree : Infinity
+
+    // Ce que le bouton de l'autre niveau donnerait, pour qu'il le dise lui-même.
+    const definitionAutreNiveau =
+      niveau === "haute"
+        ? (palierVideo(court) ?? court)
+        : Math.min(court, VIDEO_BORD_COURT_HAUTE)
 
     /*
      * ══════ OÙ L'ON DESCEND, ET DE COMBIEN ══════
@@ -279,16 +325,24 @@ async function convertir(
       vise = Math.min(court, VIDEO_BORD_COURT_HAUTE)
     } else {
       /*
-       * ⚠️ DÉJÀ SORTIE DE CHEZ NOUS : ON NE DESCEND PAS D'UNE MARCHE DE PLUS.
-       * C'est la garde contre la cascade — voir `dejaUnPalierAlanya`.
+       * ⚠️ LE DÉCLENCHEUR PASSE AVANT L'ESCALIER — voir `SEUIL_DEBIT`. Un
+       * fichier déjà sous le seuil repart intact, quelle que soit sa
+       * définition : c'est ce qui empêche de descendre une marche pour rien, et
+       * c'est aussi ce qui interdit la cascade.
+       *
+       * ⚠️ `niveauSuperieurPossible` EST FAUX ICI, et ce n'est pas un oubli :
+       * on n'a rien fait, et le niveau haut ne ferait rien non plus — il
+       * n'agrandit jamais, et il ne recompresse pas un fichier déjà plus léger
+       * que sa propre cible. Proposer le bouton serait promettre un changement
+       * qui n'arriverait pas.
        */
-      if (dejaUnPalierAlanya(court, debit)) {
-        return { ...intact(file, "deja_legere"), niveauSuperieurPossible: hautePlusFine(court) }
+      if (dejaAssezLegere(debit)) {
+        return { ...intact(file, "deja_legere"), niveauSuperieurPossible: false }
       }
       const palier = palierVideo(court)
       if (palier === null) {
         // 240p ou moins : l'escalier s'arrête là.
-        return { ...intact(file, "deja_legere"), niveauSuperieurPossible: hautePlusFine(court) }
+        return { ...intact(file, "deja_legere"), niveauSuperieurPossible: false }
       }
       vise = palier
     }
@@ -319,7 +373,11 @@ async function convertir(
      * tourner l'encodeur une minute pour rien.
      */
     if (cible.debit >= debit) {
-      return { ...intact(file, "deja_legere"), niveauSuperieurPossible: hautePlusFine(court) }
+      return {
+        ...intact(file, "deja_legere"),
+        niveauSuperieurPossible: niveau === "haute" ? false : hautePlusFine(court),
+        definitionAutreNiveau,
+      }
     }
 
     /*
@@ -327,6 +385,7 @@ async function convertir(
      * plus rapide, et ce qui passe partout. La voie lente la rattrape, et
      * rattrape aussi les navigateurs qui n'ont pas de H.264 du tout.
      */
+    const depart = performance.now()
     const rapide = await transcoderRapide(mb, input, piste, cible, duree, onProgression).catch(
       () => null
     )
@@ -350,6 +409,8 @@ async function convertir(
       tailleAvant: file.size,
       tailleApres: octets.byteLength,
       niveauSuperieurPossible: hautePlusFine(court),
+      definitionAutreNiveau,
+      msEncodage: Math.round(performance.now() - depart),
     }
   } catch {
     return intact(file, "conversion_impossible")
@@ -358,21 +419,40 @@ async function convertir(
   }
 }
 
-/** La première configuration H.264 que l'encodeur du navigateur accepte. */
+/**
+ * La première configuration H.264 que l'encodeur du navigateur accepte.
+ *
+ * 🔴 ON DEMANDE L'ENCODEUR MATÉRIEL D'ABORD (16/10/2026). On ne le demandait
+ * pas : sans `hardwareAcceleration`, la norme laisse le navigateur choisir, et
+ * Chrome retombe volontiers sur son encodeur LOGICIEL — cinq à vingt fois plus
+ * lent, pour le même fichier à l'arrivée. C'est l'une des trois causes de la
+ * lenteur signalée par le user le 16/10 (« rien que le temps que ça compresse…
+ * c'est beaucoup trop long »).
+ *
+ * ⚠️ DEUX PASSES, ET L'ORDRE COMPTE. La puce matérielle est un gain bien plus
+ * grand que le profil H.264 : on essaie donc les trois profils EN MATÉRIEL
+ * avant d'essayer le premier en logiciel. Un encodeur matériel refuse parfois
+ * les très petites images ou les profils élevés — la seconde passe, sans
+ * exigence, rattrape ces cas.
+ */
 async function configurationAvc(cible: Cible): Promise<VideoEncoderConfig | null> {
   // High, Main puis Baseline, niveau 4.0 : de quoi tenir du 720p à 60 i/s.
-  for (const codec of ["avc1.640028", "avc1.4d4028", "avc1.42e028"]) {
-    const config: VideoEncoderConfig = {
-      codec,
-      width: cible.largeur,
-      height: cible.hauteur,
-      bitrate: cible.debit,
-      avc: { format: "avc" },
-    }
-    try {
-      if ((await VideoEncoder.isConfigSupported(config)).supported) return config
-    } catch {
-      /* configuration refusée : on essaie la suivante */
+  const codecs = ["avc1.640028", "avc1.4d4028", "avc1.42e028"]
+  for (const acceleration of ["prefer-hardware", undefined] as const) {
+    for (const codec of codecs) {
+      const config: VideoEncoderConfig = {
+        codec,
+        width: cible.largeur,
+        height: cible.hauteur,
+        bitrate: cible.debit,
+        avc: { format: "avc" },
+        ...(acceleration ? { hardwareAcceleration: acceleration } : {}),
+      }
+      try {
+        if ((await VideoEncoder.isConfigSupported(config)).supported) return config
+      } catch {
+        /* configuration refusée : on essaie la suivante */
+      }
     }
   }
   return null

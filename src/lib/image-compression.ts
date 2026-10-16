@@ -360,6 +360,26 @@ function transparente(ctx: CanvasRenderingContext2D, l: number, h: number): bool
 }
 
 /**
+ * Le niveau haut donnerait-il une définition plus fine que le niveau normal ?
+ *
+ * 🐛 LA QUESTION ÉTAIT MAL POSÉE : on comparait le grand côté au plafond du
+ * niveau normal (1600 px), ce qui était juste AVANT L'ESCALIER. Depuis le
+ * 13/10/2026 le niveau normal descend d'une marche : une photo de 1200 px part
+ * en 1000 px, et le niveau haut lui rendrait ses 1200 px — mais le bouton
+ * n'apparaissait pas. Le défaut ne se voyait pas sur une photo de téléphone
+ * (4000 px, donc au-dessus du plafond), seulement entre 640 et 1600 px.
+ *
+ * ⚠️ Jumelle de `hautePlusFine` côté vidéo : les deux doivent rester d'accord.
+ */
+function hautePlusFineImage(bordLong: number): boolean {
+  const normal = palierImage(bordLong)
+  // L'escalier ne fait rien (640 px ou moins) : le plafond haut n'y ferait rien
+  // non plus, puisqu'on n'agrandit jamais.
+  if (normal === null) return false
+  return Math.min(bordLong, IMAGE_BORD_MAX_HAUTE) > normal
+}
+
+/**
  * Compresse une image, ou rend l'original si le moindre doute existe.
  *
  * Ne lève jamais : un envoi ne doit pas échouer parce qu'une optimisation a
@@ -427,7 +447,7 @@ export async function compresserImage(
         bordLong <= bordMax &&
         file.size <= largeurSource * hauteurSource * OCTETS_PAR_PIXEL_MAX
       ) {
-        return { ...intact(file, "trop_petite"), niveauSuperieurPossible: bordLong > IMAGE_BORD_MAX }
+        return { ...intact(file, "trop_petite"), niveauSuperieurPossible: false }
       }
       cible = bordMax
     } else {
@@ -436,7 +456,7 @@ export async function compresserImage(
         format !== "png" &&
         dejaUnPalierImageAlanya(bordLong, file.size, largeurSource * hauteurSource)
       ) {
-        return { ...intact(file, "trop_petite"), niveauSuperieurPossible: bordLong > IMAGE_BORD_MAX }
+        return { ...intact(file, "trop_petite"), niveauSuperieurPossible: false }
       }
       const palier = palierImage(bordLong)
       /*
@@ -499,7 +519,7 @@ export async function compresserImage(
       compresse: true,
       tailleAvant: file.size,
       tailleApres: blob.size,
-      niveauSuperieurPossible: bordLong > IMAGE_BORD_MAX,
+      niveauSuperieurPossible: hautePlusFineImage(bordLong),
     }
   } catch {
     return intact(file, "decodage_impossible")
