@@ -54,6 +54,8 @@ interface BackendConversation {
   isGroup: boolean
   /** La conversation est-elle chiffree de bout en bout ? Absent = non. */
   e2eeActif?: boolean
+  /** Fil avec le compte officiel « Alanya Work » (on n'y repond pas). Absent = non. */
+  officiel?: boolean
   title: string | null
   /**
    * Vrai pour la conversation du compte avec lui-meme (non-groupe, un seul
@@ -213,6 +215,7 @@ function toFrontConversation(c: BackendConversation): ConversationListItem {
   return {
     id: c.id,
     isSelf,
+    officiel: c.officiel === true,
     name,
     initials: toInitials(name),
     colorIdx: pickColorIdx(c.id),
@@ -260,6 +263,8 @@ export async function fetchChatConversations(): Promise<ConversationListItem[]> 
         // Sans lui, l’affichage depuis le cache ne saurait pas qu’un fil est
         // chiffré, donc qu’il faut chercher son dernier texte en local.
         e2eeActif: c.e2eeActif,
+        // Sans lui, un demarrage a froid proposerait la saisie au compte officiel.
+        officiel: c.officiel,
         title: c.title,
         avatarUrl: c.avatarUrl,
         members: c.members,

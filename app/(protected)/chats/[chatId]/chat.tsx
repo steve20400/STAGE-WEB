@@ -5456,6 +5456,12 @@ export default function ChatRoomPage() {
    * rien, et proposer une action qui echoue est pire que ne rien proposer.
    */
   const cestMoiMeme = backendChat?.isSelf === true
+  /**
+   * Fil avec le compte officiel « Alanya Work » : on n'y repond pas (decision
+   * du user, 16/10/2026). La saisie cede la place a un bandeau, et l'appel
+   * disparait — le serveur refuse de toute facon (`COMPTE_OFFICIEL`).
+   */
+  const compteOfficiel = backendChat?.officiel === true
   const [chatLoading, setChatLoading] = useState(true)
 
   useEffect(() => {
@@ -8235,8 +8241,9 @@ export default function ChatRoomPage() {
             <>
               {/* Les APPELS n'ont pas de sens vers soi-meme : les boutons
                   disparaissent plutot que d'echouer sous le doigt. Le menu de
-                  contact partage applique deja la meme regle. */}
-              {!cestMoiMeme && (
+                  contact partage applique deja la meme regle. Le compte
+                  officiel non plus ne decroche jamais. */}
+              {!cestMoiMeme && !compteOfficiel && (
                 <>
                   {/* 🔴 UN SEUL BOUTON D'APPEL, LE TYPE SE CHOISIT AU CLIC.
 
@@ -9023,7 +9030,15 @@ export default function ChatRoomPage() {
           plutot que de la desactiver. Un champ grise laisse chercher pourquoi ;
           une phrase qui nomme le detenteur repond avant qu'on se pose la
           question. Le fil, lui, reste entierement lisible. */}
-      {verrou.parUnAutre ? (
+      {/* Le compte officiel ne recoit pas de reponse : on le dit a la place
+          du champ, comme les comptes d'entreprise de WhatsApp. */}
+      {compteOfficiel ? (
+        <div className="room-input-wrap">
+          <div className="room-locked">
+            <span>{t("officiel_pas_de_reponse")}</span>
+          </div>
+        </div>
+      ) : verrou.parUnAutre ? (
         <div className="room-input-wrap">
           <div className="room-locked">
             <svg

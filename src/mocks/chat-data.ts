@@ -51,6 +51,11 @@ export interface ConversationMock {
    * la sienne ; le client ne le recalcule pas.
    */
   isSelf?: boolean
+  /**
+   * Fil avec le compte officiel « Alanya Work » : on n'y repond pas. Vient du
+   * serveur ; absent = non. L'ecran remplace alors la saisie par un bandeau.
+   */
+  officiel?: boolean
   members?: string[]
   membersInfo?: Array<{
     id: string

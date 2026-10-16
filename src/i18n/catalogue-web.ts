@@ -171,6 +171,7 @@ export const WEB_TRANSLATION_KEYS = [
   "section_recent",
   "open_contacts",
   "locked_by_device",
+  "officiel_pas_de_reponse",
   "select_conversation",
   "theme",
   "search_contact",
@@ -2590,6 +2591,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "Recents",
     open_contacts: "Ouvrir les contacts",
     locked_by_device: "Reservee par un appareil de ce compte",
+    officiel_pas_de_reponse: "Vous ne pouvez pas répondre à ce compte. Seul Alanya Work peut écrire ici.",
     device_name_title: "Nommez cet appareil",
     device_name_explain:
       "Ce nom apparait au-dessus des messages envoyes depuis cet appareil, et uniquement pour les autres appareils connectes a ce compte. Vos correspondants ne le voient jamais.",
@@ -4111,6 +4113,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "Recent",
     open_contacts: "Open contacts",
     locked_by_device: "Reserved by a device of this account",
+    officiel_pas_de_reponse: "You can’t reply to this account. Only Alanya Work can send messages here.",
     device_name_title: "Name this device",
     device_name_explain:
       "This name appears above messages sent from this device, and only for other devices signed in to this account. Your contacts never see it.",
@@ -5624,6 +5627,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "Recientes",
     open_contacts: "Abrir contactos",
     locked_by_device: "Reservada por un dispositivo de esta cuenta",
+    officiel_pas_de_reponse: "No puedes responder a esta cuenta. Solo Alanya Work puede escribir aquí.",
     device_name_title: "Nombra este dispositivo",
     device_name_explain:
       "Este nombre aparece encima de los mensajes enviados desde este dispositivo, y solo para los demás dispositivos conectados a esta cuenta. Tus contactos nunca lo ven.",
@@ -7147,6 +7151,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "Neueste",
     open_contacts: "Kontakte öffnen",
     locked_by_device: "Von einem Gerät dieses Kontos reserviert",
+    officiel_pas_de_reponse: "Sie können diesem Konto nicht antworten. Nur Alanya Work kann hier schreiben.",
     device_name_title: "Diesem Gerät einen Namen geben",
     device_name_explain:
       "Dieser Name erscheint über Nachrichten, die von diesem Gerät gesendet werden, und nur für andere Geräte dieses Kontos. Deine Kontakte sehen ihn nie.",
@@ -8667,6 +8672,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "Recentes",
     open_contacts: "Abrir contactos",
     locked_by_device: "Reservada por um aparelho desta conta",
+    officiel_pas_de_reponse: "Você não pode responder a esta conta. Só a Alanya Work pode escrever aqui.",
     device_name_title: "Dê um nome a este aparelho",
     device_name_explain:
       "Este nome aparece acima das mensagens enviadas deste aparelho, e apenas para os outros aparelhos ligados a esta conta. Os seus contactos nunca o veem.",
@@ -10176,6 +10182,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "Недавние",
     open_contacts: "Открыть контакты",
     locked_by_device: "Зарезервировано устройством этого аккаунта",
+    officiel_pas_de_reponse: "Вы не можете ответить этому аккаунту. Писать сюда может только Alanya Work.",
     device_name_title: "Назовите это устройство",
     device_name_explain:
       "Это имя отображается над сообщениями, отправленными с этого устройства, и только на других устройствах этого аккаунта. Ваши собеседники его никогда не видят.",
@@ -11661,6 +11668,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "最近",
     open_contacts: "打开联系人",
     locked_by_device: "已被本账户的某台设备占用",
+    officiel_pas_de_reponse: "您无法回复此账号。只有 Alanya Work 可以在此发送消息。",
     device_name_title: "为此设备命名",
     device_name_explain:
       "该名称会显示在从此设备发送的消息上方，且仅对本账户的其他设备可见。您的联系人永远看不到它。",
@@ -13151,6 +13159,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "Senaste",
     open_contacts: "Öppna kontakter",
     locked_by_device: "Reserverad av en enhet på detta konto",
+    officiel_pas_de_reponse: "Du kan inte svara detta konto. Endast Alanya Work kan skriva här.",
     device_name_title: "Namnge den här enheten",
     device_name_explain:
       "Namnet visas ovanför meddelanden som skickas från den här enheten, och endast för andra enheter som är inloggade på kontot. Dina kontakter ser det aldrig.",
@@ -14662,6 +14671,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     section_recent: "Nylige",
     open_contacts: "Åpne kontakter",
     locked_by_device: "Reservert av en enhet på denne kontoen",
+    officiel_pas_de_reponse: "Du kan ikke svare denne kontoen. Bare Alanya Work kan skrive her.",
     device_name_title: "Gi denne enheten et navn",
     device_name_explain:
       "Navnet vises over meldinger som sendes fra denne enheten, og bare for andre enheter som er logget på kontoen. Kontaktene dine ser det aldri.",
