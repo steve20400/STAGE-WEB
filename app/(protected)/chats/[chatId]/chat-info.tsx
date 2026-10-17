@@ -82,6 +82,16 @@ interface ConvInfo {
   statusMsg?: string
   /** Alanya ID de l'interlocuteur, pour une conversation a deux. */
   alanyaId?: string
+  /**
+   * L'identifiant de COMPTE du correspondant, en tête-à-tête.
+   *
+   * ⚠️ IL NE SE DÉDUIT PAS DE `members`. Pour une conversation à deux, cette
+   * liste porte UNE entrée dont l'`id` est celui de la CONVERSATION — pratique
+   * pour l'affichage, faux pour la cryptographie : un code de sécurité calculé
+   * là-dessus ne correspondrait à personne. On transporte donc l'identifiant du
+   * compte à part, renseigné par chacun des deux constructeurs.
+   */
+  pairUserId?: string
 }
 
 interface PendingAction {
@@ -216,6 +226,14 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
    * glissé par le serveur dans le compte d'un membre (chapitre 31).
    */
   const [membreAVerifier, setMembreAVerifier] = useState<{ id: string; name: string } | null>(null)
+
+  /*
+   * L'IDENTIFIANT DU CORRESPONDANT, en tête-à-tête — celui dont on compare la
+   * clé. `null` en groupe, et `null` aussi tant que la liste des membres n'est
+   * pas connue : la rangée du code de sécurité ne paraît qu'une fois qu'on sait
+   * à qui elle s'adresse, plutôt que d'ouvrir un écran sans destinataire.
+   */
+  const pairId = conv.isGroup ? null : (conv.pairUserId ?? null)
   const [showAddMember, setShowAddMember] = useState(false)
 
   const color = COLORS[conv.color]
@@ -1064,6 +1082,63 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
             </div>
           )}
 
+          {/* ══════════════════════ Chiffrement ═══════════════════════════
+              🔴 C'EST ICI QU'ON VA CHERCHER LE CODE DE SÉCURITÉ, comme sur le
+              mobile et comme chez WhatsApp (demande du user, 16/10/2026).
+
+              🐛 L'ÉCRAN EXISTAIT MAIS N'ÉTAIT PLUS ATTEIGNABLE. Le bouclier de
+              l'en-tête l'ouvrait ; il a été retiré le 12/10 pour rendre le
+              chiffrement invisible, et plus rien n'appelait `E2eeVerification`
+              en tête-à-tête. Le code de sécurité est pourtant la seule chose
+              que l'utilisateur doive pouvoir vérifier lui-même.
+
+              ⚠️ AUCUNE ACTIVATION ICI, ET C'EST TOUTE LA DIFFÉRENCE AVEC
+              L'ANCIEN BOUTON. Le chiffrement s'active en UN SEUL endroit, les
+              réglages de l'application. Cette rangée ne fait que MONTRER le
+              code — elle ne demande pas de mot de passe et ne change rien.
+
+              ⚠️ TÊTE-À-TÊTE SEULEMENT : en groupe, il n'y a pas une identité à
+              comparer mais une par membre, et elles se vérifient une à une
+              depuis la liste des membres, plus haut.
+          */}
+          {!conv.isGroup && pairId !== null && (
+            <div className="cip-section">
+              <div className="cip-section-title">{t("e2ee_reglage_titre")}</div>
+              <div
+                className="danger-item"
+                role="button"
+                tabIndex={0}
+                onClick={() => setMembreAVerifier({ id: pairId, name: conv.name })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    setMembreAVerifier({ id: pairId, name: conv.name })
+                  }
+                }}
+              >
+                <div className="di-icon" style={{ background: "var(--accent-dim,#10b98115)" }}>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="var(--accent,#10b981)"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="M9 12l2 2 4-4" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="danger-label">{t("e2ee_verif_ouvrir")}</div>
+                  <div className="danger-sub">{t("e2ee_verif_limite")}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {(tab === "fichiers" || !conv.isGroup) && (
             <div className="cip-section">
               {!conv.isGroup && <div className="cip-section-title">{t("cinfo_shared_files")}</div>}
@@ -1358,6 +1433,7 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
     isGroup: false,
     online: conv.online,
     alanyaId: alanyaIdPair,
+    pairUserId: autre?.id,
     // statusMsg reste vide : la mention de presence se compose au rendu, donc
     // elle suit la langue choisie.
     members: [
@@ -1431,6 +1507,8 @@ function buildConvInfoFromLocalData(chatId: string): ConvInfo | null {
     isGroup: false,
     online: contact.online,
     alanyaId: contact.phone,
+    // Dans les données locales, une conversation à deux EST son contact.
+    pairUserId: contact.id,
     // statusMsg reste vide : voir plus haut, la presence se compose au rendu.
     members: [
       {

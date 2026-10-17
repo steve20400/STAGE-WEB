@@ -1,6 +1,6 @@
 import { FingerprintGenerator } from "@privacyresearch/libsignal-protocol-typescript"
 import { getMyUserId } from "../data/session-user"
-import { idAppareil } from "./e2ee-service"
+import { idAppareil, ouvrirSessions } from "./e2ee-service"
 import { CoffreE2ee, oublierAvertissement } from "./e2ee-store"
 import {
   clesSecrets,
@@ -87,9 +87,17 @@ export interface Empreinte {
  * sans casser le ratchet. La contrepartie est ici : vérifier un correspondant
  * qui a deux appareils, c'est vérifier deux codes.
  *
- * ⚠️ RIEN N'EST DEMANDÉ AU SERVEUR. Si aucune session n'a jamais été ouverte
- * avec cette personne, la liste est vide — il n'y a rien à vérifier, et c'est la
- * réponse honnête.
+ * 🔴 ON OUVRE LA SESSION NOUS-MÊMES PLUTÔT QUE D'EXIGER UN ÉCHANGE (16/10/2026,
+ * alignement sur le mobile). Avant, cette fonction ne lisait que le coffre : sans
+ * message chiffré déjà échangé, elle rendait une liste vide et l'écran disait
+ * « il n'y a rien à comparer ». Or VÉRIFIER AVANT D'ÉCRIRE est précisément à quoi
+ * sert un code de sécurité — exiger l'échange d'abord retourne l'outil contre son
+ * usage. `ouvrirSessions` va chercher le paquet de pré-clés, vérifie sa signature
+ * et range l'identité : exactement ce que ferait le premier envoi, sans envoyer.
+ *
+ * ⚠️ SANS RÉSEAU, ON SE RABAT SUR LE COFFRE. Une panne de réseau ne doit pas
+ * effacer un code qu'on connaît déjà : l'échec est avalé, et la suite lit ce que
+ * le coffre contient.
  */
 export async function empreintesPour(peerUserId: string): Promise<Empreinte[]> {
   await ouvrirCoffre()
@@ -99,6 +107,12 @@ export async function empreintesPour(peerUserId: string): Promise<Empreinte[]> {
 
   const maCle = await coffre.getIdentityKeyPair()
   if (!maCle) return []
+
+  try {
+    await ouvrirSessions(peerUserId)
+  } catch {
+    /* hors ligne, ou correspondant sans appareil : on lit ce qu'on a déjà */
+  }
 
   /*
    * Les appareils connus se lisent dans le coffre : la bibliothèque y range la
