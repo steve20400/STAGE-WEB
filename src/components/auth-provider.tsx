@@ -15,7 +15,7 @@ import {
   type SessionUser,
 } from "../data/session-user"
 import { clearSessionToken, loadRefreshToken, loadSessionToken } from "../data/session-auth"
-import { drainOfflineOutbox } from "../services/messages-service"
+import { drainOfflineOutbox, resteAEnvoyer } from "../services/messages-service"
 import { viderFileStatuts } from "../services/outbox-statuts"
 import {
   enregistrerAppareilCourant,
@@ -155,6 +155,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener("online", drain)
 
     /*
+     * ══════ ET UN RÉESSAI RÉGULIER TANT QU'IL RESTE QUELQUE CHOSE ══════
+     *
+     * 🐛 UN ENVOI COUPÉ PAR LE RELAIS N'ÉTAIT JAMAIS REPRIS (user, 17/10/2026).
+     * Les trois signaux ci-dessus ont un point commun : ils supposent que le
+     * réseau est TOMBÉ. Un téléversement de 300 Mo qui meurt sur un 504, lui,
+     * échoue alors que la connexion est debout et que le WebSocket n'a pas
+     * bougé — donc rien ne se déclenchait, et le fichier dormait en file
+     * jusqu'au prochain rechargement de la page.
+     *
+     * ⚠️ ON NE RÉVEILLE RIEN QUAND LA FILE EST VIDE : la minuterie ne touche à
+     * IndexedDB que pour compter, et ne part que s'il y a de quoi faire.
+     */
+    const minuterie = window.setInterval(() => {
+      void resteAEnvoyer().then((reste) => {
+        if (reste) drain()
+      })
+    }, 60_000)
+
+    /*
      * ⚠️ LA RECONNEXION DU WEBSOCKET EST LE SIGNAL FIABLE, pas `online`.
      *
      * L'evenement `online` du navigateur dit seulement « une interface reseau
@@ -183,6 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
+      window.clearInterval(minuterie)
       window.removeEventListener("online", drain)
       stopWs()
       stopParti()

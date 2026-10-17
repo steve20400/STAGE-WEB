@@ -51,8 +51,23 @@ export type { NiveauQualite }
 /** Bord court visé, en pixels. */
 export const VIDEO_BORD_COURT = 720
 
-/** Bord court visé au niveau haut : du 1080p. */
-export const VIDEO_BORD_COURT_HAUTE = 1080
+/**
+ * Bord court visé au niveau haut : du 720p, et c'est aussi le plafond absolu.
+ *
+ * 🔴 IL VALAIT 1080 JUSQU'AU 17/10/2026. Le user l'a ramené à 720 (« le 1080 ne
+ * doit pas être là, on doit descendre à 720, que ce soit sur le web ou sur le
+ * mobile »), dans le sens de ce que demande le professeur : des fichiers plus
+ * légers. Plus aucune vidéo ne sort d'ici au-dessus de 720p.
+ *
+ * ⚠️ CE CHANGEMENT A SUPPRIMÉ LA SEULE DIVERGENCE WEB/MOBILE QUI RESTAIT. Le
+ * niveau haut ré-encodait une source déjà en 1080p pour en baisser le débit ;
+ * le transcodeur du téléphone, lui, laissait la piste passer telle quelle quand
+ * la définition visée égalait celle de la source, et ne produisait alors aucun
+ * fichier. Les deux clients rendaient donc des poids différents. Avec un plafond
+ * à 720, ce cas n'existe plus : au-dessus de 720 on réduit pour de bon, en
+ * dessous on ne touche à rien.
+ */
+export const VIDEO_BORD_COURT_HAUTE = 720
 
 /**
  * L'ESCALIER DES PALIERS — décision du user, 13/10/2026.
@@ -168,11 +183,11 @@ export function bordCourtVise(niveau: NiveauQualite): number {
   return niveau === "haute" ? VIDEO_BORD_COURT_HAUTE : VIDEO_BORD_COURT
 }
 
-/**
- * Débit visé pour du 720p : c'est le repère du palier, et la base du prorata du
- * niveau haut. Un seul nombre, pour qu'ils ne puissent plus se contredire.
+/*
+ * ⚠️ `DEBIT_720P` A DISPARU (17/10/2026). Il servait de base au PRORATA DE
+ * SURFACE du niveau haut, qui n'a plus d'objet : ce niveau ne vise plus qu'une
+ * seule définition, 720p, donc un seul débit — celui de son palier.
  */
-const DEBIT_720P = DEBIT_PALIER[720]
 
 /*
  * ⚠️ DEUX RÈGLES ONT VÉCU ICI AVANT LE SEUIL AU DÉBIT, et l'histoire explique
@@ -322,7 +337,26 @@ async function convertir(
      */
     let vise: number
     if (niveau === "haute") {
-      vise = Math.min(court, VIDEO_BORD_COURT_HAUTE)
+      /*
+       * ══════ LE NIVEAU HAUT : 720p AU PLUS, ET PAS D'ESCALIER ══════
+       *
+       * 🔴 RÈGLE DU USER, 17/10/2026, mot pour mot : « on doit descendre à 720 ;
+       * et si la vidéo est inférieure à 720 et qu'on clique sur meilleure
+       * qualité, alors ça ne compresse plus ».
+       *
+       * Le bouton ne promet donc pas « mieux que l'original » — on n'agrandit
+       * jamais — mais « mieux que la marche que l'escalier allait prendre ». Une
+       * vidéo filmée en 720p part en 360p au niveau normal ; ici elle part
+       * entière. Une vidéo de 1080p ou plus descend à 720p, et pas davantage.
+       */
+      if (court <= VIDEO_BORD_COURT_HAUTE) {
+        return {
+          ...intact(file, "deja_legere"),
+          niveauSuperieurPossible: false,
+          definitionAutreNiveau,
+        }
+      }
+      vise = VIDEO_BORD_COURT_HAUTE
     } else {
       /*
        * ⚠️ LE DÉCLENCHEUR PASSE AVANT L'ESCALIER — voir `SEUIL_DEBIT`. Un
@@ -360,10 +394,13 @@ async function convertir(
      * Le débit du palier au niveau normal ; au prorata de la surface au niveau
      * haut, qui n'a pas de palier.
      */
-    cible.debit =
-      niveau === "haute"
-        ? Math.max(400_000, Math.round((DEBIT_720P * cible.largeur * cible.hauteur) / (1280 * 720)))
-        : DEBIT_PALIER[vise]
+    /*
+     * ⚠️ UN SEUL DÉBIT POUR LES DEUX NIVEAUX, depuis que le niveau haut vise
+     * 720p lui aussi. Le prorata de surface qui vivait ici n'avait de sens que
+     * pour un plafond à 1080 : le niveau haut ne connaît plus qu'une seule
+     * définition, donc un seul débit, celui de son palier.
+     */
+    cible.debit = niveau === "haute" ? DEBIT_PALIER[VIDEO_BORD_COURT_HAUTE] : DEBIT_PALIER[vise]
 
     /*
      * ⚠️ RIEN À GAGNER : ON S'ABSTIENT PLUTÔT QUE DE TRANSCODER POUR RIEN. Au

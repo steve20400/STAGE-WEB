@@ -126,7 +126,7 @@ import { TexteForme } from "../../../../src/components/texte-forme"
 import { MediaChiffre, MediaChiffreIndisponible, TuileChiffree } from "./media-chiffre"
 import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { envoyerMediaChiffre } from "../../../../src/services/e2ee-media-envoi"
-import { televerser } from "../../../../src/services/envoi-morceaux"
+import { televerser, type Reprise } from "../../../../src/services/envoi-morceaux"
 import { urlApercu } from "../../../../src/services/e2ee-media"
 import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
 import { appliquerMarqueur, MARQUEURS, sansMarqueurs } from "../../../../src/lib/mise-en-forme"
@@ -7384,6 +7384,16 @@ export default function ChatRoomPage() {
         return
       }
 
+      /*
+       * LA RÉSERVATION D'ENVOI, GARDÉE SOUS LA MAIN.
+       *
+       * 🔴 C'EST ELLE QUI PERMET DE REPRENDRE (user, 17/10/2026 : « quand la
+       * connexion revient, ça doit seulement continuer au lieu de
+       * recommencer »). Si l'envoi casse en route, elle part avec le fichier
+       * dans la file d'attente, et le prochain essai ne redemande au serveur
+       * que les morceaux qui lui manquent.
+       */
+      let reservation: Reprise | undefined
       try {
         // En morceaux au-delà d'un mébioctet (chapitre 46).
         const media = await televerser(file, {
@@ -7391,6 +7401,9 @@ export default function ChatRoomPage() {
           mime,
           dureeMs: durationMs,
           onProgression: progression,
+          onReservation: (r) => {
+            reservation = r
+          },
         })
         const saved = await sendChatMessage(chatId, caption, msgType, {
           mediaId: media.id,
@@ -7459,6 +7472,7 @@ export default function ChatRoomPage() {
               durationMs,
               caption,
               replyToId: replyTo?.id,
+              envoi: reservation,
             })
             setReplyTo(null)
             // ⚠️ NE PAS LIBERER `localUrl` ICI : c'est lui qui porte l'apercu de

@@ -24,6 +24,7 @@ import {
   enqueueOffline,
 } from "./indexeddb-cache"
 import { uploadMedia } from "./media-service"
+import { televerser, type Reprise } from "./envoi-morceaux"
 import {
   chargePour,
   estChiffree,
@@ -1001,9 +1002,38 @@ function estRefusPourBlocage(err: unknown): boolean {
  * delai depasse. Tout code renvoye par le serveur, meme 500, signifie qu'il a
  * repondu, donc qu'il a decide. On ne met pas sa decision en file d'attente.
  */
+/**
+ * Les réponses qui veulent dire « le serveur n'a pas répondu », et non
+ * « le serveur refuse ».
+ *
+ * 🐛 UN ENVOI COUPÉ EN ROUTE FAISAIT DISPARAÎTRE LA BULLE (user, 17/10/2026 :
+ * « quand ça coupe, surtout sur le web, ça disparaît totalement de la
+ * discussion »). On ne reconnaissait qu'une seule panne : le statut 0, celui
+ * d'une requête que le navigateur n'a pas pu finir. Mais un téléversement long
+ * meurt le plus souvent AUTREMENT — le relais s'impatiente avant le serveur, et
+ * répond lui-même :
+ *
+ *   · 502, 503, 504 — nginx n'a pas obtenu de réponse du serveur à temps ;
+ *   · 408 — le relais a jugé la requête trop lente ;
+ *   · 429 — on nous demande d'attendre.
+ *
+ * Aucun de ces cinq ne dit que l'envoi est IMPOSSIBLE : il dit qu'il n'a pas
+ * abouti CETTE FOIS. Les traiter comme un refus définitif retirait la bulle et
+ * jetait le fichier, alors que le réessayer plus tard a toutes les chances de
+ * marcher.
+ *
+ * ⚠️ 413 N'EN FAIT PAS PARTIE, ET C'EST VOULU. « Fichier trop lourd » est un
+ * refus que le temps ne répare pas : le remettre en file le ferait échouer en
+ * boucle, en silence, et l'utilisateur croirait son fichier parti. Celui-là se
+ * dit. ⚠️ S'il apparaît pour un fichier SOUS notre plafond annoncé, ce n'est
+ * pas l'utilisateur qui a tort mais `client_max_body_size` du relais, qui doit
+ * suivre `MEDIA_MAX_SIZE_MB`.
+ */
+const STATUTS_A_REESSAYER = new Set([0, 408, 429, 502, 503, 504])
+
 export function estPanneReseau(err: unknown): boolean {
   if (!navigator.onLine) return true
-  return err instanceof ApiError && err.status === 0
+  return err instanceof ApiError && STATUTS_A_REESSAYER.has(err.status)
 }
 
 /**
@@ -1035,6 +1065,11 @@ export async function mettreMediaEnFile(
     durationMs?: number
     caption?: string
     replyToId?: string
+    /**
+     * La réservation obtenue avant la coupure, s'il y en avait une : la file
+     * reprendra les morceaux manquants au lieu de tout renvoyer.
+     */
+    envoi?: Reprise
   }
 ): Promise<void> {
   const myId = getMyUserId()
@@ -1051,6 +1086,7 @@ export async function mettreMediaEnFile(
     mediaNom: media.filename,
     mediaMime: media.mime,
     mediaDureeMs: media.durationMs,
+    ...(media.envoi ? { envoiId: media.envoi.id, envoiJeton: media.envoi.jeton } : {}),
   })
 
   // Le message optimiste est aussi mis en cache : sans lui, recharger la page
@@ -1108,8 +1144,36 @@ export async function apercusMediasEnAttente(
   return apercus
 }
 
+/**
+ * La réservation d'envoi rangée à côté d'un fichier en attente, s'il y en a
+ * une. C'est elle qui permet de REPRENDRE au lieu de recommencer.
+ */
+function repriseDeFile(item: { [k: string]: unknown }): Reprise | undefined {
+  const id = item.envoiId
+  const jeton = item.envoiJeton
+  if (typeof id !== "string" || typeof jeton !== "string") return undefined
+  return { id, jeton }
+}
+
 /** Un seul drain a la fois : "online" et le montage peuvent se declencher ensemble. */
 let draining = false
+
+/**
+ * Reste-t-il quelque chose à envoyer ?
+ *
+ * 🔴 SERT À SAVOIR S'IL FAUT RÉESSAYER PLUS TARD, et c'est ce qui manquait. Le
+ * drain ne se déclenchait qu'au montage, au retour de `online` et à la
+ * reconnexion du WebSocket. Or un téléversement coupé par le relais échoue
+ * SANS que le réseau tombe : aucun de ces trois signaux ne se produit, et le
+ * fichier attendait jusqu'au prochain rechargement de la page.
+ */
+export async function resteAEnvoyer(): Promise<boolean> {
+  try {
+    return (await getOfflineQueue()).length > 0
+  } catch {
+    return false
+  }
+}
 
 /**
  * Renvoie les messages ecrits hors ligne (outbox IndexedDB). Sans ce drain, la
@@ -1150,11 +1214,33 @@ export async function drainOfflineOutbox(): Promise<number> {
          * forfait mobile.
          */
         if (!mediaId && item.mediaBlob instanceof Blob) {
-          const media = await uploadMedia(
-            item.mediaBlob,
-            typeof item.mediaNom === "string" ? item.mediaNom : "fichier",
-            typeof item.mediaDureeMs === "number" ? item.mediaDureeMs : undefined
-          )
+          /*
+           * 🔴 EN MORCEAUX, ET EN REPRENANT — pas d'un seul bloc (17/10/2026).
+           *
+           * 🐛 LA FILE RENVOYAIT LE FICHIER ENTIER PAR `POST /api/media`, et
+           * deux choses en découlaient, toutes deux signalées par le user :
+           *   · un envoi coupé à 90 % repartait de ZÉRO. Sur une connexion à
+           *     1 Mbit/s en montée, un fichier de 300 Mo demande quarante
+           *     minutes : il ne finissait jamais ;
+           *   · la route d'un seul bloc fait passer les 300 Mo en une requête,
+           *     celle que le relais coupe le premier.
+           *
+           * `televerser` découpe, réessaie morceau par morceau, et avec
+           * `reprise` ne redemande au serveur que ce qui lui manque. La
+           * réservation est rangée DÈS QU'ELLE EXISTE, avant le premier
+           * morceau : sans cela, un arrêt pendant le tout premier envoi
+           * perdrait le fil.
+           */
+          const nom = typeof item.mediaNom === "string" ? item.mediaNom : "fichier"
+          const media = await televerser(item.mediaBlob, {
+            nom,
+            mime: item.mediaBlob.type || "application/octet-stream",
+            dureeMs: typeof item.mediaDureeMs === "number" ? item.mediaDureeMs : undefined,
+            reprise: repriseDeFile(item),
+            onReservation: (r) => {
+              void patchOfflineQueueItem(tempId, { envoiId: r.id, envoiJeton: r.jeton })
+            },
+          })
           mediaId = media.id
           await patchOfflineQueueItem(tempId, { mediaId, mediaBlob: undefined })
         }

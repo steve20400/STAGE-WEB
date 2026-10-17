@@ -43,6 +43,30 @@ export interface OptionsEnvoi {
   empreinteHex?: string
   /** Avancement, de 0 à 1 — jamais 1 avant que le serveur ait tout assemblé. */
   onProgression?: (fraction: number) => void
+  /**
+   * UNE RÉSERVATION DÉJÀ OBTENUE : on ne renvoie QUE les morceaux manquants.
+   *
+   * 🔴 DEMANDE DU USER, 17/10/2026 : « si l'envoi s'arrête à cause de la
+   * connexion, quand elle revient ça doit seulement continuer au lieu de
+   * recommencer ». Le serveur garde le fichier partiel et sait dire quels
+   * morceaux lui manquent : il suffisait de le lui demander.
+   */
+  reprise?: Reprise
+  /**
+   * Appelé dès que la réservation existe, AVANT le premier morceau.
+   *
+   * ⚠️ C'EST CE QUI REND LA REPRISE POSSIBLE. L'appelant range ces deux valeurs
+   * à côté du fichier en attente ; sans elles, un envoi coupé repartirait de
+   * zéro, et sur une connexion à 1 Mbit/s un fichier de 300 Mo ne finirait
+   * jamais.
+   */
+  onReservation?: (r: Reprise) => void
+}
+
+/** De quoi reprendre un envoi commencé : son identifiant et son jeton. */
+export interface Reprise {
+  id: string
+  jeton: string
 }
 
 /** SHA-256 en hexadécimal. */
@@ -59,6 +83,21 @@ export async function empreinteHex(octets: Uint8Array): Promise<string> {
  */
 export async function televerser(fichier: Blob, o: OptionsEnvoi): Promise<{ id: string }> {
   if (fichier.size <= SEUIL_MORCEAUX) return unBloc(fichier, o)
+
+  /*
+   * ══════ REPRENDRE PLUTÔT QUE RECOMMENCER ══════
+   *
+   * On demande au serveur où il en est. Trois réponses possibles :
+   *   · « terminé » — tout était arrivé, l'échec était ailleurs (l'envoi du
+   *     message, par exemple) : il n'y a plus un octet à transmettre ;
+   *   · une liste de manquants — on ne renvoie que ceux-là ;
+   *   · une erreur (envoi expiré, jeton périmé, serveur sans la route) — on
+   *     repart sur une réservation neuve, ce qui est le pire cas, pas une panne.
+   */
+  if (o.reprise) {
+    const repris = await reprendre(fichier, o, o.reprise).catch(() => null)
+    if (repris) return repris
+  }
 
   let r: Reservation
   try {
@@ -77,7 +116,67 @@ export async function televerser(fichier: Blob, o: OptionsEnvoi): Promise<{ id: 
     if (err instanceof ApiError && err.status === 404) return unBloc(fichier, o)
     throw err
   }
+  o.onReservation?.({ id: r.id, jeton: r.jeton })
 
+  return envoyerMorceaux(fichier, o, r, null)
+}
+
+/**
+ * Reprend un envoi commencé : ne transmet que ce qui manque.
+ *
+ * Rend `null` quand la reprise n'est pas possible — l'appelant repart alors sur
+ * une réservation neuve.
+ */
+async function reprendre(
+  fichier: Blob,
+  o: OptionsEnvoi,
+  reprise: Reprise,
+): Promise<{ id: string } | null> {
+  const faux = { id: reprise.id, jeton: reprise.jeton } as Reservation
+  const etat = await avecJeton<EtatEnvoi>(faux, "GET", `/api/media/envois/${reprise.id}`)
+  if (!etat || typeof etat.total !== "number" || typeof etat.tailleMorceau !== "number") return null
+  /*
+   * ⚠️ LE DÉCOUPAGE DOIT CONCORDER. Si le serveur a changé sa taille de morceau
+   * entre-temps, les octets déjà reçus ne sont plus à la bonne place : mieux
+   * vaut un envoi neuf qu'un fichier mélangé.
+   */
+  if (etat.total !== Math.ceil(fichier.size / etat.tailleMorceau)) return null
+
+  if (etat.statut === "termine") {
+    o.onProgression?.(1)
+    return { id: etat.media?.id ?? reprise.id }
+  }
+
+  const r: Reservation = {
+    id: reprise.id,
+    jeton: reprise.jeton,
+    mediaId: etat.media?.id ?? reprise.id,
+    tailleMorceau: etat.tailleMorceau,
+    nbMorceaux: etat.total,
+  }
+  return envoyerMorceaux(fichier, o, r, etat.manquants ?? null)
+}
+
+/** Ce que le serveur dit d'un envoi en cours. */
+interface EtatEnvoi {
+  statut?: string
+  total?: number
+  recus?: number
+  tailleMorceau?: number
+  manquants?: number[]
+  media?: { id: string }
+}
+
+/**
+ * Transmet les morceaux — tous, ou seulement [manquants] sur une reprise — puis
+ * fait assembler.
+ */
+async function envoyerMorceaux(
+  fichier: Blob,
+  o: OptionsEnvoi,
+  r: Reservation,
+  manquants: number[] | null,
+): Promise<{ id: string }> {
   const avance = new Map<number, number>()
   const tailles = new Map<number, number>()
   for (let n = 0; n < r.nbMorceaux; n++) {
@@ -90,8 +189,20 @@ export async function televerser(fichier: Blob, o: OptionsEnvoi): Promise<{ id: 
     o.onProgression?.(Math.min(0.99, faits / fichier.size))
   }
 
+  /*
+   * ⚠️ CE QUI EST DÉJÀ ARRIVÉ COMPTE DANS L'AVANCEMENT, sinon une reprise à
+   * 90 % repartirait visuellement de zéro et l'utilisateur croirait que rien
+   * n'a été gardé.
+   */
+  const aFaire = manquants ?? Array.from({ length: r.nbMorceaux }, (_, n) => n)
+  if (manquants) {
+    const reste = new Set(manquants)
+    for (let n = 0; n < r.nbMorceaux; n++) if (!reste.has(n)) avance.set(n, 1)
+    signaler()
+  }
+
   let termine = false
-  const file = Array.from({ length: r.nbMorceaux }, (_, n) => n)
+  const file = [...aFaire]
   const ouvrier = async () => {
     for (let n = file.shift(); n !== undefined; n = file.shift()) {
       const debut = n * r.tailleMorceau
@@ -105,7 +216,7 @@ export async function televerser(fichier: Blob, o: OptionsEnvoi): Promise<{ id: 
       if (reponse?.termine === true) termine = true
     }
   }
-  await Promise.all(Array.from({ length: Math.min(EN_PARALLELE, r.nbMorceaux) }, ouvrier))
+  await Promise.all(Array.from({ length: Math.min(EN_PARALLELE, file.length || 1) }, ouvrier))
 
   /*
    * ⚠️ PERSONNE N'A DIT « TERMINÉ » : deux morceaux ont fini ensemble et c'est
