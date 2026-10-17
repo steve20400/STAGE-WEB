@@ -70,6 +70,27 @@ export const VIDEO_BORD_COURT = 720
 export const VIDEO_BORD_COURT_HAUTE = 720
 
 /**
+ * Le débit du niveau haut, à 720p — environ le double de celui du palier.
+ *
+ * 🔴 CE QUI DONNE UN SENS AU BOUTON AU-DESSUS DE 720p. Le niveau haut plafonne
+ * à 720p, et l'escalier descend aussi à 720p pour une source qui le dépasse :
+ * les deux niveaux rendaient donc EXACTEMENT le même fichier, et le bouton ne
+ * changeait rien. On l'avait alors caché — ce que le user a refusé le
+ * 17/10/2026 : « les deux boutons doivent être toujours là ».
+ *
+ * La définition ne peut plus les distinguer (720p est le plafond du professeur),
+ * le DÉBIT le peut : même image, deux fois plus de bits pour la décrire. C'est
+ * précisément ce que veut dire « meilleure qualité » à définition égale.
+ *
+ * ⚠️ 2,5 Mbit/s N'EST PAS UN NOMBRE INVENTÉ : c'est le seuil qui, jusqu'au
+ * 13/10/2026, définissait une vidéo 720p « déjà légère, on n'y touche pas ».
+ *
+ * ⚠️ JAMAIS PLUS QUE LA SOURCE. Un fichier ne doit pas s'alourdir en passant par
+ * ici : le débit visé est le PLUS PETIT des deux (voir `convertir`).
+ */
+export const DEBIT_HAUTE_720 = 2_500_000
+
+/**
  * L'ESCALIER DES PALIERS — décision du user, 13/10/2026.
  *
  * 🐛 « SI LA TAILLE DE LA VIDÉO EST INFÉRIEURE À 720, ON NE COMPRESSE PLUS.
@@ -246,7 +267,27 @@ function intact(file: File, raisonSaut: RaisonSautVideo): ResultatCompressionVid
  * plus à offrir, et le bouton « 1080p » serait un mensonge.
  */
 function hautePlusFine(bordCourtSource: number): boolean {
-  return bordCourtSource > VIDEO_BORD_COURT
+  /*
+   * 🔴 LA QUESTION EST « LES DEUX NIVEAUX DONNENT-ILS AUTRE CHOSE ? », et la
+   * réponse tient en une ligne depuis le 17/10/2026 : oui dès que le niveau
+   * normal fait quelque chose.
+   *
+   *   · source au-dessus de 720p — les deux rendent du 720p, mais le niveau
+   *     haut y met deux fois plus de débit (`DEBIT_HAUTE_720`) ;
+   *   · source entre 241 et 720 — le normal descend d'une marche, le haut
+   *     rend l'ORIGINAL INTACT. ⚠️ Il ne l'agrandit pas : on ne remonte jamais
+   *     une vidéo à 720p, on se contente de ne pas y toucher ;
+   *   · source à 240 ou moins — l'escalier s'arrête, le haut n'a rien à faire
+   *     non plus : aucun bouton, et c'est la règle du user (« on ne voit rien
+   *     que lorsque l'application ne compresse pas »).
+   *
+   * 🐛 ELLE A ÉTÉ MAL POSÉE DEUX FOIS. D'abord « la source dépasse-t-elle
+   * 720p ? » — la question d'avant l'escalier, qui privait du bouton toute
+   * vidéo filmée en 720p. Puis « le haut donne-t-il une définition plus fine ? »
+   * — vraie, mais elle cachait le bouton au-dessus de 720p, là où c'est le
+   * débit qui distingue les deux niveaux et non la définition.
+   */
+  return palierVideo(bordCourtSource) !== null
 }
 
 /**
@@ -349,6 +390,14 @@ async function convertir(
        * vidéo filmée en 720p part en 360p au niveau normal ; ici elle part
        * entière. Une vidéo de 1080p ou plus descend à 720p, et pas davantage.
        */
+      /*
+       * ⚠️ SOUS LE PLAFOND : ON N'Y TOUCHE PAS, ET ON N'AGRANDIT SURTOUT PAS.
+       * Règle du user, mot pour mot : « comme on ne veut pas que ça agrandisse
+       * l'image pour envoyer à 720p, on envoie juste la taille originale, on ne
+       * compresse rien ». C'est le sens historique du bouton — « envoyer la
+       * taille originale » — que le plafond du professeur borne désormais à
+       * 720p, sans le remplacer.
+       */
       if (court <= VIDEO_BORD_COURT_HAUTE) {
         return {
           ...intact(file, "deja_legere"),
@@ -400,7 +449,7 @@ async function convertir(
      * pour un plafond à 1080 : le niveau haut ne connaît plus qu'une seule
      * définition, donc un seul débit, celui de son palier.
      */
-    cible.debit = niveau === "haute" ? DEBIT_PALIER[VIDEO_BORD_COURT_HAUTE] : DEBIT_PALIER[vise]
+    cible.debit = niveau === "haute" ? DEBIT_HAUTE_720 : DEBIT_PALIER[vise]
 
     /*
      * ⚠️ RIEN À GAGNER : ON S'ABSTIENT PLUTÔT QUE DE TRANSCODER POUR RIEN. Au
@@ -408,6 +457,14 @@ async function convertir(
      * celui qu'on viserait : la recompresser l'alourdirait. La règle du gain
      * minimum, plus bas, rendrait bien l'original — mais après avoir fait
      * tourner l'encodeur une minute pour rien.
+     */
+    /*
+     * ⚠️ C'EST AUSSI CE QUI PROTÈGE LE NIVEAU HAUT D'ALOURDIR UN FICHIER. Une
+     * vidéo tournée en 1080p à 2 Mbit/s est déjà plus légère que les
+     * 2,5 Mbit/s qu'on viserait : la ré-encoder ne gagnerait rien et lui
+     * coûterait des pixels. Elle part donc INTACTE, en 1080p — le plafond de
+     * 720p borne ce que nous PRODUISONS, il n'oblige pas à dégrader un fichier
+     * qui est déjà plus léger que notre propre cible.
      */
     if (cible.debit >= debit) {
       return {
