@@ -53,6 +53,12 @@ export interface DescripteurMedia {
   pages?: number
   /** Aperçu JPEG en base64 : photo floutée, première image, première page. */
   apercu?: string
+  /**
+   * DOCUMENT SENSIBLE (18/10/2026, posé par l'application mobile) : il ne
+   * s'ouvre que dans l'application (filigrane, écran protégé), et ne se
+   * transfère ni ne se partage. Absent : document ordinaire.
+   */
+  sensible?: boolean
 }
 
 /** Ce que porte une enveloppe une fois ouverte. */

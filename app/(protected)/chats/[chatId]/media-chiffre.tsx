@@ -174,6 +174,30 @@ export function MediaChiffre({
       .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
   }
   const type = typeFichier ?? { color: "#6b7280", label: (d.nom?.split(".").pop() ?? "").slice(0, 4).toUpperCase() || "DOC" }
+
+  /*
+   * 🔴 DOCUMENT SENSIBLE (18/10/2026) : il ne s'ouvre pas dans un navigateur,
+   * qui permettrait de l'enregistrer d'un clic. L'application mobile l'ouvre
+   * avec un filigrane (numéro, appareil, date) et un écran protégé.
+   */
+  if (d.sensible) {
+    return (
+      <div className={`mc-document${isMe ? " moi" : ""}`} role="note">
+        <span className="mc-doc-ligne">
+          <span className="mc-doc-type" style={{ color: "#e53935", background: "#e539351f" }} aria-hidden="true">
+            {type.label}
+          </span>
+          <span className="mc-doc-texte">
+            <span className="mc-doc-nom">{d.nom ?? t("file")}</span>
+            <span className="mc-doc-detail" style={{ color: "#e53935" }}>
+              {t("sens_titre")} — {t("sens_web_ouvrir")}
+            </span>
+          </span>
+        </span>
+      </div>
+    )
+  }
+
   return (
     <button
       type="button"

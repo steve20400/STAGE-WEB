@@ -5773,6 +5773,23 @@ export default function ChatRoomPage() {
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   // Message en cours de PARTAGE (Alanya Work ou autre application).
   const [partageMsg, setPartageMsg] = useState<Message | null>(null)
+  /** Document SENSIBLE (18/10/2026) : ni transfert, ni partage. */
+  const estSensible = (m: Message | null) =>
+    Boolean((m?.mediaChiffre as { sensible?: boolean } | undefined)?.sensible)
+  const demanderTransfert = (m: Message | null) => {
+    if (estSensible(m)) {
+      error(t("sens_titre"), t("sens_pas_partage"))
+      return
+    }
+    setForwardMsg(m)
+  }
+  const demanderPartage = (m: Message | null) => {
+    if (estSensible(m)) {
+      error(t("sens_titre"), t("sens_pas_partage"))
+      return
+    }
+    setPartageMsg(m)
+  }
   /*
    * Message en cours de MODIFICATION : le champ de saisie porte son texte, et
    * « Envoyer » le remplace au lieu d'écrire un nouveau message.
@@ -8749,8 +8766,8 @@ export default function ChatRoomPage() {
                           handleDelete(m, scope)
                         })
                       }}
-                      onForward={setForwardMsg}
-                      onShare={setPartageMsg}
+                      onForward={demanderTransfert}
+                      onShare={demanderPartage}
                       onReessayer={reessayerEnvoi}
                       onCopy={handleCopy}
                       isGroup={chat?.isGroup}
@@ -8842,8 +8859,8 @@ export default function ChatRoomPage() {
                     onOpenImage={(url, name) => setLightbox({ url, name })}
                     onOpenGalerie={(msgs, index) => setGallery({ msgs, index })}
                     onDelete={handleDelete}
-                    onForward={setForwardMsg}
-                    onShare={setPartageMsg}
+                    onForward={demanderTransfert}
+                    onShare={demanderPartage}
                     onEdit={peutModifier(msg) ? demarrerModification : undefined}
                     onReessayer={reessayerEnvoi}
                     onCopy={handleCopy}
