@@ -68,6 +68,27 @@ interface AuthTokensResponse {
    * l'expiration de leur jeton d'acces, soit un quart d'heure.
    */
   sessionsFermees?: string[]
+  /**
+   * Connexion web en deux étapes (18/10/2026) : le mot de passe est bon, mais
+   * le compte demande un code envoyé dans l'application. Pas de jeton alors.
+   */
+  deuxEtapes?: boolean
+  defiId?: string
+  expireDans?: number
+}
+
+/**
+ * Levée quand le compte demande un code reçu dans l'application Alanya : la
+ * page de connexion passe à l'étape « code » et finit par `loginWithCode`.
+ */
+export class DeuxEtapesRequises extends Error {
+  constructor(
+    readonly defiId: string,
+    readonly expireDans: number,
+  ) {
+    super("Code de connexion requis")
+    this.name = "DeuxEtapesRequises"
+  }
 }
 
 interface VerifyResponse {
@@ -147,6 +168,11 @@ export async function loginWithPassword(payload: LoginPayload) {
       },
     })
 
+    // Le compte demande un code reçu dans l'application : aucune session encore.
+    if (response.deuxEtapes && response.defiId) {
+      throw new DeuxEtapesRequises(response.defiId, response.expireDans ?? 300)
+    }
+
     // Les navigateurs evinces sont prevenus par le temps reel — l'API Next et
     // `ws-server.mjs` sont deux process sans canal entre eux, c'est donc au
     // client qui vient d'ouvrir la session de faire le lien.
@@ -158,11 +184,34 @@ export async function loginWithPassword(payload: LoginPayload) {
       refreshToken: response.refreshToken,
     } satisfies AuthSession
   } catch (error) {
+    if (error instanceof DeuxEtapesRequises) throw error
     if (!shouldUsePrototypeFallback(error)) throw error
     return {
       user: await loginPrototypeAccount(fallbackUser.phone, payload.password),
     } satisfies AuthSession
   }
+}
+
+/**
+ * POST /api/auth/login/code — seconde étape : le code reçu dans l'application.
+ * Rend la même session qu'une connexion ordinaire.
+ */
+export async function loginWithCode(defiId: string, code: string) {
+  const response = await apiRequest<AuthTokensResponse>("/api/auth/login/code", {
+    method: "POST",
+    body: {
+      defiId,
+      code: code.replace(/\s+/g, ""),
+      deviceId: getOrCreateWebDeviceId(),
+      typeDevice: 0,
+    },
+  })
+  annonceLesEvictions(response.sessionsFermees ?? [])
+  return {
+    user: toSessionUser(response.user, buildPrototypeUser(response.user?.publicNumber ?? "")),
+    token: response.accessToken,
+    refreshToken: response.refreshToken,
+  } satisfies AuthSession
 }
 
 /** GET /api/me — restaure la session au chargement de l'app. */

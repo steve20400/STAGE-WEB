@@ -1,6 +1,7 @@
 ﻿import { useMemo, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
+import { DeuxEtapesRequises } from "../../../src/services/auth-api"
 import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from "../../../src/i18n"
 import {
   ALANYA_NUMBER_FORMATTED_MAX_LENGTH,
@@ -38,12 +39,20 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const { language, setLanguage, t } = useTranslation()
   const location = useLocation()
-  const { login } = useAuth()
+  const { login, loginAvecCode } = useAuth()
   const [showPwd, setShowPwd] = useState(false)
   const [phone, setPhone] = useState("")
   const [pwd, setPwd] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  /*
+   * CONNEXION EN DEUX ÉTAPES (18/10/2026) : le mot de passe était bon, le
+   * compte demande en plus un code envoyé dans l'application Alanya. Le
+   * formulaire passe alors à cette seconde étape, sans recharger la page.
+   */
+  const [defiId, setDefiId] = useState<string | null>(null)
+  const [code, setCode] = useState("")
 
   /**
    * Pourquoi la session precedente s'est fermee, quand ce n'est pas
@@ -62,7 +71,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!canSubmit) return
+    if (defiId ? !codeValide : !canSubmit) return
 
     const redirectTo =
       (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/chats"
@@ -71,15 +80,32 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      await login({ phone: normalizeIdentifier(phone), password: pwd })
+      if (defiId) {
+        await loginAvecCode(defiId, code, pwd)
+      } else {
+        await login({ phone: normalizeIdentifier(phone), password: pwd })
+      }
       // L'historique chiffré revient d'abord, sur sa propre page, avec sa
       // progression ; elle mène ensuite là où l'on voulait aller.
       navigate("/restauration", { replace: true, state: { suite: redirectTo } })
     } catch (submitError) {
+      if (submitError instanceof DeuxEtapesRequises) {
+        setDefiId(submitError.defiId)
+        setCode("")
+        return
+      }
       setError(submitError instanceof Error ? submitError.message : t("x2_login_failed"))
     } finally {
       setLoading(false)
     }
+  }
+
+  const codeValide = /^\d{6}$/.test(code.replace(/\s+/g, ""))
+
+  const revenirALaConnexion = () => {
+    setDefiId(null)
+    setCode("")
+    setError("")
   }
 
   return (
@@ -154,6 +180,48 @@ export default function LoginPage() {
             </div>
           ) : null}
 
+          {defiId ? (
+            <>
+              <h3 className="form-title" style={{ fontSize: 18, marginTop: 4 }}>
+                {t("dx_titre")}
+              </h3>
+              <p className="form-subtitle">{t("dx_corps")}</p>
+              <div className="field">
+                <input
+                  id="code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder=" "
+                  autoFocus
+                  maxLength={7}
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.replace(/[^\d\s]/g, ""))}
+                  style={{ letterSpacing: 6, fontSize: 20, fontWeight: 600 }}
+                />
+                <label htmlFor="code">{t("dx_code")}</label>
+              </div>
+              <p className="form-subtitle" style={{ fontSize: 12 }}>
+                {t("dx_validite")}
+              </p>
+              <button type="submit" className="btn-submit" disabled={loading || !codeValide}>
+                {loading ? (
+                  <>
+                    <div className="spinner" /> {t("signing_in")}
+                  </>
+                ) : (
+                  <>{t("dx_valider")}</>
+                )}
+              </button>
+              <p className="signup-txt">
+                <button type="button" className="forgot-link" onClick={revenirALaConnexion}
+                  style={{ background: "none", border: 0, cursor: "pointer" }}>
+                  {t("dx_retour")}
+                </button>
+              </p>
+            </>
+          ) : (
+          <>
           <div className="field">
             <input
               id="phone"
@@ -235,6 +303,8 @@ export default function LoginPage() {
               {t("create_account")}
             </Link>
           </p>
+          </>
+          )}
         </form>
       </div>
     </div>

@@ -48,6 +48,7 @@ import {
   completeRegistration,
   registerSansEmail,
   deleteCurrentAccount,
+  loginWithCode,
   loginWithPassword,
   logoutAllSessions,
   revokeSession,
@@ -62,6 +63,12 @@ interface AuthContextValue {
   user: SessionUser | null
   isAuthenticated: boolean
   login: (payload: LoginPayload) => Promise<SessionUser>
+  /**
+   * Seconde étape d'une connexion en deux étapes : le code reçu dans
+   * l'application. [password] est celui de la première étape, pour restaurer
+   * l'historique chiffré comme après une connexion ordinaire.
+   */
+  loginAvecCode: (defiId: string, code: string, password: string) => Promise<SessionUser>
   register: (draft: RegistrationDraft, otp: string) => Promise<SessionUser>
   /** Inscription sans adresse : rend AUSSI le code de recuperation, montre une seule fois. */
   registerWithoutEmail: (
@@ -254,8 +261,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const login = useCallback(async (payload: LoginPayload) => {
-    const nextUser = storeAuthenticatedSession(await loginWithPassword(payload))
+  /*
+   * L'ENTRÉE EN SESSION, commune à la connexion ordinaire et à la seconde
+   * étape d'une connexion en deux étapes (18/10/2026) : après le code, on
+   * entre exactement comme après le mot de passe.
+   */
+  const entrer = useCallback(async (
+    session: Parameters<typeof storeAuthenticatedSession>[0],
+    password: string,
+  ) => {
+    const nextUser = storeAuthenticatedSession(session)
     await claimLocalCaches(accountKey(nextUser))
     saveSessionUser(nextUser)
     setUser(nextUser)
@@ -282,10 +297,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * nouveau navigateur ne charge pas l archive ». Le mot de passe lui est
      * confié EN MÉMOIRE, une fois. Voir `restauration-en-attente.ts`.
      */
-    confierMotDePasse(payload.password)
+    confierMotDePasse(password)
 
     return nextUser
   }, [publierMesCles])
+
+  const login = useCallback(
+    async (payload: LoginPayload) => entrer(await loginWithPassword(payload), payload.password),
+    [entrer],
+  )
+
+  const loginAvecCode = useCallback(
+    async (defiId: string, code: string, password: string) =>
+      entrer(await loginWithCode(defiId, code), password),
+    [entrer],
+  )
 
   const register = useCallback(async (draft: RegistrationDraft, otp: string) => {
     const nextUser = storeAuthenticatedSession(await completeRegistration(draft, otp))
@@ -505,6 +531,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAuthenticated: Boolean(user),
       login,
+      loginAvecCode,
       register,
       registerWithoutEmail,
       logout,
@@ -512,7 +539,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUser,
       deleteAccount,
     }),
-    [deleteAccount, isReady, login, logout, logoutEverywhere, register, updateUser, user]
+    [deleteAccount, isReady, login, loginAvecCode, logout, logoutEverywhere, register, updateUser, user]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
