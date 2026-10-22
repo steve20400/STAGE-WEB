@@ -25,6 +25,9 @@ import {
 } from "../../../../src/data/local-conversations"
 import { findLocalGroup, toChatInfoMock } from "../../../../src/data/local-groups"
 import { useToast } from "../../../../src/components/toast"
+import { useAuth } from "../../../../src/components/auth-provider"
+import { copieSignee } from "../../../../src/services/sortie-document-sensible"
+import type { GesteSortie } from "../../../../src/services/signature-document"
 import {
   formatBytes,
   applyMessageEditToCache,
@@ -5455,6 +5458,8 @@ export default function ChatRoomPage() {
   chatIdCourant.current = chatId
   const returnTo = `/chats/${chatId}`
   const { error, success, info } = useToast()
+  // Mon Alanya ID : signe la copie d'un document sensible qui sort.
+  const { user: moi } = useAuth()
 
   const contacts = useMemo(() => loadContacts(), [])
   const fallbackContact = useMemo(
@@ -5773,23 +5778,31 @@ export default function ChatRoomPage() {
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   // Message en cours de PARTAGE (Alanya Work ou autre application).
   const [partageMsg, setPartageMsg] = useState<Message | null>(null)
-  /** Document SENSIBLE (18/10/2026) : ni transfert, ni partage. */
-  const estSensible = (m: Message | null) =>
-    Boolean((m?.mediaChiffre as { sensible?: boolean } | undefined)?.sensible)
-  const demanderTransfert = (m: Message | null) => {
-    if (estSensible(m)) {
-      error(t("sens_titre"), t("sens_pas_partage"))
-      return
+  /*
+   * Document SENSIBLE : interdit de transfert et de partage du 18 au 22/10/2026.
+   * Depuis, il se transfère et se partage, mais ce qui sort est une copie
+   * SIGNÉE à mon nom (bords, métadonnées, code de trace noté au serveur).
+   */
+  const estSensible = (m: Message | null) => Boolean(m?.mediaChiffre?.sensible)
+  const demanderTransfert = (m: Message | null) => setForwardMsg(m)
+  const demanderPartage = (m: Message | null) => setPartageMsg(m)
+  /** La copie signée d'un document sensible de `m`, pour `geste`. */
+  const signerPour =
+    (m: Message, geste: GesteSortie) =>
+    async (clair: Blob): Promise<File> => {
+      const d = m.mediaChiffre
+      if (!d) throw new Error("Pas un média chiffré")
+      const c = await copieSignee({
+        clair,
+        d,
+        geste,
+        alanyaId: moi?.phone ?? "",
+        convId: chatId,
+        expediteurId: m.senderId === "me" ? moi?.phone : undefined,
+      })
+      if (!c.signee) info(t("sens_titre"), t("sens_copie_non_signee"))
+      return c.fichier
     }
-    setForwardMsg(m)
-  }
-  const demanderPartage = (m: Message | null) => {
-    if (estSensible(m)) {
-      error(t("sens_titre"), t("sens_pas_partage"))
-      return
-    }
-    setPartageMsg(m)
-  }
   /*
    * Message en cours de MODIFICATION : le champ de saisie porte son texte, et
    * « Envoyer » le remplace au lieu d'écrire un nouveau message.
@@ -9716,6 +9729,10 @@ export default function ChatRoomPage() {
             mediaMime: partageMsg.mediaMime,
             fileName: partageMsg.fileName,
             mediaChiffre: partageMsg.mediaChiffre,
+            // Un document sensible sort en copie signée à mon nom.
+            signer: estSensible(partageMsg)
+              ? (clair, geste) => signerPour(partageMsg, geste)(clair)
+              : undefined,
           }}
           onFermer={() => setPartageMsg(null)}
           onDansAlanya={() => setForwardMsg(partageMsg)}
@@ -9744,9 +9761,15 @@ export default function ChatRoomPage() {
                 ;(transfertParLAppareil(forwardMsg, source, cible) ? parAppareil : parServeur).push(id)
               }
               let count = parServeur.length > 0 ? await forwardChatMessage(forwardMsg.id, parServeur) : 0
+              // Un document sensible part en copie SIGNÉE : une seule copie,
+              // donc un seul code de trace, quel que soit le nombre de fils.
+              let copie: Promise<File> | null = null
+              const copieSensible = estSensible(forwardMsg)
+                ? (clair: Blob) => (copie ??= signerPour(forwardMsg, "TRANSFERT")(clair))
+                : undefined
               for (const id of parAppareil) {
                 try {
-                  await transfererDepuisLAppareil(forwardMsg, id)
+                  await transfererDepuisLAppareil(forwardMsg, id, copieSensible)
                   count++
                 } catch (err) {
                   console.warn("[transfert] échec vers", id, err)

@@ -61,7 +61,7 @@ export function FenetrePartage({
   const repli = async () => {
     try {
       if (aUnFichier(msg)) {
-        const fichier = await fichierAPartager(msg)
+        const fichier = await fichierAPartager(msg, "TELECHARGEMENT")
         const url = URL.createObjectURL(fichier)
         const lien = document.createElement("a")
         lien.href = url

@@ -1,0 +1,162 @@
+/* Visionneuse d'un document sensible (22/10/2026). Fond sombre comme sur le
+   mobile, quel que soit le thème : le document et sa signature rouge s'y
+   lisent également. */
+
+.vs-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: #1b1b1b;
+  color: #fff;
+}
+
+.vs-barre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #000;
+}
+
+.vs-titre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+}
+
+.vs-titre span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.vs-bouton {
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.vs-bouton:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.vs-bouton.accent {
+  border-color: #e53935;
+  background: #e53935;
+}
+
+.vs-fermer {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vs-scene {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  user-select: none;
+}
+
+.vs-contenu {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  /* Le contenu ne passe pas sous la signature des bords. */
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.vs-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.vs-page {
+  max-width: 100%;
+  height: auto;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.vs-image,
+.vs-video {
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  object-fit: contain;
+}
+
+.vs-message {
+  margin: auto;
+  max-width: 420px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* La signature, le long des quatre bords. */
+.vs-bord {
+  position: absolute;
+  pointer-events: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(229, 57, 53, 0.9);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+.vs-bord.haut,
+.vs-bord.bas {
+  left: 22px;
+  right: 22px;
+}
+
+.vs-bord.haut {
+  top: 2px;
+}
+
+.vs-bord.bas {
+  bottom: 2px;
+}
+
+.vs-bord.gauche,
+.vs-bord.droite {
+  top: 22px;
+  bottom: 22px;
+  width: 18px;
+  writing-mode: vertical-rl;
+}
+
+/* À gauche, on lit de bas en haut ; à droite, de haut en bas. */
+.vs-bord.gauche {
+  left: 2px;
+  transform: rotate(180deg);
+}
+
+.vs-bord.droite {
+  right: 2px;
+}

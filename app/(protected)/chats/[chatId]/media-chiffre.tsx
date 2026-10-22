@@ -5,6 +5,7 @@ import type { DescripteurMedia } from "../../../../src/services/e2ee-media"
 import { FichierInvalide, urlApercu } from "../../../../src/services/e2ee-media"
 import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { formatBytes } from "../../../../src/services/messages-service"
+import { VisionneuseSensible } from "./visionneuse-sensible"
 import "./media-chiffre.css"
 
 /**
@@ -59,6 +60,8 @@ export function MediaChiffre({
 
   const [url, setUrl] = useState<string | null>(null)
   const [etat, setEtat] = useState<"attente" | "chargement" | "pret" | "altere" | "echec">("attente")
+  /** Document sensible déchiffré, ouvert dans sa visionneuse. */
+  const [clairSensible, setClairSensible] = useState<Blob | null>(null)
 
   const lancer = () => {
     setEtat("chargement")
@@ -74,9 +77,10 @@ export function MediaChiffre({
     lancer()
   }
 
-  // La photo se charge d'elle-même ; le reste attend un geste.
+  // La photo se charge d'elle-même ; le reste attend un geste. Une photo
+  // SENSIBLE aussi : elle ne s'affiche que dans sa visionneuse.
   useEffect(() => {
-    if (genre === "image") charger()
+    if (genre === "image" && !d.sensible) charger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d.id])
 
@@ -98,6 +102,54 @@ export function MediaChiffre({
           </button>
         )}
       </span>
+    )
+  }
+
+  /*
+   * 🔴 DOCUMENT SENSIBLE (18/10/2026, revu le 22/10/2026) : quel que soit son
+   * genre — PDF, photo, vidéo —, une carte, puis la visionneuse protégée :
+   * signature aux quatre bords, consultation notée, et Télécharger / Partager
+   * qui donnent une copie SIGNÉE. Jamais la galerie ni le lecteur du
+   * navigateur, qui donneraient l'original.
+   */
+  if (d.sensible) {
+    const typeSensible =
+      typeFichier ?? { color: "#e53935", label: (d.nom?.split(".").pop() ?? "").slice(0, 4).toUpperCase() || "DOC" }
+    const ouvrirSensible = () => {
+      if (etat === "chargement") return
+      setEtat("chargement")
+      ouvrirMediaChiffre(d)
+        .then((blob) => {
+          setEtat("attente")
+          setClairSensible(blob)
+        })
+        .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
+    }
+    return (
+      <>
+        <button
+          type="button"
+          className={`mc-document${isMe ? " moi" : ""}`}
+          onClick={ouvrirSensible}
+          aria-label={d.nom ?? t("sens_titre")}
+        >
+          <span className="mc-doc-ligne">
+            <span className="mc-doc-type" style={{ color: "#e53935", background: "#e539351f" }} aria-hidden="true">
+              {typeSensible.label}
+            </span>
+            <span className="mc-doc-texte">
+              <span className="mc-doc-nom">{d.nom ?? t("file")}</span>
+              <span className="mc-doc-detail" style={{ color: "#e53935" }}>
+                {t("sens_titre")} — {t("sens_web_ouvrir")}
+              </span>
+            </span>
+            {etat === "chargement" && <span className="mc-doc-attente" aria-label={t("loading")} />}
+          </span>
+        </button>
+        {clairSensible && (
+          <VisionneuseSensible d={d} clair={clairSensible} isMe={isMe} onFermer={() => setClairSensible(null)} />
+        )}
+      </>
     )
   }
 
@@ -174,29 +226,6 @@ export function MediaChiffre({
       .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
   }
   const type = typeFichier ?? { color: "#6b7280", label: (d.nom?.split(".").pop() ?? "").slice(0, 4).toUpperCase() || "DOC" }
-
-  /*
-   * 🔴 DOCUMENT SENSIBLE (18/10/2026) : il ne s'ouvre pas dans un navigateur,
-   * qui permettrait de l'enregistrer d'un clic. L'application mobile l'ouvre
-   * avec un filigrane (numéro, appareil, date) et un écran protégé.
-   */
-  if (d.sensible) {
-    return (
-      <div className={`mc-document${isMe ? " moi" : ""}`} role="note">
-        <span className="mc-doc-ligne">
-          <span className="mc-doc-type" style={{ color: "#e53935", background: "#e539351f" }} aria-hidden="true">
-            {type.label}
-          </span>
-          <span className="mc-doc-texte">
-            <span className="mc-doc-nom">{d.nom ?? t("file")}</span>
-            <span className="mc-doc-detail" style={{ color: "#e53935" }}>
-              {t("sens_titre")} — {t("sens_web_ouvrir")}
-            </span>
-          </span>
-        </span>
-      </div>
-    )
-  }
 
   return (
     <button
