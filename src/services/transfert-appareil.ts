@@ -46,17 +46,8 @@ function aUnMedia(m: ChatMessageMock): boolean {
 /**
  * Renvoie `m` dans `cible`, depuis le contenu en clair de ce navigateur.
  * Lève en cas d'échec : l'appelant le dit.
- *
- * `copieSensible` (22/10/2026) : pour un document sensible, rend sa copie
- * SIGNÉE à mon nom, à envoyer à la place du clair. Vers un fil chiffré, elle
- * reste « sensible » ; un fil en clair ne porte pas ce caractère (il voyage
- * dans l'enveloppe chiffrée) : elle y arrive en fichier ordinaire, signé.
  */
-export async function transfererDepuisLAppareil(
-  m: ChatMessageMock,
-  cible: string,
-  copieSensible?: (clair: Blob) => Promise<File>,
-): Promise<void> {
+export async function transfererDepuisLAppareil(m: ChatMessageMock, cible: string): Promise<void> {
   const texte = m.content ?? ""
 
   if (!aUnMedia(m)) {
@@ -67,21 +58,18 @@ export async function transfererDepuisLAppareil(
 
   // Le fichier en clair : déchiffré ici, ou téléchargé.
   const d = m.mediaChiffre
-  const clair = d
+  const fichier = d
     ? await ouvrirMediaChiffre(d)
     : await fetch(resolveMediaUrl(m.mediaUrl ?? "")).then((r) => {
         if (!r.ok) throw new Error(`Téléchargement impossible (${r.status})`)
         return r.blob()
       })
-  const sensible = Boolean(d?.sensible && copieSensible)
-  const signee = sensible && copieSensible ? await copieSensible(clair) : null
-  const fichier: Blob = signee ?? clair
-  const nom = signee?.name ?? d?.nom ?? m.fileName ?? "fichier"
-  const mime = signee?.type || d?.mime || m.mediaMime || fichier.type || "application/octet-stream"
+  const nom = d?.nom ?? m.fileName ?? "fichier"
+  const mime = d?.mime ?? m.mediaMime ?? fichier.type ?? "application/octet-stream"
   const dureeMs = d?.dureeMs ?? m.durationMs ?? undefined
 
   if (await filChiffre(cible)) {
-    await envoyerMediaChiffre(cible, fichier, { nom, mime, dureeMs, legende: texte, sensible })
+    await envoyerMediaChiffre(cible, fichier, { nom, mime, dureeMs, legende: texte })
     return
   }
   const envoye = await uploadMedia(new File([fichier], nom, { type: mime }), nom, dureeMs)

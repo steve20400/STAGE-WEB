@@ -31,11 +31,6 @@ export interface MessageAPartager {
   mediaMime?: string
   fileName?: string
   mediaChiffre?: DescripteurMedia
-  /**
-   * Document SENSIBLE (22/10/2026) : rend la copie SIGNÉE à mon nom, qui
-   * sort à la place du clair. `geste` dit au serveur ce qui en est fait.
-   */
-  signer?: (clair: File, geste: "PARTAGE" | "TELECHARGEMENT") => Promise<File>
 }
 
 /** Le navigateur sait-il ouvrir la feuille de partage du système ? */
@@ -68,13 +63,10 @@ export function aUnFichier(m: MessageAPartager): boolean {
 }
 
 /**
- * Le fichier EN CLAIR du message : déchiffré ici, ou téléchargé — ou, pour un
- * document sensible, sa copie signée. Lève en cas d'échec.
+ * Le fichier EN CLAIR du message : déchiffré ici, ou téléchargé.
+ * Lève en cas d'échec.
  */
-export async function fichierAPartager(
-  m: MessageAPartager,
-  geste: "PARTAGE" | "TELECHARGEMENT" = "PARTAGE",
-): Promise<File> {
+export async function fichierAPartager(m: MessageAPartager): Promise<File> {
   const d = m.mediaChiffre
   const blob = d
     ? await ouvrirMediaChiffre(d)
@@ -84,8 +76,7 @@ export async function fichierAPartager(
       })
   const nom = d?.nom ?? m.fileName ?? "fichier"
   const type = d?.mime ?? m.mediaMime ?? (blob.type || "application/octet-stream")
-  const fichier = new File([blob], nom, { type })
-  return m.signer && d?.sensible ? m.signer(fichier, geste) : fichier
+  return new File([blob], nom, { type })
 }
 
 /** Ce qu'on donne à `navigator.share`. */

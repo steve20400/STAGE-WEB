@@ -19,14 +19,14 @@ import "./visionneuse-sensible.css"
 /**
  * LA VISIONNEUSE D'UN DOCUMENT SENSIBLE DANS LE NAVIGATEUR (22/10/2026).
  *
- * Jusqu'au 22/10, le web renvoyait vers l'application mobile. Le user a levé
- * l'interdiction de télécharger et de partager : le navigateur ouvre donc le
- * document, comme le mobile —
+ * Jusqu'au 22/10, le web renvoyait vers l'application mobile. Le user a permis
+ * le téléchargement : le navigateur ouvre donc le document, comme le mobile —
  *   - la signature « Consulté par Alanya … · Chrome · Windows · date » court
  *     aux QUATRE BORDS ;
  *   - la consultation est notée au serveur ;
- *   - Télécharger et Partager donnent une copie SIGNÉE (bords, métadonnées,
- *     code de trace noté au serveur), jamais le fichier d'origine.
+ *   - Télécharger donne une copie SIGNÉE (bords, métadonnées, empreinte
+ *     numérique notée au serveur), jamais le fichier d'origine.
+ * Le partage, permis du 22 au 24/10, est de nouveau bloqué.
  *
  * Le PDF est dessiné par PDF.js, pas par le lecteur du navigateur : celui-ci a
  * son propre bouton « Télécharger », qui donnerait l'original non signé.
@@ -57,8 +57,6 @@ export function VisionneuseSensible({
   const onErreur = (texte: string) => error(t("sens_titre"), texte)
   const [url] = useState(() => URL.createObjectURL(clair))
   const [occupe, setOccupe] = useState(false)
-  /** Copie prête, quand le navigateur a refusé un partage trop tardif. */
-  const [enAttente, setEnAttente] = useState<File | null>(null)
   const [quand] = useState(() => new Date())
 
   const genre =
@@ -91,54 +89,12 @@ export function VisionneuseSensible({
     return () => document.removeEventListener("keydown", surTouche)
   }, [onFermer])
 
-  const preparer = (geste: "TELECHARGEMENT" | "PARTAGE") =>
-    copieSignee({ clair, d, geste, alanyaId, convId, expediteurId })
-
   const telecharger = async () => {
     setOccupe(true)
     try {
-      const c = await preparer("TELECHARGEMENT")
+      const c = await copieSignee({ clair, d, geste: "TELECHARGEMENT", alanyaId, convId, expediteurId })
       telechargerFichier(c.fichier)
       if (!c.signee) onInfo(t("sens_copie_non_signee"))
-    } catch {
-      onErreur(t("partage_echec"))
-    } finally {
-      setOccupe(false)
-    }
-  }
-
-  const envoyerAuSysteme = async (fichier: File) => {
-    try {
-      await navigator.share({ files: [fichier] })
-      setEnAttente(null)
-    } catch (e) {
-      const nom = e instanceof DOMException ? e.name : ""
-      if (nom === "AbortError") {
-        setEnAttente(null)
-        return
-      }
-      // La signature a pris trop de temps : le navigateur veut un clic récent.
-      if (nom === "NotAllowedError") {
-        setEnAttente(fichier)
-        return
-      }
-      setEnAttente(null)
-      onErreur(t("partage_echec"))
-    }
-  }
-
-  const partager = async () => {
-    setOccupe(true)
-    try {
-      const c = await preparer("PARTAGE")
-      if (!c.signee) onInfo(t("sens_copie_non_signee"))
-      if (typeof navigator.share === "function" && navigator.canShare?.({ files: [c.fichier] })) {
-        await envoyerAuSysteme(c.fichier)
-      } else {
-        // Sans partage de fichiers (Firefox, Chrome sous Linux) : on télécharge.
-        telechargerFichier(c.fichier)
-        onInfo(t("partage_indisponible"))
-      }
     } catch {
       onErreur(t("partage_echec"))
     } finally {
@@ -158,20 +114,10 @@ export function VisionneuseSensible({
           </svg>
           <span>{d.nom ?? t("sens_titre")}</span>
         </span>
-        {enAttente ? (
-          <button type="button" className="vs-bouton accent" onClick={() => void envoyerAuSysteme(enAttente)}>
-            {t("partage_pret")}
-          </button>
-        ) : (
-          <>
-            <button type="button" className="vs-bouton" onClick={() => void telecharger()} disabled={occupe}>
-              {t("download")}
-            </button>
-            <button type="button" className="vs-bouton" onClick={() => void partager()} disabled={occupe}>
-              {t("msg_partager")}
-            </button>
-          </>
-        )}
+        {/* Pas de « Partager » : un document sensible ne se partage pas (24/10/2026). */}
+        <button type="button" className="vs-bouton" onClick={() => void telecharger()} disabled={occupe}>
+          {t("download")}
+        </button>
         <button type="button" className="vs-fermer" onClick={onFermer} aria-label={t("close")}>
           ×
         </button>

@@ -127,6 +127,7 @@ import { sendSessionRevoked } from "../../../src/services/websocket-service"
 import { avatarDisplaySrc, fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { E2eeSauvegardePanneau } from "./e2ee-sauvegarde-panneau"
+import { EmpreintePanneau } from "./empreinte-panneau"
 import { suivreChangementMotDePasse } from "../../../src/services/e2ee-sauvegarde"
 
 type SettingsSection =
@@ -3268,6 +3269,10 @@ export default function SettingsPage() {
                 historique.
               */}
               <E2eeSauvegardePanneau />
+
+              {/* Retrouver qui a fait sortir une copie d'un document sensible,
+                  par l'empreinte écrite sur ses bords (24/10/2026). */}
+              <EmpreintePanneau />
 
               <div className="s-card">
                 <div className="s-card-title">{t("change_password")}</div>
