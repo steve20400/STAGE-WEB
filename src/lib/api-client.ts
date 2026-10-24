@@ -13,6 +13,7 @@ import {
   poseMessageDeconnexion,
 } from "../data/session-message"
 import { langueInitiale, traduire } from "../i18n"
+import { signalerMaintenance } from "./maintenance"
 
 export class ApiError extends Error {
   status: number
@@ -362,6 +363,10 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   const payload = parsePayload(text)
 
   if (!response.ok) {
+    // Le serveur est en maintenance : l'écran d'attente prend le relais.
+    if (response.status === 503 && (payload as { error?: { code?: string } } | null)?.error?.code === "MAINTENANCE") {
+      signalerMaintenance()
+    }
     throw new ApiError(
       inferMessage(
         payload,

@@ -7,6 +7,7 @@ import { ThemeProvider } from "./components/theme-provider"
 import { LanguageProvider } from "./i18n"
 import { ToastProvider } from "./components/toast"
 import { AppErrorBoundary } from "./components/app-error-boundary"
+import { EcranMaintenance } from "./components/ecran-maintenance"
 import { CallRatingGate } from "./components/call-rating-gate"
 import "./styles/globals.css"
 import LoginPage from "../app/(auth)/login/login"
@@ -367,6 +368,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 </Routes>
                 {/* Racine, pas dans l'ecran d'appel : voir la doc de CallRatingGate. */}
                 <CallRatingGate />
+                {/* Par-dessus tout : le serveur est en maintenance. */}
+                <EcranMaintenance />
               </AuthProvider>
             </BrowserRouter>
           </ToastProvider>
