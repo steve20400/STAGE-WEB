@@ -82,5 +82,9 @@ export async function signerPdf(
   for (const [cle, valeur] of Object.entries(meta)) {
     info.set(PDFName.of(cle), PDFHexString.fromText(valeur))
   }
-  return doc.save()
+  // 🔴 SANS FLUX D'OBJETS (24/10/2026) : pdf-lib compresse par défaut le
+  // dictionnaire Info avec le reste. En clair, « Empreinte#20numerique » se
+  // lit dans les octets, et l'envoi refuse de faire repartir cette copie en
+  // « sensible » (`detecteur-copie-signee.ts`, et son jumeau du mobile).
+  return doc.save({ useObjectStreams: false })
 }
