@@ -55,10 +55,12 @@ export async function signerVideoIncrustee(
     const h = piste.displayHeight - (piste.displayHeight % 2)
     if (l < 16 || h < 16) return null
 
+    // Pas de `hardwareAcceleration: "prefer-hardware"` : mesuré le 24/10/2026,
+    // Chrome prend déjà la puce vidéo de lui-même, le forcer ne gagne rien.
     let choix: (typeof CODECS)[number] | null = null
     for (const c of CODECS) {
       const possible = await mb
-        .canEncodeVideo(c.codec, { width: l, height: h, bitrate: mb.QUALITY_VERY_HIGH })
+        .canEncodeVideo(c.codec, { width: l, height: h, quality: mb.QUALITY_VERY_HIGH })
         .catch(() => false)
       if (possible) {
         choix = c
@@ -76,6 +78,15 @@ export async function signerVideoIncrustee(
     const toile = new OffscreenCanvas(l, h)
     const ctx = toile.getContext("2d")
     if (!ctx) return null
+    // Les bords sont peints UNE fois, sur un calque transparent collé ensuite
+    // sur chaque image (comme le mobile), plutôt que de redessiner le texte et
+    // son contour ~2 000 fois. Gain mesuré modeste (~1 s sur 19) : le plancher
+    // est le réencodage lui-même, mais le processeur est moins sollicité.
+    const feuille = new OffscreenCanvas(l, h)
+    const ctxFeuille = feuille.getContext("2d")
+    if (!ctxFeuille) return null
+    peindreBords(ctxFeuille, l, h, texte)
+    const calque = feuille.transferToImageBitmap()
 
     const conversion = await mb.Conversion.init({
       input,
@@ -90,7 +101,7 @@ export async function signerVideoIncrustee(
         processedHeight: h,
         process: (echantillon) => {
           echantillon.draw(ctx, 0, 0, l, h)
-          peindreBords(ctx, l, h, texte)
+          ctx.drawImage(calque, 0, 0)
           return toile
         },
       },
@@ -113,6 +124,7 @@ export async function signerVideoIncrustee(
     if (!conversion.isValid || conversion.discardedTracks.length > 0) return null
     if (onProgression) conversion.onProgress = (p) => onProgression(p)
     await conversion.execute()
+    calque.close()
     const tampon = (output.target as InstanceType<typeof mb.BufferTarget>).buffer
     if (!tampon) return null
     return { blob: new Blob([tampon], { type: choix.mime }), mime: choix.mime, extension: choix.conteneur }
