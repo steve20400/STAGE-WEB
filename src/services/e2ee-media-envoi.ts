@@ -43,6 +43,11 @@ export async function envoyerMediaChiffre(
     replyToId?: string
     /** Avancement du téléversement, de 0 à 1 (chapitre 46). */
     onProgression?: (fraction: number) => void
+    /**
+     * Document SENSIBLE (24/10/2026) : le destinataire l'ouvre dans la
+     * visionneuse protégée, et toute copie qui en sort est signée.
+     */
+    sensible?: boolean
   },
 ): Promise<{ id: string; createdAt: string; descripteur: DescripteurMedia }> {
   /*
@@ -84,6 +89,9 @@ export async function envoyerMediaChiffre(
     mime: o.mime,
     nom: o.nom,
     ...apercu,
+    // Écrit seulement s'il est vrai : le format d'un document ordinaire ne
+    // change pas (même règle que le mobile).
+    ...(o.sensible ? { sensible: true } : {}),
   }
 
   const legende = o.legende ?? ""

@@ -25,6 +25,7 @@ import {
 } from "../../../../src/data/local-conversations"
 import { findLocalGroup, toChatInfoMock } from "../../../../src/data/local-groups"
 import { useToast } from "../../../../src/components/toast"
+import { estCopieSignee } from "../../../../src/services/detecteur-copie-signee"
 import {
   formatBytes,
   applyMessageEditToCache,
@@ -2358,6 +2359,11 @@ interface PendingMedia {
    * l'original que le normal.
    */
   niveau?: NiveauQualite
+  /**
+   * Document SENSIBLE (24/10/2026) : il part tel quel, sans compression, et le
+   * destinataire l'ouvre dans la visionneuse protégée. Fils chiffrés seulement.
+   */
+  sensible?: boolean
 }
 
 /**
@@ -5877,6 +5883,8 @@ export default function ChatRoomPage() {
   const initialScrollDoneRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  /** Le prochain choix de fichiers vient de « Sensible » (24/10/2026). */
+  const envoiSensibleRef = useRef(false)
   const attachRef = useRef<HTMLDivElement>(null)
   const typingTimer = useRef<ReturnType<typeof setTimeout>>()
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -7281,7 +7289,9 @@ export default function ChatRoomPage() {
        * avait échoué. La bulle part maintenant tout de suite, avec l'aperçu
        * de l'original, et l'on attend la compression ICI.
        */
-      preparation?: Promise<File>
+      preparation?: Promise<File>,
+      /** Document SENSIBLE : marqué dans l'enveloppe chiffrée (24/10/2026). */
+      sensible = false
     ) => {
       const tempId = `tmp-${Date.now()}-${(tempSeqRef.current += 1)}`
       const localUrl = URL.createObjectURL(file)
@@ -7364,6 +7374,7 @@ export default function ChatRoomPage() {
             legende: caption,
             replyToId: replyTo?.id,
             onProgression: progression,
+            sensible,
           })
           setReplyTo(null)
           setMessages((prev) => {
@@ -7559,25 +7570,62 @@ export default function ChatRoomPage() {
   // Rien ne part ici : les fichiers passent par l'ecran de confirmation.
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
+    // Le choix vient-il de « Sensible » ? Lu une fois, puis remis à faux.
+    const sensible = envoiSensibleRef.current
+    envoiSensibleRef.current = false
     if (!files || files.length === 0) return
     setShowAttach(false)
-    await preparerFichiers(Array.from(files))
+    const choisis = Array.from(files)
     e.target.value = ""
+    if (!sensible) {
+      await preparerFichiers(choisis)
+      return
+    }
+    /*
+     * 🔴 UN DOCUMENT SENSIBLE NE PART QUE DANS UN FIL CHIFFRÉ : son caractère
+     * « sensible » voyage dans l'enveloppe chiffrée (même règle que le mobile).
+     */
+    if (!estChiffree(chatId)) {
+      error(t("sens_titre"), t("sens_chiffre_requis"))
+      return
+    }
+    /*
+     * 🔴 UNE COPIE SIGNÉE NE REPART PAS EN « SENSIBLE » (24/10/2026, user) : re-
+     * signée, elle prendrait l'empreinte du compte qui la renvoie, et la trace
+     * du vrai fuiteur serait perdue. Elle ne part qu'en document ordinaire,
+     * qui garde ses métadonnées.
+     */
+    const signees: File[] = []
+    for (const f of choisis) if (await estCopieSignee(f)) signees.push(f)
+    if (signees.length > 0) {
+      const ordinaire = window.confirm(
+        `${t("sens_copie_titre")}\n\n${t("sens_copie_texte", { nom: signees.map((f) => f.name).join(", ") })}\n\n${t("sens_copie_ordinaire")} ?`
+      )
+      if (!ordinaire) return
+    }
+    await preparerFichiers(choisis, new Set(choisis.filter((f) => !signees.includes(f))))
   }
 
   /**
    * Prépare des fichiers pour l'écran d'envoi — qu'ils viennent du sélecteur
    * ou d'un PARTAGE reçu d'une autre application (07/10/2026).
+   *
+   * `sensibles` : ceux qui partent en document SENSIBLE (24/10/2026) — tels
+   * quels, sans compression.
    */
-  const preparerFichiers = async (toSend: File[]) => {
+  const preparerFichiers = async (toSend: File[], sensibles?: Set<File>) => {
     /*
      * 🔴 UNE VIDÉO TROP LOURDE PASSE SI ELLE SERA COMPRESSÉE (06/10/2026).
      * La limite du serveur porte sur ce qui PART : une vidéo de 70 Mo en
      * ressort sous les 10. Si, même compressée, elle dépasse encore, l'envoi
      * le dit — voir `sendMediaMessage`.
      */
+    // Un document sensible part tel quel : il n'est jamais compressé.
     const compresseeAvant = (f: File) =>
-      mediaKindFromFile(f) === "video" && videoCompressible() && f.size <= TAILLE_VIDEO_A_COMPRESSER_MAX
+      !sensibles?.has(f) &&
+      mediaKindFromFile(f) === "video" &&
+      videoCompressible() &&
+      f.size <= TAILLE_VIDEO_A_COMPRESSER_MAX
     const oversized = toSend.filter((f) => f.size > TAILLE_MEDIA_MAX_OCTETS && !compresseeAvant(f))
     if (oversized.length > 0) {
       /*
@@ -7617,8 +7665,10 @@ export default function ChatRoomPage() {
       const mime =
         ext === "aac" || ext === "acc" ? "audio/aac" : file.type || "application/octet-stream"
       const durationMs = kind === "audio" ? await readAudioDuration(file) : undefined
-      const suivi = kind === "video" && videoCompressible() ? creerSuivi() : undefined
+      const sensible = sensibles?.has(file) ?? false
+      const suivi = kind === "video" && videoCompressible() && !sensible ? creerSuivi() : undefined
       prepared.push({
+        sensible,
         file,
         url: URL.createObjectURL(file),
         kind,
@@ -7637,7 +7687,7 @@ export default function ChatRoomPage() {
          * 500 Mo. La boucle qui nous porte est deja sequentielle.
          */
         compression:
-          kind === "image"
+          kind === "image" && !sensible
             ? compresserImage(file)
             : suivi
               ? compresserVideo(file, suivi.publier)
@@ -7741,7 +7791,8 @@ export default function ChatRoomPage() {
           item.kind,
           item.durationMs,
           item.caption.trim(),
-          preparation
+          preparation,
+          item.sensible
         )
       }
     })()
@@ -9177,6 +9228,7 @@ export default function ChatRoomPage() {
                 <button
                   className="attach-opt"
                   onClick={() => {
+                    envoiSensibleRef.current = false
                     fileRef.current!.accept = "image/*"
                     fileRef.current!.click()
                   }}
@@ -9204,6 +9256,7 @@ export default function ChatRoomPage() {
                 <button
                   className="attach-opt"
                   onClick={() => {
+                    envoiSensibleRef.current = false
                     fileRef.current!.accept = ".mp4,.mov,.avi,.mkv,.webm"
                     fileRef.current!.click()
                   }}
@@ -9230,6 +9283,7 @@ export default function ChatRoomPage() {
                 <button
                   className="attach-opt"
                   onClick={() => {
+                    envoiSensibleRef.current = false
                     fileRef.current!.accept =
                       ".pdf,.doc,.docx,.txt,.tsx,.css,.json,.py,.java,.cpp,.h,.md,.yaml,.yml,.properties,.xml,.php"
                     fileRef.current!.click()
@@ -9257,6 +9311,7 @@ export default function ChatRoomPage() {
                 <button
                   className="attach-opt"
                   onClick={() => {
+                    envoiSensibleRef.current = false
                     fileRef.current!.accept = ".mp3,.aac,.acc,.wav,.ogg,.m4a,.flac,.webm"
                     fileRef.current!.click()
                   }}
@@ -9284,6 +9339,7 @@ export default function ChatRoomPage() {
                 <button
                   className="attach-opt"
                   onClick={() => {
+                    envoiSensibleRef.current = false
                     fileRef.current!.accept = "*/*"
                     fileRef.current!.click()
                   }}
@@ -9306,6 +9362,40 @@ export default function ChatRoomPage() {
                   </div>
                   {t("f2_any_file")}
                 </button>
+                {/* DOCUMENT SENSIBLE (24/10/2026) : fils chiffrés seulement,
+                    comme sur le mobile. Le destinataire l'ouvre dans la
+                    visionneuse protégée ; il ne se partage ni ne se transfère,
+                    et toute copie téléchargée est signée. */}
+                {estChiffree(chatId) && (
+                  <button
+                    className="attach-opt"
+                    onClick={() => {
+                      envoiSensibleRef.current = true
+                      fileRef.current!.accept = "*/*"
+                      fileRef.current!.click()
+                    }}
+                  >
+                    <div
+                      className="attach-icon"
+                      style={{ background: "#e5393520", color: "#e53935" }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        <path d="m9 12 2 2 4-4" />
+                      </svg>
+                    </div>
+                    {t("sens_option")}
+                  </button>
+                )}
                 {/* Fiche de contact. Seule entree du menu qui n'ouvre PAS le
                     selecteur de fichiers : elle ouvre la fenetre de choix, d'ou
                     l'on prend un contact du repertoire ou l'on compose un
