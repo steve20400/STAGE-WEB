@@ -1,11 +1,13 @@
+import { CLE } from "./signature-document"
+
 /**
  * PDF SIGNÉ D'UN DOCUMENT SENSIBLE (22/10/2026) — pendant web de
  * `SignatureDocument.kt` du mobile.
  *
  * Le texte de la signature est écrit aux QUATRE BORDS de chaque page (par-
  * dessus le contenu, rien n'est effacé), et le dictionnaire Info reçoit
- * Creator, Producer, Subject, Keywords et des clés `Alanya…`, visibles dans
- * les propriétés du document.
+ * Creator, Producer, Subject, Keywords et les champs Alanya (« Alanya ID »,
+ * « Empreinte numerique »…), visibles dans les propriétés du document.
  *
  * pdf-lib (MIT) n'est chargé qu'au premier PDF signé. Un PDF chiffré lève
  * ici : l'appelant laisse alors la copie sortir telle quelle.
@@ -65,16 +67,17 @@ export async function signerPdf(
     })
   }
 
-  const application = meta.AlanyaApplication ?? "Alanya Work"
+  const application = meta[CLE.application] ?? "Alanya Work"
   doc.setCreator(application)
   doc.setProducer(application)
   doc.setSubject(texte)
   doc.setKeywords(
-    [application, meta.AlanyaID && `Alanya ${meta.AlanyaID}`, meta.AlanyaTrace && `Trace ${meta.AlanyaTrace}`].filter(
+    [application, meta[CLE.alanyaId] && `Alanya ${meta[CLE.alanyaId]}`, meta[CLE.empreinte] && `Trace ${meta[CLE.empreinte]}`].filter(
       (k): k is string => Boolean(k),
     ),
   )
-  // Les clés `Alanya…` dans le dictionnaire Info (créé par les appels ci-dessus).
+  // Les champs Alanya (« Alanya ID », « Empreinte numerique »…) dans le
+  // dictionnaire Info, créé par les appels ci-dessus.
   const info = doc.context.lookup(doc.context.trailerInfo.Info, PDFDict)
   for (const [cle, valeur] of Object.entries(meta)) {
     info.set(PDFName.of(cle), PDFHexString.fromText(valeur))

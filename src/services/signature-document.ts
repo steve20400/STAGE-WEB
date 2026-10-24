@@ -117,17 +117,33 @@ export function texteBords(s: SignatureSortie): string {
   return [APPLICATION, `Alanya ${s.alanyaId}`, s.appareil, dateLisible(s.quand), codeLisible(s.code)].join(" · ")
 }
 
-/** Les métadonnées, sous les mêmes clés que le mobile. */
+/**
+ * Les noms des champs de métadonnées, courts et lisibles (24/10/2026, demande
+ * du user). Les mêmes que `CleMeta` du mobile.
+ */
+export const CLE = {
+  application: "Application",
+  alanyaId: "Alanya ID",
+  appareil: "Appareil",
+  dateCreation: "Date Creation",
+  /** Le code de trace, noté aussi par le serveur avec le geste. */
+  empreinte: "Empreinte numerique",
+  geste: "Geste",
+  expediteur: "Expediteur",
+  document: "Document",
+} as const
+
+/** Les métadonnées : Info d'un PDF, EXIF ou iTXt d'une image, éléments libres d'une vidéo. */
 export function metadonnees(s: SignatureSortie): Record<string, string> {
   return {
-    AlanyaApplication: APPLICATION,
-    AlanyaGeste: s.geste,
-    AlanyaID: s.alanyaId,
-    AlanyaAppareil: s.appareil,
-    AlanyaDate: dateIso(s.quand),
-    AlanyaTrace: s.code,
-    ...(s.expediteurId ? { AlanyaExpediteur: s.expediteurId } : {}),
-    ...(s.mediaId ? { AlanyaDocument: s.mediaId } : {}),
+    [CLE.application]: APPLICATION,
+    [CLE.alanyaId]: s.alanyaId,
+    [CLE.appareil]: s.appareil,
+    [CLE.dateCreation]: dateIso(s.quand),
+    [CLE.empreinte]: s.code,
+    [CLE.geste]: s.geste,
+    ...(s.expediteurId ? { [CLE.expediteur]: s.expediteurId } : {}),
+    ...(s.mediaId ? { [CLE.document]: s.mediaId } : {}),
   }
 }
 
@@ -139,16 +155,7 @@ export function elementsMp4(s: SignatureSortie): ElementsMp4 {
       "©cmt": texteBords(s),
       "©day": dateIso(s.quand),
     },
-    libres: {
-      application: APPLICATION,
-      geste: s.geste,
-      alanya_id: s.alanyaId,
-      appareil: s.appareil,
-      date: dateIso(s.quand),
-      trace: s.code,
-      ...(s.expediteurId ? { expediteur: s.expediteurId } : {}),
-      ...(s.mediaId ? { document: s.mediaId } : {}),
-    },
+    libres: metadonnees(s),
   }
 }
 

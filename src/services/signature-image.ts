@@ -1,3 +1,5 @@
+import { CLE } from "./signature-document"
+
 /**
  * IMAGE SIGNÉE D'UN DOCUMENT SENSIBLE (22/10/2026) — pendant web de
  * `SignatureDocument.kt` du mobile.
@@ -5,9 +7,9 @@
  * Le texte est peint aux QUATRE BORDS (contour blanc : lisible sur fond clair
  * comme sombre), puis les métadonnées sont écrites dans le fichier :
  *   - JPEG : un segment EXIF (Artist, Software, ImageDescription, Copyright,
- *     UserComment, ImageUniqueID = code de trace) ;
+ *     UserComment avec tous les champs, ImageUniqueID = empreinte) ;
  *   - PNG : des blocs texte `iTXt` (Author, Description, Software, Comment et
- *     les clés `Alanya…`), lus par exiftool et la plupart des visionneuses.
+ *     les champs Alanya), lus par exiftool et la plupart des visionneuses.
  * Une image qui n'est pas un PNG devient un JPEG (le navigateur ne sait pas
  * écrire l'EXIF d'un WebP ou d'un HEIC).
  */
@@ -107,18 +109,18 @@ export function asciiExif(s: string): string {
 /** Insère un segment EXIF juste après l'en-tête JFIF (ou après SOI). */
 export function avecExif(jpeg: Uint8Array, texte: string, meta: Record<string, string>): Uint8Array<ArrayBuffer> {
   if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) throw new Error("Pas un JPEG")
-  const application = meta.AlanyaApplication ?? "Alanya Work"
+  const application = meta[CLE.application] ?? "Alanya Work"
   const exif = segmentExif({
     description: asciiExif(texte),
     logiciel: asciiExif(application),
-    auteur: asciiExif(meta.AlanyaID ? `Alanya ${meta.AlanyaID}` : application),
+    auteur: asciiExif(meta[CLE.alanyaId] ? `Alanya ${meta[CLE.alanyaId]}` : application),
     droits: asciiExif(application),
     commentaire: asciiExif(
       Object.entries(meta)
         .map(([k, v]) => `${k}=${v}`)
         .join("; "),
     ),
-    code: meta.AlanyaTrace,
+    code: meta[CLE.empreinte],
   })
   // Après SOI et, s'il est là, après le segment JFIF (APP0).
   let pos = 2
@@ -220,9 +222,9 @@ function segmentExif(c: ChampsExif): Uint8Array {
 
 /** Insère des blocs `iTXt` (texte UTF-8) juste avant `IEND`. */
 export function avecTextesPng(png: Uint8Array, texte: string, meta: Record<string, string>): Uint8Array<ArrayBuffer> {
-  const application = meta.AlanyaApplication ?? "Alanya Work"
+  const application = meta[CLE.application] ?? "Alanya Work"
   const textes: Record<string, string> = {
-    Author: meta.AlanyaID ? `Alanya ${meta.AlanyaID}` : application,
+    Author: meta[CLE.alanyaId] ? `Alanya ${meta[CLE.alanyaId]}` : application,
     Description: texte,
     Software: application,
     Copyright: application,
