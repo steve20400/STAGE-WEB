@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from "react"
 import type { PDFDocumentLoadingTask } from "pdfjs-dist"
+import { BoutonsMessage } from "./boutons-message"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   CHAT_COLORS,
@@ -5247,6 +5248,8 @@ function MessageBubble({
                   {!msg.isDeleted && msg.type === "location" && (
                     <LocationCard content={msg.content ?? null} isMe={isMe} />
                   )}
+                  {/* Boutons d'un message officiel : ils remplacent le texte de repli. */}
+                  {!msg.isDeleted && !!msg.boutons?.length && <BoutonsMessage boutons={msg.boutons} />}
 
                   {/*
                     🔴 UNE BULLE CHIFFREE SANS TEXTE DOIT DIRE POURQUOI.
@@ -5283,7 +5286,7 @@ function MessageBubble({
                   {/* Legende du media : elle accompagne aussi les documents et les
                     audios, sinon le texte saisi au moment de l'envoi serait perdu
                     a l'affichage. */}
-                  {msg.content && msg.type !== "contact" && msg.type !== "location" && (
+                  {msg.content && msg.type !== "contact" && msg.type !== "location" && !msg.boutons?.length && (
                     <span
                       style={
                         msg.type === "image"

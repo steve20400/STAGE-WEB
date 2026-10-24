@@ -271,6 +271,10 @@ export function toFrontMessage(
     mentions: (m as BackendMessage).mentions ?? undefined,
     mentionTousLibelle:
       (m as { mentionTousLibelle?: string | null }).mentionTousLibelle ?? null,
+    // Les boutons d'un message officiel (bienvenue de la console).
+    boutons: ((m as { boutons?: unknown }).boutons as ChatMessageMock["boutons"] | undefined)?.filter(
+      (b) => !!b?.label && !!b?.target,
+    ),
     statutCite: (m as { statutCite?: ChatMessageMock["statutCite"] }).statutCite ?? null,
     // Le serveur ne met ce champ que dans la charge des appareils du compte
     // emetteur : le recevoir suffit a avoir le droit de l'afficher.

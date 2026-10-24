@@ -115,6 +115,13 @@ export interface MentionMessage {
   libelle: string
 }
 
+/** Un bouton d'action sous un message officiel : un lien, ou un écran. */
+export interface BoutonMessage {
+  label: string
+  action: "url" | "route"
+  target: string
+}
+
 export interface ChatMessageMock {
   /**
    * Avancement de l'ENVOI d'un média, de 0 à 1, tant que le message est
@@ -156,6 +163,11 @@ export interface ChatMessageMock {
    * « all », « tous », « alle ». Absent = pas de mention collective.
    */
   mentionTousLibelle?: string | null
+  /**
+   * Les boutons d'action d'un message officiel (bienvenue de la console,
+   * 24/10/2026), dans la langue du lecteur. Ils remplacent le texte de repli.
+   */
+  boutons?: BoutonMessage[]
   /**
    * Photo, video ou vocal A VUE UNIQUE (02/10/2026). Le web ne l'ouvre pas :
    * il affiche une pastille invitant a l'ouvrir sur le telephone, ou le
