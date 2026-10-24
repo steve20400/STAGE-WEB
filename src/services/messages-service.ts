@@ -176,6 +176,7 @@ function mapType(type?: string): MessageType {
   // sur "text" et affichait sa charge JSON brute dans la bulle.
   if (t === "CONTACT") return "contact"
   if (t === "LOCATION") return "location"
+  if (t === "STICKER") return "sticker"
   return "text"
 }
 
@@ -211,6 +212,7 @@ function toBackendType(type: MessageType): string {
   if (type === "system") return "SYSTEM"
   if (type === "contact") return "CONTACT"
   if (type === "location") return "LOCATION"
+  if (type === "sticker") return "STICKER"
   return "TEXT"
 }
 
@@ -686,7 +688,7 @@ function cacheDeliveredMessage(message: BackendMessage | WsMessagePayload): void
  * le serveur refuse dans un fil chiffré : il ne partait jamais.
  */
 function chiffrable(type: MessageType): boolean {
-  return type === "text" || type === "contact" || type === "location"
+  return type === "text" || type === "contact" || type === "location" || type === "sticker"
 }
 
 /** La citation et le genre, sous la forme de l'archive (`MessageArchive`). */
@@ -698,7 +700,14 @@ function optionsArchive(type: MessageType, options: SendOptions) {
 /** Ce que l'envoi chiffré doit savoir de plus que le texte : genre et citation. */
 function optionsChiffre(type: MessageType, options: SendOptions) {
   return {
-    genre: type === "contact" ? ("CONTACT" as const) : type === "location" ? ("LOCATION" as const) : undefined,
+    genre:
+      type === "contact"
+        ? ("CONTACT" as const)
+        : type === "location"
+          ? ("LOCATION" as const)
+          : type === "sticker"
+            ? ("STICKER" as const)
+            : undefined,
     replyToId: options.replyToId,
   }
 }

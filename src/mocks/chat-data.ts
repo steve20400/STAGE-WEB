@@ -26,6 +26,8 @@ export type MessageType =
   | "system"
   | "contact"
   | "location"
+  // Un sticker (24/10/2026) : sa charge JSON est dans `content`.
+  | "sticker"
 
 export interface ConversationMock {
   id: string

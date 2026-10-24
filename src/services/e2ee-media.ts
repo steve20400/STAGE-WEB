@@ -95,7 +95,7 @@ export interface Charge {
 }
 
 /** Les messages STRUCTURÉS qu'une charge peut porter dans `texte`. */
-export type GenreCharge = "CONTACT" | "LOCATION"
+export type GenreCharge = "CONTACT" | "LOCATION" | "STICKER"
 
 /** Ce qu'une charge peut porter EN PLUS du texte et du média. */
 export interface ExtrasCharge {
@@ -171,7 +171,7 @@ export function lireCharge(clair: string, messageId: string | null): Charge {
   }
   const media = c.media === undefined ? undefined : descripteurValide(c.media)
   // Un genre inconnu (version future) est ignoré : le texte s'affiche tel quel.
-  const genre = c.genre === "CONTACT" || c.genre === "LOCATION" ? c.genre : undefined
+  const genre = c.genre === "CONTACT" || c.genre === "LOCATION" || c.genre === "STICKER" ? c.genre : undefined
   return {
     texte: typeof c.texte === "string" ? c.texte : "",
     media,

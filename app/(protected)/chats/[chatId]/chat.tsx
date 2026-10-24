@@ -131,6 +131,13 @@ import { envoyerMediaChiffre } from "../../../../src/services/e2ee-media-envoi"
 import { televerser, type Reprise } from "../../../../src/services/envoi-morceaux"
 import { urlApercu } from "../../../../src/services/e2ee-media"
 import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
+import { BulleSticker } from "../../../../src/components/stickers/bulle-sticker"
+import {
+  chargeSticker,
+  lireChargeSticker,
+  noterRecent as noterStickerRecent,
+  type Sticker,
+} from "../../../../src/services/stickers-service"
 import { appliquerMarqueur, MARQUEURS, sansMarqueurs } from "../../../../src/lib/mise-en-forme"
 import { lireVerrou, useVerrou } from "../../../../src/hooks/use-verrou"
 import { ensurePdfWorker } from "../../../../src/services/pdf-worker"
@@ -3278,7 +3285,8 @@ function hasQuotedMedia(msg: Message): boolean {
     // mais pour leur LIBELLÉ : sans cela, la branche `quote.content` afficherait
     // leur charge JSON telle quelle.
     msg.type === "contact" ||
-    msg.type === "location"
+    msg.type === "location" ||
+    msg.type === "sticker"
   )
 }
 
@@ -3329,6 +3337,12 @@ function apercuStructureTraduit(msg: Message): string | null {
     return position.label
       ? `📍 ${position.label}`
       : `📍 ${traduire(langue, "mp_position_shared")}`
+  }
+
+  // Un sticker (24/10/2026) : « 👋 Sticker », jamais sa charge JSON.
+  if (type === "sticker") {
+    const s = lireChargeSticker(contenu)
+    return `${s?.emoji ? `${s.emoji} ` : ""}${traduire(langue, "sticker")}`
   }
 
   return null
@@ -3903,6 +3917,10 @@ function MessageBubble({
    *    appel pour rendre les memes chiffres. Ce qui accompagne les coordonnees,
    *    lui, se traduit — d'ou un retrait plutot qu'un rejet du message entier.
    */
+  // Un sticker (24/10/2026) : l'image seule, sans bulle. Charge illisible →
+  // la bulle ordinaire, qui dira « Sticker ».
+  const stickerRecu = !msg.isDeleted && msg.type === "sticker" ? lireChargeSticker(msg.content) : null
+
   const texteATraduire = useMemo(() => {
     if (msg.isDeleted || msg.type === "system") return ""
     /*
@@ -3919,7 +3937,7 @@ function MessageBubble({
      * bas ; la traduction, elle, ne le faisait pas — un garde posee a un seul
      * des deux endroits.
      */
-    if (msg.type === "contact" || msg.type === "location") return ""
+    if (msg.type === "contact" || msg.type === "location" || msg.type === "sticker") return ""
     const brut = (msg.content ?? "").trim()
     if (!brut) return ""
     const prose = extractGpsCoords(brut) ? removeGpsCoordinates(brut) : brut
@@ -4470,11 +4488,11 @@ function MessageBubble({
             <div
               data-message-id={msg.id}
               style={{
-                background: isMe ? "var(--bubble-me-bg)" : "var(--bubble-them-bg)",
+                background: stickerRecu ? "transparent" : isMe ? "var(--bubble-me-bg)" : "var(--bubble-them-bg)",
                 color: isMe ? "var(--bubble-me-text)" : "var(--bubble-them-text)",
-                border: isMe ? "none" : "1px solid var(--bubble-them-border)",
-                boxShadow: "0 1px 1px rgba(0, 0, 0, 0.06)",
-                padding: msg.type === "image" && mediaSrc ? 4 : "6px 9px 5px",
+                border: isMe || stickerRecu ? "none" : "1px solid var(--bubble-them-border)",
+                boxShadow: stickerRecu ? "none" : "0 1px 1px rgba(0, 0, 0, 0.06)",
+                padding: stickerRecu ? 0 : msg.type === "image" && mediaSrc ? 4 : "6px 9px 5px",
                 borderRadius: isMe ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
                 fontSize: 13.5,
                 lineHeight: 1.4,
@@ -5248,6 +5266,7 @@ function MessageBubble({
                   {!msg.isDeleted && msg.type === "location" && (
                     <LocationCard content={msg.content ?? null} isMe={isMe} />
                   )}
+                  {stickerRecu && <BulleSticker charge={stickerRecu} />}
                   {/* Boutons d'un message officiel : ils remplacent le texte de repli. */}
                   {!msg.isDeleted && !!msg.boutons?.length && <BoutonsMessage boutons={msg.boutons} />}
 
@@ -5268,7 +5287,7 @@ function MessageBubble({
                   */}
                   {!msg.isDeleted &&
                     !msg.content &&
-                    msg.type === "text" &&
+                    (msg.type === "text" || msg.type === "sticker") &&
                     estChiffree(conversationId) && (
                       <span
                         style={{
@@ -5286,7 +5305,7 @@ function MessageBubble({
                   {/* Legende du media : elle accompagne aussi les documents et les
                     audios, sinon le texte saisi au moment de l'envoi serait perdu
                     a l'affichage. */}
-                  {msg.content && msg.type !== "contact" && msg.type !== "location" && !msg.boutons?.length && (
+                  {msg.content && msg.type !== "contact" && msg.type !== "location" && msg.type !== "sticker" && !msg.boutons?.length && (
                     <span
                       style={
                         msg.type === "image"
@@ -5369,18 +5388,25 @@ function MessageBubble({
                 long passe au-dessus ; le parent en flow-root contient le flottant. */}
               {!msg.isDeleted && (
                 <span
-                  style={{
-                    float: "right",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 3,
-                    marginLeft: 8,
-                    transform: "translateY(4px)",
-                    fontSize: 10,
-                    lineHeight: 1,
-                    whiteSpace: "nowrap",
-                    color: isMe ? "rgba(255, 255, 255, 0.75)" : "var(--text-faint)",
-                  }}
+                  // Sous un sticker, l'heure se pose dans une pastille sombre :
+                  // sans bulle, le texte clair disparaîtrait sur un fond clair.
+                  className={stickerRecu ? "stk-heure" : undefined}
+                  style={
+                    stickerRecu
+                      ? undefined
+                      : {
+                          float: "right",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          marginLeft: 8,
+                          transform: "translateY(4px)",
+                          fontSize: 10,
+                          lineHeight: 1,
+                          whiteSpace: "nowrap",
+                          color: isMe ? "rgba(255, 255, 255, 0.75)" : "var(--text-faint)",
+                        }
+                  }
                 >
                   {/* « modifie » AVANT l'heure, et en italique, comme le
                     mobile : les deux clients doivent se lire pareil. Le `gap`
@@ -7036,6 +7062,45 @@ export default function ChatRoomPage() {
       }
     },
     [chatId, error, replyTo, sending, t]
+  )
+
+  /**
+   * ENVOIE UN STICKER (24/10/2026), dès le clic, comme WhatsApp : pas
+   * d'aperçu ni de légende. Même chemin que la fiche de contact — chiffré si
+   * le fil l'est (`chiffrable`, genre STICKER). Le panneau reste ouvert, et
+   * plusieurs stickers peuvent partir à la suite : pas de verrou `sending`.
+   */
+  const envoyerSticker = useCallback(
+    async (sticker: Sticker) => {
+      const charge = chargeSticker(sticker)
+      const tempId = `tmp-${Date.now()}-${sticker.id}`
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: tempId,
+          senderId: "me",
+          content: charge,
+          type: "sticker",
+          status: "sending",
+          timestamp: new Date(),
+          replyTo: replyTo?.id,
+        },
+      ])
+      setReplyTo(null)
+      noterStickerRecent(sticker.id)
+      try {
+        const saved = await sendChatMessage(chatId, charge, "sticker", { replyToId: replyTo?.id })
+        setMessages((prev) => {
+          const dejaRecu = prev.some((m) => m.id === saved.id)
+          if (dejaRecu) return prev.filter((m) => m.id !== tempId)
+          return prev.map((m) => (m.id === tempId ? { ...saved, timestamp: m.timestamp } : m))
+        })
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : t("send_failed")
+        error(t("f2_message_not_sent"), detail)
+      }
+    },
+    [chatId, error, replyTo, t]
   )
 
   // Touche Entree = envoi (Shift+Entree = saut de ligne)
@@ -9216,7 +9281,11 @@ export default function ChatRoomPage() {
             onMouseLeave={() => setShowAttach(false)}
           >
             {emojisOuverts && (
-              <SelecteurEmojis onChoisir={insereEmoji} onFermer={() => setEmojisOuverts(false)} />
+              <SelecteurEmojis
+                onChoisir={insereEmoji}
+                onFermer={() => setEmojisOuverts(false)}
+                onSticker={(s) => void envoyerSticker(s)}
+              />
             )}
 
             {/* Popup attachement */}

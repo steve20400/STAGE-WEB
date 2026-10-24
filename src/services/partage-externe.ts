@@ -20,7 +20,7 @@
  */
 import { resolveMediaUrl } from "./media-service"
 import { ouvrirMediaChiffre } from "./e2ee-media-ouverture"
-import { contactsDepuisContenu, positionDepuisContenu } from "./message-payload"
+import { apercuStructure, contactsDepuisContenu, positionDepuisContenu } from "./message-payload"
 import type { DescripteurMedia } from "./e2ee-media"
 
 /** Ce que le partage a besoin de savoir d'un message. */
@@ -55,6 +55,8 @@ export function texteAPartager(m: MessageAPartager): string {
       return p.label ? `${p.label}\n${lien}` : lien
     }
   }
+  // Un sticker hors d'Alanya : son libellé, jamais sa charge JSON.
+  if (m.type === "sticker") return apercuStructure("sticker", m.content ?? null) ?? ""
   return (m.content ?? "").trim()
 }
 

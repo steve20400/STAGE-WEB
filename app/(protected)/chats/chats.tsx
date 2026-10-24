@@ -101,6 +101,7 @@ function apercuDernierMessage(conv: ConversationMock): string {
    */
   if (estChiffree(conv.id) && !conv.lastMessage) return traduire(langue, "e2ee_apercu")
 
+  if (conv.lastMessageType === "sticker") return conv.lastMessage || "Sticker"
   if (conv.lastMessageType === "contact" || conv.lastMessageType === "location") {
     /*
      * LE SERVEUR A DEJA FAIT CE TRAVAIL, ET MIEUX QUE NOUS.

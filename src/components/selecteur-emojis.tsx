@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 
 import type { CategorieEmoji, EntreeEmoji } from "../data/emojis-catalogue"
 import { useTranslation } from "../i18n"
+import { useStickers, type Sticker } from "../services/stickers-service"
+import { ICONE_STICKERS, PanneauStickers } from "./stickers/panneau-stickers"
 import "./selecteur-emojis.css"
 
 /**
@@ -63,11 +65,20 @@ function chargerCatalogue(): Promise<Catalogue> {
 export function SelecteurEmojis({
   onChoisir,
   onFermer,
+  onSticker,
 }: {
   onChoisir: (emoji: string) => void
   onFermer: () => void
+  /**
+   * Ajoute, comme WhatsApp, une barre en bas « Émoji | Stickers » (24/10/2026),
+   * seulement quand la console a ouvert les stickers.
+   */
+  onSticker?: (s: Sticker) => void
 }) {
   const { t } = useTranslation()
+  const { ouverts: stickersOuverts } = useStickers()
+  const [modeStickers, setModeStickers] = useState(false)
+  const avecStickers = !!onSticker && stickersOuverts
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null)
   const [requete, setRequete] = useState("")
   const [recents, setRecents] = useState<string[]>(lireRecents)
@@ -93,7 +104,9 @@ export function SelecteurEmojis({
     }
     const clic = (e: PointerEvent) => {
       const cible = e.target as Node
-      if (racine.current && !racine.current.contains(cible) && !(cible as Element).closest?.(".emoji-declencheur")) {
+      // `.stk-voile` : la boutique de stickers s'ouvre par-dessus, sur <body> ;
+      // y cliquer ne doit pas refermer le panneau qui l'a ouverte.
+      if (racine.current && !racine.current.contains(cible) && !(cible as Element).closest?.(".emoji-declencheur, .stk-voile")) {
         onFermer()
       }
     }
@@ -161,6 +174,42 @@ export function SelecteurEmojis({
     </button>
   )
 
+  const pied = avecStickers && (
+    <div className="emoji-pied" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={!modeStickers}
+        title={t("stickers_onglet_emoji")}
+        aria-label={t("stickers_onglet_emoji")}
+        data-onglet="emojis"
+        onClick={() => setModeStickers(false)}
+      >
+        {ICONES.smileys}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={modeStickers}
+        title={t("stickers_onglet")}
+        aria-label={t("stickers_onglet")}
+        data-onglet="stickers"
+        onClick={() => setModeStickers(true)}
+      >
+        {ICONE_STICKERS}
+      </button>
+    </div>
+  )
+
+  if (avecStickers && modeStickers && onSticker) {
+    return (
+      <div className="emoji-panneau" ref={racine} role="dialog" aria-label={t("stickers_onglet")}>
+        <PanneauStickers onEnvoyer={onSticker} />
+        {pied}
+      </div>
+    )
+  }
+
   return (
     <div className="emoji-panneau" ref={racine} role="dialog" aria-label={t("emojis")}>
       <div className="emoji-recherche">
@@ -221,6 +270,7 @@ export function SelecteurEmojis({
           </>
         )}
       </div>
+      {pied}
     </div>
   )
 }

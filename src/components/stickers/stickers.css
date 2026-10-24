@@ -1,0 +1,339 @@
+/*
+ * STICKERS (24/10/2026) — panneau du sélecteur, boutique, aperçu d'un pack,
+ * bulle dans le fil. Couleurs par jetons de thème uniquement : tout suit les
+ * quatre thèmes. Espacements : 4, 8, 12, 16, 24.
+ */
+
+/* ── Barre du bas du sélecteur : Émoji | Stickers ── */
+.emoji-pied {
+  display: flex;
+  border-top: 1px solid var(--border-subtle);
+}
+.emoji-pied button {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 38px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.emoji-pied button[aria-selected="true"] {
+  color: var(--accent);
+}
+.emoji-pied button:hover {
+  background: var(--bg-hover);
+}
+.emoji-pied svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ── Panneau ── */
+.stk-panneau {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.stk-onglets {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.stk-onglet {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 8px 8px 0 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.stk-onglet:hover {
+  background: var(--bg-hover);
+}
+.stk-onglet[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+.stk-onglet svg {
+  width: 18px;
+  height: 18px;
+}
+.stk-onglet img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+.stk-plus {
+  margin-left: auto;
+}
+.stk-recherche {
+  padding: 8px 10px 0;
+}
+.stk-recherche input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.stk-recherche input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.stk-grille {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+  padding: 8px;
+  align-content: start;
+}
+.stk-case {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  cursor: pointer;
+}
+.stk-case:hover,
+.stk-case:focus-visible {
+  background: var(--bg-hover);
+}
+.stk-case img,
+.stk-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.stk-vide {
+  grid-column: 1 / -1;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── Fenêtres (boutique, pack, sticker reçu) ── */
+.stk-voile {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.stk-fenetre {
+  display: flex;
+  flex-direction: column;
+  width: min(480px, 100%);
+  max-height: min(640px, calc(100vh - 32px));
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.stk-entete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.stk-entete h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.stk-fermer {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.stk-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.stk-tabs button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stk-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+.stk-liste {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+.stk-ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+}
+.stk-ligne:hover {
+  background: var(--bg-hover);
+}
+.stk-ligne-ouvrir {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.stk-ligne-ouvrir img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.stk-ligne-texte {
+  min-width: 0;
+}
+.stk-ligne-texte strong,
+.stk-ligne-texte span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stk-ligne-texte span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.stk-action {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stk-action.plein {
+  background: var(--accent);
+  color: #fff;
+}
+.stk-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.stk-ordre {
+  display: flex;
+  flex-direction: column;
+}
+.stk-ordre button {
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1.1;
+}
+.stk-ordre button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.stk-pied {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.stk-pied .stk-action {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+}
+.stk-description {
+  padding: 8px 16px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.stk-recu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+.stk-recu img {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+}
+.stk-recu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ── Dans le fil ── */
+.stk-bulle {
+  display: block;
+  width: 150px;
+  height: 150px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.stk-heure {
+  float: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  padding: 3px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}

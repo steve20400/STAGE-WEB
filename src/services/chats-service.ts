@@ -137,6 +137,7 @@ function mapLastMessageType(type?: string): MessageType {
   if (t === "FILE" || t === "VIDEO") return "file"
   if (t === "CONTACT") return "contact"
   if (t === "LOCATION") return "location"
+  if (t === "STICKER") return "sticker"
   return "text"
 }
 

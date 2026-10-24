@@ -195,5 +195,16 @@ export function apercuStructure(type: string, content: string | null | undefined
     if (position === null) return "📍 Position"
     return position.label ? `📍 ${position.label}` : "📍 Position partagée"
   }
+  if (type === "sticker" || type === "STICKER") {
+    // Comme le serveur et le mobile : « Sticker », précédé de son émoji.
+    let emoji = ""
+    try {
+      const j = JSON.parse(content ?? "") as { emoji?: unknown }
+      if (typeof j?.emoji === "string") emoji = j.emoji.trim()
+    } catch {
+      /* charge illisible : « Sticker » seul */
+    }
+    return emoji ? `${emoji} Sticker` : "Sticker"
+  }
   return null
 }
