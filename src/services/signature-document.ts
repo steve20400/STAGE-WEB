@@ -169,9 +169,12 @@ export function natureSignature(mime: string, nom: string): NatureSignature {
   if (m === "application/pdf" || ext === "pdf") return "pdf"
   // Un GIF animé perdrait son animation, un SVG n'est pas une image en points.
   if (IMAGES_SIGNABLES.has(ext) || (m.startsWith("image/") && m !== "image/gif" && !m.includes("svg"))) return "image"
-  if (mp4PrisEnCharge(m, nom)) return "video"
+  if (mp4PrisEnCharge(m, nom) || m.startsWith("video/") || VIDEOS_AUTRES.has(ext)) return "video"
   return "aucune"
 }
+
+/** Les conteneurs vidéo que `mediabunny` lit, en plus de MP4 / MOV / 3GP. */
+const VIDEOS_AUTRES = new Set(["webm", "mkv"])
 
 export interface CopieSignee {
   /** La copie, sous le nom à donner (une image non PNG devient un JPEG). */
@@ -183,8 +186,17 @@ export interface CopieSignee {
 /**
  * Signe une copie de `source` (le clair déchiffré). Ne lève jamais : un échec
  * rend la copie telle quelle, avec `signee: false`.
+ *
+ * `onProgression` (0 à 1) : l'avancement d'une vidéo, seule à prendre du
+ * temps — elle est réencodée image par image.
  */
-export async function signerCopie(source: Blob, nom: string, mime: string, s: SignatureSortie): Promise<CopieSignee> {
+export async function signerCopie(
+  source: Blob,
+  nom: string,
+  mime: string,
+  s: SignatureSortie,
+  onProgression?: (fraction: number) => void,
+): Promise<CopieSignee> {
   try {
     switch (natureSignature(mime, nom)) {
       case "pdf": {
@@ -202,6 +214,21 @@ export async function signerCopie(source: Blob, nom: string, mime: string, s: Si
         return { fichier: new File([r.blob], garde ? nom : `${base}.${r.extension}`, { type: r.mime }), signee: true }
       }
       case "video": {
+        /*
+         * 🔴 D'ABORD LA SIGNATURE INCRUSTÉE AUX QUATRE BORDS (24/10/2026) : elle
+         * survit à WhatsApp, qui réencode la vidéo et efface les métadonnées.
+         * La vidéo est réencodée ici ; un MP4 reçoit en plus les huit champs.
+         */
+        const { signerVideoIncrustee } = await import("./signature-video")
+        const v = await signerVideoIncrustee(source, texteBords(s), metadonnees(s), onProgression)
+        if (v) {
+          const blob = v.extension === "mp4" ? await ecrireMetadonneesMp4(v.blob, elementsMp4(s)) : v.blob
+          const base = nom.includes(".") ? nom.slice(0, nom.lastIndexOf(".")) : nom
+          return { fichier: new File([blob], `${base}.${v.extension}`, { type: v.mime }), signee: true }
+        }
+        // Repli : le navigateur ne sait pas réencoder. Un MP4 / MOV / 3GP garde
+        // au moins ses métadonnées ; un autre conteneur sort tel quel.
+        if (!mp4PrisEnCharge(mime, nom)) break
         const blob = await ecrireMetadonneesMp4(source, elementsMp4(s))
         return { fichier: new File([blob], nom, { type: mime }), signee: true }
       }

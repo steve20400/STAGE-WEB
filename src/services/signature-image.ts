@@ -56,13 +56,29 @@ export async function signerImage(
   }
 }
 
-function peindreBords(ctx: CanvasRenderingContext2D, l: number, h: number, texte: string): void {
+/**
+ * Le texte de la signature le long des quatre bords — images et vidéos
+ * (chaque image d'une vidéo passe ici).
+ *
+ * 🐛 LES COINS SE CHEVAUCHAIENT (capture du user, 24/10/2026) : sur une image
+ * presque carrée, chaque ligne occupait tout son bord et mordait sur la
+ * colonne voisine. Chaque ligne laisse maintenant libre, à ses deux bouts, la
+ * bande où court le texte perpendiculaire.
+ */
+export function peindreBords(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  l: number,
+  h: number,
+  texte: string,
+): void {
   const base = Math.max(12, Math.min(l, h) / 50)
   const marge = base * 0.6
+  // La bande du texte perpendiculaire : sa marge, plus sa hauteur de ligne.
+  const coin = marge + base * 1.3
   const police = (t: number) => `bold ${t}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`
   ctx.font = police(base)
   const unite = ctx.measureText(texte).width / base
-  const taillePour = (longueur: number) => Math.min(base, (longueur - 2 * marge) / unite)
+  const taillePour = (longueur: number) => Math.min(base, (longueur - 2 * coin) / unite)
 
   const bord = (cx: number, cy: number, angle: number, t: number) => {
     ctx.save()

@@ -33,6 +33,8 @@ export async function copieSignee(o: {
   alanyaId: string
   convId?: string
   expediteurId?: string
+  /** L'avancement (0 à 1) d'une vidéo, réencodée image par image. */
+  onProgression?: (fraction: number) => void
 }): Promise<CopieSignee> {
   const s = nouvelleSignature({
     geste: o.geste,
@@ -40,7 +42,7 @@ export async function copieSignee(o: {
     expediteurId: o.expediteurId,
     mediaId: o.d.id,
   })
-  const copie = await signerCopie(o.clair, nomDuDocument(o.d), o.d.mime, s)
+  const copie = await signerCopie(o.clair, nomDuDocument(o.d), o.d.mime, s, o.onProgression)
   void noterSortie(s, o.d, o.convId)
   return copie
 }

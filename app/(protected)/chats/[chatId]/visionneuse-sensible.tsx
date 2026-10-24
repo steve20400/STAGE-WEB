@@ -57,6 +57,8 @@ export function VisionneuseSensible({
   const onErreur = (texte: string) => error(t("sens_titre"), texte)
   const [url] = useState(() => URL.createObjectURL(clair))
   const [occupe, setOccupe] = useState(false)
+  /** L'avancement d'une vidéo signée (réencodée image par image), en %. */
+  const [pourcent, setPourcent] = useState<number | null>(null)
   const [quand] = useState(() => new Date())
 
   const genre =
@@ -92,13 +94,23 @@ export function VisionneuseSensible({
   const telecharger = async () => {
     setOccupe(true)
     try {
-      const c = await copieSignee({ clair, d, geste: "TELECHARGEMENT", alanyaId, convId, expediteurId })
+      const c = await copieSignee({
+        clair,
+        d,
+        geste: "TELECHARGEMENT",
+        alanyaId,
+        convId,
+        expediteurId,
+        // Au pour cent près : un rendu par image redessinerait 30 fois par seconde.
+        onProgression: (f) => setPourcent((p) => (Math.round(f * 100) === p ? p : Math.round(f * 100))),
+      })
       telechargerFichier(c.fichier)
       if (!c.signee) onInfo(t("sens_copie_non_signee"))
     } catch {
       onErreur(t("partage_echec"))
     } finally {
       setOccupe(false)
+      setPourcent(null)
     }
   }
 
@@ -116,7 +128,7 @@ export function VisionneuseSensible({
         </span>
         {/* Pas de « Partager » : un document sensible ne se partage pas (24/10/2026). */}
         <button type="button" className="vs-bouton" onClick={() => void telecharger()} disabled={occupe}>
-          {t("download")}
+          {pourcent !== null ? `${t("download")} ${pourcent} %` : t("download")}
         </button>
         <button type="button" className="vs-fermer" onClick={onFermer} aria-label={t("close")}>
           ×
