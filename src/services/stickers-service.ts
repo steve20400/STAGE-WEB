@@ -46,6 +46,10 @@ export interface EtatStickers {
   favoris: number[]
   /** Les derniers envoyés depuis ce navigateur. */
   recents: number[]
+  /** La console permet-elle de CRÉER ses stickers (25/10/2026) ? */
+  creation: boolean
+  /** « Mes créations », la plus récente d'abord ; `null` tant que rien n'est créé. */
+  creations: PackStickers | null
 }
 
 const MAX_RECENTS = 30
@@ -157,12 +161,27 @@ function etatDepuisCatalogue(cat: unknown): Pick<EtatStickers, "ouverts" | "cata
   }
 }
 
+interface Moi {
+  packs?: Array<{ id: number }> | number[]
+  favorites?: number[]
+  features?: { creation?: boolean }
+  created?: unknown
+}
+
+/** Ce que `/api/stickers/me` dit de MOI (et ce qu'on en garde dans ce navigateur). */
+function etatDepuisMoi(moi: Moi): Pick<EtatStickers, "mesPacks" | "favoris" | "creation" | "creations"> {
+  return {
+    mesPacks: (moi.packs ?? []).map((p) => (typeof p === "number" ? p : p.id)),
+    favoris: moi.favorites ?? [],
+    creation: moi.features?.creation === true,
+    creations: lirePack(moi.created ?? null),
+  }
+}
+
 function etatInitial(): EtatStickers {
-  const moi = lireStockage<{ packs?: number[]; favorites?: number[] }>(cleMoi(), {})
   return {
     ...etatDepuisCatalogue(lireStockage(CLE_CATALOGUE, null)),
-    mesPacks: moi.packs ?? [],
-    favoris: moi.favorites ?? [],
+    ...etatDepuisMoi(lireStockage<Moi>(cleMoi(), {})),
     recents: lireStockage<number[]>(cleRecents(), []),
   }
 }
@@ -193,11 +212,9 @@ async function charger(): Promise<void> {
     ecrireStockage(CLE_CATALOGUE, cat)
     const base = etatDepuisCatalogue(cat)
     if (base.ouverts) {
-      const moi = await apiRequest<{ packs?: Array<{ id: number }>; favorites?: number[] }>("/api/stickers/me")
-      const mesPacks = (moi.packs ?? []).map((p) => p.id)
-      const favoris = moi.favorites ?? []
-      ecrireStockage(cleMoi(), { packs: mesPacks, favorites: favoris })
-      changer({ ...base, mesPacks, favoris })
+      const moi = await apiRequest<Moi>("/api/stickers/me")
+      ecrireStockage(cleMoi(), moi)
+      changer({ ...base, ...etatDepuisMoi(moi) })
     } else {
       changer(base)
     }
@@ -236,9 +253,12 @@ export function useStickers(): EtatStickers {
 export const packParId = (e: EtatStickers, id: number) => e.catalogue.find((p) => p.id === id) ?? null
 export const packParCode = (e: EtatStickers, code: string) => e.catalogue.find((p) => p.code === code) ?? null
 export function stickerParId(e: EtatStickers, id: number): Sticker | null {
-  for (const p of e.catalogue) for (const s of p.stickers) if (s.id === id) return s
+  for (const p of [...e.catalogue, ...(e.creations ? [e.creations] : [])]) {
+    for (const s of p.stickers) if (s.id === id) return s
+  }
   return null
 }
+export const estMaCreation = (e: EtatStickers, id: number) => !!e.creations?.stickers.some((s) => s.id === id)
 export const packsInstalles = (e: EtatStickers) =>
   e.mesPacks.map((id) => packParId(e, id)).filter((p): p is PackStickers => p !== null)
 export const stickersDe = (e: EtatStickers, ids: number[]) =>
@@ -248,7 +268,7 @@ export const stickersDe = (e: EtatStickers, ids: number[]) =>
 export function chercherStickers(e: EtatStickers, requete: string): Sticker[] {
   const q = requete.trim().toLowerCase()
   if (!q) return []
-  return packsInstalles(e).flatMap((p) =>
+  return [...(e.creations ? [e.creations] : []), ...packsInstalles(e)].flatMap((p) =>
     p.stickers.filter((s) => s.emoji.includes(q) || Object.values(s.nom).some((n) => n.toLowerCase().includes(q))),
   )
 }
@@ -256,7 +276,59 @@ export function chercherStickers(e: EtatStickers, requete: string): Sticker[] {
 // ── Écriture : l'écran change tout de suite, un refus remet l'état d'avant ──
 
 function memoriserMoi() {
-  ecrireStockage(cleMoi(), { packs: etat.mesPacks, favorites: etat.favoris })
+  ecrireStockage(cleMoi(), {
+    packs: etat.mesPacks,
+    favorites: etat.favoris,
+    features: { creation: etat.creation },
+    created: etat.creations
+      ? {
+          ...etat.creations,
+          stickers: etat.creations.stickers.map((s) => ({ id: s.id, assetId: s.assetId, emoji: s.emoji, nom: s.nom, url: s.url, anime: s.anime })),
+        }
+      : null,
+  })
+}
+
+async function relireMoi() {
+  const moi = await apiRequest<Moi>("/api/stickers/me")
+  ecrireStockage(cleMoi(), moi)
+  changer(etatDepuisMoi(moi))
+}
+
+// ── Créer ses stickers (25/10/2026) ─────────────────────────────────────────
+
+/** Crée un sticker à partir d'une image PNG ; il entre en tête de « Mes créations ». */
+export async function creerSticker(png: Blob): Promise<Sticker> {
+  const f = new FormData()
+  f.append("file", png, "sticker.png")
+  const r = await apiRequest<{ stickerId: number }>("/api/stickers/assets", { method: "POST", body: f })
+  await relireMoi()
+  const cree = stickerParId(etat, r.stickerId)
+  if (!cree) throw new Error("Sticker créé introuvable")
+  return cree
+}
+
+/** Retire une de mes créations ; son image reste dans les messages envoyés. */
+export function supprimerCreation(id: number) {
+  const c = etat.creations
+  return optimiste(
+    {
+      creations: c ? { ...c, stickers: c.stickers.filter((s) => s.id !== id) } : c,
+      favoris: etat.favoris.filter((x) => x !== id),
+    },
+    () => apiRequest(`/api/stickers/stickers/${id}`, { method: "DELETE" }),
+  )
+}
+
+/** Garde dans « Mes créations » un sticker reçu (celui d'un autre). */
+export async function copierSticker(id: number) {
+  await apiRequest(`/api/stickers/stickers/${id}/copy`, { method: "POST" })
+  await relireMoi()
+}
+
+/** Signale l'image d'un sticker reçu à la modération. */
+export function signalerSticker(assetId: number) {
+  return apiRequest("/api/stickers/signalements", { method: "POST", body: { assetId, motif: "inapproprie" } })
 }
 
 async function optimiste(patch: Partial<EtatStickers>, appel: () => Promise<unknown>) {

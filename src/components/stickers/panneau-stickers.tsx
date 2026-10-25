@@ -4,14 +4,18 @@ import { useTranslation } from "../../i18n"
 import {
   basculerFavori,
   chercherStickers,
+  estMaCreation,
   nomDans,
   packsInstalles,
   stickersDe,
+  supprimerCreation,
   useStickers,
   vignette,
   type Sticker,
 } from "../../services/stickers-service"
 import { BoutiqueStickers } from "./boutique-stickers"
+import { CreateurSticker } from "./createur-sticker"
+import { FenetreSticker } from "./fenetre-sticker"
 import "./stickers.css"
 
 /**
@@ -23,6 +27,8 @@ import "./stickers.css"
 const RECHERCHE = -1
 const RECENTS = -2
 const FAVORIS = -3
+/** « Mes créations » (25/10/2026) : une case « Créer » en tête de la grille. */
+const CREATIONS = -4
 
 export function PanneauStickers({ onEnvoyer }: { onEnvoyer: (s: Sticker) => void }) {
   const { t, language } = useTranslation()
@@ -31,6 +37,8 @@ export function PanneauStickers({ onEnvoyer }: { onEnvoyer: (s: Sticker) => void
   const [requete, setRequete] = useState("")
   const [boutique, setBoutique] = useState(false)
   const [avis, setAvis] = useState<string | null>(null)
+  const [createur, setCreateur] = useState(false)
+  const [options, setOptions] = useState<Sticker | null>(null)
 
   const packs = packsInstalles(etat)
   const recents = stickersDe(etat, etat.recents)
@@ -49,6 +57,9 @@ export function PanneauStickers({ onEnvoyer }: { onEnvoyer: (s: Sticker) => void
   } else if (actif === FAVORIS) {
     grille = stickersDe(etat, etat.favoris)
     vide = t("stickers_vide_favoris")
+  } else if (actif === CREATIONS) {
+    grille = etat.creations?.stickers ?? []
+    vide = ""
   } else {
     grille = packs.find((p) => p.id === actif)?.stickers ?? []
     vide = t("stickers_aucun_pack")
@@ -86,6 +97,7 @@ export function PanneauStickers({ onEnvoyer }: { onEnvoyer: (s: Sticker) => void
         {onglet(RECHERCHE, ICONE_LOUPE, t("stickers_chercher"))}
         {onglet(RECENTS, ICONE_HORLOGE, t("stickers_recents"))}
         {onglet(FAVORIS, ICONE_ETOILE, t("stickers_favoris"))}
+        {etat.creation && onglet(CREATIONS, ICONE_PINCEAU, t("stickers_creations"))}
         {packs.map((p) => onglet(p.id, vignette(p) ? <img src={vignette(p)!} alt="" /> : ICONE_PACK, nomDans(p.nom, language, p.code)))}
         <button
           type="button"
@@ -111,7 +123,13 @@ export function PanneauStickers({ onEnvoyer }: { onEnvoyer: (s: Sticker) => void
       )}
       {avis && <p className="stk-description" role="status">{avis}</p>}
       <div className="stk-grille">
-        {grille.length === 0 ? (
+        {actif === CREATIONS && (
+          <button type="button" className="stk-creer" data-action="creer" onClick={() => setCreateur(true)}>
+            {ICONE_PHOTO}
+            {t("stickers_creer")}
+          </button>
+        )}
+        {grille.length === 0 && actif !== CREATIONS ? (
           <p className="stk-vide">{vide}</p>
         ) : (
           grille.map((s) => (
@@ -124,7 +142,9 @@ export function PanneauStickers({ onEnvoyer }: { onEnvoyer: (s: Sticker) => void
               onClick={() => onEnvoyer(s)}
               onContextMenu={(e) => {
                 e.preventDefault()
-                void favori(s)
+                // Une de MES créations : favori ou suppression ; sinon, favori.
+                if (estMaCreation(etat, s.id)) setOptions(s)
+                else void favori(s)
               }}
             >
               <img src={s.url} alt={s.emoji} loading="lazy" />
@@ -133,6 +153,48 @@ export function PanneauStickers({ onEnvoyer }: { onEnvoyer: (s: Sticker) => void
         )}
       </div>
       {boutique && <BoutiqueStickers onFermer={() => setBoutique(false)} />}
+      {createur && (
+        <CreateurSticker
+          onFermer={() => setCreateur(false)}
+          onCree={(s) => {
+            // Comme WhatsApp : le sticker créé part aussitôt.
+            setCreateur(false)
+            setActif(CREATIONS)
+            onEnvoyer(s)
+          }}
+        />
+      )}
+      {options && (
+        <FenetreSticker titre={t("stickers_creations")} onFermer={() => setOptions(null)} libelleFermer={t("close")}>
+          <div className="stk-recu">
+            <img src={options.url} alt={options.emoji} />
+            <div className="stk-recu-actions">
+              <button
+                type="button"
+                className="stk-action"
+                onClick={() => {
+                  void favori(options)
+                  setOptions(null)
+                }}
+              >
+                {t(etat.favoris.includes(options.id) ? "stickers_retirer_favori" : "stickers_ajouter_favori")}
+              </button>
+              <button
+                type="button"
+                className="stk-action plein"
+                data-action="supprimer"
+                onClick={() => {
+                  const id = options.id
+                  setOptions(null)
+                  supprimerCreation(id).catch(() => setAvis(t("stickers_erreur")))
+                }}
+              >
+                {t("stickers_supprimer")}
+              </button>
+            </div>
+          </div>
+        </FenetreSticker>
+      )}
     </div>
   )
 }
@@ -167,6 +229,19 @@ const ICONE_PACK = (
   <Trace>
     <rect x="4" y="4" width="16" height="16" rx="4" />
     <path d="M14 20v-4a2 2 0 0 1 2-2h4" />
+  </Trace>
+)
+const ICONE_PINCEAU = (
+  <Trace>
+    <path d="M18.4 2.6a2 2 0 0 1 2.9 2.9L11 15.8 8.2 13Z" />
+    <path d="M7 14.5c-2 0-3.5 1.6-3.5 3.5 0 1.2-.7 2-1.5 2.5 3 1 7 .5 7.8-3.2" />
+  </Trace>
+)
+const ICONE_PHOTO = (
+  <Trace>
+    <rect x="3" y="5" width="18" height="15" rx="3" />
+    <circle cx="9" cy="11" r="2" />
+    <path d="M21 16l-5-5-8 9" />
   </Trace>
 )
 const ICONE_PLUS = (

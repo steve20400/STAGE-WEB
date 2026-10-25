@@ -337,3 +337,68 @@
   line-height: 1;
   white-space: nowrap;
 }
+
+/* ── Créer un sticker (25/10/2026) ── */
+.stk-createur {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+}
+.stk-choisir {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 16px;
+  color: var(--text-muted);
+  text-align: center;
+  cursor: pointer;
+}
+.stk-choisir input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.stk-cadre {
+  border-radius: 8px;
+  /* Le damier dit « ici, ce sera transparent ». */
+  background: repeating-conic-gradient(var(--bg-hover) 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+  cursor: grab;
+  touch-action: none;
+}
+.stk-cadre:active {
+  cursor: grabbing;
+}
+.stk-zoom {
+  width: 280px;
+  accent-color: var(--accent);
+}
+.stk-createur-pied {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: 8px;
+}
+.stk-creer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 1;
+  border: 1px dashed var(--border-default, var(--border-subtle));
+  border-radius: 10px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.stk-creer svg {
+  width: 22px;
+  height: 22px;
+}
