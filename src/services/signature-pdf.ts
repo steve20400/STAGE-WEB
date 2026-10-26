@@ -1,3 +1,4 @@
+import type { ProtectionPdf } from "./e2ee-media"
 import { CLE } from "./signature-document"
 
 /**
@@ -11,6 +12,18 @@ import { CLE } from "./signature-document"
  *
  * pdf-lib (MIT) n'est chargé qu'au premier PDF signé. Un PDF chiffré lève
  * ici : l'appelant laisse alors la copie sortir telle quelle.
+ *
+ * 🔴 UN PDF PROTÉGÉ PAR L'EXPÉDITEUR (26/10/2026, jumeau de
+ * `protection_pdf_copie.dart` du mobile) passe par `@cantoo/pdf-lib` (MIT),
+ * la même bibliothèque qui sait aussi CHIFFRER (AES-256) :
+ *
+ * - avec mot de passe : plus de texte aux quatre bords, seulement l'empreinte
+ *   numérique EN HAUT À DROITE de chaque page ([coin]) ;
+ * - sans mot de passe (impression interdite) : les quatre bords, puis la
+ *   restriction.
+ *
+ * Les noms des champs (« Empreinte#20numerique ») restent lisibles dans les
+ * octets : un PDF ne chiffre que ses chaînes, jamais ses noms.
  */
 
 /** Rouge des documents sensibles (#E53935). */
@@ -20,8 +33,12 @@ export async function signerPdf(
   octets: ArrayBuffer,
   texte: string,
   meta: Record<string, string>,
+  protection?: ProtectionPdf,
+  coin?: string,
 ): Promise<Uint8Array> {
-  const { PDFDocument, PDFDict, PDFHexString, PDFName, StandardFonts, degrees, rgb } = await import("pdf-lib")
+  const { PDFDocument, PDFDict, PDFHexString, PDFName, StandardFonts, degrees, rgb } = protection
+    ? ((await import("@cantoo/pdf-lib")) as unknown as typeof import("pdf-lib"))
+    : await import("pdf-lib")
   // `updateMetadata: false` : pdf-lib n'écrit pas son propre nom par-dessus.
   const doc = await PDFDocument.load(octets, { updateMetadata: false })
   const police = await doc.embedFont(StandardFonts.HelveticaBold)
@@ -38,7 +55,17 @@ export async function signerPdf(
   const unite = police.widthOfTextAtSize(ecrit, 1)
   const couleur = rgb(ROUGE.r, ROUGE.g, ROUGE.b)
 
-  for (const page of doc.getPages()) {
+  // Avec mot de passe : l'empreinte seule, en haut à droite (comme le mobile).
+  if (protection?.ouverture && coin) {
+    for (const page of doc.getPages()) {
+      const { x, y, width: l, height: h } = page.getCropBox()
+      const taille = Math.min(12, Math.max(7, Math.min(l, h) / 50))
+      const largeur = police.widthOfTextAtSize(coin, taille)
+      const marge = taille * 1.2
+      page.drawText(coin, { font: police, size: taille, color: couleur, x: x + l - marge - largeur, y: y + h - marge - taille })
+    }
+  }
+  for (const page of protection?.ouverture ? [] : doc.getPages()) {
     const { x, y, width: l, height: h } = page.getCropBox()
     const base = Math.min(9, Math.max(5, Math.min(l, h) / 75))
     const marge = base * 0.9
@@ -86,5 +113,21 @@ export async function signerPdf(
   // dictionnaire Info avec le reste. En clair, « Empreinte#20numerique » se
   // lit dans les octets, et l'envoi refuse de faire repartir cette copie en
   // « sensible » (`detecteur-copie-signee.ts`, et son jumeau du mobile).
+  if (protection) {
+    ;(doc as unknown as { encrypt: (o: object) => void }).encrypt({
+      userPassword: protection.ouverture ?? "",
+      ownerPassword: protection.proprietaire,
+      permissions: {
+        printing: protection.imprimer ? "highResolution" : false,
+        modifying: false,
+        copying: false,
+        annotating: false,
+        fillingForms: false,
+        // Les lecteurs d'écran gardent l'accès au texte.
+        contentAccessibility: true,
+        documentAssembly: false,
+      },
+    })
+  }
   return doc.save({ useObjectStreams: false })
 }

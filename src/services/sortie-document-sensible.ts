@@ -42,7 +42,8 @@ export async function copieSignee(o: {
     expediteurId: o.expediteurId,
     mediaId: o.d.id,
   })
-  const copie = await signerCopie(o.clair, nomDuDocument(o.d), o.d.mime, s, o.onProgression)
+  // Un PDF protégé (26/10/2026) : l'échec de la protection lève, avant toute trace.
+  const copie = await signerCopie(o.clair, nomDuDocument(o.d), o.d.mime, s, o.onProgression, o.d.protection)
   void noterSortie(s, o.d, o.convId)
   return copie
 }

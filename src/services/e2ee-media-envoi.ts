@@ -2,7 +2,7 @@ import { apiRequest } from "../lib/api-client"
 import { getMyUserId } from "../data/session-user"
 import { correspondant } from "./e2ee-fil"
 import { chiffrerPour, deposer, idAppareil, ouvrirSessions } from "./e2ee-service"
-import { chiffrerFichier, ecrireCharge, type DescripteurMedia } from "./e2ee-media"
+import { chiffrerFichier, ecrireCharge, type DescripteurMedia, type ProtectionPdf } from "./e2ee-media"
 import { fabriquerApercu } from "./e2ee-apercus"
 import { entreeCacheDechiffree, typeDuMessage } from "./e2ee-entree-cache"
 import { cacheMessage } from "./indexeddb-cache"
@@ -48,6 +48,8 @@ export async function envoyerMediaChiffre(
      * visionneuse protégée, et toute copie qui en sort est signée.
      */
     sensible?: boolean
+    /** La protection d'un PDF sensible (26/10/2026) : mots de passe, impression. */
+    protection?: ProtectionPdf
   },
 ): Promise<{ id: string; createdAt: string; descripteur: DescripteurMedia }> {
   /*
@@ -92,6 +94,7 @@ export async function envoyerMediaChiffre(
     // Écrit seulement s'il est vrai : le format d'un document ordinaire ne
     // change pas (même règle que le mobile).
     ...(o.sensible ? { sensible: true } : {}),
+    ...(o.sensible && o.protection ? { protection: o.protection } : {}),
   }
 
   const legende = o.legende ?? ""

@@ -1,4 +1,5 @@
 import { formatAlanyaNumber } from "../lib/alanya-number"
+import type { ProtectionPdf } from "./e2ee-media"
 import { ecrireMetadonneesMp4, mp4PrisEnCharge, type ElementsMp4 } from "./mp4-metadonnees"
 
 /**
@@ -236,7 +237,20 @@ export async function signerCopie(
   mime: string,
   s: SignatureSortie,
   onProgression?: (fraction: number) => void,
+  /** Un PDF protégé par l'expéditeur (26/10/2026). Un échec LÈVE : rien ne sort sans elle. */
+  protection?: ProtectionPdf,
 ): Promise<CopieSignee> {
+  if (protection && natureSignature(mime, nom) === "pdf") {
+    const { signerPdf } = await import("./signature-pdf")
+    const octets = await signerPdf(
+      await source.arrayBuffer(),
+      texteBordsPdf(s),
+      metadonnees(s),
+      protection,
+      codeLisible(s.code),
+    )
+    return { fichier: new File([octets as Uint8Array<ArrayBuffer>], nom, { type: "application/pdf" }), signee: true }
+  }
   try {
     switch (natureSignature(mime, nom)) {
       case "pdf": {

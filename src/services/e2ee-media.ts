@@ -59,6 +59,57 @@ export interface DescripteurMedia {
    * transfère ni ne se partage. Absent : document ordinaire.
    */
   sensible?: boolean
+  /**
+   * La PROTECTION d'un PDF sensible (24/10/2026, posée par le mobile, et par
+   * le web depuis le 26/10/2026) : voir {@link ProtectionPdf}. Écrite
+   * seulement si elle existe — même règle que `sensible`.
+   */
+  protection?: ProtectionPdf
+}
+
+/**
+ * LA PROTECTION D'UN PDF SENSIBLE — jumelle de `ProtectionPdf`
+ * (`alanya/lib/services/e2ee/e2ee_media.dart`), même JSON.
+ *
+ * L'expéditeur la règle une fois, à l'envoi : impression permise ou non, et
+ * s'il le veut deux mots de passe — d'OUVERTURE (montré en clair à
+ * l'expéditeur, une seule fois au destinataire) et PROPRIÉTAIRE (lève les
+ * restrictions, montré à l'expéditeur seulement). Sans mot de passe mais sans
+ * impression, le propriétaire est tiré au hasard et personne ne le voit.
+ *
+ * 🔴 ELLE VOYAGE DANS L'ENVELOPPE CHIFFRÉE : le serveur ne voit pas les mots
+ * de passe. Elle s'applique à la COPIE qui sort d'Alanya.
+ */
+export interface ProtectionPdf {
+  imprimer: boolean
+  ouverture?: string
+  proprietaire: string
+}
+
+/** Un mot de passe propriétaire que personne ne saisit : 24 caractères sûrs. */
+export function proprietaireAuHasard(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+  const o = crypto.getRandomValues(new Uint8Array(24))
+  return Array.from(o, (x) => alphabet[x % alphabet.length]).join("")
+}
+
+function protectionValide(p: unknown): ProtectionPdf {
+  const v = p as Record<string, unknown> | null
+  if (
+    !v ||
+    typeof v !== "object" ||
+    typeof v.imprimer !== "boolean" ||
+    typeof v.proprietaire !== "string" ||
+    v.proprietaire === "" ||
+    (v.ouverture !== undefined && (typeof v.ouverture !== "string" || v.ouverture === ""))
+  ) {
+    throw new ChargeInvalide("protection mal formée")
+  }
+  return {
+    imprimer: v.imprimer,
+    proprietaire: v.proprietaire,
+    ...(typeof v.ouverture === "string" ? { ouverture: v.ouverture } : {}),
+  }
 }
 
 /** Ce que porte une enveloppe une fois ouverte. */
@@ -236,6 +287,9 @@ function descripteurValide(m: unknown): DescripteurMedia {
   if (base64EnOctets(d.cle as string).length !== 32) throw new ChargeInvalide("clé de média invalide")
   if (base64EnOctets(d.empreinte as string).length !== 32) {
     throw new ChargeInvalide("empreinte de média invalide")
+  }
+  if (d.protection !== undefined && d.protection !== null) {
+    return { ...(d as unknown as DescripteurMedia), protection: protectionValide(d.protection) }
   }
   return d as unknown as DescripteurMedia
 }

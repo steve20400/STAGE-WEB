@@ -6,6 +6,7 @@ import { FichierInvalide, urlApercu } from "../../../../src/services/e2ee-media"
 import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { formatBytes } from "../../../../src/services/messages-service"
 import { VisionneuseSensible } from "./visionneuse-sensible"
+import { InfosProtectionPdf } from "../../../../src/components/protection-pdf"
 import "./media-chiffre.css"
 
 /**
@@ -146,6 +147,9 @@ export function MediaChiffre({
             {etat === "chargement" && <span className="mc-doc-attente" aria-label={t("loading")} />}
           </span>
         </button>
+        {/* PDF protégé (26/10/2026) : mots de passe en clair chez l'expéditeur,
+            en vue unique chez le destinataire. */}
+        {d.protection && <InfosProtectionPdf protection={d.protection} mediaId={d.id} isMe={isMe} />}
         {clairSensible && (
           <VisionneuseSensible d={d} clair={clairSensible} isMe={isMe} onFermer={() => setClairSensible(null)} />
         )}

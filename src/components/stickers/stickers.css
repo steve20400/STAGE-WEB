@@ -402,3 +402,63 @@
   width: 22px;
   height: 22px;
 }
+
+/* ── PDF sensible protégé (26/10/2026, protection-pdf.tsx) ── */
+.ppdf {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 16px 16px;
+  overflow-y: auto;
+}
+.ppdf-bascule {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+.ppdf-bascule input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+.ppdf-bascule small,
+.ppdf-champ small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.ppdf-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.ppdf-champ input {
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+.ppdf-erreur {
+  color: #d64545;
+  font-size: 12px;
+  font-style: normal;
+}
+.ppdf-infos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.ppdf-infos code,
+.ppdf-revele {
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+}
+.ppdf-revele {
+  font-size: 22px;
+  user-select: all;
+}

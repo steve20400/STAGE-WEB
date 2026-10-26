@@ -129,7 +129,8 @@ import { MediaChiffre, MediaChiffreIndisponible, TuileChiffree } from "./media-c
 import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { envoyerMediaChiffre } from "../../../../src/services/e2ee-media-envoi"
 import { televerser, type Reprise } from "../../../../src/services/envoi-morceaux"
-import { urlApercu } from "../../../../src/services/e2ee-media"
+import { urlApercu, type ProtectionPdf } from "../../../../src/services/e2ee-media"
+import { DialogueProtectionPdf, type ChoixProtectionPdf } from "../../../../src/components/protection-pdf"
 import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
 import { BulleSticker } from "../../../../src/components/stickers/bulle-sticker"
 import {
@@ -2372,6 +2373,8 @@ interface PendingMedia {
    * destinataire l'ouvre dans la visionneuse protégée. Fils chiffrés seulement.
    */
   sensible?: boolean
+  /** La protection d'un PDF sensible, réglée à l'envoi (26/10/2026). */
+  protection?: ProtectionPdf
 }
 
 /**
@@ -5467,6 +5470,9 @@ function MessageBubble({
   )
 }
 
+/** Un PDF, à son type ou à son extension (certains navigateurs n'annoncent pas le type). */
+const estPdf = (f: File) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")
+
 export default function ChatRoomPage() {
   const params = useParams()
   const navigate = useNavigate()
@@ -5623,6 +5629,11 @@ export default function ChatRoomPage() {
   const [showAttach, setShowAttach] = useState(false)
   /** Le sélecteur d'emojis, au-dessus du champ. */
   const [emojisOuverts, setEmojisOuverts] = useState(false)
+  /** Le dialogue des permissions d'un PDF sensible, en attente de réponse (26/10/2026). */
+  const [demandeProtection, setDemandeProtection] = useState<{
+    nombre: number
+    resoudre: (c: ChoixProtectionPdf | null) => void
+  } | null>(null)
   /** La barre de mise en forme (B, I, S, U, manuscrit), comme le « A » du mobile. */
   const [barreFormatOuverte, setBarreFormatOuverte] = useState(false)
   /** Fenetre de choix du contact a envoyer (repertoire ou numero compose). */
@@ -7359,7 +7370,9 @@ export default function ChatRoomPage() {
        */
       preparation?: Promise<File>,
       /** Document SENSIBLE : marqué dans l'enveloppe chiffrée (24/10/2026). */
-      sensible = false
+      sensible = false,
+      /** La protection d'un PDF sensible (26/10/2026). */
+      protection?: ProtectionPdf
     ) => {
       const tempId = `tmp-${Date.now()}-${(tempSeqRef.current += 1)}`
       const localUrl = URL.createObjectURL(file)
@@ -7443,6 +7456,7 @@ export default function ChatRoomPage() {
             replyToId: replyTo?.id,
             onProgression: progression,
             sensible,
+            protection,
           })
           setReplyTo(null)
           setMessages((prev) => {
@@ -7671,7 +7685,22 @@ export default function ChatRoomPage() {
       )
       if (!ordinaire) return
     }
-    await preparerFichiers(choisis, new Set(choisis.filter((f) => !signees.includes(f))))
+    const sensibles = new Set(choisis.filter((f) => !signees.includes(f)))
+    /*
+     * 🔴 LES PERMISSIONS D'UN PDF SENSIBLE (26/10/2026, comme le mobile) :
+     * l'expéditeur les règle UNE FOIS pour tous les PDF sensibles de l'envoi
+     * — impression, mot de passe d'ouverture et propriétaire. Annuler annule
+     * l'envoi.
+     */
+    const nbPdf = [...sensibles].filter(estPdf).length
+    let protection: ProtectionPdf | null = null
+    if (nbPdf > 0) {
+      const choix = await new Promise<ChoixProtectionPdf | null>((resoudre) => setDemandeProtection({ nombre: nbPdf, resoudre }))
+      setDemandeProtection(null)
+      if (!choix) return
+      protection = choix.protection
+    }
+    await preparerFichiers(choisis, sensibles, protection)
   }
 
   /**
@@ -7681,7 +7710,7 @@ export default function ChatRoomPage() {
    * `sensibles` : ceux qui partent en document SENSIBLE (24/10/2026) — tels
    * quels, sans compression.
    */
-  const preparerFichiers = async (toSend: File[], sensibles?: Set<File>) => {
+  const preparerFichiers = async (toSend: File[], sensibles?: Set<File>, protection?: ProtectionPdf | null) => {
     /*
      * 🔴 UNE VIDÉO TROP LOURDE PASSE SI ELLE SERA COMPRESSÉE (06/10/2026).
      * La limite du serveur porte sur ce qui PART : une vidéo de 70 Mo en
@@ -7737,6 +7766,7 @@ export default function ChatRoomPage() {
       const suivi = kind === "video" && videoCompressible() && !sensible ? creerSuivi() : undefined
       prepared.push({
         sensible,
+        ...(sensible && protection && estPdf(file) ? { protection } : {}),
         file,
         url: URL.createObjectURL(file),
         kind,
@@ -7860,7 +7890,8 @@ export default function ChatRoomPage() {
           item.durationMs,
           item.caption.trim(),
           preparation,
-          item.sensible
+          item.sensible,
+          item.protection
         )
       }
     })()
@@ -8339,6 +8370,13 @@ export default function ChatRoomPage() {
 
   return (
     <div className={`room-root ${infoPanelOpen ? "info-panel-open" : ""}`}>
+      {demandeProtection && (
+        <DialogueProtectionPdf
+          nombre={demandeProtection.nombre}
+          onValider={(c) => demandeProtection.resoudre(c)}
+          onAnnuler={() => demandeProtection.resoudre(null)}
+        />
+      )}
       <div className="room-top">
         <button className="back-btn" onClick={() => navigate("/chats")} aria-label={t("back")}>
           <svg
