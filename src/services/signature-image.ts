@@ -48,7 +48,9 @@ export async function signerImage(
     toile.toBlob((b) => (b ? ok(b) : ko(new Error("Encodage impossible"))), png ? "image/png" : "image/jpeg", 0.92),
   )
   const octets = new Uint8Array(await brut.arrayBuffer())
-  const signe = png ? avecTextesPng(octets, texte, meta) : avecExif(octets, texte, meta)
+  // Les quatre lignes des bords, sur une seule ligne de description.
+  const description = texte.replace(/\n/g, " · ")
+  const signe = png ? avecTextesPng(octets, description, meta) : avecExif(octets, description, meta)
   return {
     blob: new Blob([signe], { type: png ? "image/png" : "image/jpeg" }),
     mime: png ? "image/png" : "image/jpeg",
@@ -71,16 +73,26 @@ export function peindreBords(
   h: number,
   texte: string,
 ): void {
-  const base = Math.max(12, Math.min(l, h) / 50)
+  // 🔴 UN CHAMP PAR BORD (25/10/2026) : quatre lignes séparées par « \n » —
+  // haut, bas, gauche, droite (`bordsVisuels`). Une seule ligne est répétée.
+  const lignes = texte.split("\n")
+  const [haut, bas, gauche, droite] = lignes.length === 4 ? lignes : [texte, texte, texte, texte]
+  // 16 px au moins (25/10/2026, demande du patron), davantage sur une grande
+  // image : la ligne reste lisible une fois l'image réduite par WhatsApp.
+  const base = Math.max(16, Math.min(l, h) / 50)
   const marge = base * 0.6
   // La bande du texte perpendiculaire : sa marge, plus sa hauteur de ligne.
   const coin = marge + base * 1.3
   const police = (t: number) => `bold ${t}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`
-  ctx.font = police(base)
-  const unite = ctx.measureText(texte).width / base
-  const taillePour = (longueur: number) => Math.min(base, (longueur - 2 * coin) / unite)
+  // Réduite seulement si la ligne ne tient pas sur son bord.
+  const taillePour = (ligne: string, longueur: number) => {
+    ctx.font = police(base)
+    const unite = ctx.measureText(ligne).width / base
+    return unite > 0 ? Math.min(base, (longueur - 2 * coin) / unite) : base
+  }
 
-  const bord = (cx: number, cy: number, angle: number, t: number) => {
+  const bord = (ligne: string, cx: number, cy: number, angle: number, t: number) => {
+    if (!ligne.trim()) return
     ctx.save()
     ctx.translate(cx, cy)
     ctx.rotate(angle)
@@ -88,21 +100,25 @@ export function peindreBords(
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
     ctx.lineJoin = "round"
-    ctx.lineWidth = t * 0.18
-    ctx.strokeStyle = "rgba(255,255,255,0.78)"
-    ctx.strokeText(texte, 0, 0)
-    ctx.fillStyle = "rgba(229,57,53,0.88)"
-    ctx.fillText(texte, 0, 0)
+    // 🔴 BLANC CERNÉ DE NOIR (25/10/2026) : le rouge sur blanc devenait
+    // illisible quand WhatsApp recompressait la photo ou la vidéo.
+    ctx.lineWidth = t * 0.22
+    ctx.strokeStyle = "rgba(0,0,0,0.9)"
+    ctx.strokeText(ligne, 0, 0)
+    ctx.fillStyle = "rgba(255,255,255,0.94)"
+    ctx.fillText(ligne, 0, 0)
     ctx.restore()
   }
 
-  const tH = taillePour(l)
-  const tV = taillePour(h)
-  bord(l / 2, marge + tH * 0.6, 0, tH)
-  bord(l / 2, h - marge - tH * 0.6, 0, tH)
+  const tHaut = taillePour(haut, l)
+  const tBas = taillePour(bas, l)
+  const tGauche = taillePour(gauche, h)
+  const tDroite = taillePour(droite, h)
+  bord(haut, l / 2, marge + tHaut * 0.6, 0, tHaut)
+  bord(bas, l / 2, h - marge - tBas * 0.6, 0, tBas)
   // Gauche : lu de bas en haut. Droite : lu de haut en bas.
-  bord(marge + tV * 0.6, h / 2, -Math.PI / 2, tV)
-  bord(l - marge - tV * 0.6, h / 2, Math.PI / 2, tV)
+  bord(gauche, marge + tGauche * 0.6, h / 2, -Math.PI / 2, tGauche)
+  bord(droite, l - marge - tDroite * 0.6, h / 2, Math.PI / 2, tDroite)
 }
 
 const utf8 = new TextEncoder()

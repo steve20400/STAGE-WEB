@@ -112,7 +112,31 @@ export function dateIso(d: Date): string {
   )
 }
 
-/** Le texte écrit aux quatre bords. */
+/** L'Alanya ID tel que l'écrit le filigrane : « AW 3333 3333 ». */
+export function alanyaIdAw(s: SignatureSortie): string {
+  const d = s.alanyaId.replace(/\D/g, "")
+  return d.length === 8 ? `AW ${d.slice(0, 4)} ${d.slice(4)}` : `AW ${d}`
+}
+
+/**
+ * PHOTOS ET VIDÉOS : UN CHAMP PAR BORD (25/10/2026, recommandation retenue
+ * par le patron) — haut, bas, gauche, droite, séparés par « \n » :
+ * l'application et l'Alanya ID, la date, l'appareil, l'empreinte. Écrits en
+ * blanc cerné de noir, 16 px au moins (`peindreBords`). Jumeau du mobile.
+ */
+export function bordsVisuels(s: SignatureSortie): string {
+  return [`${APPLICATION} · ${alanyaIdAw(s)}`, dateLisible(s.quand), s.appareil, codeLisible(s.code)].join("\n")
+}
+
+/**
+ * PDF : l'EMPREINTE NUMÉRIQUE à la place de l'Alanya ID (25/10/2026, demande
+ * du patron). L'Alanya ID reste dans les métadonnées.
+ */
+export function texteBordsPdf(s: SignatureSortie): string {
+  return [APPLICATION, codeLisible(s.code), s.appareil, dateLisible(s.quand)].join(" · ")
+}
+
+/** La chaîne complète (commentaire d'une vidéo, ancien filigrane). */
 export function texteBords(s: SignatureSortie): string {
   return [APPLICATION, `Alanya ${s.alanyaId}`, s.appareil, dateLisible(s.quand), codeLisible(s.code)].join(" · ")
 }
@@ -147,21 +171,35 @@ export function metadonnees(s: SignatureSortie): Record<string, string> {
   }
 }
 
+/**
+ * 🐛 LES MÉTADONNÉES D'UNE VIDÉO SEMBLAIENT INCOMPLÈTES (user, 25/10/2026) :
+ * les huit champs n'étaient que dans des éléments libres (`----`), que
+ * l'Explorateur de Windows n'affiche pas. Ils vont aussi, en toutes lettres,
+ * dans le COMMENTAIRE (`©cmt`) — comme le commentaire EXIF d'une image — ;
+ * titre, description et copyright suivent. Jumeau du mobile.
+ */
 export function elementsMp4(s: SignatureSortie): ElementsMp4 {
+  const meta = metadonnees(s)
   return {
     standard: {
+      "©nam": texteBords(s),
+      desc: texteBords(s),
       "©too": APPLICATION,
       "©ART": `Alanya ${s.alanyaId}`,
-      "©cmt": texteBords(s),
+      "©cmt": Object.entries(meta)
+        .map(([k, v]) => `${k}=${v}`)
+        .join("; "),
       "©day": dateIso(s.quand),
+      cprt: APPLICATION,
     },
-    libres: metadonnees(s),
+    libres: meta,
   }
 }
 
-export type NatureSignature = "pdf" | "image" | "video" | "aucune"
+export type NatureSignature = "pdf" | "image" | "video" | "audio" | "aucune"
 
 const IMAGES_SIGNABLES = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "bmp"])
+const AUDIOS = new Set(["mp3", "m4a", "aac", "wav", "ogg", "oga", "opus", "flac", "amr", "3ga", "weba"])
 
 export function natureSignature(mime: string, nom: string): NatureSignature {
   const m = mime.toLowerCase()
@@ -169,6 +207,8 @@ export function natureSignature(mime: string, nom: string): NatureSignature {
   if (m === "application/pdf" || ext === "pdf") return "pdf"
   // Un GIF animé perdrait son animation, un SVG n'est pas une image en points.
   if (IMAGES_SIGNABLES.has(ext) || (m.startsWith("image/") && m !== "image/gif" && !m.includes("svg"))) return "image"
+  // L'audio AVANT la vidéo : un M4A est un MP4, il ne doit pas être réencodé.
+  if (m.startsWith("audio/") || AUDIOS.has(ext)) return "audio"
   if (mp4PrisEnCharge(m, nom) || m.startsWith("video/") || VIDEOS_AUTRES.has(ext)) return "video"
   return "aucune"
 }
@@ -201,13 +241,13 @@ export async function signerCopie(
     switch (natureSignature(mime, nom)) {
       case "pdf": {
         const { signerPdf } = await import("./signature-pdf")
-        const octets = await signerPdf(await source.arrayBuffer(), texteBords(s), metadonnees(s))
+        const octets = await signerPdf(await source.arrayBuffer(), texteBordsPdf(s), metadonnees(s))
         // pdf-lib rend un Uint8Array sur un ArrayBuffer ordinaire.
         return { fichier: new File([octets as Uint8Array<ArrayBuffer>], nom, { type: "application/pdf" }), signee: true }
       }
       case "image": {
         const { signerImage } = await import("./signature-image")
-        const r = await signerImage(source, mime, texteBords(s), metadonnees(s))
+        const r = await signerImage(source, mime, bordsVisuels(s), metadonnees(s))
         const base = nom.includes(".") ? nom.slice(0, nom.lastIndexOf(".")) : nom
         const ext = nom.includes(".") ? nom.slice(nom.lastIndexOf(".") + 1).toLowerCase() : ""
         const garde = ext === r.extension || (r.extension === "jpg" && ext === "jpeg")
@@ -220,7 +260,7 @@ export async function signerCopie(
          * La vidéo est réencodée ici ; un MP4 reçoit en plus les huit champs.
          */
         const { signerVideoIncrustee } = await import("./signature-video")
-        const v = await signerVideoIncrustee(source, texteBords(s), metadonnees(s), onProgression)
+        const v = await signerVideoIncrustee(source, bordsVisuels(s), metadonnees(s), onProgression)
         if (v) {
           const blob = v.extension === "mp4" ? await ecrireMetadonneesMp4(v.blob, elementsMp4(s)) : v.blob
           const base = nom.includes(".") ? nom.slice(0, nom.lastIndexOf(".")) : nom
@@ -230,6 +270,13 @@ export async function signerCopie(
         // au moins ses métadonnées ; un autre conteneur sort tel quel.
         if (!mp4PrisEnCharge(mime, nom)) break
         const blob = await ecrireMetadonneesMp4(source, elementsMp4(s))
+        return { fichier: new File([blob], nom, { type: mime }), signee: true }
+      }
+      case "audio": {
+        // L'empreinte SEULE (25/10/2026, demande du patron).
+        const { signerAudio } = await import("./signature-audio")
+        const blob = await signerAudio(source, s.code)
+        if (!blob) break
         return { fichier: new File([blob], nom, { type: mime }), signee: true }
       }
       case "aucune":

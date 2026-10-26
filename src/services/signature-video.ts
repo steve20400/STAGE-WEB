@@ -110,7 +110,7 @@ export async function signerVideoIncrustee(
       // Les métadonnées, dans les deux conteneurs : le texte des bords en
       // commentaire, et les huit champs sous leurs noms courts.
       tags: {
-        comment: texte,
+        comment: texte.replace(/\n/g, " · "),
         artist: meta["Alanya ID"] ? `Alanya ${meta["Alanya ID"]}` : undefined,
         description: Object.entries(meta)
           .map(([k, v]) => `${k}=${v}`)
