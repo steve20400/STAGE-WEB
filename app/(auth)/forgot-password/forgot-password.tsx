@@ -10,6 +10,7 @@ import {
   reinitialiserParEmail,
   verifierCodeRecuperation,
 } from "../../../src/services/auth-api"
+import { ApiError } from "../../../src/lib/api-client"
 
 /**
  * 🔴 CETTE PAGE N'APPELAIT AUCUNE API — c'était une maquette.
@@ -109,7 +110,7 @@ export default function ForgotPasswordPage() {
       } else if (!codeEnvoye) {
         await demanderCodeReinitialisation(email)
         setCodeEnvoye(true)
-        setSucces(t("auth_recover_next", { identifiant: email.trim() }))
+        setSucces(t("auth_reset_code_envoye", { identifiant: email.trim() }))
         return
       } else {
         await reinitialiserParEmail(email, code, motDePasse)
@@ -120,7 +121,12 @@ export default function ForgotPasswordPage() {
       setSucces(t("auth_password_reset_done"))
       setTimeout(() => navigate("/login"), 1200)
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : t("auth_verify_unexpected"))
+      // 26/10/2026 : le serveur dit enfin quand aucun compte n'a cette adresse.
+      if (e instanceof ApiError && (e.payload as { error?: { code?: string } } | undefined)?.error?.code === "EMAIL_INCONNU") {
+        setErreur(t("auth_email_inconnu"))
+      } else {
+        setErreur(e instanceof Error ? e.message : t("auth_verify_unexpected"))
+      }
     } finally {
       setEnCours(false)
     }

@@ -862,6 +862,8 @@ export const WEB_TRANSLATION_KEYS = [
   "auth_recover_explain",
   "auth_account_found",
   "auth_recover_next",
+  "auth_reset_code_envoye",
+  "auth_email_inconnu",
   "auth_email_or_phone",
   "auth_check_account",
   "auth_back_to_login",
@@ -3249,6 +3251,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "Contact : {name}",
     l2_contacts_shared: "Contacts : {name} +{count}",
     pc_load_failed: "Impossible de charger vos contacts.",
+    auth_reset_code_envoye: "Un code a été envoyé à {identifiant}. Saisissez-le ci-dessous avec votre nouveau mot de passe.",
+    auth_email_inconnu: "Aucun compte n'est associé à cet email.",
   },
   en: {
     e2ee_bouton: "End-to-end encryption",
@@ -4865,6 +4869,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "Contact: {name}",
     l2_contacts_shared: "Contacts: {name} +{count}",
     pc_load_failed: "Your contacts could not be loaded.",
+    auth_reset_code_envoye: "A code has been sent to {identifiant}. Enter it below with your new password.",
+    auth_email_inconnu: "No account is linked to this email.",
   },
   es: {
     e2ee_bouton: "Cifrado de extremo a extremo",
@@ -6481,6 +6487,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "Contacto: {name}",
     l2_contacts_shared: "Contactos: {name} +{count}",
     pc_load_failed: "No se han podido cargar tus contactos.",
+    auth_reset_code_envoye: "Se ha enviado un código a {identifiant}. Escríbelo abajo con tu nueva contraseña.",
+    auth_email_inconnu: "Ninguna cuenta está asociada a este correo.",
   },
   de: {
     e2ee_bouton: "Ende-zu-Ende-Verschlüsselung",
@@ -8110,6 +8118,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "Kontakt: {name}",
     l2_contacts_shared: "Kontakte: {name} +{count}",
     pc_load_failed: "Deine Kontakte konnten nicht geladen werden.",
+    auth_reset_code_envoye: "Ein Code wurde an {identifiant} gesendet. Gib ihn unten mit deinem neuen Passwort ein.",
+    auth_email_inconnu: "Mit dieser E-Mail ist kein Konto verknüpft.",
   },
   pt: {
     e2ee_bouton: "Cifragem de ponta a ponta",
@@ -9726,6 +9736,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "Contacto: {name}",
     l2_contacts_shared: "Contactos: {name} +{count}",
     pc_load_failed: "Não foi possível carregar os seus contactos.",
+    auth_reset_code_envoye: "Foi enviado um código para {identifiant}. Digite-o abaixo com a sua nova senha.",
+    auth_email_inconnu: "Nenhuma conta está associada a este email.",
   },
   ru: {
     e2ee_bouton: "Сквозное шифрование",
@@ -11335,6 +11347,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "Контакт: {name}",
     l2_contacts_shared: "Контакты: {name} +{count}",
     pc_load_failed: "Не удалось загрузить ваши контакты.",
+    auth_reset_code_envoye: "Код отправлен на {identifiant}. Введите его ниже вместе с новым паролем.",
+    auth_email_inconnu: "С этим адресом не связан ни один аккаунт.",
   },
   zh: {
     e2ee_bouton: "端到端加密",
@@ -12902,6 +12916,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "联系人：{name}",
     l2_contacts_shared: "联系人：{name} +{count}",
     pc_load_failed: "无法加载您的联系人。",
+    auth_reset_code_envoye: "验证码已发送至 {identifiant}。请在下方输入验证码和新密码。",
+    auth_email_inconnu: "没有与该邮箱关联的账户。",
   },
   sv: {
     e2ee_bouton: "Totalsträckskryptering",
@@ -14513,6 +14529,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "Kontakt: {name}",
     l2_contacts_shared: "Kontakter: {name} +{count}",
     pc_load_failed: "Dina kontakter kunde inte laddas.",
+    auth_reset_code_envoye: "En kod har skickats till {identifiant}. Ange den nedan med ditt nya lösenord.",
+    auth_email_inconnu: "Inget konto är kopplat till denna e-post.",
   },
   no: {
     e2ee_bouton: "Ende-til-ende-kryptering",
@@ -16125,5 +16143,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     l2_contact_shared: "Kontakt: {name}",
     l2_contacts_shared: "Kontakter: {name} +{count}",
     pc_load_failed: "Kunne ikke laste kontaktene dine.",
+    auth_reset_code_envoye: "En kode er sendt til {identifiant}. Skriv den inn nedenfor med det nye passordet.",
+    auth_email_inconnu: "Ingen konto er knyttet til denne e-posten.",
   },
 }
