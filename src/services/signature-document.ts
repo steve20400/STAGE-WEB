@@ -113,10 +113,14 @@ export function dateIso(d: Date): string {
   )
 }
 
-/** L'Alanya ID tel que l'écrit le filigrane : « AW 3333 3333 ». */
+/**
+ * L'Alanya ID tel que l'écrit le filigrane : « AW 67 64 15 99 ». Par
+ * `formatAlanyaNumber`, comme partout ailleurs (27/10/2026, user) : le
+ * découpage écrit ici à la main (« 6764 1599 ») ne ressemblait à aucun
+ * Alanya ID affiché dans l'application.
+ */
 export function alanyaIdAw(s: SignatureSortie): string {
-  const d = s.alanyaId.replace(/\D/g, "")
-  return d.length === 8 ? `AW ${d.slice(0, 4)} ${d.slice(4)}` : `AW ${d}`
+  return `AW ${formatAlanyaNumber(s.alanyaId)}`
 }
 
 /**
