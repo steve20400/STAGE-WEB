@@ -35,6 +35,7 @@ import {
 } from "../../../src/services/message-payload"
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { estChiffree } from "../../../src/services/e2ee-fil"
+import { composerMessageSysteme } from "../../../src/i18n/messages-systeme"
 import "./chats-page.css"
 
 // Helper hors composant : la langue est relue a chaque appel, donc a chaque
@@ -127,6 +128,17 @@ function apercuDernierMessage(conv: ConversationMock): string {
       conv.lastMessageType === "contact" ? "f2_contact" : "thr_gps_position"
     )
   }
+
+  /*
+   * 🐛 « [Fichier] {"code":"e2ee_active","actor":"D… » (user, 27/10/2026). Un
+   * avis SYSTÈME (membre ajouté, chiffrement activé…) est rangé en JSON avec le
+   * type 2 — celui d'un fichier. Il se compose ici comme dans la discussion,
+   * dans la langue de l'utilisateur et sans le préfixe « [Fichier] ».
+   */
+  const systeme = composerMessageSysteme(conv.lastMessage, getMyUserId(), (k) =>
+    traduire(langue, k)
+  )
+  if (systeme !== conv.lastMessage) return systeme
 
   return `${lastMsgIcon(conv.lastMessageType)}${conv.lastMessage}`
 }
