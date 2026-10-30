@@ -39,6 +39,9 @@ export const WEB_TRANSLATION_KEYS = [
   "maintenance_titre",
   "maintenance_texte",
   "maintenance_reessayer",
+  "priv_calls_contacts_only",
+  "priv_calls_contacts_only_sub",
+  "call_err_contacts_only",
   // Le PDF sensible protégé (26/10/2026) — mêmes textes que le mobile.
   "pdfp_titre",
   "pdfp_intro",
@@ -3253,6 +3256,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Impossible de charger vos contacts.",
     auth_reset_code_envoye: "Un code a été envoyé à {identifiant}. Saisissez-le ci-dessous avec votre nouveau mot de passe.",
     auth_email_inconnu: "Aucun compte n'est associé à cet email.",
+    priv_calls_contacts_only: "Contacts préférés uniquement",
+    priv_calls_contacts_only_sub: "Seuls vos contacts enregistrés peuvent vous appeler",
+    call_err_contacts_only: "Ce correspondant n'accepte que les appels de ses contacts.",
   },
   en: {
     e2ee_bouton: "End-to-end encryption",
@@ -4871,6 +4877,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Your contacts could not be loaded.",
     auth_reset_code_envoye: "A code has been sent to {identifiant}. Enter it below with your new password.",
     auth_email_inconnu: "No account is linked to this email.",
+    priv_calls_contacts_only: "Saved contacts only",
+    priv_calls_contacts_only_sub: "Only your saved contacts can call you",
+    call_err_contacts_only: "This person only accepts calls from their contacts.",
   },
   es: {
     e2ee_bouton: "Cifrado de extremo a extremo",
@@ -6489,6 +6498,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "No se han podido cargar tus contactos.",
     auth_reset_code_envoye: "Se ha enviado un código a {identifiant}. Escríbelo abajo con tu nueva contraseña.",
     auth_email_inconnu: "Ninguna cuenta está asociada a este correo.",
+    priv_calls_contacts_only: "Solo contactos guardados",
+    priv_calls_contacts_only_sub: "Solo tus contactos guardados pueden llamarte",
+    call_err_contacts_only: "Esta persona solo acepta llamadas de sus contactos.",
   },
   de: {
     e2ee_bouton: "Ende-zu-Ende-Verschlüsselung",
@@ -8120,6 +8132,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Deine Kontakte konnten nicht geladen werden.",
     auth_reset_code_envoye: "Ein Code wurde an {identifiant} gesendet. Gib ihn unten mit deinem neuen Passwort ein.",
     auth_email_inconnu: "Mit dieser E-Mail ist kein Konto verknüpft.",
+    priv_calls_contacts_only: "Nur gespeicherte Kontakte",
+    priv_calls_contacts_only_sub: "Nur deine gespeicherten Kontakte können dich anrufen",
+    call_err_contacts_only: "Diese Person nimmt nur Anrufe ihrer Kontakte an.",
   },
   pt: {
     e2ee_bouton: "Cifragem de ponta a ponta",
@@ -9738,6 +9753,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Não foi possível carregar os seus contactos.",
     auth_reset_code_envoye: "Foi enviado um código para {identifiant}. Digite-o abaixo com a sua nova senha.",
     auth_email_inconnu: "Nenhuma conta está associada a este email.",
+    priv_calls_contacts_only: "Apenas contatos salvos",
+    priv_calls_contacts_only_sub: "Apenas seus contatos salvos podem ligar para você",
+    call_err_contacts_only: "Esta pessoa só aceita chamadas dos seus contatos.",
   },
   ru: {
     e2ee_bouton: "Сквозное шифрование",
@@ -11349,6 +11367,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Не удалось загрузить ваши контакты.",
     auth_reset_code_envoye: "Код отправлен на {identifiant}. Введите его ниже вместе с новым паролем.",
     auth_email_inconnu: "С этим адресом не связан ни один аккаунт.",
+    priv_calls_contacts_only: "Только сохранённые контакты",
+    priv_calls_contacts_only_sub: "Звонить вам могут только сохранённые контакты",
+    call_err_contacts_only: "Этот человек принимает звонки только от своих контактов.",
   },
   zh: {
     e2ee_bouton: "端到端加密",
@@ -12918,6 +12939,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "无法加载您的联系人。",
     auth_reset_code_envoye: "验证码已发送至 {identifiant}。请在下方输入验证码和新密码。",
     auth_email_inconnu: "没有与该邮箱关联的账户。",
+    priv_calls_contacts_only: "仅限已保存的联系人",
+    priv_calls_contacts_only_sub: "只有已保存的联系人可以给你打电话",
+    call_err_contacts_only: "对方只接受其联系人的来电。",
   },
   sv: {
     e2ee_bouton: "Totalsträckskryptering",
@@ -14531,6 +14555,9 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Dina kontakter kunde inte laddas.",
     auth_reset_code_envoye: "En kod har skickats till {identifiant}. Ange den nedan med ditt nya lösenord.",
     auth_email_inconnu: "Inget konto är kopplat till denna e-post.",
+    priv_calls_contacts_only: "Endast sparade kontakter",
+    priv_calls_contacts_only_sub: "Bara dina sparade kontakter kan ringa dig",
+    call_err_contacts_only: "Den här personen tar bara emot samtal från sina kontakter.",
   },
   no: {
     e2ee_bouton: "Ende-til-ende-kryptering",
@@ -16145,5 +16172,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     pc_load_failed: "Kunne ikke laste kontaktene dine.",
     auth_reset_code_envoye: "En kode er sendt til {identifiant}. Skriv den inn nedenfor med det nye passordet.",
     auth_email_inconnu: "Ingen konto er knyttet til denne e-posten.",
+    priv_calls_contacts_only: "Bare lagrede kontakter",
+    priv_calls_contacts_only_sub: "Bare de lagrede kontaktene dine kan ringe deg",
+    call_err_contacts_only: "Denne personen tar bare imot anrop fra kontaktene sine.",
   },
 }

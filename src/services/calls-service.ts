@@ -1,4 +1,5 @@
-import { apiRequest } from "../lib/api-client"
+import { ApiError, apiRequest } from "../lib/api-client"
+import { langueInitiale, traduire } from "../i18n"
 import { cacheCallLog, loadCachedCallLogs } from "./indexeddb-cache"
 import { createPrivateChat } from "./chats-service"
 import { loadContacts } from "../data/contacts"
@@ -270,10 +271,23 @@ export interface StartedCall {
 
 /** POST /api/calls — cree l'appel (statut RINGING) dans une conversation existante. */
 export async function startCallRest(convId: string, type: CallType): Promise<StartedCall> {
-  return apiRequest<StartedCall>("/api/calls", {
-    method: "POST",
-    body: { convId, type: type === "video" ? "VIDEO" : "AUDIO" },
-  })
+  try {
+    return await apiRequest<StartedCall>("/api/calls", {
+      method: "POST",
+      body: { convId, type: type === "video" ? "VIDEO" : "AUDIO" },
+    })
+  } catch (e) {
+    // « Contacts préférés uniquement » chez l'appelé (29/10/2026) : le motif
+    // dans la langue de l'utilisateur, et non la phrase française du serveur.
+    const code =
+      e instanceof ApiError
+        ? (e.payload as { error?: { code?: string } } | undefined)?.error?.code
+        : undefined
+    if (code === "APPEL_CONTACTS_SEULEMENT") {
+      throw new Error(traduire(langueInitiale(), "call_err_contacts_only"))
+    }
+    throw e
+  }
 }
 
 /** Demarre un appel direct vers un numero Alanya (cree/retrouve la conversation d'abord). */

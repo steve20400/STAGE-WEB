@@ -41,6 +41,8 @@ export interface PrivacySettings {
    * défait pas. Les conversations déjà chiffrées le restent, et l'écran le dit.
    */
   chiffrementActif: boolean
+  /** « Contacts préférés uniquement » (29/10/2026) : seuls mes contacts m'appellent. */
+  appelsContactsSeulement: boolean
 }
 
 /** Valeurs par defaut du backend : lecture confirmee, presence publique. */
@@ -50,6 +52,7 @@ export const PRIVACY_DEFAULTS: PrivacySettings = {
   // ⚠️ CHIFFRÉ PAR DÉFAUT, ici comme sur le serveur : un serveur plus ancien
   // qui ne rend pas ce champ doit laisser le client protéger, pas se taire.
   chiffrementActif: true,
+  appelsContactsSeulement: false,
 }
 
 function toVisibility(value: unknown): LastSeenVisibility {
@@ -62,6 +65,7 @@ export async function fetchPrivacy(): Promise<PrivacySettings> {
     readReceipts?: number
     lastSeenVisibility?: number
     chiffrementActif?: boolean
+    appelsContactsSeulement?: boolean
   }>("/api/account/privacy")
   return {
     readReceipts: (data.readReceipts ?? 1) !== 0,
@@ -69,6 +73,7 @@ export async function fetchPrivacy(): Promise<PrivacySettings> {
       data.lastSeenVisibility ?? PRIVACY_DEFAULTS.lastSeenVisibility
     ),
     chiffrementActif: data.chiffrementActif ?? PRIVACY_DEFAULTS.chiffrementActif,
+    appelsContactsSeulement: data.appelsContactsSeulement === true,
   }
 }
 
@@ -83,6 +88,9 @@ export async function savePrivacy(patch: Partial<PrivacySettings>): Promise<void
   if (patch.readReceipts !== undefined) body.readReceipts = patch.readReceipts ? 1 : 0
   if (patch.lastSeenVisibility !== undefined) body.lastSeenVisibility = patch.lastSeenVisibility
   if (patch.chiffrementActif !== undefined) body.chiffrementActif = patch.chiffrementActif
+  if (patch.appelsContactsSeulement !== undefined) {
+    body.appelsContactsSeulement = patch.appelsContactsSeulement
+  }
   if (Object.keys(body).length === 0) return
   await apiRequest<void>("/api/account/privacy", { method: "POST", body })
 }

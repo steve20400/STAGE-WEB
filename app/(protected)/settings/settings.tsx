@@ -3975,6 +3975,14 @@ export default function SettingsPage() {
                   description={t("read_receipts_sub")}
                 />
 
+                {/* Demande du user (29/10/2026) : seuls mes contacts m'appellent. */}
+                <Toggle
+                  value={privacy.appelsContactsSeulement}
+                  onChange={(v) => void updatePrivacy({ appelsContactsSeulement: v })}
+                  label={t("priv_calls_contacts_only")}
+                  description={t("priv_calls_contacts_only_sub")}
+                />
+
                 <div className="privacy-choice">
                   <div className="privacy-choice-head">
                     <div className="privacy-choice-label">{t("last_seen")}</div>
