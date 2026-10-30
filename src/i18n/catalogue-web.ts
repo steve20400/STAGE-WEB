@@ -39,6 +39,7 @@ export const WEB_TRANSLATION_KEYS = [
   "maintenance_titre",
   "maintenance_texte",
   "maintenance_reessayer",
+  "system_capture_ecran",
   "priv_calls_contacts_only",
   "priv_calls_contacts_only_sub",
   "call_err_contacts_only",
@@ -3259,6 +3260,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "Contacts préférés uniquement",
     priv_calls_contacts_only_sub: "Seuls vos contacts enregistrés peuvent vous appeler",
     call_err_contacts_only: "Ce correspondant n'accepte que les appels de ses contacts.",
+    system_capture_ecran: "{actor} a fait une capture d'écran",
   },
   en: {
     e2ee_bouton: "End-to-end encryption",
@@ -4880,6 +4882,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "Saved contacts only",
     priv_calls_contacts_only_sub: "Only your saved contacts can call you",
     call_err_contacts_only: "This person only accepts calls from their contacts.",
+    system_capture_ecran: "{actor} took a screenshot",
   },
   es: {
     e2ee_bouton: "Cifrado de extremo a extremo",
@@ -6501,6 +6504,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "Solo contactos guardados",
     priv_calls_contacts_only_sub: "Solo tus contactos guardados pueden llamarte",
     call_err_contacts_only: "Esta persona solo acepta llamadas de sus contactos.",
+    system_capture_ecran: "{actor} hizo una captura de pantalla",
   },
   de: {
     e2ee_bouton: "Ende-zu-Ende-Verschlüsselung",
@@ -8135,6 +8139,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "Nur gespeicherte Kontakte",
     priv_calls_contacts_only_sub: "Nur deine gespeicherten Kontakte können dich anrufen",
     call_err_contacts_only: "Diese Person nimmt nur Anrufe ihrer Kontakte an.",
+    system_capture_ecran: "{actor} hat einen Screenshot gemacht",
   },
   pt: {
     e2ee_bouton: "Cifragem de ponta a ponta",
@@ -9756,6 +9761,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "Apenas contatos salvos",
     priv_calls_contacts_only_sub: "Apenas seus contatos salvos podem ligar para você",
     call_err_contacts_only: "Esta pessoa só aceita chamadas dos seus contatos.",
+    system_capture_ecran: "{actor} fez uma captura de tela",
   },
   ru: {
     e2ee_bouton: "Сквозное шифрование",
@@ -11370,6 +11376,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "Только сохранённые контакты",
     priv_calls_contacts_only_sub: "Звонить вам могут только сохранённые контакты",
     call_err_contacts_only: "Этот человек принимает звонки только от своих контактов.",
+    system_capture_ecran: "{actor} сделал(а) снимок экрана",
   },
   zh: {
     e2ee_bouton: "端到端加密",
@@ -12942,6 +12949,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "仅限已保存的联系人",
     priv_calls_contacts_only_sub: "只有已保存的联系人可以给你打电话",
     call_err_contacts_only: "对方只接受其联系人的来电。",
+    system_capture_ecran: "{actor} 截了屏",
   },
   sv: {
     e2ee_bouton: "Totalsträckskryptering",
@@ -14558,6 +14566,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "Endast sparade kontakter",
     priv_calls_contacts_only_sub: "Bara dina sparade kontakter kan ringa dig",
     call_err_contacts_only: "Den här personen tar bara emot samtal från sina kontakter.",
+    system_capture_ecran: "{actor} tog en skärmbild",
   },
   no: {
     e2ee_bouton: "Ende-til-ende-kryptering",
@@ -16175,5 +16184,6 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     priv_calls_contacts_only: "Bare lagrede kontakter",
     priv_calls_contacts_only_sub: "Bare de lagrede kontaktene dine kan ringe deg",
     call_err_contacts_only: "Denne personen tar bare imot anrop fra kontaktene sine.",
+    system_capture_ecran: "{actor} tok et skjermbilde",
   },
 }

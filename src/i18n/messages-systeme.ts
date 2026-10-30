@@ -89,6 +89,10 @@ export function composerMessageSysteme(
     case "e2ee_cle_changee":
       return t("system_e2ee_cle_changee").replace("{actor}", texte(charge.actor))
 
+    // « X a fait une capture d'écran » (29/10/2026), signalée par le mobile.
+    case "capture_ecran":
+      return t("system_capture_ecran").replace("{actor}", texte(charge.actor))
+
     default:
       // Code inconnu — client plus ancien que le serveur. On n'invente pas de
       // phrase : on ne montre rien plutot qu'un JSON brut.
