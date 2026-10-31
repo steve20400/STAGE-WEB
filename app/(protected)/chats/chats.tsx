@@ -36,6 +36,7 @@ import {
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { estChiffree } from "../../../src/services/e2ee-fil"
 import { composerMessageSysteme } from "../../../src/i18n/messages-systeme"
+import { chargerFil, groupeDe, useStatutsEnDirect } from "../../../src/services/statuts-en-direct"
 import "./chats-page.css"
 
 // Helper hors composant : la langue est relue a chaque appel, donc a chaque
@@ -239,6 +240,10 @@ function FenetreNouvelleListe({
 }
 
 export default function ChatsPage() {
+  // Les anneaux de statut autour des avatars (01/11/2026).
+  useEffect(() => {
+    void chargerFil()
+  }, [])
   const { t } = useTranslation()
   const { success, warning } = useToast()
   const navigate = useNavigate()
@@ -829,14 +834,40 @@ export default function ChatsPage() {
 
 function ConvItem({ conv }: { conv: ConversationListItem }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const color = CHAT_COLORS[conv.colorIdx % CHAT_COLORS.length]
   const nom = nomConversation(conv)
+  /*
+   * 🔴 L'ANNEAU DE STATUT (01/11/2026, repris d'Alanya). Un contact qui a des
+   * statuts en ligne porte un anneau — accent ce qui reste a voir, discret ce
+   * qui est vu — et un clic sur sa photo les ouvre, au lieu de la discussion.
+   */
+  useStatutsEnDirect()
+  const pairId =
+    conv.isGroup || conv.isSelf
+      ? null
+      : (conv.membersInfo?.find((m) => m.id !== getMyUserId())?.id ?? null)
+  const statuts = groupeDe(pairId)
   return (
     <NavLink
       to={`/chats/${conv.id}`}
       className={({ isActive }) => `conv-item ${isActive ? "active" : ""}`}
     >
-      <div className="av" style={{ background: color.bg, color: color.text, overflow: "hidden" }}>
+      <div
+        className={`av${statuts ? ` av-statut${statuts.hasUnviewed ? "" : " vu"}` : ""}`}
+        style={{ background: color.bg, color: color.text, overflow: "hidden" }}
+        title={statuts ? t("status_open_statuses") : undefined}
+        onClick={
+          statuts
+            ? (e) => {
+                // Le lien de la ligne ouvrirait la discussion : on l'arrete.
+                e.preventDefault()
+                e.stopPropagation()
+                navigate(`/status?u=${encodeURIComponent(statuts.userId)}`)
+              }
+            : undefined
+        }
+      >
         {avatarDisplaySrc(conv.avatar) ? (
           <img
             src={avatarDisplaySrc(conv.avatar)!}

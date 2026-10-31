@@ -1210,6 +1210,32 @@ export function subscribeToVueUnique(
   })
 }
 
+/** Une vue ou un « J'aime » sur l'un de MES statuts (01/11/2026). */
+export interface EvenementStatut {
+  type: "statut_vu" | "statut_aime"
+  statusId: string
+  viewsCount?: number
+  likesCount?: number
+}
+
+/**
+ * VUES ET « J'AIME » EN DIRECT, emis par l'API (`statut_vu`, `statut_aime`)
+ * vers l'auteur seul. Lu par `statuts-en-direct.ts`.
+ */
+export function subscribeToStatutsEnDirect(handler: (event: EvenementStatut) => void): () => void {
+  return addListener((event) => {
+    const e = event as unknown as Record<string, unknown>
+    if ((e.type === "statut_vu" || e.type === "statut_aime") && typeof e.statusId === "string") {
+      handler({
+        type: e.type,
+        statusId: e.statusId,
+        viewsCount: typeof e.viewsCount === "number" ? e.viewsCount : undefined,
+        likesCount: typeof e.likesCount === "number" ? e.likesCount : undefined,
+      })
+    }
+  })
+}
+
 /** Supprime un message : "me" (masque local) ou "everyone" (efface pour tous). */
 export function sendDeleteMessage(messageId: string, scope: "me" | "everyone") {
   sendRaw({ type: "delete_message", messageId, scope })

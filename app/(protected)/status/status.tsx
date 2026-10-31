@@ -1,5 +1,6 @@
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { compresserImage } from "../../../src/lib/image-compression"
 import { EditeurStatut } from "../../../src/components/editeur-statut"
 import { createPrivateChat } from "../../../src/services/chats-service"
@@ -8,13 +9,30 @@ import { useToast } from "../../../src/components/toast"
 import { toInitials } from "../../../src/data/session-user"
 import { resolveMediaUrl,
   TAILLE_MEDIA_MAX_OCTETS,
+  uploadMedia,
 } from "../../../src/services/media-service"
+import {
+  demarrerEnregistrementVocal,
+  lireDureeMs,
+  type EnregistrementVocal,
+} from "../../../src/lib/enregistreur-vocal"
+import { estChiffree, etatConnu, lireEtatE2ee } from "../../../src/services/e2ee-fil"
+import { envoyerMediaChiffre } from "../../../src/services/e2ee-media-envoi"
+import {
+  aimeParMoiDe,
+  aimesDe,
+  marquerAime,
+  retenirFil,
+  useStatutsEnDirect,
+  vuesDe,
+} from "../../../src/services/statuts-en-direct"
 import { estPanneReseau } from "../../../src/services/messages-service"
 import {
   compterStatutsEnAttente,
   mettreStatutEnFile,
 } from "../../../src/services/outbox-statuts"
 import {
+  aimerStatut,
   deleteStatus,
   fetchStatusFeed,
   postMediaStatus,
@@ -27,6 +45,21 @@ import "../calls/calls-page.css"
 
 const TEXT_BG_COLORS = ["#8A4B2B", "#2E7D32", "#C04D29", "#1D4ED8", "#6D28D9", "#2B1B12"]
 const STATUS_DURATION_MS = 5000
+
+/**
+ * LA DUREE D'UN STATUT AUDIO (01/11/2026) : soixante secondes, comme sur le
+ * mobile (`dureeVideoStatutMax`). Un enregistrement s'arrete de lui-meme a la
+ * limite ; un fichier plus long est refuse avant d'etre televerse.
+ */
+const DUREE_AUDIO_MAX_MS = 60_000
+
+/**
+ * Les durees connues des enregistrements faits ici : un WebM enregistre par le
+ * navigateur annonce une duree infinie, l'horloge seule la connait.
+ */
+const dureesConnues = new WeakMap<File, number>()
+
+const formatSecondes = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`
 
 function groupLabel(group: StatusGroup): string {
   return group.pseudo?.trim() || group.publicNumber
@@ -121,6 +154,9 @@ export default function StatusPage() {
   const { success, error, info } = useToast()
   const [feed, setFeed] = useState<StatusFeed>({ me: null, others: [] })
   const [loading, setLoading] = useState(true)
+  // Vues et « J'aime » en direct : redessine a chaque evenement (01/11/2026).
+  useStatutsEnDirect()
+  const [params, setParams] = useSearchParams()
 
   /**
    * Combien de statuts attendent le reseau.
@@ -158,6 +194,8 @@ export default function StatusPage() {
     try {
       const data = await fetchStatusFeed()
       setFeed(data)
+      // Partage avec la liste des discussions (anneaux) — 01/11/2026.
+      retenirFil(data)
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn("[status] chargement echoue", err)
@@ -169,6 +207,44 @@ export default function StatusPage() {
   useEffect(() => {
     void reload()
   }, [reload])
+
+  /*
+   * OUVERT DEPUIS AILLEURS (01/11/2026, repris d'Alanya) :
+   *  - `?u=<id>` : l'anneau d'un avatar dans la liste des discussions ;
+   *  - `?statut=<id>&auteur=<id>` : la citation d'un statut dans une
+   *    conversation — ce statut-la, et lui seul.
+   * Le parametre est retire aussitot lu : revenir en arriere ne doit pas
+   * rouvrir la visionneuse.
+   */
+  useEffect(() => {
+    if (loading) return
+    const u = params.get("u")
+    const statutId = params.get("statut")
+    if (!u && !statutId) return
+    setParams({}, { replace: true })
+    const maintenant = Date.now()
+    const enLigne = (s: { expiresAt: string }) => new Date(s.expiresAt).getTime() > maintenant
+    if (u) {
+      const groupe = feed.others.find((g) => g.userId === u)
+      const restants = groupe?.statuses.filter(enLigne) ?? []
+      if (groupe && restants.length > 0) {
+        setViewer({ group: { ...groupe, statuses: restants }, index: 0, isMine: false })
+      } else {
+        error(t("status_expired"))
+      }
+      return
+    }
+    const auteur = params.get("auteur")
+    for (const g of [feed.me, ...feed.others]) {
+      if (!g || (auteur && g.userId !== auteur)) continue
+      const s = g.statuses.find((x) => x.id === statutId && enLigne(x))
+      if (s) {
+        setViewer({ group: { ...g, statuses: [s] }, index: 0, isMine: g === feed.me })
+        return
+      }
+    }
+    error(t("status_expired"))
+  }, [loading, feed, params, setParams, error, t])
 
   /* ----------------- Visionneuse ----------------- */
 
@@ -243,7 +319,7 @@ export default function StatusPage() {
     if (!viewer.isMine) void viewStatus(status.id)
 
     if (progressTimer.current) clearInterval(progressTimer.current)
-    if (status.type === "VIDEO") return // gere par onEnded
+    if (status.type === "VIDEO" || status.type === "AUDIO") return // gere par onEnded
     if (enPause) return // l'appui est maintenu : la barre ne bouge pas
     // ⚠️ LE COMPTE A REBOURS SUIT LE TELECHARGEMENT. Un statut de cinq secondes
     // sur une connexion lente passait avant que l'image arrive.
@@ -318,6 +394,133 @@ export default function StatusPage() {
     }
   }
 
+  /*
+   * ══════════════ LE MICRO (01/11/2026, repris d'Alanya) ══════════════
+   *
+   * Deux usages, un seul enregistreur : le STATUT AUDIO (depuis le composeur)
+   * et la REPONSE VOCALE a un statut (depuis la visionneuse). Soixante
+   * secondes au plus ; a la limite, l'enregistrement s'arrete et part.
+   */
+  const enregistrement = useRef<EnregistrementVocal | null>(null)
+  const [micro, setMicro] = useState<null | "statut" | "reponse">(null)
+  const [secondesMicro, setSecondesMicro] = useState(0)
+
+  const commencerMicro = async (usage: "statut" | "reponse") => {
+    if (enregistrement.current) return
+    try {
+      enregistrement.current = await demarrerEnregistrementVocal(
+        usage === "statut" ? "statut-audio" : "reponse-statut",
+      )
+    } catch {
+      error(t("micro_unavailable"), t("allow_mic"))
+      return
+    }
+    if (usage === "reponse") setEnPause(true)
+    setSecondesMicro(0)
+    setMicro(usage)
+  }
+
+  const annulerMicro = () => {
+    enregistrement.current?.annuler()
+    enregistrement.current = null
+    if (micro === "reponse") setEnPause(false)
+    setMicro(null)
+  }
+
+  const terminerMicro = async () => {
+    const rec = enregistrement.current
+    const usage = micro
+    if (!rec || !usage) return
+    enregistrement.current = null
+    setMicro(null)
+    const r = await rec.arreter()
+    if (!r) {
+      if (usage === "reponse") setEnPause(false)
+      return
+    }
+    if (usage === "statut") {
+      dureesConnues.set(r.fichier, r.dureeMs)
+      void publierDirectement([r.fichier])
+    } else {
+      await repondreEnVocal(r.fichier, r.dureeMs)
+    }
+  }
+
+  // Le compteur, et l'arret a la limite.
+  useEffect(() => {
+    if (!micro) return
+    const minuteur = window.setInterval(() => {
+      const rec = enregistrement.current
+      if (!rec) return
+      const ecoule = Date.now() - rec.debut
+      setSecondesMicro(ecoule / 1000)
+      if (ecoule >= DUREE_AUDIO_MAX_MS) void terminerMicro()
+    }, 250)
+    return () => window.clearInterval(minuteur)
+    // terminerMicro lit l'etat courant a chaque rendu : pas de dependance figee.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micro])
+
+  // On quitte la page en plein enregistrement : le micro se coupe.
+  useEffect(() => () => enregistrement.current?.annuler(), [])
+
+  /**
+   * REPONSE VOCALE A UN STATUT : un message vocal dans le tete-a-tete, qui cite
+   * le statut comme une reponse ecrite.
+   *
+   * ⚠️ DANS UN FIL CHIFFRE, le vocal part chiffre et SANS citation : le chemin
+   * chiffre ne la porte pas (meme limite que la reponse ecrite).
+   */
+  const repondreEnVocal = async (fichier: File, dureeMs: number) => {
+    if (!viewer) return
+    const statut = viewer.group.statuses[viewer.index]
+    if (!statut) return
+    setEnvoiReponse(true)
+    setEnPause(true)
+    try {
+      const { id } = await createPrivateChat(viewer.group.publicNumber)
+      if (!etatConnu(id)) await lireEtatE2ee(id).catch(() => undefined)
+      if (estChiffree(id)) {
+        await envoyerMediaChiffre(id, fichier, { nom: fichier.name, mime: fichier.type, dureeMs })
+      } else {
+        const media = await uploadMedia(fichier, fichier.name, dureeMs)
+        await sendChatMessage(id, "", "audio", { mediaId: media.id, statutCite: statut.id })
+      }
+      success(t("statut_reponse_envoyee"))
+    } catch {
+      error(t("server_unreachable"))
+    } finally {
+      setEnvoiReponse(false)
+      setEnPause(false)
+    }
+  }
+
+  /** « J'aime » : affiche tout de suite, annule si le serveur refuse. */
+  const basculerAime = async () => {
+    if (!viewer || viewer.isMine) return
+    const statut = viewer.group.statuses[viewer.index]
+    if (!statut) return
+    const aime = !aimeParMoiDe(statut)
+    marquerAime(statut.id, aime)
+    try {
+      await aimerStatut(statut.id, aime)
+    } catch {
+      marquerAime(statut.id, !aime)
+    }
+  }
+
+  /*
+   * LA LECTURE SUIT L'APPUI : un audio ou une video s'arrete sous le doigt,
+   * comme la barre d'une photo.
+   */
+  const lecteurMedia = useRef<HTMLMediaElement | null>(null)
+  useEffect(() => {
+    const m = lecteurMedia.current
+    if (!m) return
+    if (enPause) m.pause()
+    else void m.play().catch(() => undefined)
+  }, [enPause])
+
   /* ----------------- Composeur ----------------- */
 
   const submitTextStatus = async () => {
@@ -356,8 +559,25 @@ export default function StatusPage() {
    * dit ce qui a reellement ete publie. Perdre trois photos parce que la
    * deuxieme etait trop lourde serait le pire des comportements.
    */
-  const publierPlusieurs = (fichiers: File[]) => {
+  const publierPlusieurs = async (fichiers: File[]) => {
     if (posting) return
+    /*
+     * UN AUDIO TROP LONG EST ECARTE AVANT D'ETRE TELEVERSE (01/11/2026) : la
+     * visionneuse ne lirait pas au-dela de la limite.
+     */
+    const retenus: File[] = []
+    for (const f of fichiers) {
+      if (f.type.startsWith("audio/")) {
+        const duree = await lireDureeMs(f)
+        if (duree > DUREE_AUDIO_MAX_MS) {
+          error(t("status_audio_too_long", { n: DUREE_AUDIO_MAX_MS / 1000 }), f.name)
+          continue
+        }
+        dureesConnues.set(f, duree)
+      }
+      retenus.push(f)
+    }
+    fichiers = retenus
     /*
      * LES VIDEOS PASSENT DIRECTEMENT, les images par l'editeur.
      *
@@ -399,7 +619,7 @@ export default function StatusPage() {
            */
           if (estPanneReseau(err)) {
             try {
-              await mettreStatutEnFile(fichier)
+              await mettreStatutEnFile(fichier, dureesConnues.get(fichier))
               differes += 1
               continue
             } catch {
@@ -450,7 +670,11 @@ export default function StatusPage() {
      */
     const pret =
       file.type.startsWith("image/") ? await compresserImage(file) : null
-    await postMediaStatus(pret?.fichier ?? file)
+    // La duree d'un audio ou d'une video : la visionneuse s'y cale.
+    const duree = file.type.startsWith("image/")
+      ? undefined
+      : (dureesConnues.get(file) ?? (await lireDureeMs(file)))
+    await postMediaStatus(pret?.fichier ?? file, duree)
     setComposerOpen(false)
   }
 
@@ -588,7 +812,7 @@ export default function StatusPage() {
             <input
               ref={fileRef}
               type="file"
-              accept="image/*,video/*"
+              accept="image/*,video/*,audio/*"
               // PLUSIEURS A LA FOIS, photos et videos melangees. On n'en
               // prenait qu'un : publier trois cliches d'un evenement demandait
               // de rouvrir le selecteur trois fois.
@@ -615,6 +839,48 @@ export default function StatusPage() {
             >
               {t("l2_photo_video")}
             </button>
+            {/* STATUT AUDIO (01/11/2026) : un clic enregistre, le second publie. */}
+            {micro === "statut" ? (
+              <>
+                <span style={{ fontSize: 12, color: "var(--danger, #e5484d)", whiteSpace: "nowrap" }}>
+                  ● {t("status_recording")} {formatSecondes(secondesMicro)} / {formatSecondes(DUREE_AUDIO_MAX_MS / 1000)}
+                </span>
+                <button
+                  onClick={annulerMicro}
+                  style={{
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    color: "var(--text-secondary)",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t("cancel")}
+                </button>
+                <button className="new-call-btn" onClick={() => void terminerMicro()}>
+                  {t("status_audio_stop_publish")}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => void commencerMicro("statut")}
+                disabled={posting || micro !== null}
+                title={t("status_audio_title")}
+                style={{
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  color: "var(--text-secondary)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                🎙 {t("status_audio_btn")}
+              </button>
+            )}
             <button
               className="new-call-btn"
               onClick={() => void submitTextStatus()}
@@ -709,8 +975,10 @@ export default function StatusPage() {
               </div>
               <div style={{ color: "#ffffff90", fontSize: 11 }}>
                 {timeAgo(currentStatus.createdAt)}
+                {/* Vues et « J'aime » EN DIRECT (01/11/2026). */}
                 {viewer.isMine
-                  ? ` — ${t("l2_views_count", { count: currentStatus.viewsCount })}`
+                  ? ` — ${t("l2_views_count", { count: vuesDe(currentStatus) })}` +
+                    (aimesDe(currentStatus) > 0 ? ` · ❤ ${aimesDe(currentStatus)}` : "")
                   : ""}
               </div>
             </div>
@@ -901,9 +1169,48 @@ export default function StatusPage() {
               />
             )}
 
+            {/*
+              STATUT AUDIO (01/11/2026) : memes signaux que la video — le
+              cercle tant qu'il charge, la barre qui suit la lecture, le
+              suivant a la fin.
+            */}
+            {currentStatus.type === "AUDIO" && currentStatus.mediaUrl && (
+              <div className="statut-audio">
+                <div className="statut-audio-disque" aria-hidden="true">🎵</div>
+                <audio
+                  key={currentStatus.id}
+                  ref={(el) => {
+                    lecteurMedia.current = el
+                  }}
+                  src={resolveMediaUrl(currentStatus.mediaUrl)}
+                  autoPlay
+                  onCanPlay={() => setMediaPret(true)}
+                  onPlaying={() => setMediaPret(true)}
+                  onWaiting={() => setMediaPret(false)}
+                  onError={() => setMediaPret(true)}
+                  onTimeUpdate={(e) => {
+                    const a = e.currentTarget
+                    // Un WebM peut annoncer une duree infinie : la duree
+                    // declaree par le serveur prend alors le relais.
+                    const duree = Number.isFinite(a.duration) && a.duration > 0
+                      ? a.duration
+                      : (currentStatus.mediaDurationMs ?? 0) / 1000
+                    if (duree > 0) setProgress(Math.min(1, a.currentTime / duree))
+                  }}
+                  onEnded={() => goTo(1)}
+                />
+                {currentStatus.text?.trim() && (
+                  <div className="statut-audio-legende">{currentStatus.text}</div>
+                )}
+              </div>
+            )}
+
             {currentStatus.type === "VIDEO" && currentStatus.mediaUrl && (
               <video
                 key={currentStatus.id}
+                ref={(el) => {
+                  lecteurMedia.current = el
+                }}
                 src={resolveMediaUrl(currentStatus.mediaUrl)}
                 autoPlay
                 playsInline
@@ -980,20 +1287,53 @@ export default function StatusPage() {
                   void repondreAuStatut(reponse)
                 }}
               >
-                <input
-                  value={reponse}
-                  onChange={(e) => setReponse(e.target.value)}
-                  placeholder={t("statut_repondre")}
-                  aria-label={t("statut_repondre")}
-                  // La lecture s'arrete pendant qu'on ecrit : le statut ne doit
-                  // pas defiler sous la reponse en cours.
-                  onFocus={() => setEnPause(true)}
-                  onBlur={() => setEnPause(false)}
-                  disabled={envoiReponse}
-                />
-                <button type="submit" disabled={envoiReponse || reponse.trim() === ""}>
-                  {t("send")}
+                {micro === "reponse" ? (
+                  <div className="statut-micro">
+                    <span>● {t("status_recording")} {formatSecondes(secondesMicro)}</span>
+                    <button type="button" className="statut-icone" onClick={annulerMicro} aria-label={t("cancel")}>
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    value={reponse}
+                    onChange={(e) => setReponse(e.target.value)}
+                    placeholder={t("statut_repondre")}
+                    aria-label={t("statut_repondre")}
+                    // La lecture s'arrete pendant qu'on ecrit : le statut ne doit
+                    // pas defiler sous la reponse en cours.
+                    onFocus={() => setEnPause(true)}
+                    onBlur={() => setEnPause(false)}
+                    disabled={envoiReponse}
+                  />
+                )}
+                {/* « J'aime » (01/11/2026, repris d'Alanya). */}
+                <button
+                  type="button"
+                  className={`statut-icone${aimeParMoiDe(currentStatus) ? " aime" : ""}`}
+                  onClick={() => void basculerAime()}
+                  aria-label={t("status_like")}
+                  aria-pressed={aimeParMoiDe(currentStatus)}
+                  title={t("status_like")}
+                >
+                  {aimeParMoiDe(currentStatus) ? "♥" : "♡"}
                 </button>
+                {/* Reponse vocale : un clic enregistre, le second envoie. */}
+                <button
+                  type="button"
+                  className="statut-icone"
+                  onClick={() => void (micro === "reponse" ? terminerMicro() : commencerMicro("reponse"))}
+                  disabled={envoiReponse || micro === "statut"}
+                  aria-label={t("status_voice_reply")}
+                  title={t("status_voice_reply")}
+                >
+                  {micro === "reponse" ? "➤" : "🎙"}
+                </button>
+                {micro !== "reponse" && (
+                  <button type="submit" disabled={envoiReponse || reponse.trim() === ""}>
+                    {t("send")}
+                  </button>
+                )}
               </form>
             </div>
           )}

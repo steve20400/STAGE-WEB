@@ -4,10 +4,16 @@ import { uploadMedia } from "./media-service"
 /** Statut ephemere (24 h) tel que renvoye par GET /api/statuses. */
 export interface StatusItem {
   id: string
-  type: "TEXT" | "IMAGE" | "VIDEO"
+  type: "TEXT" | "IMAGE" | "VIDEO" | "AUDIO"
   text: string | null
-  /** URL relative backend (/api/media/{id}) pour IMAGE/VIDEO. */
+  /** URL relative backend (/api/media/{id}) pour IMAGE/VIDEO/AUDIO. */
   mediaUrl: string | null
+  /** Duree d'un statut audio ou video (01/11/2026). Absente sur un ancien serveur. */
+  mediaDurationMs?: number | null
+  /** L'ai-je aime ? (01/11/2026) */
+  likedByMe?: boolean
+  /** Nombre de « J'aime » — envoye a l'auteur seul. */
+  likesCount?: number
   bgColor: string | null
   createdAt: string
   expiresAt: string
@@ -42,14 +48,41 @@ export async function postTextStatus(text: string, bgColor: string): Promise<voi
   })
 }
 
-/** Upload du media puis POST /api/statuses (IMAGE ou VIDEO). */
-export async function postMediaStatus(file: File): Promise<void> {
-  const isVideo = file.type.startsWith("video/")
-  const media = await uploadMedia(file, file.name)
+/** Le type de statut d'un fichier, d'apres son MIME. */
+export function typeStatutDe(mime: string): "IMAGE" | "VIDEO" | "AUDIO" {
+  if (mime.startsWith("video/")) return "VIDEO"
+  if (mime.startsWith("audio/")) return "AUDIO"
+  return "IMAGE"
+}
+
+/**
+ * Upload du media puis POST /api/statuses (IMAGE, VIDEO ou AUDIO).
+ *
+ * [dureeMs] : la visionneuse d'un audio ou d'une video s'y cale (01/11/2026).
+ */
+export async function postMediaStatus(file: File, dureeMs?: number): Promise<void> {
+  const type = typeStatutDe(file.type)
+  const media = await uploadMedia(file, file.name, dureeMs)
   await apiRequest("/api/statuses", {
     method: "POST",
-    body: { type: isVideo ? "VIDEO" : "IMAGE", mediaId: media.id },
+    body: {
+      type,
+      mediaId: media.id,
+      ...(type !== "IMAGE" && dureeMs && dureeMs > 0 ? { mediaDurationMs: Math.round(dureeMs) } : {}),
+    },
   })
+}
+
+/**
+ * « J'AIME » SUR UN STATUT (01/11/2026, repris d'Alanya). Rend le nombre de
+ * « J'aime » du statut. Pas sur son propre statut : le serveur le refuse.
+ */
+export async function aimerStatut(statusId: string, aime: boolean): Promise<number> {
+  const r = await apiRequest<{ liked: boolean; likesCount: number }>(
+    `/api/statuses/${statusId}/like`,
+    { method: aime ? "POST" : "DELETE" },
+  )
+  return r?.likesCount ?? 0
 }
 
 /** POST /api/statuses/:id/view — marque un statut comme vu. */

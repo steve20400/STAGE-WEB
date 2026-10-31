@@ -3876,6 +3876,8 @@ function MessageBubble({
   /** Epingle (id) ou detache (`null`). Absent = l'action n'est pas proposee. */
   onTogglePin?: (messageId: string | null) => void
 }) {
+  // La citation d'un statut rouvre la page Statuts (01/11/2026).
+  const navigate = useNavigate()
   // Les actions n'apparaissent pas au survol immediat : le bouton surgissait
   // dans la rangee et decalait la bulle a chaque passage de souris. Il est
   // desormais hors du flux (position absolue) et se revele soit au clic sur le
@@ -4597,9 +4599,37 @@ function MessageBubble({
                 Le contenu est RECOPIE par le serveur : il reste lisible meme
                 apres l'expiration du statut, 24 h plus tard.
               */}
+              {/*
+                CLIQUABLE DEPUIS LE 01/11/2026 (repris d'Alanya) : la
+                citation rouvre le statut s'il est encore en ligne — la page
+                Statuts dit sinon qu'il ne l'est plus.
+              */}
               {msg.statutCite && !msg.isDeleted && (
-                <div className="statut-cite">
-                  {msg.statutCite.mediaUrl ? (
+                <div
+                  className="statut-cite cliquable"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    navigate(
+                      `/status?statut=${encodeURIComponent(msg.statutCite!.statusId)}&auteur=${encodeURIComponent(msg.statutCite!.authorId)}`,
+                    )
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      navigate(
+                        `/status?statut=${encodeURIComponent(msg.statutCite!.statusId)}&auteur=${encodeURIComponent(msg.statutCite!.authorId)}`,
+                      )
+                    }
+                  }}
+                >
+                  {/* Ni un audio ni une video n'ont de vignette : une icone dit
+                      au moins la nature du statut. */}
+                  {msg.statutCite.type === "AUDIO" || msg.statutCite.type === "VIDEO" ? (
+                    <span className="statut-cite-vignette icone" aria-hidden="true">
+                      {msg.statutCite.type === "AUDIO" ? "🎵" : "🎬"}
+                    </span>
+                  ) : msg.statutCite.mediaUrl ? (
                     <img
                       className="statut-cite-vignette"
                       src={resolveMediaUrl(msg.statutCite.mediaUrl)}
@@ -4617,7 +4647,11 @@ function MessageBubble({
                     <span className="statut-cite-titre">{t("statut_cite_titre")}</span>
                     <span className="statut-cite-apercu">
                       {msg.statutCite.text?.trim() ||
-                        (msg.statutCite.type === "VIDEO" ? t("video_label") : t("photo"))}
+                        (msg.statutCite.type === "VIDEO"
+                          ? t("video_label")
+                          : msg.statutCite.type === "AUDIO"
+                            ? t("status_audio_label")
+                            : t("photo"))}
                     </span>
                   </span>
                 </div>

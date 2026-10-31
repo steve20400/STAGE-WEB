@@ -230,6 +230,19 @@
   flex-shrink: 0;
   position: relative;
 }
+/*
+ * L'ANNEAU DE STATUT (01/11/2026) : un contour DECALE, pas une bordure — la
+ * taille de l'avatar ne change pas, et les noms restent alignes d'une ligne a
+ * l'autre, avec ou sans anneau.
+ */
+.av.av-statut {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  cursor: pointer;
+}
+.av.av-statut.vu {
+  outline-color: var(--border-strong);
+}
 .av-dot {
   position: absolute;
   bottom: 1px;

@@ -1270,6 +1270,21 @@ textarea.room-textarea::placeholder {
 .statut-cite-vignette.texte {
   display: block;
 }
+/* Audio ou video : une icone (01/11/2026). */
+.statut-cite-vignette.icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+/* La citation rouvre le statut (01/11/2026). */
+.statut-cite.cliquable {
+  cursor: pointer;
+}
+.statut-cite.cliquable:hover {
+  background: color-mix(in srgb, currentColor 15%, transparent);
+}
 .statut-cite-textes {
   display: flex;
   flex-direction: column;

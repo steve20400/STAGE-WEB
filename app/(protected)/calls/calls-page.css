@@ -610,3 +610,59 @@
   opacity: 0.45;
   cursor: default;
 }
+
+/* « J'aime » et micro (01/11/2026) : ronds, sans fond d'accent — l'envoi garde
+   seul la couleur, c'est lui l'action principale. */
+.statut-saisie button.statut-icone {
+  width: 40px;
+  padding: 0;
+  background: #ffffff14;
+  color: #fff;
+  font-size: 18px;
+}
+.statut-saisie button.statut-icone.aime {
+  color: #ff4d6d;
+}
+.statut-micro {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px 0 14px;
+  border: 1px solid #ffffff35;
+  border-radius: 22px;
+  background: #ffffff14;
+  color: #fff;
+  font-size: 14px;
+}
+.statut-micro span {
+  color: #ff8a8a;
+}
+
+/* LE STATUT AUDIO (01/11/2026) : un disque a la place de l'image. */
+.statut-audio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+}
+.statut-audio-disque {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: #ffffff1f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+}
+.statut-audio-legende {
+  color: #fff;
+  font-size: 16px;
+  text-align: center;
+  max-width: 520px;
+  word-break: break-word;
+}

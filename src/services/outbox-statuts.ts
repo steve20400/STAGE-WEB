@@ -2,6 +2,7 @@ import { initIndexedDB } from "../indexedDB/schema"
 import { uploadMedia } from "./media-service"
 import { apiRequest } from "../lib/api-client"
 import { estPanneReseau } from "./messages-service"
+import { typeStatutDe } from "./status-service"
 
 /**
  * LES STATUTS ECRITS SANS RESEAU, ET PUBLIES DES SON RETOUR.
@@ -38,18 +39,25 @@ interface StatutEnAttente {
   id: string
   blob: Blob
   nomFichier: string
+  /** Ancien champ, garde pour relire une file ecrite avant le 01/11/2026. */
   estVideo: boolean
+  /** Le MIME du fichier : c'est lui qui dit IMAGE, VIDEO ou AUDIO. */
+  mime?: string
+  /** Duree d'un audio ou d'une video. */
+  dureeMs?: number
   createdAt: number
 }
 
 /** Met un statut en file d'attente, octets compris. */
-export async function mettreStatutEnFile(fichier: File): Promise<void> {
+export async function mettreStatutEnFile(fichier: File, dureeMs?: number): Promise<void> {
   const db = await initIndexedDB()
   await db.put("outboxStatuts", {
     id: `statut_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     blob: fichier,
     nomFichier: fichier.name,
     estVideo: fichier.type.startsWith("video/"),
+    mime: fichier.type,
+    dureeMs,
     createdAt: Date.now(),
   } satisfies StatutEnAttente)
 }
@@ -92,10 +100,19 @@ export async function viderFileStatuts(): Promise<number> {
       }
 
       try {
-        const media = await uploadMedia(statut.blob, statut.nomFichier)
+        const media = await uploadMedia(statut.blob, statut.nomFichier, statut.dureeMs)
+        const type = statut.mime
+          ? typeStatutDe(statut.mime)
+          : statut.estVideo
+            ? "VIDEO"
+            : "IMAGE"
         await apiRequest("/api/statuses", {
           method: "POST",
-          body: { type: statut.estVideo ? "VIDEO" : "IMAGE", mediaId: media.id },
+          body: {
+            type,
+            mediaId: media.id,
+            ...(type !== "IMAGE" && statut.dureeMs ? { mediaDurationMs: Math.round(statut.dureeMs) } : {}),
+          },
         })
         publies += 1
       } catch (err) {
