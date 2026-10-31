@@ -384,6 +384,19 @@ const OFFRE_SANS_REPONSE_MAX_MS = 8000
  */
 const DEBIT_VIDEO_MAX = 800_000
 const DEBIT_VIDEO_FAIBLE = 300_000
+/**
+ * Le plancher de definition (demande du user) : en connexion faible, la video
+ * descend jusqu'a 360 lignes, jamais en dessous. Elle etait divisee par deux :
+ * une capture 640×480 tombait a 320×240.
+ */
+const DEFINITION_MIN = 360
+
+/** Le facteur qui ramene la piste a DEFINITION_MIN lignes sur son petit cote. */
+function facteurVersPlancher(piste: MediaStreamTrack | null): number {
+  const s = piste?.getSettings?.() ?? {}
+  const petitCote = s.width && s.height ? Math.min(s.width, s.height) : 480
+  return Math.max(1, petitCote / DEFINITION_MIN)
+}
 const CADENCE_VIDEO_MAX = 30
 const PERTE_MAX = 0.05
 const ALLER_RETOUR_MAX_S = 0.6
@@ -1186,7 +1199,7 @@ class PeerSession {
     }
   }
 
-  /** Video allegee (moitie de definition, 300 kbit/s) ou normale. */
+  /** Video allegee (360 lignes, 300 kbit/s) ou normale. */
   private async appliquerDebit(faible: boolean) {
     const pc = this.pc
     if (!pc || !this.isVideo) return
@@ -1197,7 +1210,7 @@ class PeerSession {
         if (!p.encodings || p.encodings.length === 0) continue
         for (const e of p.encodings) {
           e.maxBitrate = faible ? DEBIT_VIDEO_FAIBLE : DEBIT_VIDEO_MAX
-          e.scaleResolutionDownBy = faible ? 2 : 1
+          e.scaleResolutionDownBy = faible ? facteurVersPlancher(emetteur.track) : 1
         }
         await emetteur.setParameters(p)
       }
@@ -2244,14 +2257,15 @@ function contraintesVideo(): MediaTrackConstraints {
   const portrait =
     typeof window !== "undefined" && window.matchMedia?.("(orientation: portrait)")?.matches
   /*
-   * 🔴 640×480, 720p AU PLUS, 30 IMAGES/S AU PLUS (demande du patron, guide du
-   * 31/10/2026). Viser plus haut saturait l'encodeur et le reseau : l'image se
-   * figeait. L'emission en baisse encore la definition si le reseau faiblit.
+   * 🔴 640×480, 360 LIGNES AU MOINS, 720p AU PLUS, 30 IMAGES/S AU PLUS (demande
+   * du patron, guide du 31/10/2026 ; plancher de 360 demande par le user).
+   * Viser plus haut saturait l'encodeur et le reseau : l'image se figeait.
+   * L'emission baisse la definition si le reseau faiblit, jusqu'au plancher.
    */
   return {
     facingMode: "user",
-    width: { ideal: portrait ? 480 : 640, max: portrait ? 720 : 1280 },
-    height: { ideal: portrait ? 640 : 480, max: portrait ? 1280 : 720 },
+    width: { min: portrait ? 360 : 480, ideal: portrait ? 480 : 640, max: portrait ? 720 : 1280 },
+    height: { min: portrait ? 480 : 360, ideal: portrait ? 640 : 480, max: portrait ? 1280 : 720 },
     frameRate: { ideal: 24, max: 30 },
   }
 }
