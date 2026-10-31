@@ -25,9 +25,12 @@ function ilYa(iso: string): string {
 export function VuesStatut({
   statut,
   onOuvert,
+  ouvrir = 0,
 }: {
   statut: StatusItem
   onOuvert: (ouvert: boolean) => void
+  /** Change pour ouvrir la liste de l'exterieur : le geste « tirer vers le haut ». */
+  ouvrir?: number
 }) {
   const { t } = useTranslation()
   useStatutsEnDirect()
@@ -53,6 +56,14 @@ export function VuesStatut({
       actif = false
     }
   }, [ouvert, statut.id, vues, aimes])
+
+  useEffect(() => {
+    if (ouvrir === 0) return
+    setOuvert(true)
+    onOuvert(true)
+    // Seul le signal compte : onOuvert peut changer d'identite a chaque rendu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouvrir])
 
   // Un autre statut : la liste repart fermee.
   useEffect(() => {

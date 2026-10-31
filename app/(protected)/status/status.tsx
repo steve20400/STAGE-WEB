@@ -309,6 +309,31 @@ export default function StatusPage() {
   const [aPublier, setAPublier] = useState<File[]>([])
 
   const [reponse, setReponse] = useState("")
+
+  /*
+   * TIRER VERS LE HAUT (01/11/2026, comme WhatsApp et le mobile) : sur le
+   * statut de quelqu'un, on lui repond — le champ prend la main ; sur le
+   * mien, la liste de qui l'a vu s'ouvre. Au doigt, sur un ecran tactile.
+   */
+  const champReponse = useRef<HTMLInputElement>(null)
+  const [ouvrirVues, setOuvrirVues] = useState(0)
+  const departGlisse = useRef<{ y: number; quand: number } | null>(null)
+  // Un glissement ne doit pas compter comme un clic sur les zones gauche/droite.
+  const vientDeGlisser = useRef(false)
+
+  const finGlisse = (y: number) => {
+    const depart = departGlisse.current
+    departGlisse.current = null
+    if (!depart) return
+    if (depart.y - y > 60 && Date.now() - depart.quand < 700) {
+      vientDeGlisser.current = true
+      window.setTimeout(() => {
+        vientDeGlisser.current = false
+      }, 400)
+      if (viewer?.isMine) setOuvrirVues((n) => n + 1)
+      else champReponse.current?.focus()
+    }
+  }
   const [envoiReponse, setEnvoiReponse] = useState(false)
 
   // La progression s'ACCUMULE au lieu de repartir de l'heure de depart : sans
@@ -1061,8 +1086,14 @@ export default function StatusPage() {
              * pointeur, ne declenchent PAS `pointerup`. Sans eux, le statut
              * resterait fige indefiniment.
              */
-            onPointerDown={() => setEnPause(true)}
-            onPointerUp={() => setEnPause(false)}
+            onPointerDown={(e) => {
+              setEnPause(true)
+              departGlisse.current = { y: e.clientY, quand: Date.now() }
+            }}
+            onPointerUp={(e) => {
+              setEnPause(false)
+              finGlisse(e.clientY)
+            }}
             onPointerLeave={() => setEnPause(false)}
             onPointerCancel={() => setEnPause(false)}
           >
@@ -1073,7 +1104,9 @@ export default function StatusPage() {
               pouce cacherait le statut.
             */}
             <div
-              onClick={() => goTo(-1)}
+              onClick={() => {
+                if (!vientDeGlisser.current) goTo(-1)
+              }}
               style={{
                 position: "absolute",
                 left: 0,
@@ -1085,7 +1118,9 @@ export default function StatusPage() {
               }}
             />
             <div
-              onClick={() => goTo(1)}
+              onClick={() => {
+                if (!vientDeGlisser.current) goTo(1)
+              }}
               style={{
                 position: "absolute",
                 right: 0,
@@ -1258,7 +1293,9 @@ export default function StatusPage() {
             MON STATUT : qui l'a vu, qui l'a aime (01/11/2026), comme le
             mobile — un pied en bas, la liste au clic.
           */}
-          {viewer.isMine && <VuesStatut statut={currentStatus} onOuvert={setEnPause} />}
+          {viewer.isMine && (
+            <VuesStatut statut={currentStatus} onOuvert={setEnPause} ouvrir={ouvrirVues} />
+          )}
 
           {/*
             REPONDRE — jamais sur son propre statut : on ne s'ecrit pas a
@@ -1305,6 +1342,7 @@ export default function StatusPage() {
                   </div>
                 ) : (
                   <input
+                    ref={champReponse}
                     value={reponse}
                     onChange={(e) => setReponse(e.target.value)}
                     placeholder={t("statut_repondre")}
