@@ -21,6 +21,7 @@ import { envoyerMediaChiffre } from "../../../src/services/e2ee-media-envoi"
 import {
   aimeParMoiDe,
   aimesDe,
+  filStatuts,
   marquerAime,
   retenirFil,
   useStatutsEnDirect,
@@ -152,8 +153,13 @@ function StatusAvatar({
 export default function StatusPage() {
   const { t } = useTranslation()
   const { success, error, info } = useToast()
-  const [feed, setFeed] = useState<StatusFeed>({ me: null, others: [] })
-  const [loading, setLoading] = useState(true)
+  /*
+   * LE FIL DEJA CONNU D'ABORD (01/11/2026) : la liste des discussions l'a
+   * charge pour ses anneaux. Ouvrir un statut depuis une citation n'attend
+   * plus le reseau ; le fil se rafraichit ensuite.
+   */
+  const [feed, setFeed] = useState<StatusFeed>(() => filStatuts() ?? { me: null, others: [] })
+  const [loading, setLoading] = useState(() => filStatuts() === null)
   // Vues et « J'aime » en direct : redessine a chaque evenement (01/11/2026).
   useStatutsEnDirect()
   const [params, setParams] = useSearchParams()
