@@ -45,6 +45,12 @@ export interface ConversationMock {
    * demonstration. L'interrupteur part alors de « non ».
    */
   sourdine?: boolean
+  /** Sourdine pour un temps : jusqu'a quand (01/11/2026). */
+  sourdineJusqua?: string | null
+  /** En groupe : notifie seulement quand on me mentionne. */
+  mentionsSeulement?: boolean
+  /** Ajoute par quelqu'un, pas encore « Rester ». */
+  arriveeAConfirmer?: boolean
   online: boolean
   isGroup: boolean
   /**

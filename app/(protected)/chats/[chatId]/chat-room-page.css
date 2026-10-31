@@ -1270,6 +1270,39 @@ textarea.room-textarea::placeholder {
 .statut-cite-vignette.texte {
   display: block;
 }
+/* « Rester / Quitter » : un membre tout juste ajoute (01/11/2026). */
+.bandeau-arrivee {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.bandeau-arrivee span {
+  flex: 1;
+  min-width: 0;
+}
+.bandeau-arrivee button {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bandeau-arrivee .quitter {
+  background: none;
+  color: var(--danger, #e5484d);
+}
+.bandeau-arrivee .rester {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
 /* Audio ou video : une icone (01/11/2026). */
 .statut-cite-vignette.icone {
   display: flex;

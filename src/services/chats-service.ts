@@ -103,6 +103,9 @@ interface BackendConversation {
    * se mettre a jour en direct chez qui la regarde.
    */
   sourdine?: boolean
+  sourdineJusqua?: string | null
+  mentionsSeulement?: boolean
+  arriveeAConfirmer?: boolean
   /**
    * Reglages de traduction de cette conversation, pour ce compte.
    *
@@ -228,6 +231,10 @@ function toFrontConversation(c: BackendConversation): ConversationListItem {
     time: formatTime(c.updatedAt ?? c.lastMessage?.createdAt),
     unread: c.unread ?? 0,
     sourdine: c.sourdine ?? false,
+    // La sourdine complete et la banniere d'arrivee (01/11/2026).
+    sourdineJusqua: c.sourdineJusqua ?? null,
+    mentionsSeulement: c.mentionsSeulement === true,
+    arriveeAConfirmer: c.arriveeAConfirmer === true,
     online: peer?.isOnline === 1,
     isGroup: Boolean(c.isGroup),
     members: c.members?.map((m) => toInitials(m.pseudo ?? m.publicNumber)),

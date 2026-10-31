@@ -107,6 +107,7 @@ import {
   createPrivateChat,
   removeGroupMember,
   setGroupMemberRole,
+  leaveGroup,
 } from "../../../../src/services/chats-service"
 import {
   formatAudioDuration,
@@ -128,6 +129,12 @@ import { TexteForme } from "../../../../src/components/texte-forme"
 import { MediaChiffre, MediaChiffreIndisponible, TuileChiffree } from "./media-chiffre"
 import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { envoyerMediaChiffre } from "../../../../src/services/e2ee-media-envoi"
+import {
+  lireGroupe,
+  reglagesConnus,
+  resterDansGroupe,
+  type ReglagesGroupe,
+} from "../../../../src/services/groupe-service"
 import { televerser, type Reprise } from "../../../../src/services/envoi-morceaux"
 import { urlApercu, type ProtectionPdf } from "../../../../src/services/e2ee-media"
 import { DialogueProtectionPdf, type ChoixProtectionPdf } from "../../../../src/components/protection-pdf"
@@ -5557,6 +5564,29 @@ export default function ChatRoomPage() {
    * disparait — le serveur refuse de toute facon (`COMPTE_OFFICIEL`).
    */
   const compteOfficiel = backendChat?.officiel === true
+
+  /*
+   * LE GROUPE LUI-MEME (01/11/2026, repris d'Alanya2026) : le mode annonce et
+   * la banniere « Rester / Quitter ». La liste des conversations dit deja si
+   * je dois confirmer mon arrivee ; les reglages arrivent avec les membres.
+   */
+  const [reglagesGroupe, setReglagesGroupe] = useState<ReglagesGroupe | null>(null)
+  useEffect(() => {
+    if (!backendChat?.isGroup) return
+    setReglagesGroupe(reglagesConnus(chatId))
+    let actif = true
+    lireGroupe(chatId)
+      .then((r) => {
+        if (actif) setReglagesGroupe(r)
+      })
+      .catch(() => {})
+    return () => {
+      actif = false
+    }
+  }, [chatId, backendChat?.isGroup])
+  const arriveeAConfirmer =
+    backendChat?.isGroup === true &&
+    (reglagesGroupe ? reglagesGroupe.arriveeAConfirmer : backendChat?.arriveeAConfirmer === true)
   const [chatLoading, setChatLoading] = useState(true)
 
   useEffect(() => {
@@ -8211,6 +8241,21 @@ export default function ChatRoomPage() {
   const jeSuisAdminDuGroupe =
     backendChat?.membersInfo?.find((m) => m.id === getMyUserId())?.role === "ADMIN"
 
+  /** Mode annonce et je n'en suis pas admin : un avis a la place du champ. */
+  const annonceSansMoi =
+    backendChat?.isGroup === true && reglagesGroupe?.adminsSeulsEcrivent === true && !jeSuisAdminDuGroupe
+
+  const resterIci = () => {
+    setReglagesGroupe((r) => (r ? { ...r, arriveeAConfirmer: false } : r))
+    void resterDansGroupe(chatId).catch(() => {})
+  }
+  const quitterDepuisBanniere = () => {
+    if (!window.confirm(t("cinfo_leave_group_detail"))) return
+    void leaveGroup(chatId)
+      .then(() => navigate("/chats"))
+      .catch(() => error(t("server_unreachable")))
+  }
+
   /** Retire un membre du groupe. Reserve a l'administrateur, jamais sur soi. */
   const retirerDuGroupe = useCallback(
     (membre: MembreDuGroupe) => {
@@ -8647,6 +8692,19 @@ export default function ChatRoomPage() {
           )}
         </div>
       </div>
+
+      {/* Ajoute par quelqu'un : « Rester / Quitter » (01/11/2026). */}
+      {arriveeAConfirmer && (
+        <div className="bandeau-arrivee">
+          <span>{t("grp_join_banner")}</span>
+          <button type="button" className="quitter" onClick={quitterDepuisBanniere}>
+            {t("grp_leave_short")}
+          </button>
+          <button type="button" className="rester" onClick={resterIci}>
+            {t("grp_stay")}
+          </button>
+        </div>
+      )}
 
       {/*
         LE BANDEAU DES MESSAGES EPINGLES.
@@ -9284,6 +9342,13 @@ export default function ChatRoomPage() {
         <div className="room-input-wrap">
           <div className="room-locked">
             <span>{t("officiel_pas_de_reponse")}</span>
+          </div>
+        </div>
+      ) : annonceSansMoi ? (
+        // Mode annonce : seuls les admins ecrivent dans ce groupe.
+        <div className="room-input-wrap">
+          <div className="room-locked">
+            <span>{t("grp_only_admins_send")}</span>
           </div>
         </div>
       ) : verrou.parUnAutre ? (

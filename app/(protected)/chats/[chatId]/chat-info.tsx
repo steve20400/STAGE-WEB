@@ -19,7 +19,6 @@ import {
   leaveGroup as leaveGroupApi,
   removeGroupMember,
   setGroupMemberRole,
-  definirSourdine,
 } from "../../../../src/services/chats-service"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
 import { getMyUserId } from "../../../../src/data/session-user"
@@ -44,6 +43,28 @@ import {
 } from "../../../../src/services/blocked-service"
 import { AvatarCircle } from "../../../../src/components/avatar-circle"
 import { MenuContact } from "../../../../src/components/menu-contact"
+import { ChoixActions } from "../../../../src/components/photo-profil"
+import type { Cle } from "../../../../src/i18n"
+import {
+  changerReglagesGroupe,
+  definirSourdineDetail,
+  lireGroupe,
+  modifierDescription,
+  reglagesConnus,
+  type CleReglage,
+  type ReglagesGroupe,
+} from "../../../../src/services/groupe-service"
+
+/** Au-dela, la liste des membres se replie derriere « Voir plus » (01/11/2026). */
+const MEMBRES_VISIBLES = 8
+
+/** Les quatre reglages du groupe : cle, titre, explication. */
+const REGLAGES_GROUPE: Array<[CleReglage, Cle, Cle]> = [
+  ["adminsSeulsEcrivent", "grp_set_admins_send", "grp_set_admins_send_sub"],
+  ["adminsSeulsModifient", "grp_set_admins_edit", "grp_set_admins_edit_sub"],
+  ["adminsSeulsAjoutent", "grp_set_admins_add", "grp_set_admins_add_sub"],
+  ["historiqueCacheNouveaux", "grp_set_hide_history", "grp_set_hide_history_sub"],
+]
 
 type BackendGroupMember =
   | string
@@ -69,6 +90,8 @@ interface ConvInfo {
    * quand l'appelant ne le renseigne pas.
    */
   sourdine?: boolean
+  sourdineJusqua?: string | null
+  mentionsSeulement?: boolean
   name: string
   initials: string
   /** Photo de profil de l'interlocuteur, ou du groupe. */
@@ -243,6 +266,79 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
    */
   const monId = getMyUserId()
   const isAdmin = members.find((member) => member.id === monId)?.role === "admin"
+
+  /*
+   * LE GROUPE LUI-MEME (01/11/2026, repris d'Alanya2026) : description,
+   * proprietaire, reglages. Les gestes suivent les droits : seul le
+   * proprietaire change les roles et retire un admin, personne ne retire le
+   * proprietaire, et le groupe peut ouvrir l'edition ou l'ajout a tous.
+   */
+  const [reglages, setReglages] = useState<ReglagesGroupe | null>(() =>
+    conv.isGroup ? reglagesConnus(conv.id) : null,
+  )
+  useEffect(() => {
+    if (!conv.isGroup) return
+    let actif = true
+    lireGroupe(conv.id)
+      .then((r) => {
+        if (actif) setReglages(r)
+      })
+      .catch(() => {})
+    return () => {
+      actif = false
+    }
+  }, [conv.id, conv.isGroup])
+  const proprietaireId = reglages?.proprietaireId ?? null
+  const suisProprietaire = proprietaireId !== null && proprietaireId === monId
+  const peutModifier = isAdmin || reglages?.adminsSeulsModifient === false
+  const peutAjouter = isAdmin || reglages?.adminsSeulsAjoutent === false
+  const peutChangerRole = (m: Member) =>
+    m.id !== proprietaireId && (proprietaireId ? suisProprietaire : isAdmin)
+  const peutRetirer = (m: Member) =>
+    isAdmin && m.id !== proprietaireId && (m.role !== "admin" || !proprietaireId || suisProprietaire)
+
+  // « Voir plus » : une longue liste de membres repoussait tout le reste.
+  const [tousLesMembres, setTousLesMembres] = useState(false)
+  // Le proprietaire d'abord, puis les admins, puis les autres.
+  const membresTries = [...members].sort((a, b) => {
+    const rang = (m: Member) => (m.id === proprietaireId ? 0 : m.role === "admin" ? 1 : 2)
+    return rang(a) - rang(b)
+  })
+  const membresAffiches = tousLesMembres ? membresTries : membresTries.slice(0, MEMBRES_VISIBLES)
+
+  const [descriptionEnCours, setDescriptionEnCours] = useState<string | null>(null)
+  const enregistrerDescription = () => {
+    const texte = (descriptionEnCours ?? "").trim()
+    setDescriptionEnCours(null)
+    if (texte === (reglages?.description ?? "")) return
+    void modifierDescription(conv.id, texte)
+      .then(setReglages)
+      .catch(() => error(t("server_unreachable")))
+  }
+  const changerReglage = (cle: CleReglage, valeur: boolean) => {
+    void changerReglagesGroupe(conv.id, { [cle]: valeur })
+      .then(setReglages)
+      .catch(() => error(t("grp_settings_failed")))
+  }
+
+  // Sourdine pour un temps, et « mentions seulement » (01/11/2026).
+  const [choixSourdine, setChoixSourdine] = useState(false)
+  const [mentionsSeulement, setMentionsSeulement] = useState(Boolean(propInfo?.mentionsSeulement))
+  const [sourdineJusqua, setSourdineJusqua] = useState<string | null>(propInfo?.sourdineJusqua ?? null)
+  const appliquerSourdine = (choix: { sourdine?: boolean; jusqua?: Date; mentionsSeulement?: boolean }) => {
+    setSourdineEnCours(true)
+    void definirSourdineDetail(convId ?? conv.id, choix)
+      .then((e) => {
+        setMute(e.sourdine)
+        setSourdineJusqua(e.sourdineJusqua)
+        setMentionsSeulement(e.mentionsSeulement)
+        if (choix.mentionsSeulement === undefined) {
+          info(e.sourdine ? t("cinfo_muted_toast") : t("cinfo_unmuted_toast"))
+        }
+      })
+      .catch(() => error(t("server_unreachable")))
+      .finally(() => setSourdineEnCours(false))
+  }
 
   const removeMember = (id: string) => {
     const member = members.find((entry) => entry.id === id)
@@ -482,6 +578,22 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
         .notif-row { display: flex; align-items: center; justify-content: space-between; }
         .notif-label { font-size: 13px; color: var(--text-primary); }
+        /* Groupes (01/11/2026) : explication sous un reglage, description,
+           « Voir plus », reglages du groupe. */
+        .notif-label small { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .notif-row + .notif-row { margin-top: 12px; }
+        .cip-description { display: block; width: 100%; margin: -8px 0 16px; padding: 8px 10px; border: 1px dashed transparent; border-radius: 8px; background: none; color: var(--text-secondary); font: inherit; font-size: 13px; line-height: 1.5; text-align: center; white-space: pre-wrap; word-break: break-word; cursor: pointer; }
+        .cip-description:hover:not(:disabled) { border-color: var(--border-default); }
+        .cip-description:disabled { cursor: default; }
+        .cip-description.vide { color: var(--accent); font-weight: 600; }
+        .cip-description-edition { margin: -8px 0 16px; display: flex; flex-direction: column; gap: 8px; }
+        .cip-description-edition textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-elevated); color: var(--text-primary); font: inherit; font-size: 13px; resize: vertical; }
+        .cip-description-edition div { display: flex; justify-content: flex-end; gap: 8px; }
+        .cip-description-edition button { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 6px 12px; background: var(--bg-elevated); color: var(--text-primary); font: inherit; font-size: 12px; cursor: pointer; }
+        .cip-description-edition button.principal { border: 0; background: var(--accent); color: var(--accent-text); font-weight: 600; }
+        .cip-voir-plus { width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: 8px; background: var(--bg-elevated); color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .cip-reglages { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+        .cip-reglages-titre { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
         .tgl { width: 38px; height: 21px; border-radius: 20px; border: none; cursor: pointer; position: relative; transition: background .2s; }
         .tgl-knob { position: absolute; top: 2.5px; width: 16px; height: 16px; border-radius: 50%; transition: left .2s; }
 
@@ -604,8 +716,39 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
             )}
             {conv.isGroup && (
               <div className="cip-sub">
-                {conv.description ?? t("cinfo_members_count", { count: members.length })}
+                {t("cinfo_members_count", { count: members.length })}
               </div>
+            )}
+            {/* La description du groupe : ajoutee ou modifiee selon les droits. */}
+            {conv.isGroup && descriptionEnCours !== null && (
+              <div className="cip-description-edition">
+                <textarea
+                  value={descriptionEnCours}
+                  maxLength={512}
+                  rows={3}
+                  autoFocus
+                  onChange={(e) => setDescriptionEnCours(e.target.value)}
+                  aria-label={t("grp_description")}
+                />
+                <div>
+                  <button type="button" onClick={() => setDescriptionEnCours(null)}>
+                    {t("cancel")}
+                  </button>
+                  <button type="button" className="principal" onClick={enregistrerDescription}>
+                    {t("save")}
+                  </button>
+                </div>
+              </div>
+            )}
+            {conv.isGroup && descriptionEnCours === null && (reglages?.description || peutModifier) && (
+              <button
+                type="button"
+                className={`cip-description${reglages?.description ? "" : " vide"}`}
+                disabled={!peutModifier}
+                onClick={() => setDescriptionEnCours(reglages?.description ?? "")}
+              >
+                {reglages?.description || t("grp_add_description")}
+              </button>
             )}
             {/* Le statut derive de la presence : on le compose au rendu, pour
                 qu'il suive un changement de langue sans recharger la page. */}
@@ -780,29 +923,32 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
             </div>
 
             <div className="notif-row">
-              <span className="notif-label">{t("cinfo_mute")}</span>
+              <span className="notif-label">
+                {t("cinfo_mute")}
+                {muteNotifs && sourdineJusqua && (
+                  <small>
+                    {t("muted_until", {
+                      quand: new Date(sourdineJusqua).toLocaleString(undefined, {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      }),
+                    })}
+                  </small>
+                )}
+              </span>
               <button
                 className="tgl"
                 style={{ background: muteNotifs ? "var(--accent)" : "var(--border-default)" }}
                 disabled={sourdineEnCours}
                 onClick={() => {
                   if (sourdineEnCours) return
-                  const vise = !muteNotifs
-                  setSourdineEnCours(true)
-                  // On bascule tout de suite — un interrupteur doit repondre au
-                  // doigt — mais on REVIENT si le serveur refuse : mieux vaut un
-                  // retour en arriere visible qu'un reglage qu'on croit pose.
-                  setMute(vise)
-                  void definirSourdine(convId ?? conv?.id ?? "", vise)
-                    .then((retenu) => {
-                      setMute(retenu)
-                      info(retenu ? t("cinfo_muted_toast") : t("cinfo_unmuted_toast"))
-                    })
-                    .catch(() => {
-                      setMute(!vise)
-                      error(t("server_unreachable"))
-                    })
-                    .finally(() => setSourdineEnCours(false))
+                  /*
+                   * COUPER DEMANDE POUR COMBIEN DE TEMPS (01/11/2026) : 8 heures,
+                   * une semaine ou toujours. Retablir est immediat. L'etat
+                   * affiche est celui que rend le serveur.
+                   */
+                  if (muteNotifs) appliquerSourdine({ sourdine: false })
+                  else setChoixSourdine(true)
                 }}
                 aria-checked={muteNotifs}
                 role="switch"
@@ -816,6 +962,48 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 />
               </button>
             </div>
+
+            {conv.isGroup && (
+              <div className="notif-row">
+                <span className="notif-label">
+                  {t("mute_mentions_only")}
+                  <small>{t("mute_mentions_only_sub")}</small>
+                </span>
+                <button
+                  className="tgl"
+                  style={{ background: mentionsSeulement ? "var(--accent)" : "var(--border-default)" }}
+                  disabled={sourdineEnCours}
+                  onClick={() => appliquerSourdine({ mentionsSeulement: !mentionsSeulement })}
+                  aria-checked={mentionsSeulement}
+                  role="switch"
+                >
+                  <div
+                    className="tgl-knob"
+                    style={{
+                      left: mentionsSeulement ? "20px" : "2.5px",
+                      background: mentionsSeulement ? "var(--accent-text)" : "var(--text-muted)",
+                    }}
+                  />
+                </button>
+              </div>
+            )}
+            {choixSourdine && (
+              <ChoixActions
+                titre={t("cinfo_mute")}
+                actions={[
+                  {
+                    libelle: t("mute_8h"),
+                    onChoisir: () => appliquerSourdine({ jusqua: new Date(Date.now() + 8 * 3600_000) }),
+                  },
+                  {
+                    libelle: t("mute_1w"),
+                    onChoisir: () => appliquerSourdine({ jusqua: new Date(Date.now() + 7 * 86400_000) }),
+                  },
+                  { libelle: t("mute_always"), onChoisir: () => appliquerSourdine({ sourdine: true }) },
+                ]}
+                onFermer={() => setChoixSourdine(false)}
+              />
+            )}
 
             {/* Bloquer : meme interrupteur que la sourdine — l'etat se lit d'un
                 coup d'oeil, ce qu'une entree de menu ne montre pas. Teinte
@@ -882,7 +1070,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           {conv.isGroup && tab === "membres" && (
             <div className="cip-section" data-section-membres>
               {conv.isGroup &&
-                members.map((member) => {
+                membresAffiches.map((member) => {
                   const memberColor = COLORS[member.color]
                   /**
                    * « Moi » se reconnait a l'identifiant de compte, jamais a la
@@ -913,7 +1101,13 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                           {member.name}
                           {member.role === "admin" && (
                             <span className={`m-role ${isMe ? "me-badge" : ""}`}>
-                              {isMe ? t("cinfo_you_admin") : t("cinfo_admin")}
+                              {member.id === proprietaireId
+                                ? isMe
+                                  ? `${t("you")} · ${t("grp_owner")}`
+                                  : t("grp_owner")
+                                : isMe
+                                  ? t("cinfo_you_admin")
+                                  : t("cinfo_admin")}
                             </span>
                           )}
                           {isMe && member.role !== "admin" && (
@@ -967,9 +1161,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                           </button>
                         </div>
                       )}
-                      {!isMe && isAdmin && (
+                      {!isMe && (peutChangerRole(member) || peutRetirer(member)) && (
                         <div className="m-actions">
-                          {member.role !== "admin" && (
+                          {member.role !== "admin" && peutChangerRole(member) && (
                             <button
                               className="m-action"
                               title={t("cinfo_make_admin")}
@@ -988,6 +1182,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                               </svg>
                             </button>
                           )}
+                          {peutRetirer(member) && (
                           <button
                             className="m-action danger"
                             title={t("cinfo_remove_from_group")}
@@ -1006,12 +1201,24 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                               <line x1="6" y1="6" x2="18" y2="18" />
                             </svg>
                           </button>
+                          )}
                         </div>
                       )}
                     </div>
                   )
                 })}
-              {conv.isGroup && isAdmin && (
+              {conv.isGroup && members.length > MEMBRES_VISIBLES && (
+                <button
+                  type="button"
+                  className="cip-voir-plus"
+                  onClick={() => setTousLesMembres((v) => !v)}
+                >
+                  {tousLesMembres
+                    ? t("grp_see_less")
+                    : t("grp_see_more", { n: members.length - MEMBRES_VISIBLES })}
+                </button>
+              )}
+              {conv.isGroup && peutAjouter && (
                 <button
                   style={{
                     width: "100%",
@@ -1057,6 +1264,35 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                   </svg>
                   {t("cinfo_add_members_cta")}
                 </button>
+              )}
+              {conv.isGroup && isAdmin && reglages && (
+                <div className="cip-reglages">
+                  <div className="cip-reglages-titre">{t("grp_settings")}</div>
+                  {REGLAGES_GROUPE.map(([cle, titre, sous]) => (
+                    <div className="notif-row" key={cle}>
+                      <span className="notif-label">
+                        {t(titre)}
+                        <small>{t(sous)}</small>
+                      </span>
+                      <button
+                        className="tgl"
+                        style={{ background: reglages[cle] ? "var(--accent)" : "var(--border-default)" }}
+                        onClick={() => changerReglage(cle, !reglages[cle])}
+                        aria-checked={reglages[cle]}
+                        role="switch"
+                        aria-label={t(titre)}
+                      >
+                        <div
+                          className="tgl-knob"
+                          style={{
+                            left: reglages[cle] ? "20px" : "2.5px",
+                            background: reglages[cle] ? "var(--accent-text)" : "var(--text-muted)",
+                          }}
+                        />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
               {conv.isGroup && isAdmin && estChiffree(conv.id) && (
                 <button
@@ -1412,6 +1648,8 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
       // L'etat REEL de la sourdine, celui du serveur. L'interrupteur partait de
       // « non » a chaque ouverture, quel que soit le reglage enregistre.
       sourdine: conv.sourdine,
+      sourdineJusqua: conv.sourdineJusqua ?? null,
+      mentionsSeulement: conv.mentionsSeulement === true,
       // Pas de description ici : le nombre de membres se compose au rendu, donc
       // il suit la langue choisie meme apres coup.
     }
