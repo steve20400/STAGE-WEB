@@ -41,6 +41,8 @@ export async function envoyerMediaChiffre(
     dureeMs?: number
     legende?: string
     replyToId?: string
+    /** Une reponse vocale a un statut (01/11/2026). */
+    statutCite?: string
     /** Avancement du téléversement, de 0 à 1 (chapitre 46). */
     onProgression?: (fraction: number) => void
     /**
@@ -131,6 +133,7 @@ export async function envoyerMediaChiffre(
         chiffre: true,
         mediaIds: [media.id],
         ...(o.replyToId ? { replyToId: o.replyToId } : {}),
+        ...(o.statutCite ? { statutCite: o.statutCite } : {}),
       },
     },
   )

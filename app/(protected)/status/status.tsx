@@ -466,10 +466,8 @@ export default function StatusPage() {
 
   /**
    * REPONSE VOCALE A UN STATUT : un message vocal dans le tete-a-tete, qui cite
-   * le statut comme une reponse ecrite.
-   *
-   * ⚠️ DANS UN FIL CHIFFRE, le vocal part chiffre et SANS citation : le chemin
-   * chiffre ne la porte pas (meme limite que la reponse ecrite).
+   * le statut comme une reponse ecrite. Dans un fil chiffre, il part chiffre,
+   * citation comprise.
    */
   const repondreEnVocal = async (fichier: File, dureeMs: number) => {
     if (!viewer) return
@@ -481,7 +479,12 @@ export default function StatusPage() {
       const { id } = await createPrivateChat(viewer.group.publicNumber)
       if (!etatConnu(id)) await lireEtatE2ee(id).catch(() => undefined)
       if (estChiffree(id)) {
-        await envoyerMediaChiffre(id, fichier, { nom: fichier.name, mime: fichier.type, dureeMs })
+        await envoyerMediaChiffre(id, fichier, {
+          nom: fichier.name,
+          mime: fichier.type,
+          dureeMs,
+          statutCite: statut.id,
+        })
       } else {
         const media = await uploadMedia(fichier, fichier.name, dureeMs)
         await sendChatMessage(id, "", "audio", { mediaId: media.id, statutCite: statut.id })

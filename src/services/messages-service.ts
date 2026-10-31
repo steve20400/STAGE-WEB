@@ -709,6 +709,8 @@ function optionsChiffre(type: MessageType, options: SendOptions) {
             ? ("STICKER" as const)
             : undefined,
     replyToId: options.replyToId,
+    // La reponse a un statut garde sa citation dans un fil chiffre (01/11/2026).
+    statutCite: options.statutCite,
   }
 }
 

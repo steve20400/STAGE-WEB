@@ -238,7 +238,16 @@ export async function envoyerChiffre(
    * clair et le serveur le refusait. `genre` dit ce que `texte` porte : la
    * fiche JSON d'un CONTACT, voyagée dans l'enveloppe.
    */
-  options: { genre?: GenreCharge; replyToId?: string } = {},
+  options: {
+    genre?: GenreCharge
+    replyToId?: string
+    /**
+     * Le statut auquel ce message repond (01/11/2026). Le serveur en recopie
+     * l'apercu depuis le statut — qu'il connait deja — sans rien lire du
+     * message. Tete-a-tete seulement : on ne repond a un statut qu'a deux.
+     */
+    statutCite?: string
+  } = {},
 ): Promise<MessageCree> {
   /*
    * 🔴 UN GROUPE PREND SON PROPRE CHEMIN (lot 4, cours chapitre 34) : un seul
@@ -271,6 +280,7 @@ export async function envoyerChiffre(
         type: options.genre ?? "TEXT",
         chiffre: true,
         ...(options.replyToId ? { replyToId: options.replyToId } : {}),
+        ...(options.statutCite ? { statutCite: options.statutCite } : {}),
       },
     },
   )
