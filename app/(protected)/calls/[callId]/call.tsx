@@ -98,7 +98,11 @@ export default function CallRoomPage() {
   // Sans image distante on retombe sur le fond motif + photo du correspondant,
   // au lieu d'un grand rectangle noir. Declare ici (et non plus bas) pour servir
   // de dependance aux effets qui branchent les flux.
-  const showRemoteVideo = isVideo && callState === "active" && hasRemote && remoteHasVideo
+  // Camera coupee chez le correspondant (31/10/2026) : son avatar, plutot qu'une
+  // image figee ou noire.
+  const cameraDistanteCoupee = call.camerasCoupees.includes(remoteStreamEntries[0]?.[0] ?? "")
+  const showRemoteVideo =
+    isVideo && callState === "active" && hasRemote && remoteHasVideo && !cameraDistanteCoupee
   /**
    * Ecran divise : chaque participant a sa tuile, avec sa photo et son nom.
    * Le grand avatar central n'a alors plus lieu d'etre — il flottait par-dessus
@@ -305,9 +309,11 @@ export default function CallRoomPage() {
       // un appel qui n'a jamais abouti.
       call.reconnexion
         ? t("call_reconnecting")
-        : call.progress === "ongoing"
-          ? `${t("call_ongoing")} — ${formatElapsed(elapsed)}`
-          : formatElapsed(elapsed),
+        : (call.progress === "ongoing"
+            ? `${t("call_ongoing")} — ${formatElapsed(elapsed)}`
+            : formatElapsed(elapsed)) +
+          // « Connexion faible », comme WhatsApp (31/10/2026).
+          (call.connexionFaible ? ` · ${t("call_weak_connection")}` : ""),
     ended: t("call_ended"),
   }
 

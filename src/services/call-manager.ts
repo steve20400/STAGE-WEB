@@ -337,12 +337,18 @@ export interface CallManagerState {
    * participants designent la meme personne.
    */
   partageParPeerId: string | null
+  /** Une liaison au moins est degradee : « Connexion faible » (31/10/2026). */
+  connexionFaible: boolean
+  /** Les pairs qui ont coupe leur camera : leur avatar a la place de l'image. */
+  camerasCoupees: string[]
 }
 
 interface WebrtcSignal {
   kind?: string
   sdp?: string
   type?: string
+  /** `camera_state` : la camera du pair est-elle allumee ? (31/10/2026) */
+  enabled?: boolean
   candidate?: { candidate?: string; sdpMid?: string; sdpMLineIndex?: number }
 }
 
@@ -360,7 +366,28 @@ interface WebrtcSignal {
  * devant quelqu'un qui a deja raccroche. Le plafond est celui du sursis du
  * serveur (45 s) : au-dela, il cloture de son cote.
  */
-const ESSAIS_REPRISE_MS = [2000, 4000, 8000]
+/*
+ * ⚠️ ETALES SUR TOUTE LA FENETRE DU SERVEUR (31/10/2026, comme le mobile). Ils
+ * etaient trois, a 2, 4 et 8 s : environ 15 s quand le serveur en accorde 45.
+ * Un passage Wi-Fi → 4G dure souvent plus, et l'appel etait perdu pour rien.
+ */
+const ESSAIS_REPRISE_MS = [1000, 2000, 3000, 4000, 5000, 6000, 8000, 8000, 8000]
+/** Une offre de reprise sans reponse au-dela est retiree (rollback). */
+const OFFRE_SANS_REPONSE_MAX_MS = 8000
+
+/*
+ * 🔴 REGLAGE DE L'EMISSION ET ADAPTATION (guide du patron, 31/10/2026 — memes
+ * valeurs que le mobile). Le son d'abord ; la video plafonnee pour ne pas
+ * remplir les files du reseau ; toutes les 3 s, les statistiques : degrade
+ * deux fois de suite, la video passe a moitie de definition et 300 kbit/s, et
+ * l'ecran dit « Connexion faible » ; trois mesures saines, elle remonte.
+ */
+const DEBIT_VIDEO_MAX = 800_000
+const DEBIT_VIDEO_FAIBLE = 300_000
+const CADENCE_VIDEO_MAX = 30
+const PERTE_MAX = 0.05
+const ALLER_RETOUR_MAX_S = 0.6
+const DEBIT_DISPONIBLE_MIN = 250_000
 const PLAFOND_REPRISE_MS = 45000
 /** Ce qu'on laisse a un `disconnected` pour se reparer tout seul. */
 const SURSIS_DISCONNECTED_MS = 3000
@@ -384,6 +411,19 @@ class PeerSession {
   private tentativesReprise = 0
   private repriseDepuis = 0
   remoteStream: MediaStream | null = null
+  private emissionReglee = false
+  private mesureTimer: ReturnType<typeof setInterval> | null = null
+  private mauvaisesDeSuite = 0
+  private bonnesDeSuite = 0
+  private recusAvant = 0
+  private perdusAvant = 0
+  private offreEnvoyeeLe = 0
+  /** « Reconnexion… » n'est affiche que si NOTRE liaison a vacille. */
+  private repriseAnnoncee = false
+  /** La liaison avec ce pair est degradee : l'ecran dit « Connexion faible ». */
+  connexionFaible = false
+  /** Le pair a coupe sa camera (bouton, ou application en arriere-plan). */
+  cameraDistanteActive = true
 
   constructor(
     private readonly peerId: string,
@@ -414,7 +454,13 @@ class PeerSession {
     if (this.started) return
     this.started = true
 
-    const pc = new RTCPeerConnection({ iceServers: this.iceServers })
+    const pc = new RTCPeerConnection({
+      iceServers: this.iceServers,
+      // Un seul port pour tous les medias, et quelques candidats collectes
+      // d'avance : la negociation et chaque reprise demarrent plus vite.
+      bundlePolicy: "max-bundle",
+      iceCandidatePoolSize: 2,
+    })
     // COLLISION D'OFFRES. Deux pairs qui renegocient dans le meme tour — deux
     // partages d'ecran lances ensemble — s'envoyaient chacun une offre, et
     // chacun rejetait celle de l'autre : les deux connexions restaient en
@@ -502,10 +548,14 @@ class PeerSession {
         if (this.sursisTimer) clearTimeout(this.sursisTimer)
         this.sursisTimer = null
         this.finDeReprise()
+        void this.reglerEmission()
+        this.demarrerMesure()
       }
     }
 
     this.declarerLesMedias(pc)
+    // Avant toute offre ou reponse : l'ordre des codecs s'ecrit dans le SDP.
+    this.preferH264(pc)
 
     if (this.isOfferer) {
       // L'emission de l'offre ne doit JAMAIS remonter jusqu'a l'appelant.
@@ -664,15 +714,30 @@ class PeerSession {
    * [immediat] saute l'attente du premier essai : sur `failed`, patienter ne
    * sert a rien puisque l'etat ne se repare pas de lui-meme.
    */
-  private demarreLaReprise(immediat = false) {
+  private demarreLaReprise(immediat = false, annoncer = true) {
     if (!this.pc) return
     if (!this.enReprise) {
       this.enReprise = true
       this.tentativesReprise = 0
       this.repriseDepuis = Date.now()
+    }
+    if (annoncer && !this.repriseAnnoncee) {
+      this.repriseAnnoncee = true
       this.onReconnecting()
     }
     this.planifieUnEssai(immediat)
+  }
+
+  /**
+   * Le WebSocket vient de revenir pendant l'appel : le reseau a tres
+   * probablement change. On relance la liaison tout de suite, sans rien
+   * afficher — WebRTC peut mettre 10 a 30 s a voir que l'ancien chemin est
+   * mort, l'image restant figee pendant ce temps (31/10/2026).
+   */
+  relancerApresChangementDeReseau() {
+    if (!this.pc) return
+    if (this.isOfferer) this.demarreLaReprise(true, false)
+    else this.onSendSignal({ kind: "ice_restart_request" })
   }
 
   private planifieUnEssai(immediat = false) {
@@ -703,6 +768,21 @@ class PeerSession {
       return
     }
 
+    // Une offre partie depuis longtemps, sans reponse (perdue avec le reseau) :
+    // on la retire, sinon toutes les tentatives suivantes l'attendraient.
+    if (
+      pc.signalingState === "have-local-offer" &&
+      this.offreEnvoyeeLe > 0 &&
+      Date.now() - this.offreEnvoyeeLe > OFFRE_SANS_REPONSE_MAX_MS
+    ) {
+      try {
+        await pc.setLocalDescription({ type: "rollback" })
+        this.offreEnvoyeeLe = 0
+      } catch {
+        /* le prochain essai retentera */
+      }
+    }
+
     try {
       // `restartIce()` marque la connexion : la PROCHAINE offre portera de
       // nouveaux `ice-ufrag`/`ice-pwd`, donc une collecte de candidats neuve.
@@ -725,7 +805,10 @@ class PeerSession {
     this.enReprise = false
     this.tentativesReprise = 0
     this.repriseDepuis = 0
-    this.onReconnected()
+    if (this.repriseAnnoncee) {
+      this.repriseAnnoncee = false
+      this.onReconnected()
+    }
   }
 
   /**
@@ -741,6 +824,7 @@ class PeerSession {
     if (this.repriseTimer) clearTimeout(this.repriseTimer)
     this.repriseTimer = null
     this.enReprise = false
+    this.repriseAnnoncee = false
     this.repriseDepuis = 0
     this.onReconnected()
     const hasTurn = this.iceServers.some((server) => {
@@ -763,6 +847,7 @@ class PeerSession {
     try {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
+      this.offreEnvoyeeLe = Date.now()
       this.onSendSignal({ kind: "offer", sdp: offer.sdp, type: offer.type })
     } catch (err) {
       console.warn(`[webrtc] renegociation impossible avec ${this.peerId}`, err)
@@ -804,12 +889,31 @@ class PeerSession {
       } else if (signal.kind === "answer" && signal.sdp) {
         await pc.setRemoteDescription({ type: "answer", sdp: signal.sdp })
         this.remoteReady = true
+        this.offreEnvoyeeLe = 0
         await this.flushIceQueue()
+        /*
+         * ⚠️ UNE REPRISE SUR UNE LIAISON QUI ALLAIT BIEN n'emet pas toujours
+         * de nouvel etat ICE : sans ce controle, elle ne se concluait jamais,
+         * les essais s'epuisaient et l'ecran annoncait un echec alors que le
+         * media passait (31/10/2026).
+         */
+        if (this.enReprise) {
+          setTimeout(() => {
+            const etat = this.pc?.iceConnectionState
+            if (etat === "connected" || etat === "completed") this.finDeReprise()
+          }, 2000)
+        }
       } else if (signal.kind === "ice_restart_request") {
         // Le pair ne peut pas relancer lui-meme — il n'est pas offreur. On le
         // fait pour lui, meme si de notre cote l'etat ICE n'a rien signale :
         // une coupure n'est pas toujours vue des deux bouts en meme temps.
-        if (this.isOfferer) this.demarreLaReprise(true)
+        // Sans annonce : notre liaison, elle, n'a peut-etre rien eu.
+        if (this.isOfferer) this.demarreLaReprise(true, false)
+      } else if (signal.kind === "camera_state") {
+        // Camera du pair coupee ou rallumee (31/10/2026) : son avatar plutot
+        // qu'une image figee.
+        this.cameraDistanteActive = signal.enabled !== false
+        majCamerasCoupees()
       } else if (signal.kind === "ice" && signal.candidate?.candidate) {
         const candidate: RTCIceCandidateInit = {
           candidate: signal.candidate.candidate,
@@ -937,6 +1041,9 @@ class PeerSession {
 
   close() {
     this.remoteStream = null
+    if (this.mesureTimer) clearInterval(this.mesureTimer)
+    this.mesureTimer = null
+    this.connexionFaible = false
     if (this.sursisTimer) clearTimeout(this.sursisTimer)
     if (this.repriseTimer) clearTimeout(this.repriseTimer)
     this.sursisTimer = null
@@ -948,6 +1055,156 @@ class PeerSession {
     this.remoteReady = false
     this.pendingSignals = []
     this.iceQueue = []
+  }
+
+  /** Previent le pair que notre camera est coupee ou rallumee. */
+  envoyerEtatCamera(active: boolean) {
+    if (!this.pc) return
+    this.onSendSignal({ kind: "camera_state", enabled: active })
+  }
+
+  /**
+   * H.264 en tete : souvent accelere par le materiel, donc moins de charge et
+   * moins de saccades. Les autres codecs suivent dans leur ordre : un pair qui
+   * ne parle pas H.264 retombe sur VP8.
+   */
+  private preferH264(pc: RTCPeerConnection) {
+    if (!this.isVideo || typeof RTCRtpSender.getCapabilities !== "function") return
+    try {
+      const codecs = RTCRtpSender.getCapabilities("video")?.codecs ?? []
+      const h264 = (c: { mimeType: string }) => c.mimeType.toLowerCase() === "video/h264"
+      if (!codecs.some(h264)) return
+      const ordonnes = [...codecs.filter(h264), ...codecs.filter((c) => !h264(c))]
+      for (const t of pc.getTransceivers()) {
+        const nature = t.sender.track?.kind ?? t.receiver.track?.kind
+        if (nature === "video" && typeof t.setCodecPreferences === "function") {
+          t.setCodecPreferences(ordonnes)
+        }
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("[webrtc] preference H.264 impossible", err)
+    }
+  }
+
+  /** Son prioritaire, video plafonnee, degradation equilibree. Une fois. */
+  private async reglerEmission() {
+    const pc = this.pc
+    if (!pc || this.emissionReglee) return
+    this.emissionReglee = true
+    try {
+      for (const emetteur of pc.getSenders()) {
+        const nature = emetteur.track?.kind
+        if (!nature) continue
+        const p = emetteur.getParameters() as RTCRtpSendParameters & {
+          degradationPreference?: string
+        }
+        if (!p.encodings || p.encodings.length === 0) p.encodings = [{}]
+        for (const e of p.encodings as (RTCRtpEncodingParameters & {
+          priority?: string
+          networkPriority?: string
+        })[]) {
+          if (nature === "audio") {
+            e.priority = "high"
+            e.networkPriority = "high"
+          } else {
+            e.maxBitrate = DEBIT_VIDEO_MAX
+            e.maxFramerate = CADENCE_VIDEO_MAX
+            e.priority = "low"
+            e.networkPriority = "low"
+          }
+        }
+        if (nature === "video") p.degradationPreference = "balanced"
+        await emetteur.setParameters(p)
+      }
+    } catch (err) {
+      this.emissionReglee = false
+      // eslint-disable-next-line no-console
+      console.warn("[webrtc] reglage de l'emission impossible", err)
+    }
+  }
+
+  private demarrerMesure() {
+    if (this.mesureTimer) return
+    this.mesureTimer = setInterval(() => void this.mesurer(), 3000)
+  }
+
+  private async mesurer() {
+    const pc = this.pc
+    if (!pc || this.enReprise) return
+    let rapports: RTCStatsReport
+    try {
+      rapports = await pc.getStats()
+    } catch {
+      return
+    }
+    let perteEmise = 0
+    let allerRetour = 0
+    let debitDisponible: number | null = null
+    let recus = 0
+    let perdus = 0
+    rapports.forEach((r) => {
+      const v = r as Record<string, unknown>
+      const n = (x: unknown) => (typeof x === "number" ? x : 0)
+      if (r.type === "remote-inbound-rtp") {
+        perteEmise = Math.max(perteEmise, n(v.fractionLost))
+        allerRetour = Math.max(allerRetour, n(v.roundTripTime))
+      } else if (r.type === "candidate-pair" && v.state === "succeeded" && v.nominated) {
+        allerRetour = Math.max(allerRetour, n(v.currentRoundTripTime))
+        if (typeof v.availableOutgoingBitrate === "number") debitDisponible = v.availableOutgoingBitrate
+      } else if (r.type === "inbound-rtp") {
+        recus += n(v.packetsReceived)
+        perdus += n(v.packetsLost)
+      }
+    })
+    const dRecus = recus - this.recusAvant
+    const dPerdus = perdus - this.perdusAvant
+    this.recusAvant = recus
+    this.perdusAvant = perdus
+    const perteRecue = dRecus + dPerdus > 20 ? dPerdus / (dRecus + dPerdus) : 0
+    const degrade =
+      perteEmise > PERTE_MAX ||
+      perteRecue > PERTE_MAX ||
+      allerRetour > ALLER_RETOUR_MAX_S ||
+      (debitDisponible !== null && debitDisponible < DEBIT_DISPONIBLE_MIN)
+    if (degrade) {
+      this.bonnesDeSuite = 0
+      this.mauvaisesDeSuite++
+      if (this.mauvaisesDeSuite >= 2 && !this.connexionFaible) {
+        this.connexionFaible = true
+        majConnexionFaible()
+        void this.appliquerDebit(true)
+      }
+    } else {
+      this.mauvaisesDeSuite = 0
+      this.bonnesDeSuite++
+      if (this.bonnesDeSuite >= 3 && this.connexionFaible) {
+        this.connexionFaible = false
+        majConnexionFaible()
+        void this.appliquerDebit(false)
+      }
+    }
+  }
+
+  /** Video allegee (moitie de definition, 300 kbit/s) ou normale. */
+  private async appliquerDebit(faible: boolean) {
+    const pc = this.pc
+    if (!pc || !this.isVideo) return
+    try {
+      for (const emetteur of pc.getSenders()) {
+        if (emetteur.track?.kind !== "video") continue
+        const p = emetteur.getParameters()
+        if (!p.encodings || p.encodings.length === 0) continue
+        for (const e of p.encodings) {
+          e.maxBitrate = faible ? DEBIT_VIDEO_FAIBLE : DEBIT_VIDEO_MAX
+          e.scaleResolutionDownBy = faible ? 2 : 1
+        }
+        await emetteur.setParameters(p)
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("[webrtc] adaptation du debit impossible", err)
+    }
   }
 }
 
@@ -1031,6 +1288,8 @@ function initialState(): CallManagerState {
     partageParMoi: false,
     peersMuted: {},
     partageParPeerId: null,
+    connexionFaible: false,
+    camerasCoupees: [],
   }
 }
 
@@ -1574,6 +1833,20 @@ const peers = new Map<string, PeerSession>()
  */
 const pairsEnReconnexion = new Set<string>()
 
+/** Recalcule « Connexion faible » a partir des sessions. */
+function majConnexionFaible() {
+  const faible = [...peers.values()].some((p) => p.connexionFaible)
+  if (faible !== state.connexionFaible) setState({ connexionFaible: faible })
+}
+
+/** Recalcule la liste des pairs dont la camera est coupee. */
+function majCamerasCoupees() {
+  const coupees = [...peers.entries()]
+    .filter(([, p]) => !p.cameraDistanteActive)
+    .map(([id]) => id)
+  setState({ camerasCoupees: coupees })
+}
+
 function marquerReconnexion(peerId: string, actif: boolean) {
   // Les reunions ont leur propre affichage : cet etat ne decrit que les appels.
   if (salleReunion !== null) return
@@ -1879,7 +2152,12 @@ function ensureEventSubscription() {
    * rien.
    */
   subscribeToWsConnected(() => {
-    if (state.activeCallId) sendCallRejoin(state.activeCallId)
+    if (!state.activeCallId) return
+    sendCallRejoin(state.activeCallId)
+    // 🔴 31/10/2026 : la socket revient presque toujours parce que le reseau a
+    // change. Les liaisons se relancent sans attendre que leur propre etat
+    // s'en apercoive — 10 a 30 s d'image figee evitees.
+    for (const p of peers.values()) p.relancerApresChangementDeReseau()
   })
   registerPageHideCleanup()
 }
@@ -1965,10 +2243,16 @@ function brancherVoixDistanteSiPossible() {
 function contraintesVideo(): MediaTrackConstraints {
   const portrait =
     typeof window !== "undefined" && window.matchMedia?.("(orientation: portrait)")?.matches
+  /*
+   * 🔴 640×480, 720p AU PLUS, 30 IMAGES/S AU PLUS (demande du patron, guide du
+   * 31/10/2026). Viser plus haut saturait l'encodeur et le reseau : l'image se
+   * figeait. L'emission en baisse encore la definition si le reseau faiblit.
+   */
   return {
     facingMode: "user",
-    width: { ideal: portrait ? 540 : 960 },
-    height: { ideal: portrait ? 960 : 540 },
+    width: { ideal: portrait ? 480 : 640, max: portrait ? 720 : 1280 },
+    height: { ideal: portrait ? 640 : 480, max: portrait ? 1280 : 720 },
+    frameRate: { ideal: 24, max: 30 },
   }
 }
 
@@ -2148,6 +2432,8 @@ function nePlusAttendre(userId: string) {
 function removePeer(peerId: string) {
   peers.get(peerId)?.close()
   peers.delete(peerId)
+  majConnexionFaible()
+  if (state.camerasCoupees.includes(peerId)) majCamerasCoupees()
   /*
    * Le presentateur s'en va : le serveur annonce lui-meme la fin de son partage
    * avant son depart, mais on referme aussi ici. Un serveur anterieur a ce
@@ -3940,6 +4226,11 @@ export function toggleCamera(): boolean {
   })
   setState({ camOn: next })
   diffuserEtatMedia()
+  // En appel, le pair est prevenu (31/10/2026) : il voit notre avatar, et non
+  // plus une image figee ou noire. La reunion a son propre message.
+  if (salleReunion === null) {
+    for (const p of peers.values()) p.envoyerEtatCamera(next)
+  }
   return next
 }
 
