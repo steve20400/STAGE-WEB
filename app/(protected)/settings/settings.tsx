@@ -124,7 +124,12 @@ import {
 } from "../../../src/services/traduction-locale"
 import { type EtatCacheTraductions } from "../../../src/services/traduction-cache"
 import { sendSessionRevoked } from "../../../src/services/websocket-service"
-import { avatarDisplaySrc, fileToAvatarDataUrl, uploadAvatarDataUrl } from "../../../src/lib/avatar"
+import { avatarDisplaySrc, uploadAvatarDataUrl } from "../../../src/lib/avatar"
+import {
+  ChoixActions,
+  RecadreurPhoto,
+  VisionneusePhotoProfil,
+} from "../../../src/components/photo-profil"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { E2eeSauvegardePanneau } from "./e2ee-sauvegarde-panneau"
 import { EmpreintePanneau } from "./empreinte-panneau"
@@ -2286,6 +2291,11 @@ export default function SettingsPage() {
     }
   }
 
+  // La photo de profil : la voir, ou la changer — et la recadrer (01/11/2026).
+  const [aRecadrer, setARecadrer] = useState<File | null>(null)
+  const [choixPhoto, setChoixPhoto] = useState(false)
+  const [photoOuverte, setPhotoOuverte] = useState(false)
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ""
@@ -2294,15 +2304,18 @@ export default function SettingsPage() {
       return toastError(t("set_file_too_large"), t("set_avatar_max_10mb"))
     if (!file.type.startsWith("image/"))
       return toastError(t("set_invalid_format"), t("set_choose_image"))
-    try {
-      // Apercu local : la miniature n'est televersee qu'a l'enregistrement.
-      const dataUrl = await fileToAvatarDataUrl(file)
-      setDraft((prev) => ({ ...prev, avatar: dataUrl }))
-      info(t("set_avatar_selected"), t("set_avatar_confirm_hint", { action: t("save") }))
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t("set_image_unreadable")
-      toastError(t("set_avatar_rejected"), message)
-    }
+    /*
+     * L'APERCU D'ABORD (01/11/2026, comme le mobile) : on recadre la photo
+     * sous le cercle avant qu'elle aille sur le profil. Annuler ne change rien.
+     */
+    setARecadrer(file)
+  }
+
+  /** La photo recadree : un apercu local, televerse a l'enregistrement. */
+  const surPhotoRecadree = (dataUrl: string) => {
+    setARecadrer(null)
+    setDraft((prev) => ({ ...prev, avatar: dataUrl }))
+    info(t("set_avatar_selected"), t("set_avatar_confirm_hint", { action: t("save") }))
   }
 
   /**
@@ -3068,6 +3081,29 @@ export default function SettingsPage() {
         accept="image/*"
         onChange={handleAvatarUpload}
       />
+      {choixPhoto && (
+        <ChoixActions
+          actions={[
+            { libelle: t("avatar_view_photo"), onChoisir: () => setPhotoOuverte(true) },
+            { libelle: t("avatar_change_photo"), onChoisir: () => fileRef.current?.click() },
+          ]}
+          onFermer={() => setChoixPhoto(false)}
+        />
+      )}
+      {photoOuverte && (
+        <VisionneusePhotoProfil
+          nom={draft.name}
+          src={avatarDisplaySrc(draft.avatar)}
+          onFermer={() => setPhotoOuverte(false)}
+        />
+      )}
+      {aRecadrer && (
+        <RecadreurPhoto
+          fichier={aRecadrer}
+          onValider={surPhotoRecadree}
+          onAnnuler={() => setARecadrer(null)}
+        />
+      )}
 
       <div className="settings-root">
         <aside className="s-sidebar">
@@ -3148,7 +3184,13 @@ export default function SettingsPage() {
               <div className="s-card">
                 {/* Avatar */}
                 <div className="avatar-section">
-                  <div className="avatar-wrap" onClick={() => fileRef.current?.click()}>
+                  {/* Un clic : la voir ou la modifier. Sans photo, rien a voir. */}
+                  <div
+                    className="avatar-wrap"
+                    onClick={() =>
+                      avatarDisplaySrc(draft.avatar) ? setChoixPhoto(true) : fileRef.current?.click()
+                    }
+                  >
                     <div className="avatar-circle">
                       {avatarDisplaySrc(draft.avatar) ? (
                         <img

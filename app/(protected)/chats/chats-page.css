@@ -243,6 +243,10 @@
 .av.av-statut.vu {
   outline-color: var(--border-strong);
 }
+/* Une photo de tete-a-tete se clique : elle s'affiche (01/11/2026). */
+.av.av-cliquable {
+  cursor: zoom-in;
+}
 .av-dot {
   position: absolute;
   bottom: 1px;

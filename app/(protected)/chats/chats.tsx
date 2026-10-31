@@ -37,6 +37,8 @@ import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { estChiffree } from "../../../src/services/e2ee-fil"
 import { composerMessageSysteme } from "../../../src/i18n/messages-systeme"
 import { chargerFil, groupeDe, useStatutsEnDirect } from "../../../src/services/statuts-en-direct"
+import { ChoixActions, VisionneusePhotoProfil } from "../../../src/components/photo-profil"
+import type { StatusGroup } from "../../../src/services/status-service"
 import "./chats-page.css"
 
 // Helper hors composant : la langue est relue a chaque appel, donc a chaque
@@ -244,6 +246,30 @@ export default function ChatsPage() {
   useEffect(() => {
     void chargerFil()
   }, [])
+
+  /*
+   * UN CLIC SUR UNE PHOTO (01/11/2026, comme le mobile) :
+   *  - pas de statut → la photo de profil ;
+   *  - des statuts pas encore vus → les statuts ;
+   *  - deja vus → on demande : le statut ou la photo ?
+   * Ma propre photo, dans la carte du haut, s'affiche en grand.
+   */
+  const [photoOuverte, setPhotoOuverte] = useState<{ nom: string; src: string | null } | null>(null)
+  const [choixPour, setChoixPour] = useState<{
+    nom: string
+    src: string | null
+    statuts: StatusGroup
+  } | null>(null)
+  const toucherAvatar = useCallback(
+    (nom: string, src: string | null, statuts: StatusGroup | null) => {
+      if (!statuts) setPhotoOuverte({ nom, src })
+      else if (statuts.hasUnviewed) navigate(`/status?u=${encodeURIComponent(statuts.userId)}`)
+      else setChoixPour({ nom, src, statuts })
+    },
+    // navigate est stable ; il est declare plus bas dans ce composant.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
   const { t } = useTranslation()
   const { success, warning } = useToast()
   const navigate = useNavigate()
@@ -566,7 +592,15 @@ export default function ChatsPage() {
               <img
                 src={avatarDisplaySrc(sessionUser?.avatar)!}
                 alt=""
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                style={{ width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }}
+                // Ma photo s'affiche ; le reste de la carte mene aux reglages.
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setPhotoOuverte({
+                    nom: sessionUser?.name ?? t("l2_me"),
+                    src: avatarDisplaySrc(sessionUser?.avatar),
+                  })
+                }}
               />
             ) : (
               toInitials(sessionUser?.name ?? t("l2_me"))
@@ -768,7 +802,7 @@ export default function ChatsPage() {
               <>
                 <div className="section-label">{t("section_pinned")}</div>
                 {pinned.map((conv) => (
-                  <ConvItem key={conv.id} conv={conv} />
+                  <ConvItem key={conv.id} conv={conv} onAvatar={toucherAvatar} />
                 ))}
               </>
             )}
@@ -776,7 +810,7 @@ export default function ChatsPage() {
               <>
                 {pinned.length > 0 && <div className="section-label">{t("section_recent")}</div>}
                 {regular.map((conv) => (
-                  <ConvItem key={conv.id} conv={conv} />
+                  <ConvItem key={conv.id} conv={conv} onAvatar={toucherAvatar} />
                 ))}
               </>
             )}
@@ -825,6 +859,31 @@ export default function ChatsPage() {
         </svg>
       </button>
 
+      {photoOuverte && (
+        <VisionneusePhotoProfil
+          nom={photoOuverte.nom}
+          src={photoOuverte.src}
+          onFermer={() => setPhotoOuverte(null)}
+        />
+      )}
+      {choixPour && (
+        <ChoixActions
+          titre={choixPour.nom}
+          actions={[
+            {
+              libelle: t("avatar_view_status"),
+              onChoisir: () =>
+                navigate(`/status?u=${encodeURIComponent(choixPour.statuts.userId)}`),
+            },
+            {
+              libelle: t("avatar_view_profile_photo"),
+              onChoisir: () => setPhotoOuverte({ nom: choixPour.nom, src: choixPour.src }),
+            },
+          ]}
+          onFermer={() => setChoixPour(null)}
+        />
+      )}
+
       {creationListe && (
         <FenetreNouvelleListe onFermer={() => setCreationListe(false)} onEnregistre={surListeCreee} />
       )}
@@ -832,9 +891,14 @@ export default function ChatsPage() {
   )
 }
 
-function ConvItem({ conv }: { conv: ConversationListItem }) {
+function ConvItem({
+  conv,
+  onAvatar,
+}: {
+  conv: ConversationListItem
+  onAvatar: (nom: string, src: string | null, statuts: StatusGroup | null) => void
+}) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const color = CHAT_COLORS[conv.colorIdx % CHAT_COLORS.length]
   const nom = nomConversation(conv)
   /*
@@ -854,16 +918,17 @@ function ConvItem({ conv }: { conv: ConversationListItem }) {
       className={({ isActive }) => `conv-item ${isActive ? "active" : ""}`}
     >
       <div
-        className={`av${statuts ? ` av-statut${statuts.hasUnviewed ? "" : " vu"}` : ""}`}
+        className={`av${statuts ? ` av-statut${statuts.hasUnviewed ? "" : " vu"}` : pairId ? " av-cliquable" : ""}`}
         style={{ background: color.bg, color: color.text, overflow: "hidden" }}
-        title={statuts ? t("status_open_statuses") : undefined}
+        title={statuts ? t("status_open_statuses") : pairId ? t("avatar_view_photo") : undefined}
         onClick={
-          statuts
+          // Tete-a-tete seulement : la photo d'un groupe ouvre la discussion.
+          pairId
             ? (e) => {
                 // Le lien de la ligne ouvrirait la discussion : on l'arrete.
                 e.preventDefault()
                 e.stopPropagation()
-                navigate(`/status?u=${encodeURIComponent(statuts.userId)}`)
+                onAvatar(nom, avatarDisplaySrc(conv.avatar), statuts)
               }
             : undefined
         }

@@ -85,6 +85,22 @@ export async function aimerStatut(statusId: string, aime: boolean): Promise<numb
   return r?.likesCount ?? 0
 }
 
+/** Une personne qui a vu mon statut (01/11/2026). */
+export interface VueStatut {
+  userId: string
+  name: string
+  avatarUrl: string | null
+  viewedAt: string
+  liked: boolean
+  likedAt: string | null
+}
+
+/** GET /api/statuses/:id/views — qui a vu MON statut, et qui l'a aime. */
+export async function fetchStatusViews(statusId: string): Promise<VueStatut[]> {
+  const r = await apiRequest<{ views: VueStatut[] }>(`/api/statuses/${statusId}/views`)
+  return r?.views ?? []
+}
+
 /** POST /api/statuses/:id/view — marque un statut comme vu. */
 export async function viewStatus(statusId: string): Promise<void> {
   try {

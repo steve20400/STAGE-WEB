@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { compresserImage } from "../../../src/lib/image-compression"
 import { EditeurStatut } from "../../../src/components/editeur-statut"
+import { VuesStatut } from "../../../src/components/vues-statut"
 import { createPrivateChat } from "../../../src/services/chats-service"
 import { sendChatMessage } from "../../../src/services/messages-service"
 import { useToast } from "../../../src/components/toast"
@@ -20,12 +21,10 @@ import { estChiffree, etatConnu, lireEtatE2ee } from "../../../src/services/e2ee
 import { envoyerMediaChiffre } from "../../../src/services/e2ee-media-envoi"
 import {
   aimeParMoiDe,
-  aimesDe,
   filStatuts,
   marquerAime,
   retenirFil,
   useStatutsEnDirect,
-  vuesDe,
 } from "../../../src/services/statuts-en-direct"
 import { estPanneReseau } from "../../../src/services/messages-service"
 import {
@@ -984,11 +983,6 @@ export default function StatusPage() {
               </div>
               <div style={{ color: "#ffffff90", fontSize: 11 }}>
                 {timeAgo(currentStatus.createdAt)}
-                {/* Vues et « J'aime » EN DIRECT (01/11/2026). */}
-                {viewer.isMine
-                  ? ` — ${t("l2_views_count", { count: vuesDe(currentStatus) })}` +
-                    (aimesDe(currentStatus) > 0 ? ` · ❤ ${aimesDe(currentStatus)}` : "")
-                  : ""}
               </div>
             </div>
             {viewer.isMine && (
@@ -1259,6 +1253,12 @@ export default function StatusPage() {
               </div>
             )}
           </div>
+
+          {/*
+            MON STATUT : qui l'a vu, qui l'a aime (01/11/2026), comme le
+            mobile — un pied en bas, la liste au clic.
+          */}
+          {viewer.isMine && <VuesStatut statut={currentStatus} onOuvert={setEnPause} />}
 
           {/*
             REPONDRE — jamais sur son propre statut : on ne s'ecrit pas a
