@@ -1,5 +1,5 @@
 import { useTranslation } from "../../../src/i18n"
-import { useEffect, useRef, useState } from "react"
+import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import { useToast } from "../../../src/components/toast"
 import {
   clearAiHistory,
@@ -8,6 +8,10 @@ import {
   type AiMessage,
 } from "../../../src/services/ai-service"
 import "../chats/[chatId]/chat-room-page.css"
+
+// La mise en forme des reponses, chargee a la demande (01/11/2026) : voir
+// `texte-markdown.tsx`.
+const TexteMarkdown = lazy(() => import("../../../src/components/texte-markdown"))
 
 /**
  * Assistant Alanya (via le backend) — meme ecran que sur l'app mobile :
@@ -184,11 +188,19 @@ export default function AiAssistantPage() {
                   borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                   fontSize: 13,
                   lineHeight: 1.6,
-                  whiteSpace: "pre-wrap",
+                  // Mes messages gardent leurs retours a la ligne ; la reponse
+                  // de l'assistant est mise en forme (titres, listes, code…).
+                  whiteSpace: isMe ? "pre-wrap" : "normal",
                   wordBreak: "break-word",
                 }}
               >
-                {msg.content}
+                {isMe ? (
+                  msg.content
+                ) : (
+                  <Suspense fallback={<span style={{ whiteSpace: "pre-wrap" }}>{msg.content}</span>}>
+                    <TexteMarkdown texte={msg.content} />
+                  </Suspense>
+                )}
               </div>
             </div>
           )
