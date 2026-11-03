@@ -382,10 +382,11 @@ const OFFRE_SANS_REPONSE_MAX_MS = 8000
  * de la qualite choisie, le son en priorite, une degradation equilibree ; on ne
  * touche plus a la video pendant l'appel.
  *
- * « CONNEXION FAIBLE » EXPLIQUE CE QUE L'ON VOIT : toutes les 3 s, en video,
- * l'avis s'affiche quand l'image l'est reellement — l'image recue a perdu plus
- * de 30 % de sa definition ou passe sous 12 images/s, ou WebRTC a reduit
- * l'image envoyee faute de debit ; en audio, sur les pertes et l'aller-retour.
+ * « CONNEXION FAIBLE » EXPLIQUE CE QUE L'ON VOIT ET ENTEND : toutes les 3 s,
+ * l'avis s'affiche quand le reseau faiblit (pertes au-dela de 5 %, aller-retour
+ * au-dela de 600 ms), en audio comme en video ; en video, aussi quand l'image
+ * l'est reellement — l'image recue a perdu plus de 30 % de sa definition ou
+ * passe sous 12 images/s, ou WebRTC a reduit l'image envoyee faute de debit.
  * Deux mesures mauvaises de suite pour l'afficher, trois bonnes pour l'effacer.
  */
 const CADENCE_VIDEO_MAX = 30
@@ -1190,6 +1191,8 @@ class PeerSession {
     this.perdusAvant = perdus
     const perteRecue = dRecus + dPerdus > 20 ? dPerdus / (dRecus + dPerdus) : 0
 
+    // L'etat du reseau : il compte dans tout appel, video comme audio.
+    const reseauMauvais = perteEmise > PERTE_MAX || perteRecue > PERTE_MAX || allerRetour > ALLER_RETOUR_MAX_S
     let degrade: boolean
     if (this.isVideo) {
       const dRecue = definitionRecue as number | null
@@ -1204,9 +1207,9 @@ class PeerSession {
       const q = qualiteAppel()
       const envoyeeFloue =
         limiteParLeDebit && dEnvoyee !== null && dEnvoyee < Math.min(q.largeur, q.hauteur) * PART_DEFINITION_MIN
-      degrade = recueFloue || recueSaccadee || envoyeeFloue
+      degrade = recueFloue || recueSaccadee || envoyeeFloue || reseauMauvais
     } else {
-      degrade = perteEmise > PERTE_MAX || perteRecue > PERTE_MAX || allerRetour > ALLER_RETOUR_MAX_S
+      degrade = reseauMauvais
     }
     if (degrade) {
       this.bonnesDeSuite = 0
