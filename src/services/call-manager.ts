@@ -48,6 +48,7 @@ import {
 } from "./websocket-service"
 import { isValidAlanyaNumber, normalizeAlanyaNumber } from "../lib/alanya-number"
 import { langueInitiale, traduire, type Cle } from "../i18n"
+import { CADENCE_VISEE, qualitePourAppel, type Preset } from "./qualite-video"
 
 /**
  * Traduction dans un service : la langue est relue a chaque appel, jamais
@@ -376,31 +377,27 @@ const ESSAIS_REPRISE_MS = [1000, 2000, 3000, 4000, 5000, 6000, 8000, 8000, 8000]
 const OFFRE_SANS_REPONSE_MAX_MS = 8000
 
 /*
- * 🔴 REGLAGE DE L'EMISSION ET ADAPTATION (guide du patron, 31/10/2026 — memes
- * valeurs que le mobile). Le son d'abord ; la video plafonnee pour ne pas
- * remplir les files du reseau ; toutes les 3 s, les statistiques : degrade
- * deux fois de suite, la video passe a moitie de definition et 300 kbit/s, et
- * l'ecran dit « Connexion faible » ; trois mesures saines, elle remonte.
+ * 🔴 L'EMISSION, REGLEE UNE FOIS — PUIS WEBRTC FAIT LE RESTE (procedure du
+ * patron, 01/11/2026 ; memes regles que le mobile). On pose le debit maximal
+ * de la qualite choisie, le son en priorite, une degradation equilibree ; on ne
+ * touche plus a la video pendant l'appel.
+ *
+ * « CONNEXION FAIBLE » EXPLIQUE CE QUE L'ON VOIT : toutes les 3 s, en video,
+ * l'avis s'affiche quand l'image l'est reellement — l'image recue a perdu plus
+ * de 30 % de sa definition ou passe sous 12 images/s, ou WebRTC a reduit
+ * l'image envoyee faute de debit ; en audio, sur les pertes et l'aller-retour.
+ * Deux mesures mauvaises de suite pour l'afficher, trois bonnes pour l'effacer.
  */
-const DEBIT_VIDEO_MAX = 800_000
-const DEBIT_VIDEO_FAIBLE = 300_000
-/**
- * Le plancher de definition (demande du user) : en connexion faible, la video
- * descend jusqu'a 360 lignes, jamais en dessous. Elle etait divisee par deux :
- * une capture 640×480 tombait a 320×240.
- */
-const DEFINITION_MIN = 360
-
-/** Le facteur qui ramene la piste a DEFINITION_MIN lignes sur son petit cote. */
-function facteurVersPlancher(piste: MediaStreamTrack | null): number {
-  const s = piste?.getSettings?.() ?? {}
-  const petitCote = s.width && s.height ? Math.min(s.width, s.height) : 480
-  return Math.max(1, petitCote / DEFINITION_MIN)
-}
 const CADENCE_VIDEO_MAX = 30
 const PERTE_MAX = 0.05
 const ALLER_RETOUR_MAX_S = 0.6
-const DEBIT_DISPONIBLE_MIN = 250_000
+const PART_DEFINITION_MIN = 0.7
+const CADENCE_MIN = 12
+
+/** La qualite de l'appel en cours : choix de l'utilisateur, plafonne en groupe et en reunion. */
+function qualiteAppel(): Preset {
+  return qualitePourAppel(state.isGroup || salleReunion !== null)
+}
 const PLAFOND_REPRISE_MS = 45000
 /** Ce qu'on laisse a un `disconnected` pour se reparer tout seul. */
 const SURSIS_DISCONNECTED_MS = 3000
@@ -435,6 +432,8 @@ class PeerSession {
   private repriseAnnoncee = false
   /** La liaison avec ce pair est degradee : l'ecran dit « Connexion faible ». */
   connexionFaible = false
+  /** La plus grande definition recue (petit cote) : la reference de ce correspondant. */
+  private definitionRecueMax = 0
   /** Le pair a coupe sa camera (bouton, ou application en arriere-plan). */
   cameraDistanteActive = true
 
@@ -1121,7 +1120,7 @@ class PeerSession {
             e.priority = "high"
             e.networkPriority = "high"
           } else {
-            e.maxBitrate = DEBIT_VIDEO_MAX
+            e.maxBitrate = qualiteAppel().debitMax
             e.maxFramerate = CADENCE_VIDEO_MAX
             e.priority = "low"
             e.networkPriority = "low"
@@ -1153,21 +1152,36 @@ class PeerSession {
     }
     let perteEmise = 0
     let allerRetour = 0
-    let debitDisponible: number | null = null
     let recus = 0
     let perdus = 0
+    let definitionRecue: number | null = null
+    let cadenceRecue: number | null = null
+    let definitionEnvoyee: number | null = null
+    let limiteParLeDebit = false
+    const n = (x: unknown) => (typeof x === "number" ? x : 0)
+    // Le petit cote de l'image : stable que l'on tienne l'ecran droit ou couche.
+    const petitCote = (v: Record<string, unknown>) =>
+      typeof v.frameWidth === "number" && typeof v.frameHeight === "number"
+        ? Math.min(v.frameWidth, v.frameHeight)
+        : null
     rapports.forEach((r) => {
       const v = r as Record<string, unknown>
-      const n = (x: unknown) => (typeof x === "number" ? x : 0)
+      const video = v.kind === "video"
       if (r.type === "remote-inbound-rtp") {
         perteEmise = Math.max(perteEmise, n(v.fractionLost))
         allerRetour = Math.max(allerRetour, n(v.roundTripTime))
       } else if (r.type === "candidate-pair" && v.state === "succeeded" && v.nominated) {
         allerRetour = Math.max(allerRetour, n(v.currentRoundTripTime))
-        if (typeof v.availableOutgoingBitrate === "number") debitDisponible = v.availableOutgoingBitrate
       } else if (r.type === "inbound-rtp") {
         recus += n(v.packetsReceived)
         perdus += n(v.packetsLost)
+        if (video) {
+          definitionRecue = petitCote(v) ?? definitionRecue
+          if (typeof v.framesPerSecond === "number") cadenceRecue = v.framesPerSecond
+        }
+      } else if (r.type === "outbound-rtp" && video) {
+        definitionEnvoyee = petitCote(v) ?? definitionEnvoyee
+        if (v.qualityLimitationReason === "bandwidth") limiteParLeDebit = true
       }
     })
     const dRecus = recus - this.recusAvant
@@ -1175,18 +1189,31 @@ class PeerSession {
     this.recusAvant = recus
     this.perdusAvant = perdus
     const perteRecue = dRecus + dPerdus > 20 ? dPerdus / (dRecus + dPerdus) : 0
-    const degrade =
-      perteEmise > PERTE_MAX ||
-      perteRecue > PERTE_MAX ||
-      allerRetour > ALLER_RETOUR_MAX_S ||
-      (debitDisponible !== null && debitDisponible < DEBIT_DISPONIBLE_MIN)
+
+    let degrade: boolean
+    if (this.isVideo) {
+      const dRecue = definitionRecue as number | null
+      const fRecue = cadenceRecue as number | null
+      const dEnvoyee = definitionEnvoyee as number | null
+      if (dRecue !== null && dRecue > this.definitionRecueMax) this.definitionRecueMax = dRecue
+      // L'image que JE vois : moins nette, ou saccadee.
+      const recueFloue =
+        dRecue !== null && this.definitionRecueMax >= 240 && dRecue < this.definitionRecueMax * PART_DEFINITION_MIN
+      const recueSaccadee = fRecue !== null && fRecue > 0 && fRecue < CADENCE_MIN
+      // L'image que L'AUTRE voit : reduite par WebRTC faute de debit.
+      const q = qualiteAppel()
+      const envoyeeFloue =
+        limiteParLeDebit && dEnvoyee !== null && dEnvoyee < Math.min(q.largeur, q.hauteur) * PART_DEFINITION_MIN
+      degrade = recueFloue || recueSaccadee || envoyeeFloue
+    } else {
+      degrade = perteEmise > PERTE_MAX || perteRecue > PERTE_MAX || allerRetour > ALLER_RETOUR_MAX_S
+    }
     if (degrade) {
       this.bonnesDeSuite = 0
       this.mauvaisesDeSuite++
       if (this.mauvaisesDeSuite >= 2 && !this.connexionFaible) {
         this.connexionFaible = true
         majConnexionFaible()
-        void this.appliquerDebit(true)
       }
     } else {
       this.mauvaisesDeSuite = 0
@@ -1194,29 +1221,7 @@ class PeerSession {
       if (this.bonnesDeSuite >= 3 && this.connexionFaible) {
         this.connexionFaible = false
         majConnexionFaible()
-        void this.appliquerDebit(false)
       }
-    }
-  }
-
-  /** Video allegee (360 lignes, 300 kbit/s) ou normale. */
-  private async appliquerDebit(faible: boolean) {
-    const pc = this.pc
-    if (!pc || !this.isVideo) return
-    try {
-      for (const emetteur of pc.getSenders()) {
-        if (emetteur.track?.kind !== "video") continue
-        const p = emetteur.getParameters()
-        if (!p.encodings || p.encodings.length === 0) continue
-        for (const e of p.encodings) {
-          e.maxBitrate = faible ? DEBIT_VIDEO_FAIBLE : DEBIT_VIDEO_MAX
-          e.scaleResolutionDownBy = faible ? facteurVersPlancher(emetteur.track) : 1
-        }
-        await emetteur.setParameters(p)
-      }
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn("[webrtc] adaptation du debit impossible", err)
     }
   }
 }
@@ -2257,16 +2262,20 @@ function contraintesVideo(): MediaTrackConstraints {
   const portrait =
     typeof window !== "undefined" && window.matchMedia?.("(orientation: portrait)")?.matches
   /*
-   * 🔴 640×480, 360 LIGNES AU MOINS, 720p AU PLUS, 30 IMAGES/S AU PLUS (demande
-   * du patron, guide du 31/10/2026 ; plancher de 360 demande par le user).
-   * Viser plus haut saturait l'encodeur et le reseau : l'image se figeait.
-   * L'emission baisse la definition si le reseau faiblit, jusqu'au plancher.
+   * 🔴 LA CAPTURE DE LA QUALITE CHOISIE, ET RIEN AU-DELA (procedure du patron,
+   * 01/11/2026) : 1280×720, 640×480 ou 640×360, 24 images/s visees. La
+   * camera ne filme pas plus que ce qu'on enverra ; WebRTC baisse ensuite la
+   * qualite lui-meme si le reseau faiblit. Pas de minimum : une webcam qui ne
+   * sait pas faire repond au mieux plutot que d'echouer.
    */
+  const q = qualiteAppel()
+  const largeur = portrait ? q.hauteur : q.largeur
+  const hauteur = portrait ? q.largeur : q.hauteur
   return {
     facingMode: "user",
-    width: { min: portrait ? 360 : 480, ideal: portrait ? 480 : 640, max: portrait ? 720 : 1280 },
-    height: { min: portrait ? 480 : 360, ideal: portrait ? 640 : 480, max: portrait ? 1280 : 720 },
-    frameRate: { ideal: 24, max: 30 },
+    width: { ideal: largeur, max: largeur },
+    height: { ideal: hauteur, max: hauteur },
+    frameRate: { ideal: CADENCE_VISEE, max: CADENCE_VIDEO_MAX },
   }
 }
 

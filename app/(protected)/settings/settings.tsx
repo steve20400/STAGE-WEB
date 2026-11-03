@@ -125,6 +125,7 @@ import {
 import { type EtatCacheTraductions } from "../../../src/services/traduction-cache"
 import { sendSessionRevoked } from "../../../src/services/websocket-service"
 import { avatarDisplaySrc, uploadAvatarDataUrl } from "../../../src/lib/avatar"
+import { ReglageQualiteVideo } from "../../../src/components/reglage-qualite-video"
 import {
   ChoixActions,
   RecadreurPhoto,
@@ -3289,6 +3290,8 @@ export default function SettingsPage() {
                   helper={t("alanya_id_locked")}
                 />
               </div>
+              {/* Reglage appel video (procedure du patron, 01/11/2026). */}
+              <ReglageQualiteVideo />
             </>
           )}
 
