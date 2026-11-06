@@ -370,6 +370,19 @@ export async function createPrivateChat(
 }
 
 /**
+ * La conversation a deux avec cet utilisateur, creee au besoin — meme route que
+ * `getOrCreateDirectConversation` du mobile. Sert au « Message » de l'appel
+ * entrant : on y ecrit a l'appelant sans connaitre son numero.
+ */
+export async function ouvrirConversationDirecte(targetUserId: string): Promise<string> {
+  const response = await apiRequest<{ id: string }>("/api/conversations/direct", {
+    method: "POST",
+    body: { targetUserId },
+  })
+  return response.id
+}
+
+/**
  * Ouvre (ou cree) MES notes personnelles — le « Moi » de WhatsApp.
  *
  * Le numero de la session est resolu ici, une fois, plutot que dans chaque ecran

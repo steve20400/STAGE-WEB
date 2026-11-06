@@ -13,6 +13,9 @@ import {
   acceptIncomingCall,
   rejectIncomingCall,
 } from "../../src/services/call-manager"
+import { ouvrirConversationDirecte } from "../../src/services/chats-service"
+import { sendChatMessage } from "../../src/services/messages-service"
+import { useToast } from "../../src/components/toast"
 import { toInitials } from "../../src/data/session-user"
 import { isAgent as checkIsAgent } from "../../src/services/queue-service"
 import { avatarDisplaySrc } from "../../src/lib/avatar"
@@ -670,6 +673,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 function GlobalIncomingCall() {
   const navigate = useNavigate()
   const { incoming } = useCallState()
+  const { t } = useTranslation()
+  const toast = useToast()
 
   if (!incoming) return null
 
@@ -697,6 +702,18 @@ function GlobalIncomingCall() {
       }}
       onDecline={() => {
         void rejectIncomingCall()
+      }}
+      onMessage={(texte) => {
+        // « Message » (appel video, comme WhatsApp) : refuser, puis ecrire a
+        // l'appelant dans notre conversation a deux — chiffree si elle l'est.
+        const appelant = incoming.callerId
+        void rejectIncomingCall()
+        void ouvrirConversationDirecte(appelant)
+          .then((convId) => sendChatMessage(convId, texte, "text"))
+          .then(
+            () => toast.success(t("call_message_sent")),
+            () => toast.error(t("call_message_failed"))
+          )
       }}
       onTimeout={() => {
         // LE DELAI REFUSE, IL NE DISPARAIT PLUS EN SILENCE.

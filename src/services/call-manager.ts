@@ -48,7 +48,7 @@ import {
 } from "./websocket-service"
 import { isValidAlanyaNumber, normalizeAlanyaNumber } from "../lib/alanya-number"
 import { langueInitiale, traduire, type Cle } from "../i18n"
-import { CADENCE_VISEE, qualitePourAppel, type Preset } from "./qualite-video"
+import { qualitePourAppel, type Preset } from "./qualite-video"
 
 /**
  * Traduction dans un service : la langue est relue a chaque appel, jamais
@@ -389,7 +389,6 @@ const OFFRE_SANS_REPONSE_MAX_MS = 8000
  * passe sous 12 images/s, ou WebRTC a reduit l'image envoyee faute de debit.
  * Deux mesures mauvaises de suite pour l'afficher, trois bonnes pour l'effacer.
  */
-const CADENCE_VIDEO_MAX = 30
 const PERTE_MAX = 0.05
 const ALLER_RETOUR_MAX_S = 0.6
 const PART_DEFINITION_MIN = 0.7
@@ -563,6 +562,13 @@ class PeerSession {
         this.finDeReprise()
         void this.reglerEmission()
         this.demarrerMesure()
+        // Camera coupee AVANT que la connexion n'existe (decroche « video
+        // desactivee », 06/11/2026) : le message de `toggleCamera` n'avait
+        // personne a qui partir. Le pair l'apprend ici, et montre notre avatar
+        // au lieu d'une image noire. Redit sans dommage apres une reprise.
+        if (this.isVideo && salleReunion === null && !state.camOn && !state.partageParMoi) {
+          this.envoyerEtatCamera(false)
+        }
       }
     }
 
@@ -1122,7 +1128,7 @@ class PeerSession {
             e.networkPriority = "high"
           } else {
             e.maxBitrate = qualiteAppel().debitMax
-            e.maxFramerate = CADENCE_VIDEO_MAX
+            e.maxFramerate = qualiteAppel().cadence
             e.priority = "low"
             e.networkPriority = "low"
           }
@@ -2261,33 +2267,130 @@ function brancherVoixDistanteSiPossible() {
  * economises cinq fois a six participants — et personne ne regarde une vignette
  * de reunion en haute definition.
  */
-function contraintesVideo(): MediaTrackConstraints {
+function contraintesVideo(q: Preset = qualiteAppel()): MediaTrackConstraints {
   const portrait =
     typeof window !== "undefined" && window.matchMedia?.("(orientation: portrait)")?.matches
   /*
    * 🔴 LA CAPTURE DE LA QUALITE CHOISIE, ET RIEN AU-DELA (procedure du patron,
-   * 01/11/2026) : 1280×720, 640×480 ou 640×360, 24 images/s visees. La
+   * 01/11/2026, revue le 06/11) : 1920×1080, 1280×720 ou 854×480 a 30 images/s,
+   * 640×360 a 20 images/s — voir `qualite-video.ts`. La
    * camera ne filme pas plus que ce qu'on enverra ; WebRTC baisse ensuite la
    * qualite lui-meme si le reseau faiblit. Pas de minimum : une webcam qui ne
    * sait pas faire repond au mieux plutot que d'echouer.
    */
-  const q = qualiteAppel()
   const largeur = portrait ? q.hauteur : q.largeur
   const hauteur = portrait ? q.largeur : q.hauteur
   return {
     facingMode: "user",
     width: { ideal: largeur, max: largeur },
     height: { ideal: hauteur, max: hauteur },
-    frameRate: { ideal: CADENCE_VISEE, max: CADENCE_VIDEO_MAX },
+    frameRate: { ideal: q.cadence, max: q.cadence },
   }
 }
 
-async function ensureLocalStream(isVideo: boolean): Promise<MediaStream> {
-  if (localStream) return localStream
-  localStream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: isVideo ? contraintesVideo() : false,
+/*
+ * L'APERCU DE L'APPEL VIDEO ENTRANT (06/11/2026), comme WhatsApp : pendant la
+ * sonnerie, on se voit deja, et l'on peut couper sa camera avant de decrocher.
+ *
+ * La camera ne s'ouvre QUE si ce site l'a deja obtenue : une demande
+ * d'autorisation pendant que ca sonne masquerait les boutons, et un refus ici
+ * n'apprendrait rien. Sans autorisation, l'ecran montre l'avatar et la camera
+ * est demandee au decroche, comme avant.
+ *
+ * En decrochant, l'apercu DEVIENT la camera de l'appel (`acceptIncomingCall`) :
+ * on n'y ajoute que le micro, sans rouvrir la camera — ce qui ferait clignoter
+ * l'image et, sur certaines webcams, echouerait (deja occupee).
+ *
+ * `jetonApercu` ecarte une ouverture devenue inutile pendant qu'elle se faisait
+ * (ecran ferme, appel refuse, double montage de React en developpement).
+ */
+let apercuEntrant: MediaStream | null = null
+let jetonApercu = 0
+let cameraEntranteActive = true
+
+function arreterApercu(): void {
+  apercuEntrant?.getTracks().forEach((t) => t.stop())
+  apercuEntrant = null
+}
+
+async function cameraDejaAutorisee(): Promise<boolean> {
+  try {
+    const r = await navigator.permissions?.query({ name: "camera" as PermissionName })
+    return r?.state === "granted"
+  } catch {
+    // Navigateur qui ne sait pas repondre pour la camera : pas d'apercu.
+    return false
+  }
+}
+
+/** Ouvre l'apercu de l'appel video qui sonne. `null` si rien a montrer. */
+export async function ouvrirApercuEntrant(): Promise<MediaStream | null> {
+  const jeton = ++jetonApercu
+  arreterApercu()
+  cameraEntranteActive = true
+  const appel = state.incoming
+  if (!appel || appel.callType !== "video" || !navigator.mediaDevices?.getUserMedia) return null
+  if (!(await cameraDejaAutorisee())) return null
+  try {
+    const flux = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: contraintesVideo(qualitePourAppel(appel.isGroup)),
+    })
+    if (jeton !== jetonApercu || state.incoming?.callId !== appel.callId) {
+      flux.getTracks().forEach((t) => t.stop())
+      return null
+    }
+    flux.getVideoTracks().forEach((t) => {
+      t.enabled = cameraEntranteActive
+    })
+    apercuEntrant = flux
+    return flux
+  } catch {
+    return null
+  }
+}
+
+/** Ferme l'apercu (ecran d'appel entrant ferme). Sans effet apres un decroche. */
+export function fermerApercuEntrant(): void {
+  jetonApercu++
+  arreterApercu()
+}
+
+/** « Desactiver la video » avant de decrocher. Renvoie le nouvel etat. */
+export function basculerCameraEntrante(): boolean {
+  cameraEntranteActive = !cameraEntranteActive
+  apercuEntrant?.getVideoTracks().forEach((t) => {
+    t.enabled = cameraEntranteActive
   })
+  return cameraEntranteActive
+}
+
+/** L'apercu, complete du micro. `null` (apercu arrete) si le micro est refuse. */
+async function ajouterLeMicro(apercu: MediaStream): Promise<MediaStream | null> {
+  try {
+    const micro = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    micro.getAudioTracks().forEach((t) => apercu.addTrack(t))
+    return apercu
+  } catch {
+    apercu.getTracks().forEach((t) => t.stop())
+    return null
+  }
+}
+
+async function ensureLocalStream(
+  isVideo: boolean,
+  apercu: MediaStream | null = null
+): Promise<MediaStream> {
+  if (localStream) {
+    apercu?.getTracks().forEach((t) => t.stop())
+    return localStream
+  }
+  localStream =
+    (apercu && (await ajouterLeMicro(apercu))) ||
+    (await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: isVideo ? contraintesVideo() : false,
+    }))
   // `mediaManquant` est remis a jour ICI, et pas seulement a l'entree en salle.
   //
   // Cette fonction est rappelee a CHAQUE pair : entre en ecoute seule, puis
@@ -3737,6 +3840,14 @@ export async function acceptIncomingCall(): Promise<string | null> {
     participantNames[participant.userId] = participant.displayName
   }
 
+  // L'apercu de la sonnerie devient la camera de l'appel ; le retirer AVANT
+  // que l'ecran d'appel entrant ne se ferme, sinon sa fermeture l'arreterait.
+  const apercu = incoming.callType === "video" ? apercuEntrant : null
+  const cameraCoupee = incoming.callType === "video" && !cameraEntranteActive
+  apercuEntrant = null
+  jetonApercu++
+  cameraEntranteActive = true
+
   setState({
     activeCallId: incoming.callId,
     activeConvId: incoming.convId,
@@ -3767,12 +3878,15 @@ export async function acceptIncomingCall(): Promise<string | null> {
   sendCallState(incoming.callId, "joined", me, myDisplayName())
 
   try {
-    await ensureLocalStream(incoming.callType === "video")
+    await ensureLocalStream(incoming.callType === "video", apercu)
   } catch {
     setState({
       error: incoming.callType === "video" ? tr("call_need_mic_cam") : tr("call_need_mic"),
     })
   }
+  // Decroche « video desactivee » : l'appel commence camera coupee. Le pair
+  // en est prevenu a la connexion (voir `envoyerEtatCamera` plus haut).
+  if (cameraCoupee && state.camOn) toggleCamera()
 
   // Enregistrement de l'appel si, et seulement si, le SERVEUR l'a autorise.
   // Sans entreprise de destination, le depot ne pourrait aboutir : on ne
