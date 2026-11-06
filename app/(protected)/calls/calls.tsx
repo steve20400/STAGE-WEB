@@ -480,7 +480,12 @@ export default function CallsPage() {
                       // d'un appel en cours : y naviguer ouvrait un ecran d'appel
                       // deja termine, qui rebondissait aussitot. Une ligne
                       // d'historique rappelle, du meme type que l'appel d'origine.
-                      onClick={() => void rappeler(call, call.type)}
+                      // Un appel de groupe ne se rappelle plus (06/11/2026) :
+                      // la ligne ouvre la conversation du groupe.
+                      onClick={() => {
+                        if (!call.isGroup) void rappeler(call, call.type)
+                        else if (call.convId) navigate(`/chats/${call.convId}`)
+                      }}
                     >
                       <AvatarCircle
                         className="call-av"
@@ -579,14 +584,19 @@ export default function CallsPage() {
                           <RowActionsMenu
                             ariaLabel={t("a2_actions_for", { name: call.contactName })}
                             actions={[
-                              {
-                                label: t("call_back_audio"),
-                                onSelect: () => void rappeler(call, "audio"),
-                              },
-                              {
-                                label: t("call_back_video"),
-                                onSelect: () => void rappeler(call, "video"),
-                              },
+                              // Pas de rappel d'un groupe (06/11/2026).
+                              ...(call.isGroup
+                                ? []
+                                : [
+                                    {
+                                      label: t("call_back_audio"),
+                                      onSelect: () => void rappeler(call, "audio"),
+                                    },
+                                    {
+                                      label: t("call_back_video"),
+                                      onSelect: () => void rappeler(call, "video"),
+                                    },
+                                  ]),
                               {
                                 label: t("open_conversation"),
                                 onSelect: () => navigate(`/chats/${call.convId ?? call.contactId}`),

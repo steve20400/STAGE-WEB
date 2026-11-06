@@ -502,11 +502,14 @@ export default function MeetingRoomPage() {
         // Annonce par le pair lui-meme (`meeting_state`). Rien dans sa piste ne
         // permettrait de le deviner : couper son micro n'agit que chez lui.
         muted: callState.peersMuted[id],
+        // Il parle : sa tuile s'encadre (06/11/2026).
+        parle: callState.parlent.includes(id),
       })),
     [
       fluxDistants,
       callState.participantNames,
       callState.peersMuted,
+      callState.parlent,
       nomsConnus,
       photosConnues,
       t,

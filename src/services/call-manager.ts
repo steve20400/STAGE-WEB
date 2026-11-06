@@ -2014,8 +2014,8 @@ export function ignorerPassageVideo(): void {
 }
 
 /*
- * QUI PARLE, EN GROUPE (06/11/2026), comme WhatsApp — jumeau de
- * `detecteur_parole.dart` du mobile.
+ * QUI PARLE, EN GROUPE ET EN REUNION (06/11/2026), comme WhatsApp — jumeau
+ * de `detecteur_parole.dart` du mobile.
  *
  * Toutes les 350 ms, `audioLevel` est lu dans les statistiques : `inbound-rtp`
  * pour la voix de chaque participant, `media-source` pour notre micro. Deux
@@ -2058,7 +2058,8 @@ function mesurerParole(id: string, niveau: number, parlent: Set<string>) {
 }
 
 async function sonderParole() {
-  if (!state.isGroup || salleReunion !== null || state.activeCallId === null || peers.size === 0) {
+  const suivi = state.isGroup || salleReunion !== null
+  if (!suivi || state.activeCallId === null || peers.size === 0) {
     arreterSondeParole()
     if (state.parlent.length > 0) setState({ parlent: [] })
     return
@@ -2729,8 +2730,8 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
     () => marquerReconnexion(peerId, false)
   )
   peers.set(peerId, session)
-  // Appel de groupe : qui parle (06/11/2026). La sonde s'arrete d'elle-meme.
-  if (state.isGroup && salleReunion === null) demarrerSondeParole()
+  // Groupe ou reunion : qui parle (06/11/2026). La sonde s'arrete d'elle-meme.
+  if (state.isGroup || salleReunion !== null) demarrerSondeParole()
   await session.start()
 
   // Rejoue les signaux arrives avant que la session existe.

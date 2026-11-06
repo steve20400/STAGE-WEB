@@ -779,6 +779,10 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 </div>
                 <span className="ca-label">{t("cinfo_message")}</span>
               </button>
+              {/* Les appels de groupe sont caches pour l'instant (06/11/2026) :
+                  un groupe se retrouve en REUNION, pas en appel. */}
+              {!conv.isGroup && (
+              <>
               <button
                 className="ca-btn"
                 onClick={() => {
@@ -846,6 +850,8 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 </div>
                 <span className="ca-label">{t("video_label")}</span>
               </button>
+              </>
+              )}
               <button className="ca-btn" aria-label={t("cinfo_search")}>
                 <div className="ca-icon">
                   <svg

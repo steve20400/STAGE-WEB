@@ -8540,7 +8540,9 @@ export default function ChatRoomPage() {
                   disparaissent plutot que d'echouer sous le doigt. Le menu de
                   contact partage applique deja la meme regle. Le compte
                   officiel non plus ne decroche jamais. */}
-              {!cestMoiMeme && !compteOfficiel && (
+              {/* Pas d'appel dans un groupe pour l'instant (06/11/2026) : un
+                  groupe se retrouve en REUNION. */}
+              {!cestMoiMeme && !compteOfficiel && !chat?.isGroup && (
                 <>
                   {/* 🔴 UN SEUL BOUTON D'APPEL, LE TYPE SE CHOISIT AU CLIC.
 
