@@ -7,7 +7,7 @@ import { ParticipantGrid } from "./participant-grid"
 import { useHasLiveVideo } from "../hooks/use-remote-video"
 import { CallOptionsMenu } from "./call-options-menu"
 import { hangUp, restoreActiveCall, toggleMicrophone } from "../services/call-manager"
-import { OUTPUT_VOLUME } from "../services/audio-output"
+import { OUTPUT_VOLUME, appliquerSortie } from "../services/audio-output"
 import { toInitials } from "../data/session-user"
 import { avatarDisplaySrc } from "../lib/avatar"
 
@@ -119,6 +119,7 @@ export function ActiveCallFloating() {
               const volume =
                 call.callType === "video" ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[call.audioOutput]
               el.volume = volume
+              appliquerSortie(el, call.sortieAudioId)
             }
           }}
         />

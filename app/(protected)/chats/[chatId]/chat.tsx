@@ -168,6 +168,7 @@ import {
 import { getMyUserId } from "../../../../src/data/session-user"
 import { activerGroupe } from "../../../../src/services/e2ee-groupe-admin"
 import { startOutgoingCall } from "../../../../src/services/call-manager"
+import { lancerAppel } from "../../../../src/services/lancer-appel"
 import { fetchCallsForConversation, type CallRecord } from "../../../../src/services/calls-service"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import {
@@ -8088,10 +8089,13 @@ export default function ChatRoomPage() {
 
   // Demarre un appel WebRTC dans cette conversation puis ouvre la salle d'appel.
   const startCallFromChat = (callType: "audio" | "video") => {
-    void startOutgoingCall(chatId, callType, chat?.name ?? t("f2_contact"))
-      .then((newCallId) => {
-        navigate(`/calls/${newCallId}?type=${callType}&returnTo=${encodeURIComponent(returnTo)}`)
-      })
+    // L'ecran s'ouvre AVANT la reponse du serveur (06/11/2026).
+    void lancerAppel(navigate, {
+      conversation: async () => chatId,
+      type: callType,
+      titre: chat?.name ?? t("f2_contact"),
+      returnTo,
+    })
       .catch((err) => {
         const message = err instanceof Error ? err.message : t("call_start_failed")
         error(t("call_failed"), message)

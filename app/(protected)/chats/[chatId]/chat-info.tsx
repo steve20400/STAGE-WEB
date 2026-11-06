@@ -20,7 +20,7 @@ import {
   removeGroupMember,
   setGroupMemberRole,
 } from "../../../../src/services/chats-service"
-import { startOutgoingCall } from "../../../../src/services/call-manager"
+import { lancerAppel } from "../../../../src/services/lancer-appel"
 import { getMyUserId } from "../../../../src/data/session-user"
 import { estChiffree } from "../../../../src/services/e2ee-fil"
 import { changerCle } from "../../../../src/services/e2ee-groupe-admin"
@@ -782,12 +782,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               <button
                 className="ca-btn"
                 onClick={() => {
-                  void startOutgoingCall(conv.id, "audio", conv.name)
-                    .then((callId) =>
-                      navigate(
-                        `/calls/${callId}?type=audio&returnTo=${encodeURIComponent(`/chats/${conv.id}/info`)}`
-                      )
-                    )
+                  void lancerAppel(navigate, {
+                    conversation: async () => conv.id,
+                    type: "audio",
+                    titre: conv.name,
+                    returnTo: `/chats/${conv.id}/info`,
+                  })
                     .catch((err) =>
                       warning(
                         t("call_failed"),
@@ -815,12 +815,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               <button
                 className="ca-btn"
                 onClick={() => {
-                  void startOutgoingCall(conv.id, "video", conv.name)
-                    .then((callId) =>
-                      navigate(
-                        `/calls/${callId}?type=video&returnTo=${encodeURIComponent(`/chats/${conv.id}/info`)}`
-                      )
-                    )
+                  void lancerAppel(navigate, {
+                    conversation: async () => conv.id,
+                    type: "video",
+                    titre: conv.name,
+                    returnTo: `/chats/${conv.id}/info`,
+                  })
                     .catch((err) =>
                       warning(
                         t("call_failed"),

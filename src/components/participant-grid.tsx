@@ -52,6 +52,8 @@ export interface Participant {
    * « ouvert », exactement comme avant.
    */
   muted?: boolean
+  /** Il parle en ce moment : sa tuile s'encadre (06/11/2026). */
+  parle?: boolean
 }
 
 /**
@@ -138,7 +140,7 @@ function TuileParticipant({
   }, [participant.stream, montrerVideo])
 
   return (
-    <div className="pg-tile">
+    <div className={participant.parle ? "pg-tile parle" : "pg-tile"}>
       {montrerVideo ? (
         // Muet volontairement : le son passe par les <audio> de l'ecran d'appel.
         <video ref={videoRef} autoPlay playsInline muted className="pg-video" />

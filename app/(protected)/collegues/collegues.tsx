@@ -5,7 +5,7 @@ import { AvatarCircle } from "../../../src/components/avatar-circle"
 import { useToast } from "../../../src/components/toast"
 import { useTranslation } from "../../../src/i18n"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
-import { startOutgoingCall } from "../../../src/services/call-manager"
+import { lancerAppel } from "../../../src/services/lancer-appel"
 import { createPrivateChat } from "../../../src/services/chats-service"
 import {
   chercherCollegues,
@@ -151,9 +151,13 @@ export default function ColleguesPage() {
     if (occupe) return
     setOccupe(c.id)
     try {
-      const conversation = await createPrivateChat(c.publicNumber)
-      const callId = await startOutgoingCall(conversation.id, "audio", c.nom)
-      navigate(`/calls/${callId}?type=audio&returnTo=${encodeURIComponent("/collegues")}`)
+      // L'ecran s'ouvre AVANT la reponse du serveur (06/11/2026).
+      await lancerAppel(navigate, {
+        conversation: async () => (await createPrivateChat(c.publicNumber)).id,
+        type: "audio",
+        titre: c.nom,
+        returnTo: "/collegues",
+      })
     } catch (e) {
       error(t("call_failed"), e instanceof Error ? e.message : t("call_start_failed"))
     } finally {

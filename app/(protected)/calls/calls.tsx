@@ -11,7 +11,7 @@ import { RowActionsMenu } from "../../../src/components/row-actions-menu"
 import { MenuContact } from "../../../src/components/menu-contact"
 import { useToast } from "../../../src/components/toast"
 import { createPrivateChat } from "../../../src/services/chats-service"
-import { startOutgoingCall } from "../../../src/services/call-manager"
+import { lancerAppel } from "../../../src/services/lancer-appel"
 import { loadSessionUser } from "../../../src/data/session-user"
 import {
   formatAlanyaNumber,
@@ -181,14 +181,14 @@ export default function CallsPage() {
    */
   const callComposedNumber = async (publicNumber: string, type: "audio" | "video") => {
     try {
-      const conversation = await createPrivateChat(publicNumber)
-      const callId = await startOutgoingCall(
-        conversation.id,
-        type,
-        formatAlanyaNumber(publicNumber)
-      )
+      // L'ecran s'ouvre AVANT la reponse du serveur (06/11/2026).
       setDialerOpen(false)
-      navigate(`/calls/${callId}?type=${type}&returnTo=/calls`)
+      await lancerAppel(navigate, {
+        conversation: async () => (await createPrivateChat(publicNumber)).id,
+        type,
+        titre: formatAlanyaNumber(publicNumber),
+        returnTo: "/calls",
+      })
     } catch (err) {
       signalerEchecAppel(err, formatAlanyaNumber(publicNumber))
     }
@@ -207,9 +207,12 @@ export default function CallsPage() {
    */
   const rappeler = async (call: CallRecord, type: "audio" | "video") => {
     try {
-      const convId = call.convId ?? (await createPrivateChat(call.contactId)).id
-      const callId = await startOutgoingCall(convId, type, call.contactName)
-      navigate(`/calls/${callId}?type=${type}&returnTo=/calls`)
+      await lancerAppel(navigate, {
+        conversation: async () => call.convId ?? (await createPrivateChat(call.contactId)).id,
+        type,
+        titre: call.contactName,
+        returnTo: "/calls",
+      })
     } catch (err) {
       signalerEchecAppel(err, call.contactName)
     }

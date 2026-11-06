@@ -4,6 +4,7 @@ import { useCallState } from "../../../../src/hooks/use-call"
 import { RepondeurAppel } from "../../../../src/components/repondeur-appel"
 import { useHasLiveVideo } from "../../../../src/hooks/use-remote-video"
 import { ParticipantGrid } from "../../../../src/components/participant-grid"
+import { ID_APPEL_EN_PREPARATION } from "../../../../src/services/lancer-appel"
 import { CallOptionsMenu } from "../../../../src/components/call-options-menu"
 import { IvrPanel } from "../../../../src/components/ivr-panel"
 import { QueueStatusPanel } from "../../../../src/components/queue-status-panel"
@@ -11,6 +12,10 @@ import {
   acknowledgeCallEnded,
   quitterRepondeur,
   hangUp as hangUpCall,
+  choisirSortieAudio,
+  ignorerPassageVideo,
+  passerEnVideo,
+  peutPasserEnVideo,
   toggleCamera,
   toggleMicrophone,
   switchCamera,
@@ -19,7 +24,12 @@ import {
 } from "../../../../src/services/call-manager"
 import { toInitials } from "../../../../src/data/session-user"
 import { useTranslation, type Cle } from "../../../../src/i18n"
-import { OUTPUT_VOLUME, type AudioOutputMode } from "../../../../src/services/audio-output"
+import {
+  OUTPUT_VOLUME,
+  appliquerSortie,
+  type AudioOutputMode,
+} from "../../../../src/services/audio-output"
+import { useSortiesAudio } from "../../../../src/hooks/use-sorties-audio"
 import { avatarDisplaySrc } from "../../../../src/lib/avatar"
 import "./call-room-page.css"
 
@@ -69,7 +79,11 @@ export default function CallRoomPage() {
   // et une constante lue avant sa declaration leve une erreur a l'execution.
   const { t } = useTranslation()
 
-  const isOurCall = call.activeCallId !== null && call.activeCallId === callId
+  // Pendant la preparation, l'ecran vit a l'adresse `/calls/nouveau` : l'appel
+  // n'a pas encore d'identifiant (voir `lancerAppel`).
+  const isOurCall =
+    (call.activeCallId !== null && call.activeCallId === callId) ||
+    (call.preparation && callId === ID_APPEL_EN_PREPARATION)
   const remoteStreamEntries = useMemo(
     () => Object.entries(call.remoteStreams),
     [call.remoteStreams]
@@ -82,8 +96,9 @@ export default function CallRoomPage() {
         id,
         stream,
         name: call.participantNames[id] ?? call.peerName ?? t("participant"),
+        parle: call.parlent.includes(id),
       })),
-    [remoteStreamEntries, call.participantNames, call.peerName, t]
+    [remoteStreamEntries, call.participantNames, call.peerName, call.parlent, t]
   )
   // Vrai uniquement si le flux distant transporte une image (voir le hook).
   const remoteHasVideo = useHasLiveVideo(remoteStreamEntries[0]?.[1])
@@ -123,6 +138,18 @@ export default function CallRoomPage() {
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [showQueueStatus, setShowQueueStatus] = useState(false)
+  const [menuSortie, setMenuSortie] = useState(false)
+  const sortiesAudio = useSortiesAudio(callState !== "ended")
+  // Un choix n'a de sens qu'a partir de deux sorties : sinon, la bascule.
+  const choixDeSortie = sortiesAudio.length > 1
+  const sortieCourante =
+    sortiesAudio.find((s) => s.deviceId === call.sortieAudioId) ??
+    sortiesAudio.find((s) => s.deviceId === "default") ??
+    sortiesAudio[0]
+  const fenetreDispo =
+    typeof document !== "undefined" &&
+    document.pictureInPictureEnabled === true &&
+    "requestPictureInPicture" in HTMLVideoElement.prototype
   const [pipPos, setPipPos] = useState({ x: 0, y: 0 })
   const pipDrag = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({
     x: 0,
@@ -205,6 +232,43 @@ export default function CallRoomPage() {
     }
   }, [remoteStreamEntries, callState, showRemoteVideo])
 
+  /*
+   * 🔴 FENETRE FLOTTANTE DU NAVIGATEUR (06/11/2026), comme WhatsApp : l'image
+   * du correspondant reste a l'ecran quand on passe a un autre onglet ou une
+   * autre application. Chrome l'ouvre de lui-meme pour un appel video si la
+   * page le lui propose (`enterpictureinpicture` de Media Session) ; partout
+   * ailleurs, le bouton « Fenetre » le fait a la demande.
+   */
+  useEffect(() => {
+    if (!fenetreDispo || !showRemoteVideo || !("mediaSession" in navigator)) return
+    const ouvrir = () => {
+      void remoteVideoRef.current?.requestPictureInPicture().catch(() => undefined)
+    }
+    try {
+      navigator.mediaSession.setActionHandler(
+        "enterpictureinpicture" as MediaSessionAction,
+        ouvrir
+      )
+    } catch {
+      // Navigateur qui ne connait pas cette action : le bouton reste.
+      return
+    }
+    return () => {
+      try {
+        navigator.mediaSession.setActionHandler("enterpictureinpicture" as MediaSessionAction, null)
+      } catch {
+        // idem
+      }
+    }
+  }, [fenetreDispo, showRemoteVideo])
+
+  // La fenetre se ferme avec l'appel.
+  useEffect(() => {
+    if (callState === "ended" && document.pictureInPictureElement) {
+      void document.exitPictureInPicture().catch(() => undefined)
+    }
+  }, [callState])
+
   // Volume des sorties audio distantes (haut-parleur on/off). Le son passe
   // uniquement par les <audio> : la grande <video> reste muette en permanence,
   // sinon le meme flux serait joue deux fois (effet d'echo).
@@ -216,8 +280,9 @@ export default function CallRoomPage() {
       // choisir entre ecoute a l'oreille et haut-parleur.
       audio.muted = false
       audio.volume = volume
+      appliquerSortie(audio, call.sortieAudioId)
     }
-  }, [call.audioOutput, isVideo, remoteStreamEntries])
+  }, [call.audioOutput, call.sortieAudioId, isVideo, remoteStreamEntries])
 
   /**
    * Quitter l'ecran d'appel sans raccrocher : l'appel passe en fenetre moyenne.
@@ -299,9 +364,11 @@ export default function CallRoomPage() {
       ? call.ivr.step === "menu"
         ? t("ivr_title")
         : t("ivr_connecting_to", { service: call.ivr.serviceChoisi ?? t("ivr_your_service") })
-      : call.progress === "ringing"
-        ? t("call_ringing")
-        : t("call_connecting"),
+      : call.preparation
+        ? t("call_calling")
+        : call.progress === "ringing"
+          ? t("call_ringing")
+          : t("call_connecting"),
     active:
       // « Reconnexion… » passe devant le chronometre, et le chronometre n'est
       // pas remis a zero pour autant : l'appel n'a pas recommence, il traverse
@@ -351,6 +418,7 @@ export default function CallRoomPage() {
                 }
                 el.muted = false
                 el.volume = isVideo ? OUTPUT_VOLUME.speaker : OUTPUT_VOLUME[call.audioOutput]
+                appliquerSortie(el, call.sortieAudioId)
                 remoteAudioRefs.current.set(peerId, el)
               } else {
                 remoteAudioRefs.current.delete(peerId)
@@ -644,6 +712,19 @@ export default function CallRoomPage() {
           <div
             className={`controls-bar ${!controlsVisible && isVideo && callState === "active" ? "hidden" : ""}`}
           >
+            {/* Le correspondant est passe en video : on le voit, il ne nous
+                voit pas encore. Comme WhatsApp, on propose la camera. */}
+            {call.passageVideoPar && (
+              <div className="passage-video">
+                <span>{t("call_peer_switched_video", { name: call.passageVideoPar })}</span>
+                <button type="button" className="passage-video-plus-tard" onClick={() => ignorerPassageVideo()}>
+                  {t("call_not_now")}
+                </button>
+                <button type="button" className="passage-video-oui" onClick={() => void passerEnVideo()}>
+                  {t("call_turn_on_camera")}
+                </button>
+              </div>
+            )}
             <div className="controls-inner">
               <button
                 className="ctrl-btn"
@@ -740,9 +821,117 @@ export default function CallRoomPage() {
                 </button>
               )}
 
+              {/* La fenetre flottante, a la demande (06/11/2026). */}
+              {fenetreDispo && showRemoteVideo && (
+                <button
+                  className="ctrl-btn"
+                  onClick={() => {
+                    const video = remoteVideoRef.current
+                    if (!video) return
+                    if (document.pictureInPictureElement) {
+                      void document.exitPictureInPicture().catch(() => undefined)
+                    } else {
+                      void video.requestPictureInPicture().catch(() => undefined)
+                    }
+                  }}
+                  aria-label={t("call_pip")}
+                  title={t("call_pip")}
+                >
+                  <div className="ctrl-btn-icon ctrl-on">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    >
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <rect x="12" y="12" width="8" height="6" rx="1" fill="currentColor" />
+                    </svg>
+                  </div>
+                  <span className="ctrl-btn-label">{t("call_pip_short")}</span>
+                </button>
+              )}
+
+              {/* Sortie audio au choix : casque, Bluetooth... (06/11/2026). */}
+              {choixDeSortie && (
+                <div className="sortie-audio">
+                  <button
+                    className="ctrl-btn"
+                    onClick={() => setMenuSortie((v) => !v)}
+                    aria-haspopup="menu"
+                    aria-expanded={menuSortie}
+                    aria-label={t("audio_out_title")}
+                    title={sortieCourante?.label}
+                  >
+                    <div className="ctrl-btn-icon ctrl-on">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      >
+                        <path d="M3 18v-6a9 9 0 0118 0v6" />
+                        <path d="M21 19a2 2 0 01-2 2h-1v-6h3zM3 19a2 2 0 002 2h1v-6H3z" />
+                      </svg>
+                    </div>
+                    <span className="ctrl-btn-label">{t("audio_out_short")}</span>
+                  </button>
+                  {menuSortie && (
+                    <div className="sortie-audio-menu" role="menu">
+                      {sortiesAudio.map((s) => (
+                        <button
+                          key={s.deviceId}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={s.deviceId === sortieCourante?.deviceId}
+                          className={s.deviceId === sortieCourante?.deviceId ? "choisie" : ""}
+                          onClick={() => {
+                            choisirSortieAudio(s.deviceId === "default" ? null : s.deviceId)
+                            setMenuSortie(false)
+                          }}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Appel audio a deux : passer en video (06/11/2026). */}
+              {!isVideo && callState === "active" && peutPasserEnVideo() && (
+                <button
+                  className="ctrl-btn"
+                  onClick={() => void passerEnVideo()}
+                  aria-label={t("video_call")}
+                >
+                  <div className="ctrl-btn-icon ctrl-off">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    >
+                      <polygon points="23 7 16 12 23 17 23 7" />
+                      <rect x="1" y="5" width="15" height="14" rx="2" />
+                    </svg>
+                  </div>
+                  <span className="ctrl-btn-label">{t("a2_cam_short")}</span>
+                </button>
+              )}
+
               {/* Uniquement sur les appels audio : un appel video reste au
                   haut-parleur, sans bascule possible. */}
-              {!isVideo && (
+              {!isVideo && !choixDeSortie && (
                 <button
                   className="ctrl-btn"
                   onClick={() =>

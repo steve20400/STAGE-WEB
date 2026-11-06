@@ -7,7 +7,7 @@ import {
   normalizeAlanyaNumber,
 } from "../lib/alanya-number"
 import { loadContacts, persistContacts, type Contact } from "../data/contacts"
-import { startOutgoingCall } from "../services/call-manager"
+import { lancerAppel } from "../services/lancer-appel"
 import { createPrivateChat } from "../services/chats-service"
 import { addContactByPhone } from "../services/contacts-service"
 import {
@@ -157,16 +157,20 @@ function FicheUnique({ contact }: { contact: SharedContact }) {
       if (occupe) return
       setOccupe(true)
       try {
-        const conversation = await createPrivateChat(numero)
         if (action === "ecrire") {
+          const conversation = await createPrivateChat(numero)
           navigate(`/chats/${conversation.id}`)
           return
         }
-        const callId = await startOutgoingCall(conversation.id, "audio", nom)
         // On emporte l'endroit d'ou l'on part : a la fin de l'appel, l'ecran y
         // ramene au lieu de deposer tout le monde sur la liste des appels.
-        const depart = `${location.pathname}${location.search}`
-        navigate(`/calls/${callId}?type=audio&returnTo=${encodeURIComponent(depart)}`)
+        // L'ecran s'ouvre AVANT la reponse du serveur (06/11/2026).
+        await lancerAppel(navigate, {
+          conversation: async () => (await createPrivateChat(numero)).id,
+          type: "audio",
+          titre: nom,
+          returnTo: `${location.pathname}${location.search}`,
+        })
       } catch (err) {
         if (!monte.current) return
         const detail = err instanceof Error ? err.message : undefined

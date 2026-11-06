@@ -77,3 +77,43 @@ export function setDefaultAudioOutput(mode: AudioOutputMode) {
     // stockage indisponible : le choix ne survivra pas a la session
   }
 }
+
+/*
+ * LE CHOIX DE LA SORTIE (06/11/2026) : la ou le navigateur sait diriger le son
+ * vers un appareil precis (`setSinkId` — Chrome, Edge, Firefox sur ordinateur),
+ * l'ecran propose la liste des sorties : haut-parleurs, casque, Bluetooth.
+ * Ailleurs — Android, Safari iOS — la bascule oreille / haut-parleur ci-dessus
+ * reste la seule possible.
+ */
+export const SORTIE_CHOISISSABLE =
+  typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype
+
+const CLE_SORTIE = "alanya.appel.sortie"
+
+/** La sortie retenue sur cet appareil ; nulle = celle du systeme. */
+export function sortieRetenue(): string | null {
+  try {
+    return localStorage.getItem(CLE_SORTIE)
+  } catch {
+    return null
+  }
+}
+
+export function retenirSortie(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(CLE_SORTIE, id)
+    else localStorage.removeItem(CLE_SORTIE)
+  } catch {
+    // Non retenue : elle vaudra pour cet appel seulement.
+  }
+}
+
+/** Dirige [el] vers la sortie [id] (nulle = celle du systeme). Sans effet ailleurs. */
+export function appliquerSortie(el: HTMLMediaElement, id: string | null): void {
+  if (!SORTIE_CHOISISSABLE) return
+  const media = el as HTMLMediaElement & { sinkId?: string; setSinkId(id: string): Promise<void> }
+  const cible = id ?? ""
+  if ((media.sinkId ?? "") === cible) return
+  // Appareil debranche depuis : le son reste ou il est.
+  void media.setSinkId(cible).catch(() => undefined)
+}

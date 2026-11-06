@@ -11,7 +11,7 @@ import {
   type ListeContacts,
 } from "../../../src/services/contact-lists-service"
 import { createPrivateChat } from "../../../src/services/chats-service"
-import { startOutgoingCall } from "../../../src/services/call-manager"
+import { lancerAppel } from "../../../src/services/lancer-appel"
 import {
   ALANYA_NUMBER_FORMATTED_MAX_LENGTH,
   formatAlanyaNumber,
@@ -189,9 +189,13 @@ export default function ContactsPage() {
 
   const callContact = async (publicNumber: string, name: string, type: "audio" | "video") => {
     try {
-      const conversation = await createPrivateChat(publicNumber)
-      const callId = await startOutgoingCall(conversation.id, type, name)
-      navigate(`/calls/${callId}?type=${type}&returnTo=/contacts`)
+      // L'ecran s'ouvre AVANT la reponse du serveur (06/11/2026).
+      await lancerAppel(navigate, {
+        conversation: async () => (await createPrivateChat(publicNumber)).id,
+        type,
+        titre: name,
+        returnTo: "/contacts",
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : t("call_failed_now")
       error(t("call_failed"), message)

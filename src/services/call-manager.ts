@@ -11,7 +11,12 @@ import {
   libererAccueilAdopte,
 } from "./prechargement-accueil"
 import { resolveMediaUrl, urlSonStandard } from "./media-service"
-import { defaultAudioOutput, type AudioOutputMode } from "./audio-output"
+import {
+  defaultAudioOutput,
+  retenirSortie,
+  sortieRetenue,
+  type AudioOutputMode,
+} from "./audio-output"
 import {
   demarrerEnregistrement,
   attacherVoixDistante,
@@ -224,6 +229,16 @@ export interface CallManagerState {
   mediaManquant: "aucun" | "camera" | "tout"
   callType: CallType
   role: CallRole
+  /**
+   * L'ecran d'appel est ouvert mais le serveur n'a pas encore cree l'appel
+   * (06/11/2026) : voir `preparerAppelSortant`.
+   */
+  preparation: boolean
+  /**
+   * Le correspondant vient de passer l'appel en video et nous n'avons pas
+   * encore repondu : son nom, pour « X est passe en video » (06/11/2026).
+   */
+  passageVideoPar: string | null
   /** Etat affichable sans modifier l'interface : Sonnerie, En train de sonner, Appel en cours. */
   progress: CallProgress
   /**
@@ -271,6 +286,13 @@ export interface CallManagerState {
    * rendus. Toujours « speaker » sur un appel video.
    */
   audioOutput: AudioOutputMode
+  /**
+   * L'appareil de sortie choisi (casque, Bluetooth...), la ou le navigateur sait
+   * en choisir un — voir `SORTIE_CHOISISSABLE`. Nul = celui du systeme.
+   */
+  sortieAudioId: string | null
+  /** Qui parle, en appel de groupe (06/11/2026) : identifiants, « moi » compris. */
+  parlent: string[]
   /** Rempli quand l'appel se termine (par nous ou a distance). */
   endedAt: number | null
   error: string | null
@@ -422,6 +444,12 @@ class PeerSession {
   private repriseDepuis = 0
   remoteStream: MediaStream | null = null
   private emissionReglee = false
+  /**
+   * L'offre qui ajoute la video attend sa reponse : le debit de la nouvelle
+   * piste se regle a son arrivee — la liaison, deja « connected », ne repasse
+   * pas par le changement d'etat ICE qui le fait d'ordinaire.
+   */
+  private reglageApresReponse = false
   private mesureTimer: ReturnType<typeof setInterval> | null = null
   private mauvaisesDeSuite = 0
   private bonnesDeSuite = 0
@@ -439,7 +467,8 @@ class PeerSession {
 
   constructor(
     private readonly peerId: string,
-    private readonly isVideo: boolean,
+    /** Non `readonly` : un appel audio peut passer en video (06/11/2026). */
+    private isVideo: boolean,
     private readonly isOfferer: boolean,
     /**
      * Le flux local, ou NUL — l'ecoute seule.
@@ -910,6 +939,11 @@ class PeerSession {
         this.remoteReady = true
         this.offreEnvoyeeLe = 0
         await this.flushIceQueue()
+        if (this.reglageApresReponse) {
+          this.reglageApresReponse = false
+          this.emissionReglee = false
+          void this.reglerEmission()
+        }
         /*
          * ⚠️ UNE REPRISE SUR UNE LIAISON QUI ALLAIT BIEN n'emet pas toujours
          * de nouvel etat ICE : sans ce controle, elle ne se concluait jamais,
@@ -928,6 +962,10 @@ class PeerSession {
         // une coupure n'est pas toujours vue des deux bouts en meme temps.
         // Sans annonce : notre liaison, elle, n'a peut-etre rien eu.
         if (this.isOfferer) this.demarreLaReprise(true, false)
+      } else if (signal.kind === "video_upgrade") {
+        // Le pair passe l'appel en video (06/11/2026) : son offre suit.
+        this.isVideo = true
+        surPassageVideoDistant(this.peerId)
       } else if (signal.kind === "camera_state") {
         // Camera du pair coupee ou rallumee (31/10/2026) : son avatar plutot
         // qu'une image figee.
@@ -1074,6 +1112,29 @@ class PeerSession {
     this.remoteReady = false
     this.pendingSignals = []
     this.iceQueue = []
+  }
+
+  /**
+   * PASSAGE EN VIDEO (06/11/2026) : la camera rejoint une liaison ouverte en
+   * audio, et une nouvelle offre la porte jusqu'au pair. Meme mecanique que le
+   * retour du micro (`ajouterPisteLocale` puis `renegocier`).
+   */
+  async ajouterVideo(piste: MediaStreamTrack, flux: MediaStream): Promise<void> {
+    this.isVideo = true
+    if (!(await this.ajouterPisteLocale(piste, flux))) return
+    this.reglageApresReponse = true
+    await this.renegocier()
+  }
+
+  /** Previent le pair que l'appel passe en video : son ecran bascule. */
+  annoncerPassageVideo() {
+    if (!this.pc) return
+    this.onSendSignal({ kind: "video_upgrade" })
+  }
+
+  /** La connexion elle-meme, pour lire qui parle. */
+  get connexion(): RTCPeerConnection | null {
+    return this.pc
   }
 
   /** Previent le pair que notre camera est coupee ou rallumee. */
@@ -1296,6 +1357,8 @@ function initialState(): CallManagerState {
     mediaManquant: "aucun",
     callType: "audio",
     role: null,
+    preparation: false,
+    passageVideoPar: null,
     progress: null,
     reconnexion: false,
     isGroup: false,
@@ -1306,6 +1369,8 @@ function initialState(): CallManagerState {
     micOn: true,
     camOn: true,
     audioOutput: defaultAudioOutput(),
+    sortieAudioId: sortieRetenue(),
+    parlent: [],
     endedAt: null,
     error: null,
     repondeur: null,
@@ -1864,6 +1929,172 @@ const pairsEnReconnexion = new Set<string>()
 function majConnexionFaible() {
   const faible = [...peers.values()].some((p) => p.connexionFaible)
   if (faible !== state.connexionFaible) setState({ connexionFaible: faible })
+}
+
+/*
+ * 🔴 PASSER EN VIDEO PENDANT UN APPEL AUDIO (06/11/2026), comme WhatsApp et
+ * comme l'application de reference — jumeau de `passerEnVideo` du mobile.
+ *
+ * Celui qui clique ouvre sa camera, l'ajoute a la liaison et envoie une
+ * nouvelle offre, precedee d'un signal `video_upgrade`. Le correspondant
+ * bascule en video CAMERA COUPEE — il voit l'autre sans etre vu — et l'ecran
+ * lui propose « Activer ma camera ». Rien ne s'allume chez lui sans son accord.
+ *
+ * ⚠️ EN TETE-A-TETE SEULEMENT : ni en groupe, ni en reunion, ni avec un
+ * standard.
+ */
+export function peutPasserEnVideo(): boolean {
+  return (
+    state.activeCallId !== null &&
+    state.role === "ongoing" &&
+    state.callType !== "video" &&
+    !state.isGroup &&
+    state.ivr === null &&
+    salleReunion === null &&
+    peers.size === 1 &&
+    localStream !== null
+  )
+}
+
+/** Allume notre camera : passe l'appel en video, ou repond a celui qui l'a fait. */
+export async function passerEnVideo(): Promise<void> {
+  const flux = localStream
+  if (!flux || state.activeCallId === null || salleReunion !== null) return
+  const annoncer = state.callType !== "video"
+  let piste = flux.getVideoTracks()[0]
+  if (!piste) {
+    let camera: MediaStream
+    try {
+      // La capture de la qualite choisie : `qualiteAppel` lit l'etat, la
+      // video est donc annoncee d'abord.
+      camera = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: contraintesVideo(qualitePourAppel(false)),
+      })
+    } catch {
+      setState({ error: tr("call_need_mic_cam") })
+      return
+    }
+    piste = camera.getVideoTracks()[0]
+    if (!piste) return
+    flux.addTrack(piste)
+    for (const p of peers.values()) {
+      if (annoncer) p.annoncerPassageVideo()
+      await p.ajouterVideo(piste, flux)
+    }
+  }
+  piste.enabled = true
+  setState({
+    callType: "video",
+    camOn: true,
+    passageVideoPar: null,
+    audioOutput: "speaker",
+    localStream: flux,
+    mediaManquant: "aucun",
+    error: null,
+  })
+  for (const p of peers.values()) p.envoyerEtatCamera(true)
+}
+
+function surPassageVideoDistant(peerId: string) {
+  if (state.callType === "video" || salleReunion !== null) return
+  setState({
+    callType: "video",
+    camOn: false,
+    passageVideoPar: state.participantNames[peerId] ?? state.peerName,
+    audioOutput: "speaker",
+  })
+  // Notre camera n'est pas ouverte : le pair voit notre avatar.
+  peers.get(peerId)?.envoyerEtatCamera(false)
+}
+
+/** « Plus tard » : on regarde sans etre vu, la camera reste coupee. */
+export function ignorerPassageVideo(): void {
+  setState({ passageVideoPar: null })
+}
+
+/*
+ * QUI PARLE, EN GROUPE (06/11/2026), comme WhatsApp — jumeau de
+ * `detecteur_parole.dart` du mobile.
+ *
+ * Toutes les 350 ms, `audioLevel` est lu dans les statistiques : `inbound-rtp`
+ * pour la voix de chaque participant, `media-source` pour notre micro. Deux
+ * mesures au-dessus du seuil allument, quatre en dessous eteignent : sans ce
+ * delai, l'indicateur clignoterait a chaque bruit.
+ */
+const SEUIL_PAROLE = 0.04
+const MESURES_POUR_ALLUMER = 2
+const MESURES_POUR_ETEINDRE = 4
+export const ID_MOI = "moi"
+let sondeParole: ReturnType<typeof setInterval> | null = null
+let sondageEnCours = false
+const audessus = new Map<string, number>()
+const endessous = new Map<string, number>()
+
+function demarrerSondeParole() {
+  if (sondeParole !== null) return
+  sondeParole = setInterval(() => void sonderParole(), 350)
+}
+
+function arreterSondeParole() {
+  if (sondeParole !== null) clearInterval(sondeParole)
+  sondeParole = null
+  audessus.clear()
+  endessous.clear()
+}
+
+function mesurerParole(id: string, niveau: number, parlent: Set<string>) {
+  if (niveau >= SEUIL_PAROLE) {
+    endessous.set(id, 0)
+    const n = (audessus.get(id) ?? 0) + 1
+    audessus.set(id, n)
+    if (n >= MESURES_POUR_ALLUMER) parlent.add(id)
+  } else {
+    audessus.set(id, 0)
+    const n = (endessous.get(id) ?? 0) + 1
+    endessous.set(id, n)
+    if (n >= MESURES_POUR_ETEINDRE) parlent.delete(id)
+  }
+}
+
+async function sonderParole() {
+  if (!state.isGroup || salleReunion !== null || state.activeCallId === null || peers.size === 0) {
+    arreterSondeParole()
+    if (state.parlent.length > 0) setState({ parlent: [] })
+    return
+  }
+  // Plusieurs `getStats` de suite peuvent depasser l'intervalle.
+  if (sondageEnCours) return
+  sondageEnCours = true
+  try {
+    const parlent = new Set(state.parlent)
+    let moiLu = false
+    for (const [id, session] of peers) {
+      const pc = session.connexion
+      if (!pc) continue
+      try {
+        const rapports = await pc.getStats()
+        rapports.forEach((r: RTCStats & { kind?: string; audioLevel?: number }) => {
+          if (r.kind !== "audio" || typeof r.audioLevel !== "number") return
+          if (r.type === "inbound-rtp") mesurerParole(id, r.audioLevel, parlent)
+          else if (!moiLu && r.type === "media-source") {
+            // Le meme micro pour toutes les liaisons : une lecture suffit.
+            mesurerParole(ID_MOI, state.micOn ? r.audioLevel : 0, parlent)
+            moiLu = true
+          }
+        })
+      } catch {
+        // Liaison en cours de fermeture : absente au tour suivant.
+      }
+    }
+    for (const id of [...parlent]) {
+      if (id !== ID_MOI && !peers.has(id)) parlent.delete(id)
+    }
+    const liste = [...parlent].sort()
+    if (liste.join() !== [...state.parlent].sort().join()) setState({ parlent: liste })
+  } finally {
+    sondageEnCours = false
+  }
 }
 
 /** Recalcule la liste des pairs dont la camera est coupee. */
@@ -2498,6 +2729,8 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
     () => marquerReconnexion(peerId, false)
   )
   peers.set(peerId, session)
+  // Appel de groupe : qui parle (06/11/2026). La sonde s'arrete d'elle-meme.
+  if (state.isGroup && salleReunion === null) demarrerSondeParole()
   await session.start()
 
   // Rejoue les signaux arrives avant que la session existe.
@@ -2604,6 +2837,7 @@ function stopMesh() {
 }
 
 function clearCall(markEnded: boolean) {
+  arreterSondeParole()
   /*
    * ⚠️ LE PRÉCHARGEMENT S'ARRÊTE ICI, et c'est sans danger pour la feuille du
    * répondeur : `attendreAccueil` lui a déjà transféré l'adresse, qui ne dépend
@@ -3265,6 +3499,58 @@ async function endStaleServerCalls(): Promise<void> {
  * Demarre un appel sortant dans une conversation.
  * Renvoie l'id de l'appel cree (RINGING cote backend).
  */
+/*
+ * 🔴 L'ECRAN D'APPEL S'OUVRE AVANT LA REPONSE DU SERVEUR (06/11/2026), comme
+ * WhatsApp et comme l'application de reference — voir `lancerAppel`.
+ *
+ * Il s'ouvrait apres `createPrivateChat`, `startCallRest` puis l'acces au
+ * micro et a la camera : plusieurs secondes sans rien a l'ecran apres le clic,
+ * davantage quand le navigateur demandait l'autorisation.
+ *
+ * Raccrocher pendant la preparation ne peut rien terminer cote serveur —
+ * l'appel n'existe pas encore : `preparationAbandonnee` le note, et
+ * `startOutgoingCall` termine l'appel des sa creation, sans le faire sonner.
+ */
+let preparationAbandonnee = false
+
+/** L'utilisateur a raccroche pendant la preparation : rien a afficher. */
+export class AppelAbandonne extends Error {}
+
+/** Ouvre l'appel cote ecran, avant toute requete. Faux si un appel occupe deja la page. */
+export function preparerAppelSortant(
+  type: CallType,
+  titre: string,
+  avatarUrl: string | null
+): boolean {
+  if (state.incoming || state.activeCallId !== null || state.role !== null) return false
+  preparationAbandonnee = false
+  setState({
+    preparation: true,
+    peerName: titre,
+    peerAvatarUrl: avatarUrl,
+    callType: type,
+    role: "outgoing",
+    progress: null,
+    isInitiator: true,
+    endedAt: null,
+    error: null,
+    repondeur: null,
+    displayMode: "full",
+  })
+  return true
+}
+
+export function appelEnPreparation(): boolean {
+  return state.preparation
+}
+
+/** La preparation a echoue (conversation ou appel refuses) : l'ecran se ferme. */
+export function annulerPreparation(): void {
+  if (!state.preparation) return
+  preparationAbandonnee = false
+  clearCall(true)
+}
+
 export async function startOutgoingCall(
   convId: string,
   type: CallType,
@@ -3276,8 +3562,9 @@ export async function startOutgoingCall(
   if (state.incoming) {
     throw new Error(tr("call_answer_incoming_first"))
   }
-  // Appel local residuel (ecran quitte sans raccrocher) : on le remplace.
-  if (state.activeCallId !== null || state.role !== null) {
+  // Ecran deja ouvert par `preparerAppelSortant` : c'est NOTRE preparation qui
+  // occupe la page, elle ne doit pas se raccrocher elle-meme.
+  if (!state.preparation && (state.activeCallId !== null || state.role !== null)) {
     await hangUp()
   }
 
@@ -3301,6 +3588,13 @@ export async function startOutgoingCall(
       throw err
     }
   }
+  if (preparationAbandonnee) {
+    // Raccroche pendant que le serveur creait l'appel : on le termine aussitot,
+    // avant qu'il ne fasse sonner qui que ce soit.
+    preparationAbandonnee = false
+    void endCallRest(started.id).catch(() => undefined)
+    throw new AppelAbandonne()
+  }
   sendCallRing(started.id)
 
   const participantNames: Record<string, string> = {}
@@ -3320,6 +3614,7 @@ export async function startOutgoingCall(
     peerAvatarUrl: started.isGroup ? null : (started.callees?.[0]?.avatarUrl ?? null),
     callType: type,
     role: "outgoing",
+    preparation: false,
     progress: "ringtone",
     isGroup: started.isGroup,
     isInitiator: true,
@@ -3952,6 +4247,12 @@ export async function rejectIncomingCall(): Promise<void> {
 
 /** Raccroche l'appel en cours (ou annule la sonnerie sortante). */
 export async function hangUp(): Promise<void> {
+  if (state.preparation && state.activeCallId === null) {
+    // L'appel n'existe pas encore cote serveur : voir `preparationAbandonnee`.
+    preparationAbandonnee = true
+    clearCall(true)
+    return
+  }
   const callId = state.activeCallId ?? state.incoming?.callId
   const wasGroup = state.isGroup
   const wasInitiator = state.isInitiator
@@ -4357,6 +4658,12 @@ export function toggleCamera(): boolean {
     return next
   }
   const pistes = localStream?.getVideoTracks() ?? []
+  // Passe en video par le correspondant, sans camera encore ouverte : la
+  // rallumer, c'est l'ouvrir (06/11/2026).
+  if (pistes.length === 0 && salleReunion === null && state.callType === "video" && !state.camOn) {
+    void passerEnVideo()
+    return true
+  }
   // Meme raison que pour le micro : sans piste video, il n'y a aucune camera a
   // rallumer, et un bouton qui s'allume promet une image qui ne partira jamais.
   // Cas courant depuis qu'on entre en reunion video sans webcam.
@@ -4728,6 +5035,12 @@ export function setCallDisplayMode(mode: CallDisplayMode): void {
 }
 
 /** Bascule haut-parleur / ecoute a l'oreille de l'appel en cours (appels audio). */
+/** Dirige le son de l'appel vers cet appareil, et le retient pour les suivants. */
+export function choisirSortieAudio(id: string | null): void {
+  retenirSortie(id)
+  setState({ sortieAudioId: id })
+}
+
 export function setCallAudioOutput(mode: AudioOutputMode): void {
   if (state.activeCallId) setState({ audioOutput: mode })
 }
