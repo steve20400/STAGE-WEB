@@ -192,7 +192,10 @@ function connect() {
   const token = loadSessionToken()
   if (!token) return
 
-  const ws = new WebSocket(`${WS_URL}/?token=${encodeURIComponent(token)}`)
+  // `capacites=sfu` (07/11/2026) : ce client sait rejoindre un groupe ou une
+  // reunion en SFU ; le serveur ne fait passer un groupe en SFU que si tous ses
+  // membres l'ont declare.
+  const ws = new WebSocket(`${WS_URL}/?token=${encodeURIComponent(token)}&capacites=sfu`)
   socket = ws
 
   // Cold start Render : si le handshake ne se termine pas, on coupe et

@@ -318,6 +318,14 @@ async function rawRequest(path: string, options: ApiRequestOptions) {
   if (!headers.has("Accept-Language")) {
     headers.set("Accept-Language", langueInitiale())
   }
+  /*
+   * `X-Alanya-Capacites: sfu` (07/11/2026) : ce client sait rejoindre un appel
+   * de groupe ou une reunion en SFU. Le serveur refuse le decroche et l'entree
+   * en reunion SFU a un client qui ne l'envoie pas.
+   */
+  if (!headers.has("X-Alanya-Capacites")) {
+    headers.set("X-Alanya-Capacites", "sfu")
+  }
 
   if (body instanceof FormData && (options.method ?? "GET").toUpperCase() === "POST") {
     return envoyerFichier(buildUrl(path), headers, body, options.onUploadProgress, options.signal)

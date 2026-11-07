@@ -267,6 +267,8 @@ export interface StartedCall {
     /** Photo de profil du destinataire, fournie par POST /api/calls. */
     avatarUrl?: string | null
   }>
+  /** `sfu` pour un appel de groupe que le serveur a place en SFU (07/11/2026). */
+  moteur?: "mesh" | "sfu"
 }
 
 /** POST /api/calls — cree l'appel (statut RINGING) dans une conversation existante. */
@@ -329,6 +331,8 @@ export interface AcceptCallResult {
   enregistrer?: boolean
   /** Entreprise destinataire de l'enregistrement, ou null. */
   enregistrementCompanyId?: number | null
+  /** Le moteur de l'appel, `mesh` ou `sfu` (07/11/2026). Absent : mesh. */
+  moteur?: "mesh" | "sfu"
 }
 
 /** POST /api/calls/:id/accept — accepte / rejoint l'appel. */
