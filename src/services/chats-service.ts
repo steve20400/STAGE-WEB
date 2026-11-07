@@ -1,4 +1,5 @@
 import { loadLocalConversations } from "../data/local-conversations"
+import { nomPour } from "./noms-donnes"
 import { loadLocalGroups, toConversationMock } from "../data/local-groups"
 import { type ConversationMock, type MessageType } from "../mocks/chat-data"
 import { getMyUserId, loadSessionUser, toInitials } from "../data/session-user"
@@ -218,13 +219,25 @@ function toFrontConversation(c: BackendConversation): ConversationListItem {
    */
   noteEtatChiffrement(c.id, c.e2eeActif === true)
 
+  /*
+   * 🔴 LE NOM QUE J'AI DONNÉ L'EMPORTE (18/10/2026, demande du patron) : « ce
+   * nom-là, quand tu m'écris, c'est ce nom-là qui doit s'afficher ». Le mobile
+   * le fait depuis le 18/10 ; le web affichait encore le nom du profil.
+   *
+   * ⚠️ ICI ET NON DANS LES ÉCRANS : c'est le point de passage de TOUTES les
+   * conversations. Appliquer la règle dans chaque composant en oublierait un.
+   * ⚠️ NI EN GROUPE NI POUR MES NOTES : il n'y a pas un correspondant unique à
+   * renommer, et `peer` vaut alors `undefined`.
+   */
+  const nomAffiche = nomPour(peer?.id, name)
+
   return {
     id: c.id,
     isSelf,
     officiel: c.officiel === true,
     badge: c.badge ?? null,
-    name,
-    initials: toInitials(name),
+    name: nomAffiche,
+    initials: toInitials(nomAffiche),
     colorIdx: pickColorIdx(c.id),
     lastMessage: c.lastMessage?.content ?? "",
     lastMessageType: mapLastMessageType(c.lastMessage?.type),

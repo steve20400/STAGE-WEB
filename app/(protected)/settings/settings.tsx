@@ -4011,6 +4011,22 @@ export default function SettingsPage() {
                 />
               </div>
 
+              {/*
+                LE PENDANT DU NOM DONNÉ. Chacun peut noter ses contacts sous le
+                nom qu'il veut — ce réglage permet de refuser qu'on le fasse
+                pour soi. Il est à côté du chiffrement, et non dans la fiche
+                d'un contact : il vaut pour tout le monde à la fois.
+              */}
+              <div className="s-card">
+                <div className="s-card-title">{t("nom_verrou_titre")}</div>
+                <Toggle
+                  value={privacy.nomVerrouille}
+                  onChange={(v) => void updatePrivacy({ nomVerrouille: v })}
+                  label={t("nom_verrou_label")}
+                  description={t(privacy.nomVerrouille ? "nom_verrou_on" : "nom_verrou_off")}
+                />
+              </div>
+
               <div className="s-card">
                 <div className="s-card-title">{t("set_visibility")}</div>
                 <Toggle

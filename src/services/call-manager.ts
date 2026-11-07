@@ -1,4 +1,5 @@
 import { getMyUserId, loadSessionUser } from "../data/session-user"
+import { nomPour } from "./noms-donnes"
 import { loadSessionToken } from "../data/session-auth"
 import { ApiError } from "../lib/api-client"
 import { isCustomRingtone, RINGTONES, ringtoneSource, ringtoneUrl } from "./ringtones"
@@ -2958,7 +2959,15 @@ async function handleServerEvent(event: CallServerEvent) {
         convId,
         callType: event.callType === "VIDEO" ? "video" : "audio",
         callerId: String(event.callerId ?? ""),
-        callerName: String(event.callerName ?? tr("call")),
+        /*
+         * 🔴 LE NOM QUE J'AI DONNÉ À CET APPELANT L'EMPORTE (18/10/2026) :
+         * « quand tu m'appelles, c'est ce nom-là ». Le serveur envoie le nom du
+         * profil ; le registre local le remplace s'il connaît mieux.
+         */
+        callerName: nomPour(
+          String(event.callerId ?? "") || null,
+          String(event.callerName ?? tr("call")),
+        ),
         callerAvatarUrl,
         isGroup: Boolean(event.isGroup),
         groupName: (event.groupName as string | null) ?? null,

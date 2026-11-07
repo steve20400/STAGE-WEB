@@ -1,4 +1,5 @@
 import { apiRequest } from "../lib/api-client"
+import { nomPour } from "./noms-donnes"
 import { uploadMedia } from "./media-service"
 
 /** Statut ephemere (24 h) tel que renvoye par GET /api/statuses. */
@@ -98,7 +99,9 @@ export interface VueStatut {
 /** GET /api/statuses/:id/views — qui a vu MON statut, et qui l'a aime. */
 export async function fetchStatusViews(statusId: string): Promise<VueStatut[]> {
   const r = await apiRequest<{ views: VueStatut[] }>(`/api/statuses/${statusId}/views`)
-  return r?.views ?? []
+  // Le nom que j'ai donné l'emporte ici aussi : c'est MA liste, elle doit
+  // porter les noms sous lesquels je connais ces gens.
+  return (r?.views ?? []).map((v) => ({ ...v, name: nomPour(v.userId, v.name) }))
 }
 
 /** POST /api/statuses/:id/view — marque un statut comme vu. */

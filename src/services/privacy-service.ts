@@ -43,6 +43,19 @@ export interface PrivacySettings {
   chiffrementActif: boolean
   /** « Contacts préférés uniquement » (29/10/2026) : seuls mes contacts m'appellent. */
   appelsContactsSeulement: boolean
+  /**
+   * « Personne ne peut me renommer » (18/10/2026) — `User.nomVerrouille`.
+   *
+   * 🔴 LE PENDANT DU NOM DONNÉ. Chacun peut noter ses contacts sous le nom
+   * qu'il veut ; ce réglage permet de refuser qu'on le fasse pour SOI. Le
+   * serveur cesse alors de renvoyer l'alias qu'on vous a donné (`alias: null`),
+   * et votre nom de profil s'impose partout.
+   *
+   * ⚠️ LE FILTRAGE EST AU SERVEUR, ET C'EST LA SEULE PLACE SÛRE. Un client
+   * garde ce qu'il veut en mémoire ; on ne peut pas l'en empêcher, on peut
+   * seulement ne plus le lui dire.
+   */
+  nomVerrouille: boolean
 }
 
 /** Valeurs par defaut du backend : lecture confirmee, presence publique. */
@@ -53,6 +66,9 @@ export const PRIVACY_DEFAULTS: PrivacySettings = {
   // qui ne rend pas ce champ doit laisser le client protéger, pas se taire.
   chiffrementActif: true,
   appelsContactsSeulement: false,
+  // ⚠️ FAUX PAR DÉFAUT : se laisser renommer est le comportement attendu, le
+  // verrou est un choix qu'on fait, pas un état qu'on subit.
+  nomVerrouille: false,
 }
 
 function toVisibility(value: unknown): LastSeenVisibility {
@@ -65,6 +81,7 @@ export async function fetchPrivacy(): Promise<PrivacySettings> {
     readReceipts?: number
     lastSeenVisibility?: number
     chiffrementActif?: boolean
+    nomVerrouille?: boolean
     appelsContactsSeulement?: boolean
   }>("/api/account/privacy")
   return {
@@ -73,6 +90,7 @@ export async function fetchPrivacy(): Promise<PrivacySettings> {
       data.lastSeenVisibility ?? PRIVACY_DEFAULTS.lastSeenVisibility
     ),
     chiffrementActif: data.chiffrementActif ?? PRIVACY_DEFAULTS.chiffrementActif,
+    nomVerrouille: data.nomVerrouille ?? PRIVACY_DEFAULTS.nomVerrouille,
     appelsContactsSeulement: data.appelsContactsSeulement === true,
   }
 }
@@ -88,6 +106,7 @@ export async function savePrivacy(patch: Partial<PrivacySettings>): Promise<void
   if (patch.readReceipts !== undefined) body.readReceipts = patch.readReceipts ? 1 : 0
   if (patch.lastSeenVisibility !== undefined) body.lastSeenVisibility = patch.lastSeenVisibility
   if (patch.chiffrementActif !== undefined) body.chiffrementActif = patch.chiffrementActif
+  if (patch.nomVerrouille !== undefined) body.nomVerrouille = patch.nomVerrouille
   if (patch.appelsContactsSeulement !== undefined) {
     body.appelsContactsSeulement = patch.appelsContactsSeulement
   }

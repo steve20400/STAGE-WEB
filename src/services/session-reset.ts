@@ -27,6 +27,10 @@ import { refermer as refermerSauvegarde } from "./e2ee-sauvegarde"
  */
 const ACCOUNT_CACHE_KEYS = [
   "alanya-contacts-v1",
+  // Les noms que le compte précédent avait donnés à SES contacts. Donnée de
+  // compte s'il en est : laissée en place, le compte suivant verrait ses
+  // correspondants sous les surnoms de quelqu'un d'autre.
+  "alanya-noms-donnes-v1",
   // Miroir des listes de contacts. Donnee de COMPTE et non preference d'appareil,
   // malgre son air de reglage de sonnerie : il porte les membres des listes, donc
   // l'identifiant et le numero Alanya de gens du repertoire du compte precedent.

@@ -1,4 +1,5 @@
 import { apiRequest } from "../lib/api-client"
+import { depuisContacts, poser } from "./noms-donnes"
 import {
   type Contact,
   type ContactColor,
@@ -58,6 +59,13 @@ function toFrontContact(c: BackendContact): Contact {
 export async function fetchContacts(): Promise<Contact[]> {
   try {
     const response = await apiRequest<ContactsListResponse>("/api/contacts")
+    /*
+     * 🔴 LE REGISTRE DES NOMS DONNÉS SE REMPLIT ICI, et nulle part ailleurs :
+     * c'est le seul endroit qui voie passer les alias BRUTS. `toFrontContact`
+     * les fond aussitôt dans `name`, et après lui l'information est perdue.
+     * Un compte qui refuse d'être renommé arrive déjà avec `alias: null`.
+     */
+    depuisContacts(response.contacts ?? [])
     const contacts = (response.contacts ?? []).map(toFrontContact)
     persistContacts(contacts)
     return contacts
@@ -75,6 +83,10 @@ export async function addContactByPhone(rawNumber: string, alias?: string): Prom
     method: "POST",
     body: { publicNumber, alias: alias?.trim() || undefined },
   })
+  // ⚠️ ON PREND L'ALIAS DE LA RÉPONSE, pas celui qu'on a demandé : le serveur
+  // l'ignore pour un compte qui refuse d'être renommé, et le registre doit
+  // dire la vérité plutôt que notre intention.
+  poser(response.user?.id, response.alias)
   return toFrontContact(response)
 }
 
