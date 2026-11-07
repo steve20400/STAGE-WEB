@@ -2,7 +2,7 @@ import React from "react"
 import ReactDOM from "react-dom/client"
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { AuthProvider } from "./components/auth-provider"
-import { ProtectedRoute, PublicOnlyRoute } from "./components/route-guards"
+import { EntreeDeveloppeur, ProtectedRoute, PublicOnlyRoute, RouteDeveloppeur } from "./components/route-guards"
 import { ThemeProvider } from "./components/theme-provider"
 import { LanguageProvider } from "./i18n"
 import { ToastProvider } from "./components/toast"
@@ -333,15 +333,21 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   />
 
                   <Route path="/developer/auth" element={<DeveloperAuthPage />} />
-                  <Route path="/developer" element={<Navigate to="/developer/dashboard" replace />} />
+                  {/*
+                    alanyavox.com/developer arrive ici (redirection du serveur,
+                    07/11/2026) : la console si l'on est connecté, sinon la page
+                    d'entrée de l'espace développeur — et non la connexion
+                    générale, qui ne propose pas de créer un compte développeur.
+                  */}
+                  <Route path="/developer" element={<EntreeDeveloppeur />} />
                   <Route
                     path="/developer/dashboard"
                     element={
-                      <ProtectedRoute>
+                      <RouteDeveloppeur>
                         <DeveloperLayout>
                           <DeveloperPage />
                         </DeveloperLayout>
-                      </ProtectedRoute>
+                      </RouteDeveloppeur>
                     }
                   />
                   <Route

@@ -48,6 +48,27 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+/**
+ * L'ESPACE DÉVELOPPEUR (07/11/2026) : alanyavox.com/developer y mène.
+ *
+ * Sans session, on arrive sur SA page d'entrée (« Continuer avec Alanya
+ * Work » / « Créer un compte développeur »), et non sur la connexion
+ * générale, qui ne propose pas de créer un compte développeur.
+ */
+export function EntreeDeveloppeur() {
+  const { isAuthenticated, isReady } = useAuth()
+  if (!isReady) return <RouteGuardFallback />
+  return <Navigate to={isAuthenticated ? "/developer/dashboard" : "/developer/auth"} replace />
+}
+
+/** La console : sans session, retour à l'entrée de l'espace développeur. */
+export function RouteDeveloppeur({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isReady } = useAuth()
+  if (!isReady) return <RouteGuardFallback />
+  if (!isAuthenticated) return <Navigate to="/developer/auth" replace />
+  return <>{children}</>
+}
+
 export function PublicOnlyRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isReady } = useAuth()
 
