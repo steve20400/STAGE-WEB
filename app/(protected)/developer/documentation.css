@@ -1,0 +1,173 @@
+/* La documentation de la console développeur (07/11/2026). */
+
+.dev-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--dev-text-primary);
+}
+
+.dev-doc-onglets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.dev-doc-onglet {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--dev-border);
+  background: transparent;
+  color: var(--dev-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dev-doc-onglet[aria-selected="true"] {
+  background: var(--dev-accent);
+  border-color: var(--dev-accent);
+  color: #ffffff;
+}
+
+.dev-doc-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dev-doc-section h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.dev-doc-section h4 {
+  margin: 6px 0 0 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dev-doc-section p {
+  margin: 0;
+}
+
+.dev-doc-section ul,
+.dev-doc-section ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.dev-doc-section li + li {
+  margin-top: 4px;
+}
+
+.dev-doc code {
+  font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--dev-accent-light);
+}
+
+.dev-doc-methode {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-right: 8px;
+  border-radius: 4px;
+  background: var(--dev-accent);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+/* Un bloc de code : un bandeau (titre, langage, Copier), puis le code. */
+.dev-doc-bloc {
+  border: 1px solid var(--dev-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--dev-bg-page);
+}
+
+.dev-doc-bloc-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
+  border-bottom: 1px solid var(--dev-border);
+  background: var(--dev-accent-light);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dev-text-secondary);
+}
+
+.dev-doc-copier {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--dev-border);
+  background: var(--dev-bg-card);
+  color: var(--dev-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dev-doc-copier:hover {
+  border-color: var(--dev-accent);
+}
+
+.dev-doc-bloc pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.dev-doc-bloc pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.dev-doc-tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dev-doc-tableau th,
+.dev-doc-tableau td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--dev-border);
+}
+
+.dev-doc-tableau th {
+  font-size: 12px;
+  color: var(--dev-text-secondary);
+  font-weight: 700;
+}
+
+.dev-doc-defile {
+  overflow-x: auto;
+}
+
+.dev-doc-note {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 3px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}

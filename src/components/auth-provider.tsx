@@ -69,6 +69,13 @@ interface AuthContextValue {
    * l'historique chiffré comme après une connexion ordinaire.
    */
   loginAvecCode: (defiId: string, code: string, password: string) => Promise<SessionUser>
+  /**
+   * Connexion de l'espace développeur : la même vérification, mais sans
+   * démarrer la messagerie (clés de chiffrement, restauration).
+   * Lève `DeuxEtapesRequises` quand le compte demande un code.
+   */
+  loginDeveloppeur: (payload: LoginPayload) => Promise<SessionUser>
+  loginDeveloppeurAvecCode: (defiId: string, code: string) => Promise<SessionUser>
   register: (draft: RegistrationDraft, otp: string) => Promise<SessionUser>
   /** Inscription sans adresse : rend AUSSI le code de recuperation, montre une seule fois. */
   registerWithoutEmail: (
@@ -269,12 +276,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const entrer = useCallback(async (
     session: Parameters<typeof storeAuthenticatedSession>[0],
     password: string,
+    /**
+     * Faux pour l'espace développeur (07/11/2026) : la session s'ouvre, mais
+     * rien de la messagerie ne démarre — ni publication des clés de
+     * chiffrement de ce navigateur, ni restauration de l'historique.
+     */
+    messagerie = true,
   ) => {
     const nextUser = storeAuthenticatedSession(session)
     await claimLocalCaches(accountKey(nextUser))
     saveSessionUser(nextUser)
     setUser(nextUser)
     setIsReady(true)
+    if (!messagerie) return nextUser
     publierMesCles()
 
     /*
@@ -310,6 +324,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginAvecCode = useCallback(
     async (defiId: string, code: string, password: string) =>
       entrer(await loginWithCode(defiId, code), password),
+    [entrer],
+  )
+
+  /*
+   * LA CONNEXION DE L'ESPACE DÉVELOPPEUR (07/11/2026, demande du user) : le
+   * même compte et les mêmes vérifications côté serveur (mot de passe, puis
+   * code dans l'application si le compte l'exige), mais on ouvre la console
+   * développeur, pas la messagerie.
+   */
+  const loginDeveloppeur = useCallback(
+    async (payload: LoginPayload) => entrer(await loginWithPassword(payload), payload.password, false),
+    [entrer],
+  )
+
+  const loginDeveloppeurAvecCode = useCallback(
+    async (defiId: string, code: string) => entrer(await loginWithCode(defiId, code), "", false),
     [entrer],
   )
 
@@ -532,6 +562,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(user),
       login,
       loginAvecCode,
+      loginDeveloppeur,
+      loginDeveloppeurAvecCode,
       register,
       registerWithoutEmail,
       logout,
@@ -539,7 +571,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateUser,
       deleteAccount,
     }),
-    [deleteAccount, isReady, login, loginAvecCode, logout, logoutEverywhere, register, updateUser, user]
+    [
+      deleteAccount,
+      isReady,
+      login,
+      loginAvecCode,
+      loginDeveloppeur,
+      loginDeveloppeurAvecCode,
+      logout,
+      logoutEverywhere,
+      register,
+      registerWithoutEmail,
+      updateUser,
+      user,
+    ]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

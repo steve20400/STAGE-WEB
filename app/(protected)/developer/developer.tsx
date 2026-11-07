@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react"
 import { useDeveloperTab } from "./developer-layout"
 import CreationEnseigne from "./creation-enseigne"
+import Documentation from "./documentation"
 import {
   api,
   messageErreur,
@@ -125,7 +126,6 @@ export default function DeveloperPage() {
   const [secretVisible, setSecretVisible] = useState(false)
   const [message, setMessage] = useState<{ texte: string; erreur: boolean } | null>(null)
   const [enCours, setEnCours] = useState(false)
-  const [docType, setDocType] = useState<"message" | "media" | "verification" | "webhook">("message")
 
   const enseigne = etat?.enseignes.find((e) => e.id === enseigneId) ?? null
 
@@ -323,7 +323,6 @@ export default function DeveloperPage() {
   /* ─── La console d'une enseigne ──────────────────────────────────────── */
 
   const clesActives = cles.filter((c) => c.isActive)
-  const exempleCle = clesActives[0] ? `${clesActives[0].prefix}…` : "ak_live_votre_cle"
   const peutEnCreer = etat.enseignes.length < etat.limite
 
   return (
@@ -753,245 +752,7 @@ export default function DeveloperPage() {
       {/* 6. DOCUMENTATION */}
       {activeTab === "docs" && (
         <div className="dev-panel-box">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-            <h3 className="dev-panel-title" style={{ margin: 0 }}>API Alanya v1</h3>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              {(["message", "media", "verification", "webhook"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setDocType(type)}
-                  className="dev-refresh-btn"
-                  style={{
-                    background: docType === type ? "var(--dev-accent)" : "transparent",
-                    color: docType === type ? "#ffffff" : "var(--dev-text-primary)",
-                    borderColor: docType === type ? "var(--dev-accent)" : "var(--dev-border)",
-                    fontWeight: 600,
-                    fontSize: "12px",
-                  }}
-                >
-                  {type === "message" && "Messages"}
-                  {type === "media" && "Fichiers"}
-                  {type === "verification" && "Codes de vérification"}
-                  {type === "webhook" && "Webhook"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0", lineHeight: 1.6 }}>
-            Quatre routes, gratuites. Les messages partent du numéro de l'enseigne
-            {enseigne ? ` (${enseigne.numero})` : ""}. Appelez-les depuis votre serveur, jamais depuis un navigateur :
-            une clé dans une page web est une clé publiée.
-          </p>
-
-          {docType === "message" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div>
-                <h4 className="dev-doc-title">1. Message texte (POST /api/v1/messages)</h4>
-                <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/messages \\
-  -H "X-Api-Key: ${exempleCle}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "destinataire": "12345678",
-    "type": "TEXT",
-    "texte": "Bonjour depuis Alanya"
-  }'
-
-// 201 Created
-{
-  "id": "3f9a1c2e-…",          // l'identifiant du message
-  "statut": "ENVOYE",
-  "destinataire": "12345678",
-  "conversationId": "8c21…",
-  "type": "TEXT",
-  "medias": [],
-  "envoyeA": "2026-11-07T14:02:11.482Z"
-}
-
-// "texte" : 500 caractères au plus, boutons compris.
-// Au-delà, 422 : le texte n'est jamais coupé en silence.`}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="dev-doc-title">2. Message avec fichier</h4>
-                <div className="dev-code-block">
-{`// Téléversez d'abord le fichier (onglet Fichiers), puis :
-curl -X POST https://alanyavox.com/api/v1/messages \\
-  -H "X-Api-Key: ${exempleCle}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "destinataire": "12345678",
-    "type": "IMAGE",
-    "texte": "La légende, facultative",
-    "mediaIds": ["b7d0…-uuid"]
-  }'
-
-// Types : TEXT · IMAGE · VIDEO · AUDIO · FILE · CONTACT · LOCATION
-// Jusqu'à 10 mediaIds, téléversés par l'enseigne.`}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="dev-doc-title">3. Boutons de réponse rapide</h4>
-                <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/messages \\
-  -H "X-Api-Key: ${exempleCle}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "destinataire": "12345678",
-    "texte": "Veux-tu manger ?",
-    "options": ["OUI", "NON"]
-  }'
-
-// La personne voit la question avec deux boutons. Un clic
-// renvoie le libellé du bouton comme message ordinaire.
-// 1 à 10 options, 24 caractères chacune, sans crochet.
-
-// ⚠️ Tout crochet dans un texte devient un bouton :
-// « commande [12345] prête » affiche un bouton 12345.
-// La réponse ne vous revient pas encore par webhook.`}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="dev-doc-title">Les refus à traiter</h4>
-                <div className="dev-code-block">
-{`404 RECIPIENT_NOT_FOUND  Ce numéro n'a pas de compte Alanya.
-403 RECIPIENT_BLOCKED    Blocage entre l'enseigne et la personne.
-                         Ce n'est pas passager : n'insistez pas.
-409 MESSAGE_REFUSED      Refus pour une autre raison (dite dans
-                         error.message).
-403 MEDIA_FORBIDDEN      mediaId inconnu, ou pas à cette enseigne.
-422 VALIDATION           Champ absent ou hors bornes. Le détail
-                         est dans error.details.fieldErrors.
-429 RATE_LIMITED         Trop d'appels : attendez Retry-After
-                         secondes, puis réessayez.`}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {docType === "media" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div>
-                <h4 className="dev-doc-title">Téléverser un fichier (POST /api/v1/media)</h4>
-                <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/media \\
-  -H "X-Api-Key: ${exempleCle}" \\
-  -F "file=@facture.pdf"
-
-// 201 Created
-{
-  "id": "b7d0…-uuid",
-  "url": "/api/media/b7d0…-uuid",
-  "nomFichier": "facture.pdf",
-  "typeMime": "application/pdf",
-  "octets": 48213,
-  "dureeMs": null
-}
-
-// Passez ensuite "id" dans mediaIds de POST /api/v1/messages.
-
-415 MEDIA_TYPE_REJECTED  Type de fichier non accepté.
-413 MEDIA_TOO_LARGE      Fichier trop gros.
-502 STORAGE_UNAVAILABLE  Notre stockage n'a pas répondu : réessayez.`}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {docType === "verification" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div>
-                <h4 className="dev-doc-title">1. Envoyer un code (POST /api/v1/verifications)</h4>
-                <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/verifications \\
-  -H "X-Api-Key: ${exempleCle}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "finalite": "AUTH_2FA",
-    "destination": "client@exemple.com",
-    "canal": "EMAIL"
-  }'
-
-// finalite : AUTH_2FA · CREATION_AGENT · VALIDATION_CONTACT
-// canal    : EMAIL · ALANYA  (EMAIL par défaut pour AUTH_2FA)
-
-{ "id": "…", "finalite": "AUTH_2FA", "canal": "EMAIL",
-  "destination": "client@exemple.com",
-  "expireA": "2026-11-07T14:07:11Z", "livraison": "REMIS" }`}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="dev-doc-title">2. Vérifier (POST /api/v1/verifications/check)</h4>
-                <div className="dev-code-block">
-{`curl -X POST https://alanyavox.com/api/v1/verifications/check \\
-  -H "X-Api-Key: ${exempleCle}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "finalite": "AUTH_2FA",
-    "destination": "client@exemple.com",
-    "code": "042518"
-  }'
-
-{ "verifie": false, "essaisRestants": 2 }
-
-// La réponse ne contient jamais le code : c'est Alanya qui le livre.
-// Un refus ne dit pas pourquoi. Affichez essaisRestants.
-// Un seul code vivant par personne et par finalité, pour
-// votre enseigne : en demander un nouveau remplace le vôtre.`}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {docType === "webhook" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div>
-                <h4 className="dev-doc-title">Ce que votre serveur reçoit</h4>
-                <div className="dev-code-block">
-{`POST <votre adresse https>
-X-Alanya-Signature: sha256=<hex>
-
-{
-  "evenement": "message.statut",
-  "emisA": "2026-11-07T14:02:11.482Z",
-  "donnees": {
-    "messageId": "3f9a1c2e-…",
-    "statut": "ENVOYE",
-    "destinataire": "12345678"
-  }
-}
-
-// Aujourd'hui : un envoi quand le message part (ENVOYE).
-// Aiguillez sur "evenement" : d'autres viendront.`}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="dev-doc-title">Vérifier la signature (Node.js)</h4>
-                <div className="dev-code-block">
-{`const brut = await request.text();   // le corps BRUT, pas un objet
-const attendu = "sha256=" + crypto
-  .createHmac("sha256", process.env.ALANYA_WEBHOOK_SECRET)
-  .update(brut, "utf8")
-  .digest("hex");
-
-const recu = request.headers.get("X-Alanya-Signature") ?? "";
-const a = Buffer.from(recu), b = Buffer.from(attendu);
-if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-  return new Response("signature invalide", { status: 401 });
-}
-const charge = JSON.parse(brut);     // parser APRÈS, jamais avant
-
-// Le secret se trouve dans l'onglet Webhook (bouton Afficher).`}
-                </div>
-              </div>
-            </div>
-          )}
+          <Documentation numeroEnseigne={enseigne?.numero} />
         </div>
       )}
     </div>
