@@ -258,3 +258,42 @@
   font-style: normal;
   cursor: pointer;
 }
+
+/*
+ * LA TUILE D'UN MÉDIA DONT CET APPAREIL N'A PAS LA CLÉ (E1, 07/11/2026).
+ *
+ * ⚠️ ELLE PREND LA PLACE DU MÉDIA, et c'est tout le propos : une phrase en
+ * italique au milieu d'une conversation se lit comme un défaut d'affichage.
+ * Mêmes bornes que `.mc-visuel` pour que la bulle ne change pas de largeur
+ * selon qu'on a la clé ou non.
+ */
+.mc-absent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: min(260px, 70vw);
+  max-width: 100%;
+  padding: 18px 14px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+.mc-absent svg {
+  width: 26px;
+  height: 26px;
+  opacity: 0.75;
+}
+/* Le filet du milieu — ce que le professeur disait avoir vu disparaître. */
+.mc-absent-trait {
+  width: 44px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.25;
+}
+.mc-absent-texte {
+  font-size: 0.82em;
+  line-height: 1.35;
+  text-align: center;
+}

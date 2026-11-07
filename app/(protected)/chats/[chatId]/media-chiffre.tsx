@@ -277,7 +277,30 @@ export function MediaChiffre({
  */
 export function MediaChiffreIndisponible() {
   const { t } = useTranslation()
-  return <span className="mc-erreur">{t("e2ee_media_indisponible")}</span>
+  /*
+   * 🔴 UNE TUILE, PLUS UNE PHRASE (E1 de la liste du professeur, 07/11/2026) :
+   * « l'affichage est inesthétique, avant il y avait un trait au milieu ».
+   *
+   * Une ligne de texte en italique à la place d'une photo se lit comme un
+   * défaut d'affichage — on croit que quelque chose a raté. Une tuile de la
+   * taille d'un média, avec un cadenas barré au-dessus d'un filet et la phrase
+   * dessous, dit la même chose en occupant la place que le média aurait prise :
+   * il manque quelque chose ICI, et ce n'est pas une panne.
+   *
+   * ⚠️ MÊME DESSIN SUR LES DEUX CLIENTS (`bulle_media_chiffre.dart`). Le
+   * professeur regardait le téléphone ; les deux affichaient la même phrase.
+   */
+  return (
+    <div className="mc-absent" role="note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+        <rect x="4" y="10" width="16" height="10" rx="2" />
+        <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        <line x1="3" y1="21" x2="21" y2="3" />
+      </svg>
+      <span className="mc-absent-trait" />
+      <span className="mc-absent-texte">{t("e2ee_media_indisponible")}</span>
+    </div>
+  )
 }
 
 function duree(ms: number): string {
