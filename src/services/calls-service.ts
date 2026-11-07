@@ -286,6 +286,11 @@ export async function startCallRest(convId: string, type: CallType): Promise<Sta
     if (code === "APPEL_CONTACTS_SEULEMENT") {
       throw new Error(traduire(langueInitiale(), "call_err_contacts_only"))
     }
+    // Une enseigne de l'espace développeur (07/11/2026) : elle envoie des
+    // messages automatiques, personne ne répondrait à l'appel.
+    if (code === "APPEL_ENSEIGNE") {
+      throw new Error(traduire(langueInitiale(), "call_err_enseigne"))
+    }
     throw e
   }
 }

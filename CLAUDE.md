@@ -37,7 +37,25 @@
 >
 > **La référence à jour est `backend-alanya/docs/2026-08-21-api-v1-integration.md`.**
 
-## 📌 Présentation de l'Espace Développeur Alanya
+> 🔴 **REFAIT LE 07/11/2026 — LES ENSEIGNES.** Ce qui suit l'emporte sur toute
+> la section « Présentation » plus bas, devenue fausse :
+>
+> - `/developer/auth` : deux portes vers les pages d'Alanya elles-mêmes —
+>   « Continuer avec Alanya Work » (`/login`, code dans l'application compris)
+>   et « Créer un compte développeur » (`/signup`, les étapes du mobile). Les
+>   deux reviennent à la console par `state.from`.
+> - Dans la console, on crée une **enseigne** : un nom et un numéro Alanya
+>   propres (compte de type 6). Clés, journal et webhook lui appartiennent, et
+>   c'est elle qui envoie les messages. Un compte qui a l'application confirme
+>   par un code avant de créer une enseigne. Agents, centres d'appels et
+>   centres vocaux ne peuvent pas en créer.
+> - **Rien n'est créé à l'ouverture de la page.** Plus de Sandbox/Production,
+>   plus d'espaces de travail, plus de « Verify Token ». Le secret du webhook
+>   se réaffiche à volonté.
+> - Fichiers : `app/(protected)/developer/developer.tsx` (console),
+>   `creation-enseigne.tsx`, `enseignes-api.ts` (appels et types).
+
+## 📌 Présentation de l'Espace Développeur Alanya (PÉRIMÉE, voir ci-dessus)
 
 L'Espace Développeur Alanya permet à tout utilisateur d'accéder à la console API et de générer des clés d'API (Sandbox `ak_test_...` et Live `ak_live_...`) pour l'intégration de services de messagerie WhatsApp, d'appels et d'authentification 2FA.
 

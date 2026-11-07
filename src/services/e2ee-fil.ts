@@ -159,7 +159,9 @@ export interface EtatE2ee {
    */
   chiffrementActif?: boolean
   activable: boolean
-  motif: "HORS_PERIMETRE" | "EMETTEUR_API" | "CLES_MANQUANTES" | null
+  // `EMETTEUR_API` n'existe plus (07/11/2026) : l'API écrit au nom d'une
+  // enseigne, compte hors périmètre (`HORS_PERIMETRE`).
+  motif: "HORS_PERIMETRE" | "CLES_MANQUANTES" | null
   sansCles: string[]
   /** Depuis le lot 2 (09/10/2026) : groupe, version courante, et qui active. */
   groupe?: boolean

@@ -1,162 +1,106 @@
-import React, { useState, useEffect } from "react"
-import { apiRequest } from "../../../src/lib/api-client"
+import React, { useCallback, useEffect, useState } from "react"
 import { useDeveloperTab } from "./developer-layout"
+import CreationEnseigne from "./creation-enseigne"
+import {
+  api,
+  messageErreur,
+  type Cle,
+  type Enseigne,
+  type EtatEnseignes,
+  type Journal,
+  type Webhook,
+} from "./enseignes-api"
 import "./developer.css"
 
-interface ApiKeyItem {
-  id: string
-  prefix: string
-  name: string
-  type: "SANDBOX" | "LIVE"
-  isActive: boolean
-  lastUsedAt: string | null
-  createdAt: string
-}
-
 /*
- * 🔴 PLUS DE SOLDE NI DE BAC À SABLE (21/08/2026).
+ * LA CONSOLE DÉVELOPPEUR (refaite le 07/11/2026, décisions du user).
  *
- * `balanceCredits` et `holdCredits` ont disparu : l'API Alanya n'est plus
- * facturée. Elle sert la plateforme de l'équipe, qui porte son propre mécanisme
- * de paiement de son côté ; nous livrons un moyen de communiquer avec les
- * utilisateurs, pas un produit à crédits. La route
- * `POST /api/developer/billing/sandbox` a été SUPPRIMÉE du backend — tout ce
- * qui l'appelait ici part avec elle, plutôt que de rester à afficher un solde
- * qui n'existe plus.
+ * On entre avec son compte Alanya. Pour utiliser l'API, on crée une ENSEIGNE :
+ * un nom et un numéro Alanya propres. Clés, journal et webhook appartiennent à
+ * l'enseigne choisie en haut de page, et c'est elle qui envoie les messages.
+ *
+ * Ce qui a disparu, et pourquoi :
+ *  - la création automatique d'un compte développeur à l'ouverture de la page ;
+ *  - le choix Sandbox / Production : les deux clés produisaient des effets
+ *    réels, le choix ne servait qu'à tromper ;
+ *  - les « espaces de travail », qui n'avaient aucun effet : l'enseigne les
+ *    remplace ;
+ *  - le champ « Verify Token », que le serveur n'utilisait jamais ;
+ *  - la courbe de latence inventée quand il y avait trop peu d'appels.
  */
-interface DeveloperData {
-  id: string
+
+/** L'enseigne choisie, retenue pour la prochaine visite (confort seulement). */
+const CLE_ENSEIGNE_CHOISIE = "alanya-dev-enseigne"
+
+function lireEnseigneChoisie(): string | null {
+  try {
+    return localStorage.getItem(CLE_ENSEIGNE_CHOISIE)
+  } catch {
+    return null
+  }
 }
 
-interface WorkspaceItem {
-  id: string
-  name: string
-  description?: string | null
-  createdAt: string
+function retenirEnseigneChoisie(id: string) {
+  try {
+    localStorage.setItem(CLE_ENSEIGNE_CHOISIE, id)
+  } catch {
+    // Stockage refusé : on choisira la première enseigne la prochaine fois.
+  }
 }
 
-interface ApiLogItem {
-  id: string
-  endpoint: string
-  method: string
-  statusCode: number
-  latencyMs: number
-  keyPrefix: string | null
-  createdAt: string
+const dateCourte = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—")
+const dateHeure = (iso: string | null) =>
+  iso ? `${new Date(iso).toLocaleDateString()} ${new Date(iso).toLocaleTimeString()}` : "jamais"
+
+const champ: React.CSSProperties = {
+  padding: "10px 14px",
+  borderRadius: "8px",
+  border: "1px solid var(--dev-border)",
+  background: "var(--dev-bg-page)",
+  color: "var(--dev-text-primary)",
+  fontSize: "14px",
+  boxSizing: "border-box",
 }
 
-interface WebhookItem {
-  id: string
-  url: string
-  verifyToken?: string | null
-  secretKey?: string | null
-  isActive: boolean
-  createdAt: string
-}
+function CourbeLatence({ journal }: { journal: Journal | null }) {
+  const lignes = journal?.logs ?? []
+  if (lignes.length < 2) {
+    return (
+      <div className="dev-panel-box" style={{ marginTop: "24px" }}>
+        <h4 style={{ margin: "0 0 6px 0", fontSize: "15px", fontWeight: 700 }}>Temps de réponse</h4>
+        <p style={{ margin: 0, color: "var(--dev-text-secondary)", fontSize: "14px" }}>
+          La courbe apparaîtra après vos premiers appels à l'API.
+        </p>
+      </div>
+    )
+  }
 
-function DevLatencyChart({ logs }: { logs: ApiLogItem[] }) {
-  const points = logs.length >= 4
-    ? logs.slice(0, 12).reverse().map((l, i) => ({ x: i, y: l.latencyMs, status: l.statusCode }))
-    : [
-        { x: 0, y: 110, status: 200 },
-        { x: 1, y: 85, status: 200 },
-        { x: 2, y: 95, status: 200 },
-        { x: 3, y: 135, status: 200 },
-        { x: 4, y: 102, status: 200 },
-        { x: 5, y: 78, status: 200 },
-        { x: 6, y: 125, status: 200 },
-        { x: 7, y: 90, status: 200 },
-        { x: 8, y: 115, status: 200 },
-        { x: 9, y: 80, status: 200 },
-      ]
-
-  const width = 640
-  const height = 180
-  const padding = 32
-
-  const maxY = Math.max(...points.map((p) => p.y), 180)
-  const minY = Math.min(...points.map((p) => p.y), 40)
-
-  const getX = (index: number) => padding + (index / (points.length - 1 || 1)) * (width - 2 * padding)
-  const getY = (val: number) => height - padding - ((val - minY) / (maxY - minY || 1)) * (height - 2 * padding)
-
-  const pathD = points.reduce((acc, p, i, a) => {
-    const x = getX(i)
-    const y = getY(p.y)
-    if (i === 0) return `M ${x} ${y}`
-    const prevX = getX(i - 1)
-    const prevY = getY(a[i - 1].y)
-    const cp1x = prevX + (x - prevX) / 2
-    const cp2x = prevX + (x - prevX) / 2
-    return `${acc} C ${cp1x} ${prevY}, ${cp2x} ${y}, ${x} ${y}`
-  }, "")
-
-  const areaD = `${pathD} L ${getX(points.length - 1)} ${height - padding} L ${getX(0)} ${height - padding} Z`
+  const points = lignes.slice(0, 12).reverse().map((l, i) => ({ x: i, y: l.latencyMs }))
+  const largeur = 640
+  const hauteur = 180
+  const marge = 32
+  const maxY = Math.max(...points.map((p) => p.y), 10)
+  const minY = Math.min(...points.map((p) => p.y), 0)
+  const x = (i: number) => marge + (i / (points.length - 1 || 1)) * (largeur - 2 * marge)
+  const y = (v: number) => hauteur - marge - ((v - minY) / (maxY - minY || 1)) * (hauteur - 2 * marge)
+  const trace = points.map((p, i) => `${i === 0 ? "M" : "L"} ${x(i)} ${y(p.y)}`).join(" ")
 
   return (
     <div className="dev-panel-box" style={{ marginTop: "24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--dev-accent)" strokeWidth="2">
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-          </svg>
-          <div>
-            <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "700" }}>
-              Rapport Graphique — Performance et Temps de Réponse API (ms)
-            </h4>
-            <span style={{ fontSize: "12px", color: "var(--dev-text-secondary)" }}>
-              Courbe de télémétrie en temps réel des requêtes traitées par l'Alanya API
-            </span>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--dev-accent)", display: "inline-block" }}></span>
-            <span style={{ fontSize: "12px", fontWeight: "600" }}>Latence (ms)</span>
-          </div>
-        </div>
-      </div>
-
+      <h4 style={{ margin: "0 0 12px 0", fontSize: "15px", fontWeight: 700 }}>
+        Temps de réponse des derniers appels (ms)
+      </h4>
       <div style={{ width: "100%", overflowX: "auto" }}>
-        <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: "visible" }}>
-          <defs>
-            <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--dev-accent)" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="var(--dev-accent)" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
-
-          {[0.25, 0.5, 0.75].map((ratio, idx) => {
-            const yPos = padding + ratio * (height - 2 * padding)
-            return (
-              <line
-                key={idx}
-                x1={padding}
-                y1={yPos}
-                x2={width - padding}
-                y2={yPos}
-                stroke="var(--dev-border)"
-                strokeDasharray="4 4"
-                strokeOpacity="0.6"
-              />
-            )
-          })}
-
-          <path d={areaD} fill="url(#latencyGradient)" />
-          <path d={pathD} fill="none" stroke="var(--dev-accent)" strokeWidth="3" strokeLinecap="round" />
-
-          {points.map((p, i) => {
-            const cx = getX(i)
-            const cy = getY(p.y)
-            return (
-              <g key={i}>
-                <circle cx={cx} cy={cy} r="4.5" fill="var(--dev-bg-panel)" stroke="var(--dev-accent)" strokeWidth="2.5" />
-                <text x={cx} y={cy - 8} textAnchor="middle" fontSize="10" fontWeight="700" fill="var(--dev-text-primary)">
-                  {p.y}ms
-                </text>
-              </g>
-            )
-          })}
+        <svg width="100%" height={hauteur} viewBox={`0 0 ${largeur} ${hauteur}`} style={{ overflow: "visible" }}>
+          <path d={trace} fill="none" stroke="var(--dev-accent)" strokeWidth="3" strokeLinecap="round" />
+          {points.map((p, i) => (
+            <g key={i}>
+              <circle cx={x(i)} cy={y(p.y)} r="4.5" fill="var(--dev-bg-panel)" stroke="var(--dev-accent)" strokeWidth="2.5" />
+              <text x={x(i)} y={y(p.y) - 8} textAnchor="middle" fontSize="10" fontWeight="700" fill="var(--dev-text-primary)">
+                {p.y}
+              </text>
+            </g>
+          ))}
         </svg>
       </div>
     </div>
@@ -165,488 +109,504 @@ function DevLatencyChart({ logs }: { logs: ApiLogItem[] }) {
 
 export default function DeveloperPage() {
   const { activeTab, setActiveTab } = useDeveloperTab()
-  const [developer, setDeveloper] = useState<DeveloperData | null>(null)
-  const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([])
-  const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([])
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("")
-  const [logs, setLogs] = useState<ApiLogItem[]>([])
-  const [webhook, setWebhook] = useState<WebhookItem | null>(null)
-  const [webhookUrl, setWebhookUrl] = useState("")
-  const [webhookVerifyToken, setWebhookVerifyToken] = useState("")
-  const [avgLatencyMs, setAvgLatencyMs] = useState<number>(0)
-  const [successRatePercent, setSuccessRatePercent] = useState<number>(100)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [keyName, setKeyName] = useState("")
-  const [keyType, setKeyType] = useState<"SANDBOX" | "LIVE">("SANDBOX")
-  const [newWsName, setNewWsName] = useState("")
-  const [showNewWsModal, setShowNewWsModal] = useState(false)
-  /*
-   * ⚠️ Les onglets `location` et `interactive` ont disparu le 21/08/2026.
-   *
-   * `interactive` et `template` étaient des notions WhatsApp : l'API les
-   * aplatissait en texte (« [Titre] » concaténé), donc elle documentait des
-   * boutons qu'aucun client Alanya n'a jamais affichés. `location` n'est pas un
-   * endpoint mais un TYPE de message parmi d'autres — il est documenté avec
-   * eux, où il se trouve réellement.
-   */
-  const [docType, setDocType] = useState<"message" | "media" | "verification" | "webhook">("message")
-  const [generatedRawKey, setGeneratedRawKey] = useState<string | null>(null)
-  const [webhookMsg, setWebhookMsg] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  useEffect(() => {
-    fetchDeveloperData()
-    fetchWorkspaces()
-    fetchLogs()
-    fetchWebhook()
+  const [etat, setEtat] = useState<EtatEnseignes | null>(null)
+  const [erreurChargement, setErreurChargement] = useState<string | null>(null)
+  const [enseigneId, setEnseigneId] = useState<string | null>(null)
+  const [enseigneCreee, setEnseigneCreee] = useState<Enseigne | null>(null)
+
+  const [cles, setCles] = useState<Cle[]>([])
+  const [webhook, setWebhook] = useState<Webhook | null>(null)
+  const [journal, setJournal] = useState<Journal | null>(null)
+
+  const [nomCle, setNomCle] = useState("")
+  const [cleComplete, setCleComplete] = useState<string | null>(null)
+  const [urlWebhook, setUrlWebhook] = useState("")
+  const [secretVisible, setSecretVisible] = useState(false)
+  const [message, setMessage] = useState<{ texte: string; erreur: boolean } | null>(null)
+  const [enCours, setEnCours] = useState(false)
+  const [docType, setDocType] = useState<"message" | "media" | "verification" | "webhook">("message")
+
+  const enseigne = etat?.enseignes.find((e) => e.id === enseigneId) ?? null
+
+  const chargerEtat = useCallback(async () => {
+    try {
+      setErreurChargement(null)
+      const e = await api.etat()
+      setEtat(e)
+      setEnseigneId((actuelle) => {
+        const retenue = actuelle ?? lireEnseigneChoisie()
+        if (retenue && e.enseignes.some((x) => x.id === retenue)) return retenue
+        return e.enseignes[0]?.id ?? null
+      })
+    } catch (err) {
+      setErreurChargement(messageErreur(err, "La console n'a pas pu se charger."))
+    }
   }, [])
 
-  const fetchDeveloperData = async () => {
+  const chargerEnseigne = useCallback(async (id: string) => {
+    const [c, w, j] = await Promise.all([
+      api.cles(id).catch(() => [] as Cle[]),
+      api.webhook(id).catch(() => null),
+      api.journal(id).catch(() => null),
+    ])
+    setCles(c)
+    setWebhook(w)
+    setUrlWebhook(w?.url ?? "")
+    setJournal(j)
+  }, [])
+
+  useEffect(() => {
+    void chargerEtat()
+  }, [chargerEtat])
+
+  useEffect(() => {
+    if (!enseigneId) return
+    retenirEnseigneChoisie(enseigneId)
+    setCleComplete(null)
+    setSecretVisible(false)
+    setMessage(null)
+    void chargerEnseigne(enseigneId)
+  }, [enseigneId, chargerEnseigne])
+
+  const action = async (travail: () => Promise<void>, repli: string) => {
+    setEnCours(true)
+    setMessage(null)
     try {
-      setLoading(true)
-      setError(null)
-      const res = (await apiRequest("/api/developer/keys", { method: "GET" })) as any
-
-      const devObj = res?.data?.developer || res?.developer || null
-      const keysList = res?.data?.apiKeys || res?.apiKeys || []
-
-      if (devObj) {
-        setDeveloper(devObj)
-        setApiKeys(keysList)
-      } else {
-        setDeveloper({ id: "default" })
-        setApiKeys([])
-      }
-    } catch {
-      setDeveloper({ id: "default" })
+      await travail()
+    } catch (err) {
+      setMessage({ texte: messageErreur(err, repli), erreur: true })
     } finally {
-      setLoading(false)
+      setEnCours(false)
     }
   }
 
-  const fetchWorkspaces = async () => {
-    try {
-      const res = (await apiRequest("/api/developer/workspaces", { method: "GET" })) as any
-      const list = res?.data?.workspaces || res?.workspaces || []
-      setWorkspaces(list)
-      if (list.length > 0 && !selectedWorkspaceId) {
-        setSelectedWorkspaceId(list[0].id)
-      }
-    } catch {}
+  const apresCreation = async (nouvelle: Enseigne) => {
+    setEnseigneCreee(nouvelle)
+    setEnseigneId(nouvelle.id)
+    await chargerEtat()
   }
 
-  const fetchLogs = async () => {
-    try {
-      const res = (await apiRequest("/api/developer/logs", { method: "GET" })) as any
-      const logList = res?.data?.logs || res?.logs || []
-      const avg = res?.data?.avgLatencyMs ?? res?.avgLatencyMs ?? 0
-      const rate = res?.data?.successRatePercent ?? res?.successRatePercent ?? 100
-      setLogs(logList)
-      setAvgLatencyMs(avg)
-      setSuccessRatePercent(rate)
-    } catch {}
+  const supprimerEnseigne = (e: Enseigne) => {
+    const ok = window.confirm(
+      `Supprimer l'enseigne « ${e.nom} » ?\n\n` +
+        `• ses clés cessent de marcher immédiatement ;\n` +
+        `• son webhook et son journal sont effacés ;\n` +
+        `• son numéro ${e.numero} est fermé.\n\n` +
+        `Votre compte Alanya n'est pas touché. Cette action est définitive.`,
+    )
+    if (!ok) return
+    void action(async () => {
+      await api.supprimerEnseigne(e.id)
+      if (enseigneId === e.id) setEnseigneId(null)
+      if (enseigneCreee?.id === e.id) setEnseigneCreee(null)
+      await chargerEtat()
+      setMessage({ texte: `L'enseigne « ${e.nom} » a été supprimée.`, erreur: false })
+    }, "La suppression a échoué.")
   }
 
-  const fetchWebhook = async () => {
-    try {
-      const res = (await apiRequest("/api/developer/webhooks", { method: "GET" })) as any
-      const wh = res?.data?.webhook || res?.webhook || null
-      if (wh) {
-        setWebhook(wh)
-        setWebhookUrl(wh.url || "")
-        setWebhookVerifyToken(wh.verifyToken || "")
-      }
-    } catch {}
+  const creerCle = (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!enseigneId) return
+    void action(async () => {
+      const r = await api.creerCle(enseigneId, nomCle.trim())
+      setCleComplete(r.cleComplete)
+      setNomCle("")
+      setCles(await api.cles(enseigneId))
+    }, "La clé n'a pas pu être créée.")
   }
 
-  const handleSaveWebhook = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      setIsSubmitting(true)
-      setWebhookMsg(null)
-      const res = (await apiRequest("/api/developer/webhooks", {
-        method: "POST",
-        body: { url: webhookUrl, verifyToken: webhookVerifyToken },
-      })) as any
-
-      const wh = res?.data?.webhook || res?.webhook
-      if (wh) {
-        setWebhook(wh)
-        setWebhookMsg("Configuration Webhook enregistrée avec succès.")
-      }
-    } catch (err: any) {
-      alert(err?.message || "Erreur de sauvegarde du Webhook")
-    } finally {
-      setIsSubmitting(false)
-    }
+  const revoquerCle = (c: Cle) => {
+    if (!enseigneId) return
+    if (!window.confirm(`Révoquer la clé « ${c.name} » ? Elle cessera de marcher immédiatement.`)) return
+    void action(async () => {
+      await api.revoquerCle(enseigneId, c.id)
+      setCles(await api.cles(enseigneId))
+    }, "La révocation a échoué.")
   }
 
-  const handleCreateWorkspace = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newWsName.trim()) return
-    try {
-      setIsSubmitting(true)
-      const res = (await apiRequest("/api/developer/workspaces", {
-        method: "POST",
-        body: { name: newWsName },
-      })) as any
-      const ws = res?.data?.workspace || res?.workspace
-      if (ws) {
-        setWorkspaces((prev) => [...prev, ws])
-        setSelectedWorkspaceId(ws.id)
-        setNewWsName("")
-        setShowNewWsModal(false)
-      }
-    } catch (err: any) {
-      alert(err?.message || "Erreur de création du workspace")
-    } finally {
-      setIsSubmitting(false)
-    }
+  const enregistrerWebhook = (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!enseigneId) return
+    void action(async () => {
+      const w = await api.enregistrerWebhook(enseigneId, urlWebhook.trim())
+      setWebhook(w)
+      setMessage({ texte: "Webhook enregistré.", erreur: false })
+    }, "Le webhook n'a pas pu être enregistré.")
   }
 
-  const handleCreateKey = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      setIsSubmitting(true)
-      setError(null)
-      const data = (await apiRequest("/api/developer/keys", {
-        method: "POST",
-        body: { name: keyName || "Clé API", type: keyType, workspaceId: selectedWorkspaceId },
-      })) as any
-
-      const raw = data?.data?.rawKey || data?.rawKey
-      if (raw) {
-        setGeneratedRawKey(raw)
-        setKeyName("")
-        fetchDeveloperData()
-      } else {
-        setError(data?.error || "Erreur de création de la clé API")
-      }
-    } catch (err: any) {
-      setError(err?.message || "Erreur de communication")
-    } finally {
-      setIsSubmitting(false)
-    }
+  const changerSecret = () => {
+    if (!enseigneId || !webhook) return
+    if (!window.confirm("Changer le secret ? L'ancien cessera aussitôt de valoir : pensez à mettre à jour votre serveur."))
+      return
+    void action(async () => {
+      setWebhook(await api.enregistrerWebhook(enseigneId, webhook.url, true))
+      setSecretVisible(true)
+      setMessage({ texte: "Nouveau secret créé.", erreur: false })
+    }, "Le secret n'a pas pu être changé.")
   }
 
-  const handleRevokeKey = async (keyId: string) => {
-    if (!confirm("Voulez-vous révoquer cette clé API ? Elle sera désactivée immédiatement.")) return
-    try {
-      const data = (await apiRequest("/api/developer/keys", {
-        method: "DELETE",
-        body: { keyId },
-      })) as any
-
-      if (data && (data.ok || data.message)) {
-        fetchDeveloperData()
-      } else {
-        alert(data?.error || "Erreur de révocation")
-      }
-    } catch (err: any) {
-      alert(err?.message || "Erreur réseau")
-    }
+  const supprimerWebhook = () => {
+    if (!enseigneId) return
+    if (!window.confirm("Supprimer le webhook ? Plus aucun envoi ne partira vers votre serveur.")) return
+    void action(async () => {
+      await api.supprimerWebhook(enseigneId)
+      setWebhook(null)
+      setUrlWebhook("")
+    }, "La suppression a échoué.")
   }
 
-  const activeKeysCount = apiKeys.filter((k) => k.isActive).length
-  const activeRawKey = apiKeys.find((k) => k.isActive)?.prefix ? `${apiKeys.find((k) => k.isActive)?.prefix}_...` : "ak_test_votre_cle_ici"
+  const copier = (texte: string) => {
+    void navigator.clipboard?.writeText(texte)
+    setMessage({ texte: "Copié.", erreur: false })
+  }
+
+  /* ─── États d'attente et d'accès ─────────────────────────────────────── */
+
+  if (erreurChargement) {
+    return (
+      <div className="dev-dashboard-main">
+        <div className="dev-panel-box">
+          <p style={{ color: "#ef4444", fontWeight: 600, margin: "0 0 12px 0" }}>{erreurChargement}</p>
+          <button className="dev-refresh-btn" onClick={() => void chargerEtat()}>
+            Réessayer
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!etat) {
+    return (
+      <div className="dev-dashboard-main">
+        <p style={{ color: "var(--dev-text-secondary)" }}>Chargement…</p>
+      </div>
+    )
+  }
+
+  if (!etat.autorise) {
+    return (
+      <div className="dev-dashboard-main">
+        <div className="dev-panel-box">
+          <h3 className="dev-panel-title">Espace développeur indisponible pour ce compte</h3>
+          <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.6 }}>
+            Les comptes agent, centre d'appels et centre vocal ne peuvent pas créer d'enseigne. Connectez-vous avec un
+            compte Alanya personnel, ou créez un compte développeur.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Aucune enseigne encore : c'est la seule chose à faire, on ne montre qu'elle.
+  if (etat.enseignes.length === 0) {
+    return (
+      <div className="dev-dashboard-main">
+        <div className="dev-panel-box">
+          <h3 className="dev-panel-title">Créez votre enseigne</h3>
+          <p style={{ margin: "0 0 20px 0", fontSize: "14px", lineHeight: 1.6, color: "var(--dev-text-secondary)" }}>
+            L'enseigne est l'expéditeur de vos messages : elle a son nom et son propre numéro Alanya. Vos clés d'API lui
+            sont rattachées. Votre compte personnel, lui, ne change pas.
+          </p>
+          {etat.limite === 0 ? (
+            <p style={{ margin: 0, fontWeight: 600 }}>
+              La création d'enseignes est fermée pour le moment. Contactez l'équipe Alanya.
+            </p>
+          ) : (
+            <CreationEnseigne confirmationRequise={etat.confirmationRequise} onCree={(e) => void apresCreation(e)} />
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  /* ─── La console d'une enseigne ──────────────────────────────────────── */
+
+  const clesActives = cles.filter((c) => c.isActive)
+  const exempleCle = clesActives[0] ? `${clesActives[0].prefix}…` : "ak_live_votre_cle"
+  const peutEnCreer = etat.enseignes.length < etat.limite
 
   return (
     <div className="dev-dashboard-main">
-      {/* EN-TÊTE PRINCIPAL AVEC SÉLECTEUR DE WORKSPACE */}
       <div className="dev-main-header">
         <div className="dev-main-header-text">
           <h1 className="dev-main-title">
             {activeTab === "dashboard" && "Tableau de bord"}
-            {activeTab === "keys" && "Gestion des Clés d'API"}
-            {activeTab === "logs" && "Journal des Requêtes (Logs API)"}
-            {activeTab === "webhooks" && "Webhooks & Callbacks Alanya API"}
-            {activeTab === "docs" && "Documentation & Spécification Alanya API"}
+            {activeTab === "enseignes" && "Mes enseignes"}
+            {activeTab === "keys" && "Clés d'API"}
+            {activeTab === "logs" && "Journal des appels"}
+            {activeTab === "webhooks" && "Webhook"}
+            {activeTab === "docs" && "Documentation"}
           </h1>
-          <p className="dev-main-subtitle">Spécification officielle Alanya API Graph v1</p>
+          {enseigne && (
+            <p className="dev-main-subtitle">
+              Enseigne <strong>{enseigne.nom}</strong> · numéro {enseigne.numero}
+            </p>
+          )}
         </div>
 
-        <div className="dev-header-actions" style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          {/* SÉLECTEUR DE WORKSPACE / PROJET */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "12px", color: "var(--dev-text-secondary)", fontWeight: "600" }}>PROJET:</span>
+        <div className="dev-header-actions" style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+          {etat.enseignes.length > 1 && (
             <select
-              value={selectedWorkspaceId}
-              onChange={(e) => setSelectedWorkspaceId(e.target.value)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--dev-border)",
-                background: "var(--dev-bg-page)",
-                color: "var(--dev-text-primary)",
-                fontWeight: "600",
-                fontSize: "13px",
-              }}
+              aria-label="Enseigne"
+              value={enseigneId ?? ""}
+              onChange={(e) => setEnseigneId(e.target.value)}
+              style={{ ...champ, padding: "8px 12px", fontWeight: 600 }}
             >
-              {workspaces.map((ws) => (
-                <option key={ws.id} value={ws.id}>
-                  {ws.name}
+              {etat.enseignes.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nom}
                 </option>
               ))}
             </select>
-            <button
-              onClick={() => setShowNewWsModal(true)}
-              className="dev-refresh-btn"
-              title="Nouveau Projet / Workspace"
-              style={{ padding: "8px 10px" }}
-            >
-              +
-            </button>
-          </div>
-
-          <button onClick={() => { fetchDeveloperData(); fetchLogs(); fetchWebhook(); }} className="dev-refresh-btn">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-            </svg>
+          )}
+          <button
+            onClick={() => enseigneId && void chargerEnseigne(enseigneId)}
+            className="dev-refresh-btn"
+          >
             Actualiser
           </button>
         </div>
       </div>
 
-      {/* MODAL CRÉATION DE WORKSPACE */}
-      {showNewWsModal && (
-        <div className="dev-panel-box" style={{ borderColor: "var(--dev-accent)", borderWidth: "2px", marginBottom: "16px" }}>
-          <h3 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>Créer un nouveau Projet / Workspace</h3>
-          <form onSubmit={handleCreateWorkspace} style={{ display: "flex", gap: "10px" }}>
-            <input
-              type="text"
-              placeholder="Nom du projet (ex: App Mobile Client)"
-              value={newWsName}
-              onChange={(e) => setNewWsName(e.target.value)}
-              style={{
-                padding: "8px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--dev-border)",
-                background: "var(--dev-bg-page)",
-                color: "var(--dev-text-primary)",
-                flex: "1",
-              }}
-              required
-            />
-            <button type="submit" className="dev-metric-btn" style={{ background: "#10b981", color: "#ffffff", padding: "8px 16px" }}>
-              {isSubmitting ? "Création..." : "Créer"}
-            </button>
-            <button type="button" className="dev-metric-btn" style={{ background: "var(--dev-border)", color: "var(--dev-text-primary)", padding: "8px 16px" }} onClick={() => setShowNewWsModal(false)}>
-              Annuler
-            </button>
-          </form>
+      {message && (
+        <div
+          role="status"
+          style={{ color: message.erreur ? "#ef4444" : "#10b981", fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}
+        >
+          {message.texte}
         </div>
       )}
 
-      {error && <div style={{ color: "#ef4444", fontSize: "14px", fontWeight: "600", marginBottom: "12px" }}>{error}</div>}
-      {webhookMsg && <div style={{ color: "#10b981", fontSize: "14px", fontWeight: "600", marginBottom: "12px" }}>{webhookMsg}</div>}
-
-      {/* BANNIÈRE CLÉ NOUVELLEMENT GÉNÉRÉE */}
-      {generatedRawKey && (
-        <div className="dev-panel-box" style={{ borderColor: "#6366f1", borderWidth: "2px", marginBottom: "16px" }}>
-          <h3 style={{ margin: "0 0 8px 0", color: "#6366f1", fontSize: "16px" }}>Nouvelle Clé API Générée</h3>
-          <p style={{ fontSize: "14px", margin: "4px 0" }}>
-            Conservez cette clé en lieu sûr. Elle ne sera plus réaffichée par la suite.
+      {enseigneCreee && (
+        <div className="dev-panel-box" style={{ borderColor: "#10b981", borderWidth: "2px", marginBottom: "16px" }}>
+          <h3 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>Enseigne « {enseigneCreee.nom} » créée</h3>
+          <p style={{ margin: "0 0 12px 0", fontSize: "14px", lineHeight: 1.6 }}>
+            Son numéro Alanya : <strong style={{ fontFamily: "monospace", fontSize: "16px" }}>{enseigneCreee.numero}</strong>.
+            C'est l'expéditeur de vos messages API.
           </p>
-          <div className="dev-code-block" style={{ color: "#10b981", fontSize: "15px", margin: "12px 0" }}>
-            {generatedRawKey}
-          </div>
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             <button
               className="dev-metric-btn"
-              style={{ background: "var(--dev-accent)", color: "#ffffff", padding: "8px 16px" }}
+              style={{ background: "#10b981", color: "#ffffff", padding: "8px 16px" }}
               onClick={() => {
-                navigator.clipboard.writeText(generatedRawKey)
-                alert("Clé API copiée !")
+                setEnseigneCreee(null)
+                setActiveTab("keys")
               }}
             >
-              Copier la Clé
+              Créer ma première clé
             </button>
-            <button
-              className="dev-metric-btn"
-              style={{ background: "var(--dev-border)", color: "var(--dev-text-primary)", padding: "8px 16px" }}
-              onClick={() => setGeneratedRawKey(null)}
-            >
+            <button className="dev-refresh-btn" onClick={() => setEnseigneCreee(null)}>
               Fermer
             </button>
           </div>
         </div>
       )}
 
-      {/* GRILLE DE CARTES MÉTRIQUES AVEC LATENCE ET TAUX DE SUCCÈS */}
-      <div className="dev-metrics-grid">
-        <div className="dev-metric-card">
-          <div className="dev-metric-header">
-            <div className="dev-metric-icon-box" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            </div>
-            <div className="dev-metric-info">
-              <span className="dev-metric-label">TAUX DE SUCCÈS API</span>
-              <span className="dev-metric-value">{successRatePercent}%</span>
-            </div>
+      {cleComplete && (
+        <div className="dev-panel-box" style={{ borderColor: "#6366f1", borderWidth: "2px", marginBottom: "16px" }}>
+          <h3 style={{ margin: "0 0 8px 0", color: "#6366f1", fontSize: "16px" }}>Votre nouvelle clé</h3>
+          <p style={{ fontSize: "14px", margin: "4px 0" }}>
+            Copiez-la maintenant et gardez-la sur votre serveur : elle ne sera plus jamais affichée.
+          </p>
+          <div className="dev-code-block" style={{ color: "#10b981", fontSize: "15px", margin: "12px 0", wordBreak: "break-all" }}>
+            {cleComplete}
           </div>
-          <button className="dev-metric-btn" onClick={() => setActiveTab("logs")}>
-            Logs Télémétrie -&gt;
-          </button>
-        </div>
-
-        <div className="dev-metric-card">
-          <div className="dev-metric-header">
-            <div className="dev-metric-icon-box" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-            </div>
-            <div className="dev-metric-info">
-              <span className="dev-metric-label">LATENCE MOYENNE</span>
-              <span className="dev-metric-value">{avgLatencyMs > 0 ? `${avgLatencyMs} ms` : "< 50 ms"}</span>
-            </div>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              className="dev-metric-btn"
+              style={{ background: "var(--dev-accent)", color: "#ffffff", padding: "8px 16px" }}
+              onClick={() => copier(cleComplete)}
+            >
+              Copier la clé
+            </button>
+            <button className="dev-refresh-btn" onClick={() => setCleComplete(null)}>
+              J'ai copié ma clé
+            </button>
           </div>
-          <button className="dev-metric-btn" onClick={() => setActiveTab("logs")}>
-            Voir Latence -&gt;
-          </button>
         </div>
+      )}
 
-        <div className="dev-metric-card">
-          <div className="dev-metric-header">
-            <div className="dev-metric-icon-box" style={{ background: "rgba(139, 92, 246, 0.15)", color: "#8b5cf6" }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 01-3.46 0" />
-              </svg>
-            </div>
-            <div className="dev-metric-info">
-              <span className="dev-metric-label">STATUT WEBHOOK</span>
-              <span className="dev-metric-value">{webhook?.url ? "ACTIF" : "INACTIF"}</span>
-            </div>
-          </div>
-          <button className="dev-metric-btn" onClick={() => setActiveTab("webhooks")}>
-            Gérer Webhook -&gt;
-          </button>
-        </div>
-      </div>
-
-      {/* CONTENU SELON MENU SÉLECTIONNÉ DANS LA SIDEBAR GAUCHE */}
-
-      {/* 1. TABLEAU DE BORD (APERÇU) */}
+      {/* 1. TABLEAU DE BORD */}
       {activeTab === "dashboard" && (
         <>
-          <div className="dev-panel-box">
-            <h3 className="dev-panel-title">Aperçu du Compte Développeur Alanya</h3>
-            <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-              Bienvenue sur votre Console Développeur Alanya. Vos clés vous permettent d'envoyer des messages texte,
-              des médias, des messages interactifs avec boutons, et des codes d'authentification OTP via l'<strong>Alanya API</strong>.
-            </p>
+          <div className="dev-metrics-grid">
+            <div className="dev-metric-card">
+              <div className="dev-metric-info">
+                <span className="dev-metric-label">CLÉS ACTIVES</span>
+                <span className="dev-metric-value">{clesActives.length}</span>
+              </div>
+              <button className="dev-metric-btn" onClick={() => setActiveTab("keys")}>
+                Gérer les clés →
+              </button>
+            </div>
+            <div className="dev-metric-card">
+              <div className="dev-metric-info">
+                <span className="dev-metric-label">APPELS RÉUSSIS</span>
+                <span className="dev-metric-value">{journal && journal.total > 0 ? `${journal.successRatePercent} %` : "—"}</span>
+              </div>
+              <button className="dev-metric-btn" onClick={() => setActiveTab("logs")}>
+                Voir le journal →
+              </button>
+            </div>
+            <div className="dev-metric-card">
+              <div className="dev-metric-info">
+                <span className="dev-metric-label">TEMPS DE RÉPONSE MOYEN</span>
+                <span className="dev-metric-value">{journal && journal.total > 0 ? `${journal.avgLatencyMs} ms` : "—"}</span>
+              </div>
+              <button className="dev-metric-btn" onClick={() => setActiveTab("logs")}>
+                Voir le journal →
+              </button>
+            </div>
+            <div className="dev-metric-card">
+              <div className="dev-metric-info">
+                <span className="dev-metric-label">WEBHOOK</span>
+                <span className="dev-metric-value">{webhook?.isActive ? "Actif" : "Aucun"}</span>
+              </div>
+              <button className="dev-metric-btn" onClick={() => setActiveTab("webhooks")}>
+                Configurer →
+              </button>
+            </div>
           </div>
-          <DevLatencyChart logs={logs} />
+
+          {clesActives.length === 0 && (
+            <div className="dev-panel-box" style={{ marginTop: "24px" }}>
+              <h3 className="dev-panel-title">Prochaine étape : une clé d'API</h3>
+              <p style={{ margin: "0 0 12px 0", fontSize: "14px", lineHeight: 1.6 }}>
+                Votre serveur s'identifie auprès d'Alanya avec une clé. Créez-en une, puis suivez la documentation pour
+                envoyer votre premier message.
+              </p>
+              <button
+                className="dev-metric-btn"
+                style={{ background: "#10b981", color: "#ffffff", padding: "8px 16px" }}
+                onClick={() => setActiveTab("keys")}
+              >
+                Créer une clé
+              </button>
+            </div>
+          )}
+
+          <CourbeLatence journal={journal} />
         </>
       )}
 
-      {/* 2. CLÉS D'API */}
+      {/* 2. MES ENSEIGNES */}
+      {activeTab === "enseignes" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <div className="dev-panel-box">
+            <h3 className="dev-panel-title">
+              Mes enseignes ({etat.enseignes.length} sur {etat.limite})
+            </h3>
+            <div className="dev-table-container">
+              <table className="dev-table">
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>Numéro Alanya</th>
+                    <th>Clés actives</th>
+                    <th>Création</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {etat.enseignes.map((e) => (
+                    <tr key={e.id}>
+                      <td style={{ fontWeight: 600 }}>{e.nom}</td>
+                      <td style={{ fontFamily: "monospace" }}>{e.numero}</td>
+                      <td>{e.clesActives}</td>
+                      <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>{dateCourte(e.creeLe)}</td>
+                      <td>
+                        <button
+                          className="dev-metric-btn"
+                          style={{ background: "#dc2626", color: "#ffffff" }}
+                          disabled={enCours}
+                          onClick={() => supprimerEnseigne(e)}
+                        >
+                          Supprimer
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="dev-panel-box">
+            <h3 className="dev-panel-title">Créer une autre enseigne</h3>
+            {peutEnCreer ? (
+              <CreationEnseigne confirmationRequise={etat.confirmationRequise} onCree={(e) => void apresCreation(e)} />
+            ) : (
+              <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.6 }}>
+                Vous avez atteint le nombre maximal d'enseignes ({etat.limite}). Contactez l'équipe Alanya pour en
+                ouvrir davantage.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. CLÉS D'API */}
       {activeTab === "keys" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <div className="dev-panel-box">
-            <h3 className="dev-panel-title">Générer une nouvelle Clé API</h3>
-            <form onSubmit={handleCreateKey} style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <h3 className="dev-panel-title">Créer une clé</h3>
+            <form onSubmit={creerCle} style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
               <input
                 type="text"
-                placeholder="Nom de la clé (ex: Serveur Production)"
-                value={keyName}
-                onChange={(e) => setKeyName(e.target.value)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--dev-border)",
-                  background: "var(--dev-bg-page)",
-                  color: "var(--dev-text-primary)",
-                  flex: "1",
-                  minWidth: "220px",
-                }}
-                required
+                placeholder="Nom de la clé (ex. : serveur principal)"
+                value={nomCle}
+                maxLength={50}
+                onChange={(e) => setNomCle(e.target.value)}
+                style={{ ...champ, flex: "1", minWidth: "200px" }}
               />
-              <select
-                value={keyType}
-                onChange={(e) => setKeyType(e.target.value as any)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--dev-border)",
-                  background: "var(--dev-bg-page)",
-                  color: "var(--dev-text-primary)",
-                }}
-              >
-                <option value="SANDBOX">Sandbox (ak_test_...)</option>
-                <option value="LIVE">Production (ak_live_...)</option>
-              </select>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={enCours}
                 className="dev-metric-btn"
                 style={{ background: "#10b981", color: "#ffffff", padding: "10px 20px" }}
               >
-                {isSubmitting ? "Création..." : "Générer la Clé"}
+                {enCours ? "Création…" : "Créer la clé"}
               </button>
             </form>
           </div>
 
           <div className="dev-panel-box">
-            <h3 className="dev-panel-title">Liste des Clés d'API</h3>
-            {apiKeys.length === 0 ? (
-              <p style={{ color: "var(--dev-text-secondary)", margin: 0 }}>
-                Aucune clé d'API active. Générez-en une ci-dessus.
-              </p>
+            <h3 className="dev-panel-title">Clés de l'enseigne</h3>
+            {cles.length === 0 ? (
+              <p style={{ color: "var(--dev-text-secondary)", margin: 0 }}>Aucune clé pour le moment.</p>
             ) : (
               <div className="dev-table-container">
                 <table className="dev-table">
                   <thead>
                     <tr>
                       <th>Nom</th>
-                      <th>Préfixe</th>
-                      <th>Type</th>
-                      <th>Statut</th>
+                      <th>Début de la clé</th>
                       <th>Création</th>
-                      <th>Action</th>
+                      <th>Dernière utilisation</th>
+                      <th>Statut</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {apiKeys.map((k) => (
-                      <tr key={k.id} style={{ opacity: k.isActive ? 1 : 0.5 }}>
-                        <td style={{ fontWeight: "600" }}>{k.name}</td>
-                        <td style={{ fontFamily: "monospace", color: "var(--dev-accent)" }}>{k.prefix}_••••••••</td>
+                    {cles.map((c) => (
+                      <tr key={c.id} style={{ opacity: c.isActive ? 1 : 0.5 }}>
+                        <td style={{ fontWeight: 600 }}>{c.name}</td>
+                        <td style={{ fontFamily: "monospace", color: "var(--dev-accent)" }}>{c.prefix}…</td>
+                        <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>{dateCourte(c.createdAt)}</td>
+                        <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>{dateHeure(c.lastUsedAt)}</td>
                         <td>
-                          <span
-                            style={{
-                              padding: "2px 8px",
-                              borderRadius: "4px",
-                              fontSize: "12px",
-                              fontWeight: "600",
-                              background: k.type === "SANDBOX" ? "#0369a1" : "#15803d",
-                              color: "#ffffff",
-                            }}
-                          >
-                            {k.type}
+                          <span style={{ color: c.isActive ? "#10b981" : "#ef4444", fontWeight: 600 }}>
+                            {c.isActive ? "Active" : "Révoquée"}
                           </span>
                         </td>
                         <td>
-                          <span style={{ color: k.isActive ? "#10b981" : "#ef4444", fontWeight: "600" }}>
-                            {k.isActive ? "Active" : "Révoquée"}
-                          </span>
-                        </td>
-                        <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>
-                          {new Date(k.createdAt).toLocaleDateString()}
-                        </td>
-                        <td>
-                          {k.isActive && (
+                          {c.isActive && (
                             <button
                               className="dev-metric-btn"
                               style={{ background: "#dc2626", color: "#ffffff" }}
-                              onClick={() => handleRevokeKey(k.id)}
+                              disabled={enCours}
+                              onClick={() => revoquerCle(c)}
                             >
                               Révoquer
                             </button>
@@ -662,143 +622,139 @@ export default function DeveloperPage() {
         </div>
       )}
 
-      {/* 3. JOURNAL DES REQUÊTES (LOGS API & TÉLÉMÉTRIE) */}
+      {/* 4. JOURNAL */}
       {activeTab === "logs" && (
         <>
           <div className="dev-panel-box">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <div>
-              <h3 className="dev-panel-title" style={{ margin: 0 }}>Journal des Requêtes API (Télémétrie)</h3>
-              <p style={{ color: "var(--dev-text-secondary)", fontSize: "13px", margin: "4px 0 0 0" }}>
-                Historique des 50 derniers appels API avec codes de statut HTTP et temps de réponse.
+            <h3 className="dev-panel-title">Derniers appels</h3>
+            {!journal || journal.logs.length === 0 ? (
+              <p style={{ color: "var(--dev-text-secondary)", margin: 0 }}>
+                Aucun appel pour le moment. Ils s'afficheront ici dès votre premier appel à l'API.
               </p>
-            </div>
-            <button onClick={fetchLogs} className="dev-refresh-btn">
-              Rafraîchir
-            </button>
+            ) : (
+              <>
+                <p style={{ color: "var(--dev-text-secondary)", fontSize: "13px", margin: "0 0 12px 0" }}>
+                  {journal.total} appel{journal.total > 1 ? "s" : ""} au total · {journal.successRatePercent} % réussis ·{" "}
+                  {journal.avgLatencyMs} ms en moyenne
+                </p>
+                <div className="dev-table-container">
+                  <table className="dev-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Route</th>
+                        <th>Statut</th>
+                        <th>Durée</th>
+                        <th>Clé</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {journal.logs.map((l) => (
+                        <tr key={l.id}>
+                          <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>{dateHeure(l.createdAt)}</td>
+                          <td style={{ fontFamily: "monospace", fontSize: "13px" }}>
+                            {l.method} {l.endpoint}
+                          </td>
+                          <td>
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                background: l.statusCode < 300 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+                                color: l.statusCode < 300 ? "#10b981" : "#ef4444",
+                              }}
+                            >
+                              {l.statusCode}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: "13px" }}>{l.latencyMs} ms</td>
+                          <td style={{ fontFamily: "monospace", color: "var(--dev-text-secondary)", fontSize: "12px" }}>
+                            {l.keyPrefix ? `${l.keyPrefix}…` : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+          <CourbeLatence journal={journal} />
+        </>
+      )}
+
+      {/* 5. WEBHOOK */}
+      {activeTab === "webhooks" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <div className="dev-panel-box">
+            <h3 className="dev-panel-title">Adresse de votre serveur</h3>
+            <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0", lineHeight: 1.6 }}>
+              Alanya prévient votre serveur quand un message de l'enseigne part. L'adresse doit commencer par{" "}
+              <code>https://</code> et être joignable sur Internet.
+            </p>
+            <form onSubmit={enregistrerWebhook} style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              <input
+                type="url"
+                placeholder="https://mon-serveur.com/alanya/webhook"
+                value={urlWebhook}
+                onChange={(e) => setUrlWebhook(e.target.value)}
+                style={{ ...champ, flex: "1", minWidth: "240px" }}
+                required
+              />
+              <button
+                type="submit"
+                disabled={enCours}
+                className="dev-metric-btn"
+                style={{ background: "#10b981", color: "#ffffff", padding: "10px 20px" }}
+              >
+                {enCours ? "Enregistrement…" : "Enregistrer"}
+              </button>
+            </form>
           </div>
 
-          {logs.length === 0 ? (
-            <p style={{ color: "var(--dev-text-secondary)", margin: 0 }}>
-              Aucun appel API enregistré pour le moment. Effectuez un premier appel pour voir la télémétrie.
-            </p>
-          ) : (
-            <div className="dev-table-container">
-              <table className="dev-table">
-                <thead>
-                  <tr>
-                    <th>Horodatage</th>
-                    <th>Méthode</th>
-                    <th>Endpoint</th>
-                    <th>Statut</th>
-                    <th>Latence</th>
-                    <th>Préfixe Clé</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((log) => (
-                    <tr key={log.id}>
-                      <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>
-                        {new Date(log.createdAt).toLocaleTimeString()} ({new Date(log.createdAt).toLocaleDateString()})
-                      </td>
-                      <td>
-                        <span style={{ fontWeight: "700", color: "var(--dev-accent)", fontSize: "12px" }}>
-                          {log.method}
-                        </span>
-                      </td>
-                      <td style={{ fontFamily: "monospace", fontSize: "13px" }}>{log.endpoint}</td>
-                      <td>
-                        <span
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: "4px",
-                            fontSize: "12px",
-                            fontWeight: "700",
-                            background: log.statusCode >= 200 && log.statusCode < 300 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                            color: log.statusCode >= 200 && log.statusCode < 300 ? "#10b981" : "#ef4444",
-                          }}
-                        >
-                          {log.statusCode}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: "600", fontSize: "13px" }}>{log.latencyMs} ms</td>
-                      <td style={{ fontFamily: "monospace", color: "var(--dev-text-secondary)", fontSize: "12px" }}>
-                        {log.keyPrefix || "ak_..."}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {webhook && (
+            <div className="dev-panel-box">
+              <h3 className="dev-panel-title">Secret de signature</h3>
+              <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 12px 0", lineHeight: 1.6 }}>
+                Chaque envoi porte l'en-tête <code>X-Alanya-Signature</code>, calculé avec ce secret. Votre serveur s'en
+                sert pour vérifier que l'envoi vient bien d'Alanya (voir la documentation).
+              </p>
+              <div className="dev-code-block" style={{ wordBreak: "break-all", margin: "0 0 12px 0" }}>
+                {secretVisible ? webhook.secretKey : "••••••••••••••••••••••••••••••••"}
+              </div>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <button className="dev-refresh-btn" onClick={() => setSecretVisible((v) => !v)}>
+                  {secretVisible ? "Masquer" : "Afficher"}
+                </button>
+                {webhook.secretKey && (
+                  <button className="dev-refresh-btn" onClick={() => copier(webhook.secretKey!)}>
+                    Copier
+                  </button>
+                )}
+                <button className="dev-refresh-btn" disabled={enCours} onClick={changerSecret}>
+                  Changer le secret
+                </button>
+                <button
+                  className="dev-metric-btn"
+                  style={{ background: "#dc2626", color: "#ffffff" }}
+                  disabled={enCours}
+                  onClick={supprimerWebhook}
+                >
+                  Supprimer le webhook
+                </button>
+              </div>
             </div>
           )}
         </div>
-        <DevLatencyChart logs={logs} />
-      </>
-    )}
-
-      {/* 4. WEBHOOKS ALANYA API */}
-      {activeTab === "webhooks" && (
-        <div className="dev-panel-box">
-          <h3 className="dev-panel-title">Configuration des Webhooks (Callbacks Alanya)</h3>
-          <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0" }}>
-            Recevez les statuts de livraison en temps réel (`sent`, `delivered`, `read`) et les messages entrants sur votre serveur.
-          </p>
-
-          <form onSubmit={handleSaveWebhook} style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "600px" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px" }}>URL du Webhook HTTP/HTTPS</label>
-              <input
-                type="url"
-                placeholder="https://mon-serveur.com/api/webhooks/alanya"
-                value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--dev-border)",
-                  background: "var(--dev-bg-page)",
-                  color: "var(--dev-text-primary)",
-                }}
-                required
-              />
-            </div>
-
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px" }}>Jeton de Vérification (Verify Token)</label>
-              <input
-                type="text"
-                placeholder="ex: my_custom_verify_token_123"
-                value={webhookVerifyToken}
-                onChange={(e) => setWebhookVerifyToken(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--dev-border)",
-                  background: "var(--dev-bg-page)",
-                  color: "var(--dev-text-primary)",
-                }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="dev-metric-btn"
-              style={{ background: "#10b981", color: "#ffffff", padding: "10px 20px", alignSelf: "flex-start" }}
-            >
-              {isSubmitting ? "Enregistrement..." : "Enregistrer la Configuration Webhook"}
-            </button>
-          </form>
-        </div>
       )}
 
-      {/* 5. DOCUMENTATION & SPÉCIFICATION ALANYA API */}
+      {/* 6. DOCUMENTATION */}
       {activeTab === "docs" && (
         <div className="dev-panel-box">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-            <h3 className="dev-panel-title" style={{ margin: 0 }}>Documentation Officielle Alanya API</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+            <h3 className="dev-panel-title" style={{ margin: 0 }}>API Alanya v1</h3>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               {(["message", "media", "verification", "webhook"] as const).map((type) => (
                 <button
@@ -809,23 +765,23 @@ export default function DeveloperPage() {
                     background: docType === type ? "var(--dev-accent)" : "transparent",
                     color: docType === type ? "#ffffff" : "var(--dev-text-primary)",
                     borderColor: docType === type ? "var(--dev-accent)" : "var(--dev-border)",
-                    fontWeight: "600",
+                    fontWeight: 600,
                     fontSize: "12px",
-                    textTransform: "uppercase",
                   }}
                 >
                   {type === "message" && "Messages"}
-                  {type === "media" && "Médias"}
-                  {type === "verification" && "Vérifications (OTP / 2FA)"}
-                  {type === "webhook" && "Webhooks"}
+                  {type === "media" && "Fichiers"}
+                  {type === "verification" && "Codes de vérification"}
+                  {type === "webhook" && "Webhook"}
                 </button>
               ))}
             </div>
           </div>
 
-          <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0" }}>
-            Quatre routes, gratuites et sans quota de volume. Seule la cadence est plafonnée.
-            Guide complet : <code>docs/2026-08-21-api-v1-integration.md</code>.
+          <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0", lineHeight: 1.6 }}>
+            Quatre routes, gratuites. Les messages partent du numéro de l'enseigne
+            {enseigne ? ` (${enseigne.numero})` : ""}. Appelez-les depuis votre serveur, jamais depuis un navigateur :
+            une clé dans une page web est une clé publiée.
           </p>
 
           {docType === "message" && (
@@ -834,7 +790,7 @@ export default function DeveloperPage() {
                 <h4 className="dev-doc-title">1. Message texte (POST /api/v1/messages)</h4>
                 <div className="dev-code-block">
 {`curl -X POST https://alanyavox.com/api/v1/messages \\
-  -H "X-Api-Key: ${activeRawKey}" \\
+  -H "X-Api-Key: ${exempleCle}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "destinataire": "12345678",
@@ -844,23 +800,26 @@ export default function DeveloperPage() {
 
 // 201 Created
 {
-  "id": "3f9a1c2e-…",          // l'identifiant RÉEL du message
+  "id": "3f9a1c2e-…",          // l'identifiant du message
   "statut": "ENVOYE",
   "destinataire": "12345678",
   "conversationId": "8c21…",
   "type": "TEXT",
   "medias": [],
-  "envoyeA": "2026-08-21T14:02:11.482Z"
-}`}
+  "envoyeA": "2026-11-07T14:02:11.482Z"
+}
+
+// "texte" : 500 caractères au plus, boutons compris.
+// Au-delà, 422 : le texte n'est jamais coupé en silence.`}
                 </div>
               </div>
 
               <div>
-                <h4 className="dev-doc-title">2. Message avec média</h4>
+                <h4 className="dev-doc-title">2. Message avec fichier</h4>
                 <div className="dev-code-block">
-{`// Téléversez d'abord le fichier (onglet Médias), puis :
+{`// Téléversez d'abord le fichier (onglet Fichiers), puis :
 curl -X POST https://alanyavox.com/api/v1/messages \\
-  -H "X-Api-Key: ${activeRawKey}" \\
+  -H "X-Api-Key: ${exempleCle}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "destinataire": "12345678",
@@ -870,8 +829,7 @@ curl -X POST https://alanyavox.com/api/v1/messages \\
   }'
 
 // Types : TEXT · IMAGE · VIDEO · AUDIO · FILE · CONTACT · LOCATION
-// Jusqu'à 10 mediaIds. Vous ne pouvez joindre que VOS propres
-// téléversements — sinon 403 MEDIA_FORBIDDEN.`}
+// Jusqu'à 10 mediaIds, téléversés par l'enseigne.`}
                 </div>
               </div>
 
@@ -879,7 +837,7 @@ curl -X POST https://alanyavox.com/api/v1/messages \\
                 <h4 className="dev-doc-title">3. Boutons de réponse rapide</h4>
                 <div className="dev-code-block">
 {`curl -X POST https://alanyavox.com/api/v1/messages \\
-  -H "X-Api-Key: ${activeRawKey}" \\
+  -H "X-Api-Key: ${exempleCle}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "destinataire": "12345678",
@@ -887,48 +845,29 @@ curl -X POST https://alanyavox.com/api/v1/messages \\
     "options": ["OUI", "NON"]
   }'
 
-// L'utilisateur voit la question, avec deux pastilles cliquables
-// dessous — sur mobile comme sur le web. Un clic renvoie le
-// libellé du bouton comme message texte ordinaire.
+// La personne voit la question avec deux boutons. Un clic
+// renvoie le libellé du bouton comme message ordinaire.
+// 1 à 10 options, 24 caractères chacune, sans crochet.
 
-// 1 à 10 options (2 ou 3 se lisent bien mieux), 24 caractères
-// chacune, sans crochet. Pas sur un CONTACT ni une LOCATION,
-// dont le contenu est du JSON.
-
-// ⚠️ Tout crochet dans un texte devient un bouton, même sans
-// "options" : « commande [12345] prête » affiche un bouton 12345
-// ET retire le numéro de la phrase.
-
-// 🔴 La réponse ne vous revient PAS par webhook : il n'y a pas
-// encore de notification de message entrant.`}
+// ⚠️ Tout crochet dans un texte devient un bouton :
+// « commande [12345] prête » affiche un bouton 12345.
+// La réponse ne vous revient pas encore par webhook.`}
                 </div>
               </div>
 
               <div>
-                <h4 className="dev-doc-title">4. Position GPS</h4>
+                <h4 className="dev-doc-title">Les refus à traiter</h4>
                 <div className="dev-code-block">
-{`// LOCATION porte sa charge en JSON dans "texte".
-curl -X POST https://alanyavox.com/api/v1/messages \\
-  -H "X-Api-Key: ${activeRawKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "destinataire": "12345678",
-    "type": "LOCATION",
-    "texte": "{\\"v\\":1,\\"lat\\":3.848,\\"lon\\":11.502,\\"nom\\":\\"Agence Yaoundé\\"}"
-  }'`}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="dev-doc-title">Les trois refus à traiter</h4>
-                <div className="dev-code-block">
-{`404 RECIPIENT_NOT_FOUND  Le numéro n'a pas de compte Alanya.
-                         Pas d'envoi hors plateforme.
-403 RECIPIENT_BLOCKED    Blocage entre les deux comptes.
-                         Ce n'est pas passager : cessez de réessayer.
-403 MEDIA_FORBIDDEN      mediaId inconnu, ou téléversé par une autre clé.
-422 VALIDATION           Champ absent ou hors bornes. Le détail est
-                         dans error.details.fieldErrors.`}
+{`404 RECIPIENT_NOT_FOUND  Ce numéro n'a pas de compte Alanya.
+403 RECIPIENT_BLOCKED    Blocage entre l'enseigne et la personne.
+                         Ce n'est pas passager : n'insistez pas.
+409 MESSAGE_REFUSED      Refus pour une autre raison (dite dans
+                         error.message).
+403 MEDIA_FORBIDDEN      mediaId inconnu, ou pas à cette enseigne.
+422 VALIDATION           Champ absent ou hors bornes. Le détail
+                         est dans error.details.fieldErrors.
+429 RATE_LIMITED         Trop d'appels : attendez Retry-After
+                         secondes, puis réessayez.`}
                 </div>
               </div>
             </div>
@@ -939,9 +878,8 @@ curl -X POST https://alanyavox.com/api/v1/messages \\
               <div>
                 <h4 className="dev-doc-title">Téléverser un fichier (POST /api/v1/media)</h4>
                 <div className="dev-code-block">
-{`// multipart/form-data — un VRAI fichier, pas une URL.
-curl -X POST https://alanyavox.com/api/v1/media \\
-  -H "X-Api-Key: ${activeRawKey}" \\
+{`curl -X POST https://alanyavox.com/api/v1/media \\
+  -H "X-Api-Key: ${exempleCle}" \\
   -F "file=@facture.pdf"
 
 // 201 Created
@@ -954,22 +892,11 @@ curl -X POST https://alanyavox.com/api/v1/media \\
   "dureeMs": null
 }
 
-// Champ facultatif : durationMs (audio, vidéo).
-// Passez ensuite "id" dans mediaIds de POST /api/v1/messages.`}
-                </div>
-              </div>
+// Passez ensuite "id" dans mediaIds de POST /api/v1/messages.
 
-              <div>
-                <h4 className="dev-doc-title">À savoir</h4>
-                <div className="dev-code-block">
-{`400 INVALID_REQUEST      Vous avez envoyé du JSON. Cette route attend
-                         un multipart avec un champ "file".
-415 MEDIA_TYPE_REJECTED  Type hors liste blanche.
-413 MEDIA_TOO_LARGE      Au-delà du plafond de taille.
-502 STORAGE_UNAVAILABLE  Notre stockage n'a pas répondu. Réessayez.
-
-L'url rendue est proxyfiée : c'est elle qui porte le contrôle
-d'accès. Ne construisez pas d'URL de stockage vous-même.`}
+415 MEDIA_TYPE_REJECTED  Type de fichier non accepté.
+413 MEDIA_TOO_LARGE      Fichier trop gros.
+502 STORAGE_UNAVAILABLE  Notre stockage n'a pas répondu : réessayez.`}
                 </div>
               </div>
             </div>
@@ -978,26 +905,23 @@ d'accès. Ne construisez pas d'URL de stockage vous-même.`}
           {docType === "verification" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               <div>
-                <h4 className="dev-doc-title">1. Émettre un code (POST /api/v1/verifications)</h4>
+                <h4 className="dev-doc-title">1. Envoyer un code (POST /api/v1/verifications)</h4>
                 <div className="dev-code-block">
 {`curl -X POST https://alanyavox.com/api/v1/verifications \\
-  -H "X-Api-Key: ${activeRawKey}" \\
+  -H "X-Api-Key: ${exempleCle}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "finalite": "AUTH_2FA",
-    "destination": "agent@exemple.com",
+    "destination": "client@exemple.com",
     "canal": "EMAIL"
   }'
 
 // finalite : AUTH_2FA · CREATION_AGENT · VALIDATION_CONTACT
-// canal    : EMAIL · ALANYA  (défaut EMAIL pour AUTH_2FA)
+// canal    : EMAIL · ALANYA  (EMAIL par défaut pour AUTH_2FA)
 
-{
-  "id": "…", "finalite": "AUTH_2FA", "canal": "EMAIL",
-  "destination": "agent@exemple.com",
-  "expireA": "2026-08-21T14:07:11Z",
-  "livraison": "REMIS"
-}`}
+{ "id": "…", "finalite": "AUTH_2FA", "canal": "EMAIL",
+  "destination": "client@exemple.com",
+  "expireA": "2026-11-07T14:07:11Z", "livraison": "REMIS" }`}
                 </div>
               </div>
 
@@ -1005,33 +929,20 @@ d'accès. Ne construisez pas d'URL de stockage vous-même.`}
                 <h4 className="dev-doc-title">2. Vérifier (POST /api/v1/verifications/check)</h4>
                 <div className="dev-code-block">
 {`curl -X POST https://alanyavox.com/api/v1/verifications/check \\
-  -H "X-Api-Key: ${activeRawKey}" \\
+  -H "X-Api-Key: ${exempleCle}" \\
   -H "Content-Type: application/json" \\
   -d '{
     "finalite": "AUTH_2FA",
-    "destination": "agent@exemple.com",
+    "destination": "client@exemple.com",
     "code": "042518"
   }'
 
-{ "verifie": false, "essaisRestants": 2 }`}
-                </div>
-              </div>
+{ "verifie": false, "essaisRestants": 2 }
 
-              <div>
-                <h4 className="dev-doc-title">Deux règles qui vous concernent</h4>
-                <div className="dev-code-block">
-{`La réponse ne contient JAMAIS le code. C'est nous qui livrons.
-
-"livraison": "REMIS" est CONSTATÉ, jamais supposé. Si rien n'est
-parti, vous recevez 502 VERIFICATION_NOT_DELIVERED — pas un faux
-succès.
-
-Un refus ne dit pas POURQUOI (faux, expiré, déjà utilisé, trop
-d'essais rendent la même réponse) : distinguer apprendrait à un
-attaquant qu'il visait le bon code. Affichez essaisRestants.
-
-Un seul code vivant à la fois par (destination, finalité) :
-en émettre un nouveau invalide le précédent.`}
+// La réponse ne contient jamais le code : c'est Alanya qui le livre.
+// Un refus ne dit pas pourquoi. Affichez essaisRestants.
+// Un seul code vivant par personne et par finalité, pour
+// votre enseigne : en demander un nouveau remplace le vôtre.`}
                 </div>
               </div>
             </div>
@@ -1040,14 +951,14 @@ en émettre un nouveau invalide le précédent.`}
           {docType === "webhook" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               <div>
-                <h4 className="dev-doc-title">Ce que vous recevez</h4>
+                <h4 className="dev-doc-title">Ce que votre serveur reçoit</h4>
                 <div className="dev-code-block">
-{`POST <votre url>
+{`POST <votre adresse https>
 X-Alanya-Signature: sha256=<hex>
 
 {
   "evenement": "message.statut",
-  "emisA": "2026-08-21T14:02:11.482Z",
+  "emisA": "2026-11-07T14:02:11.482Z",
   "donnees": {
     "messageId": "3f9a1c2e-…",
     "statut": "ENVOYE",
@@ -1055,16 +966,15 @@ X-Alanya-Signature: sha256=<hex>
   }
 }
 
-// statut : ENVOYE · REMIS · LU · ECHEC
-// "evenement" n'a qu'une valeur aujourd'hui. Aiguillez quand
-// même dessus : c'est ce qui nous permettra d'en ajouter.`}
+// Aujourd'hui : un envoi quand le message part (ENVOYE).
+// Aiguillez sur "evenement" : d'autres viendront.`}
                 </div>
               </div>
 
               <div>
-                <h4 className="dev-doc-title">Vérifier la signature</h4>
+                <h4 className="dev-doc-title">Vérifier la signature (Node.js)</h4>
                 <div className="dev-code-block">
-{`const brut = await request.text();   // le CORPS BRUT, pas un objet
+{`const brut = await request.text();   // le corps BRUT, pas un objet
 const attendu = "sha256=" + crypto
   .createHmac("sha256", process.env.ALANYA_WEBHOOK_SECRET)
   .update(brut, "utf8")
@@ -1075,21 +985,9 @@ const a = Buffer.from(recu), b = Buffer.from(attendu);
 if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
   return new Response("signature invalide", { status: 401 });
 }
-const charge = JSON.parse(brut);     // parser APRÈS, jamais avant`}
-                </div>
-              </div>
+const charge = JSON.parse(brut);     // parser APRÈS, jamais avant
 
-              <div>
-                <h4 className="dev-doc-title">Trois règles</h4>
-                <div className="dev-code-block">
-{`1. Signez le CORPS BRUT. Un JSON.parse suivi d'une
-   re-sérialisation change l'espacement, donc l'empreinte.
-2. Comparez à TEMPS CONSTANT (timingSafeEqual), jamais par ===.
-3. REJETEZ toute requête non signée. Sans secret configuré nous
-   n'envoyons aucun en-tête, plutôt qu'un en-tête décoratif.
-
-Le secret est rendu UNE SEULE FOIS, à l'enregistrement du
-webhook. Il n'est plus relisible ensuite.`}
+// Le secret se trouve dans l'onglet Webhook (bouton Afficher).`}
                 </div>
               </div>
             </div>

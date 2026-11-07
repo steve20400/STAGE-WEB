@@ -9,7 +9,8 @@ const logoDev = `${import.meta.env.BASE_URL}logo-alanya-dev.png`
 // ⚠️ `"sandbox"` retiré le 21/08/2026 avec la facturation. C'est le TYPE qui
 // fait le ménage : tout `activeTab === "sandbox"` oublié ailleurs devient une
 // erreur de compilation plutôt qu'un onglet mort qui ne s'affiche jamais.
-export type DeveloperTab = "dashboard" | "keys" | "logs" | "webhooks" | "docs"
+// `"enseignes"` ajouté le 07/11/2026 : créer, voir et supprimer ses enseignes.
+export type DeveloperTab = "dashboard" | "enseignes" | "keys" | "logs" | "webhooks" | "docs"
 
 interface DeveloperTabContextValue {
   activeTab: DeveloperTab
@@ -63,6 +64,19 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
               </button>
 
               <button
+                className={`dev-nav-item ${activeTab === "enseignes" ? "active" : ""}`}
+                onClick={() => setActiveTab("enseignes")}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 9l1.5-5h15L21 9" />
+                  <path d="M3 9h18v2a3 3 0 01-6 0 3 3 0 01-6 0 3 3 0 01-6 0z" />
+                  <path d="M5 13v8h14v-8" />
+                  <path d="M10 21v-5h4v5" />
+                </svg>
+                Mes enseignes
+              </button>
+
+              <button
                 className={`dev-nav-item ${activeTab === "keys" ? "active" : ""}`}
                 onClick={() => setActiveTab("keys")}
               >
@@ -83,7 +97,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
                   <line x1="12" y1="20" x2="12" y2="4" />
                   <line x1="6" y1="20" x2="6" y2="14" />
                 </svg>
-                Journal (Logs API)
+                Journal
               </button>
 
               <button
@@ -94,7 +108,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
                   <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 01-3.46 0" />
                 </svg>
-                Webhooks API
+                Webhook
               </button>
 
               <button
@@ -105,7 +119,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
                   <polyline points="16 18 22 12 16 6" />
                   <polyline points="8 6 2 12 8 18" />
                 </svg>
-                Documentation & SDKs
+                Documentation
               </button>
             </nav>
           </div>

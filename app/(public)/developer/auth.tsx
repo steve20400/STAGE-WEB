@@ -1,34 +1,32 @@
-import React, { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { ThemeToggle } from "../../../src/components/theme-toggle"
 import "./auth.css"
 
 const logoDev = `${import.meta.env.BASE_URL}logo-alanya-dev.png`
 
+/*
+ * L'ENTRÉE DE L'ESPACE DÉVELOPPEUR (07/11/2026, décisions du user).
+ *
+ * Deux portes, et derrière elles EXACTEMENT les pages d'Alanya :
+ *  - « Créer un compte développeur » : l'inscription d'Alanya, les mêmes
+ *    étapes que sur le mobile jusqu'à l'attribution du numéro. Le compte créé
+ *    est un compte Alanya ordinaire ;
+ *  - « Continuer avec Alanya Work » : la connexion d'Alanya, avec le code dans
+ *    l'application quand le compte l'exige.
+ * Les deux reviennent ensuite à la console, où l'on crée son enseigne.
+ *
+ * Cette page connectait par un formulaire à elle, qui ne savait pas passer
+ * l'étape du code : un compte en deux étapes ne pouvait pas entrer.
+ */
+
+const CONSOLE = { from: { pathname: "/developer/dashboard" } }
+
 export default function DeveloperAuthPage() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { user, isAuthenticated, logout } = useAuth()
 
-  const [loginEmail, setLoginEmail] = useState("")
-  const [loginPassword, setLoginPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      setLoading(true)
-      setError(null)
-      await login({ phone: loginEmail, password: loginPassword })
-      navigate("/developer/dashboard", { replace: true })
-    } catch (err: any) {
-      setError(err?.message || "Identifiants invalides")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const secondaire = { background: "transparent", color: "inherit", border: "1px solid currentColor" }
 
   return (
     <div className="dev-auth-root">
@@ -38,54 +36,48 @@ export default function DeveloperAuthPage() {
 
       <div className="dev-auth-container">
         <div className="dev-auth-brand-row">
-          <img src={logoDev} alt="Alanya Dev Logo" className="dev-auth-brand-logo" />
+          <img src={logoDev} alt="Alanya Dev" className="dev-auth-brand-logo" />
           <span className="dev-auth-brand-name">Alanya Dev</span>
         </div>
 
-        <h1 className="dev-auth-heading">Accès Espace Développeur</h1>
+        <h1 className="dev-auth-heading">Espace développeur</h1>
+        <p style={{ textAlign: "center", margin: "0 0 24px 0", lineHeight: 1.6, opacity: 0.8 }}>
+          Envoyez des messages et des codes de vérification aux utilisateurs d'Alanya depuis votre serveur.
+        </p>
 
-        {error && <div className="dev-auth-error">{error}</div>}
-
-        <form onSubmit={handleLogin} className="dev-auth-form">
-          <div className="dev-input-wrapper">
-            <input
-              type="email"
-              className="dev-input-control"
-              placeholder="Email / Identifiant"
-              value={loginEmail}
-              onChange={(e) => setLoginEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="dev-input-wrapper">
-            <input
-              type={showPassword ? "text" : "password"}
-              className="dev-input-control"
-              placeholder="Mot de passe"
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              className="dev-password-toggle"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? "Masquer" : "Afficher"}
-            </button>
-          </div>
-
-          <button type="submit" disabled={loading} className="dev-submit-action">
-            {loading ? "Connexion..." : "Accéder à la Console Développeur"}
-          </button>
-        </form>
-
-        <div className="dev-auth-footer-link">
-          Pas encore de compte Alanya ?{" "}
-          <Link to="/signup" className="dev-link-accent">
-            Créer un compte
-          </Link>
+        <div className="dev-auth-form">
+          {isAuthenticated ? (
+            <>
+              <button type="button" className="dev-submit-action" onClick={() => navigate("/developer/dashboard")}>
+                Continuer en tant que {user?.name || user?.email || "moi"}
+              </button>
+              <button
+                type="button"
+                className="dev-submit-action"
+                style={secondaire}
+                onClick={async () => {
+                  await logout()
+                  navigate("/login", { state: CONSOLE })
+                }}
+              >
+                Utiliser un autre compte
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="dev-submit-action" onClick={() => navigate("/login", { state: CONSOLE })}>
+                Continuer avec Alanya Work
+              </button>
+              <button
+                type="button"
+                className="dev-submit-action"
+                style={secondaire}
+                onClick={() => navigate("/signup", { state: CONSOLE })}
+              >
+                Créer un compte développeur
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

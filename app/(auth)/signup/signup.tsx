@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { requestRegistrationOtp } from "../../../src/services/auth-api"
 import { drapeau, listerPays, type Pays } from "../../../src/services/pays-service"
@@ -113,6 +113,15 @@ function OtpInput({ value, onChange }: { value: string[]; onChange: (value: stri
 
 export default function SignUpPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  /*
+   * Où aller une fois le compte créé. Par défaut les discussions ; l'espace
+   * développeur passe ici sa console (07/11/2026) : « Créer un compte
+   * développeur » suit EXACTEMENT cette inscription, puis y revient pour créer
+   * l'enseigne. Même convention que la page de connexion (`state.from`).
+   */
+  const destination =
+    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/chats"
   const { language, setLanguage, t } = useTranslation()
   const { register, registerWithoutEmail } = useAuth()
 
@@ -295,7 +304,7 @@ export default function SignUpPage() {
         },
         entered
       )
-      navigate("/chats", { replace: true })
+      navigate(destination, { replace: true })
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t("x2_verify_failed"))
       setOtpDigits(Array(OTP_LEN).fill(""))
@@ -692,7 +701,7 @@ export default function SignUpPage() {
                 type="button"
                 className="btn-submit"
                 disabled={!codeNote}
-                onClick={() => navigate("/chats")}
+                onClick={() => navigate(destination)}
               >
                 {t("auth_continue")}
               </button>
