@@ -4,7 +4,9 @@ import { NavLink, useNavigate } from "react-router-dom"
 import { TexteForme } from "../../../src/components/texte-forme"
 import { CHAT_COLORS, type ConversationMock } from "../../../src/mocks/chat-data"
 import {
+  archiverConversation,
   fetchChatConversations,
+  fetchConversationsArchivees,
   fetchChatConversationsCacheFirst,
   type ConversationListItem,
 } from "../../../src/services/chats-service"
@@ -412,6 +414,62 @@ export default function ChatsPage() {
   const [conversations, setConversations] = useState<ConversationListItem[]>([])
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  /*
+   * ══════════════ LES ARCHIVES ══════════════
+   *
+   * 🔴 LE MOBILE LES A DEPUIS LE 18/10/2026, LE WEB NON. Le serveur les porte
+   * depuis longtemps (`isArchived`, « F9 ») : la liste ordinaire les écarte
+   * déjà d'office, il ne manquait que de pouvoir y ranger et d'aller les voir.
+   *
+   * ⚠️ DEUX LISTES, PAS UN FILTRE. Les archivées n'arrivent jamais dans
+   * `conversations` : le serveur ne les envoie pas. Les mélanger ici
+   * obligerait à les filtrer partout ailleurs — recherche, listes, épinglés.
+   */
+  const [archivees, setArchivees] = useState<ConversationListItem[]>([])
+  const [archivesOuvertes, setArchivesOuvertes] = useState(false)
+  /** La discussion dont on a ouvert le menu d'actions (clic droit, appui long). */
+  const [actionsPour, setActionsPour] = useState<ConversationListItem | null>(null)
+
+  const rafraichirArchives = useCallback(() => {
+    void fetchConversationsArchivees()
+      .then(setArchivees)
+      .catch(() => {
+        // Hors ligne : on garde la dernière liste connue plutôt que de la vider.
+      })
+  }, [])
+
+  useEffect(() => {
+    rafraichirArchives()
+  }, [rafraichirArchives])
+
+  const basculerArchive = useCallback(
+    (conv: ConversationListItem, archiver: boolean) => {
+      setActionsPour(null)
+      /*
+       * ⚠️ L'ÉCRAN BOUGE AVANT LE SERVEUR, et revient si le serveur refuse.
+       * Ranger une discussion doit être instantané : attendre l'aller-retour
+       * sur la connexion d'ici donnerait l'impression que le clic a raté.
+       */
+      if (archiver) {
+        setConversations((prev) => prev.filter((c) => c.id !== conv.id))
+        setArchivees((prev) => [{ ...conv, isArchived: true }, ...prev])
+      } else {
+        setArchivees((prev) => prev.filter((c) => c.id !== conv.id))
+        setConversations((prev) => [{ ...conv, isArchived: false }, ...prev])
+      }
+      void archiverConversation(conv.id, archiver).catch(() => {
+        if (archiver) {
+          setArchivees((prev) => prev.filter((c) => c.id !== conv.id))
+          setConversations((prev) => [conv, ...prev])
+        } else {
+          setConversations((prev) => prev.filter((c) => c.id !== conv.id))
+          setArchivees((prev) => [conv, ...prev])
+        }
+      })
+    },
+    []
+  )
+
   /**
    * TOUTES LES LISTES DU COMPTE, dans l'ordre de priorite choisi.
    *
@@ -780,6 +838,68 @@ export default function ChatsPage() {
 
       {/* Liste */}
       <div className="ch-list">
+        {archivesOuvertes ? (
+          <>
+            <button
+              type="button"
+              className="section-label"
+              onClick={() => setArchivesOuvertes(false)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                border: 0,
+                background: "transparent",
+                cursor: "pointer",
+                font: "inherit",
+                textAlign: "left",
+              }}
+            >
+              ← {t("chats_archivees")}
+            </button>
+            {archivees.length === 0 ? (
+              <div className="empty">
+                <div className="empty-txt">{t("chats_archivees_vide")}</div>
+              </div>
+            ) : (
+              archivees.map((conv) => (
+                <ConvItem
+                  key={conv.id}
+                  conv={conv}
+                  onAvatar={toucherAvatar}
+                  onActions={setActionsPour}
+                />
+              ))
+            )}
+          </>
+        ) : (
+          <>
+        {/* ⚠️ SEULEMENT S'IL Y EN A. Une rangée « Archivées (0) » en tête de
+            liste occuperait la place la plus précieuse de l'écran pour ne rien
+            dire — c'est le choix de WhatsApp, et il est bon. */}
+        {archivees.length > 0 && query === "" && (
+          <button
+            type="button"
+            className="conv-item"
+            onClick={() => setArchivesOuvertes(true)}
+            style={{ border: 0, background: "transparent", width: "100%", cursor: "pointer" }}
+          >
+            <div className="av" style={{ background: "var(--surface-2, #2a2a35)" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <rect x="3" y="4" width="18" height="4" rx="1" />
+                <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+                <path d="M10 12h4" />
+              </svg>
+            </div>
+            <div className="conv-meta">
+              <div className="conv-name">{t("chats_archivees")}</div>
+            </div>
+            <div className="conv-side">
+              <span className="badge">{archivees.length}</span>
+            </div>
+          </button>
+        )}
         {filtered.length === 0 ? (
           <div className="empty">
             <div className="empty-icon">...</div>
@@ -802,7 +922,12 @@ export default function ChatsPage() {
               <>
                 <div className="section-label">{t("section_pinned")}</div>
                 {pinned.map((conv) => (
-                  <ConvItem key={conv.id} conv={conv} onAvatar={toucherAvatar} />
+                  <ConvItem
+                    key={conv.id}
+                    conv={conv}
+                    onAvatar={toucherAvatar}
+                    onActions={setActionsPour}
+                  />
                 ))}
               </>
             )}
@@ -810,10 +935,17 @@ export default function ChatsPage() {
               <>
                 {pinned.length > 0 && <div className="section-label">{t("section_recent")}</div>}
                 {regular.map((conv) => (
-                  <ConvItem key={conv.id} conv={conv} onAvatar={toucherAvatar} />
+                  <ConvItem
+                    key={conv.id}
+                    conv={conv}
+                    onAvatar={toucherAvatar}
+                    onActions={setActionsPour}
+                  />
                 ))}
               </>
             )}
+          </>
+        )}
           </>
         )}
       </div>
@@ -884,6 +1016,19 @@ export default function ChatsPage() {
         />
       )}
 
+      {actionsPour && (
+        <ChoixActions
+          titre={nomConversation(actionsPour)}
+          actions={[
+            {
+              libelle: actionsPour.isArchived ? t("chat_desarchiver") : t("chat_archiver"),
+              onChoisir: () => basculerArchive(actionsPour, !actionsPour.isArchived),
+            },
+          ]}
+          onFermer={() => setActionsPour(null)}
+        />
+      )}
+
       {creationListe && (
         <FenetreNouvelleListe onFermer={() => setCreationListe(false)} onEnregistre={surListeCreee} />
       )}
@@ -894,10 +1039,27 @@ export default function ChatsPage() {
 function ConvItem({
   conv,
   onAvatar,
+  onActions,
 }: {
   conv: ConversationListItem
   onAvatar: (nom: string, src: string | null, statuts: StatusGroup | null) => void
+  /** Clic droit, ou appui long sur un écran tactile : le menu de la ligne. */
+  onActions?: (conv: ConversationListItem) => void
 }) {
+  /*
+   * ⚠️ DEUX GESTES POUR UNE SEULE ACTION, parce qu'il n'y a pas de geste
+   * commun : le clic droit n'existe pas au doigt, et l'appui long n'existe pas
+   * à la souris. Le minuteur est annulé dès que le doigt bouge ou se lève,
+   * sans quoi un simple défilement de la liste ouvrirait le menu.
+   */
+  const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const arreter = () => {
+    if (minuteur.current) {
+      clearTimeout(minuteur.current)
+      minuteur.current = null
+    }
+  }
+  useEffect(() => arreter, [])
   const { t } = useTranslation()
   const color = CHAT_COLORS[conv.colorIdx % CHAT_COLORS.length]
   const nom = nomConversation(conv)
@@ -916,6 +1078,26 @@ function ConvItem({
     <NavLink
       to={`/chats/${conv.id}`}
       className={({ isActive }) => `conv-item ${isActive ? "active" : ""}`}
+      onContextMenu={
+        onActions
+          ? (e) => {
+              e.preventDefault()
+              onActions(conv)
+            }
+          : undefined
+      }
+      onPointerDown={
+        onActions
+          ? (e) => {
+              if (e.pointerType === "mouse") return
+              arreter()
+              minuteur.current = setTimeout(() => onActions(conv), 500)
+            }
+          : undefined
+      }
+      onPointerUp={arreter}
+      onPointerCancel={arreter}
+      onPointerMove={arreter}
     >
       <div
         className={`av${statuts ? ` av-statut${statuts.hasUnviewed ? "" : " vu"}` : pairId ? " av-cliquable" : ""}`}

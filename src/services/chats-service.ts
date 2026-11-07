@@ -47,6 +47,13 @@ export interface ConversationListItem extends ConversationMock {
    * seconde regle finirait par diverger de la sienne.
    */
   isSelf?: boolean
+  /**
+   * Rangée dans les archives — le « F9 » du serveur (`isArchived`).
+   *
+   * ⚠️ LA LISTE ORDINAIRE NE LES CONTIENT PAS : `GET /api/conversations` les
+   * écarte d'office. On ne les voit qu'en demandant `?archived=true`.
+   */
+  isArchived?: boolean
 }
 
 /** Conversation telle que renvoyee par GET /api/conversations. */
@@ -60,6 +67,8 @@ interface BackendConversation {
   /** Le badge a cote du nom, decide par le serveur (`src/lib/badges.ts`). */
   badge?: { type: string; image: string; libelle: string } | null
   title: string | null
+  /** Rangée dans les archives (F9). Absent = non. */
+  isArchived?: boolean
   /**
    * Vrai pour la conversation du compte avec lui-meme (non-groupe, un seul
    * participant). Le serveur l'envoie explicitement pour qu'aucun client n'ait
@@ -254,6 +263,7 @@ function toFrontConversation(c: BackendConversation): ConversationListItem {
     membersInfo: c.members,
     avatar: c.avatarUrl ?? null,
     lock: c.lock ?? null,
+    isArchived: c.isArchived === true,
   }
 }
 
@@ -369,6 +379,37 @@ export async function fetchChatConversationsCacheFirst(
  * n'a de cas particulier a traiter — c'est le meme appel, et l'ecran de
  * discussion s'ouvre pareil.
  */
+/**
+ * PATCH /api/conversations/:id/archive — ranger une discussion, ou l'en sortir.
+ *
+ * 🔴 LE MOBILE L'A DEPUIS LE 18/10/2026, LE WEB NON. Le serveur, lui, le porte
+ * depuis longtemps (`isArchived`, « F9 ») : il n'y avait qu'à s'en servir.
+ */
+export async function archiverConversation(convId: string, archivee: boolean): Promise<void> {
+  await apiRequest(`/api/conversations/${convId}/archive`, {
+    method: "PATCH",
+    body: { archived: archivee },
+  })
+}
+
+/**
+ * Les discussions rangées dans les archives.
+ *
+ * ⚠️ `?archived=true` NE REND PAS QUE LES ARCHIVÉES : il RETIRE le filtre, et
+ * rend donc tout. Le tri se fait ici, comme sur le mobile. Un paramètre qui
+ * dit « montre aussi » plutôt que « montre seulement » est un piège, mais
+ * c'est le contrat du serveur et deux clients s'y conforment déjà.
+ */
+export async function fetchConversationsArchivees(): Promise<ConversationListItem[]> {
+  const response = await apiRequest<{ conversations: BackendConversation[] }>(
+    "/api/conversations?archived=true"
+  )
+  const brutes = await avecDerniersTextesLocaux(
+    (response.conversations ?? []).filter((c) => c.isArchived === true)
+  )
+  return brutes.map(toFrontConversation)
+}
+
 export async function createPrivateChat(
   publicNumber: string
 ): Promise<{ id: string; isSelf: boolean }> {
