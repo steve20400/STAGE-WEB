@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react"
+import { formeOnde, ondeDeRepli } from "../../../../src/lib/forme-onde"
 import type { PDFDocumentLoadingTask } from "pdfjs-dist"
 import { BoutonsMessage } from "./boutons-message"
 import { useNavigate, useParams, useSearchParams } from "react-router-dom"
@@ -1804,6 +1805,53 @@ function AudioPlayer({
   const [progress, setProgress] = useState(0)
   const [elapsedSec, setElapsedSec] = useState(0)
 
+  /*
+   * ══════════ LA FORME D'ONDE, ET LA VITESSE ══════════
+   *
+   * 🔴 LE MOBILE LES A DEPUIS LE 18/10/2026 : la bulle montre la vraie voix,
+   * on s'y déplace au doigt et on accélère la lecture. Ici il n'y avait qu'une
+   * barre de progression de quatre pixels.
+   *
+   * ⚠️ L'ONDE DESSINÉE PARAÎT TOUT DE SUITE, la vraie la remplace quand elle
+   * est prête : décoder demande d'aller chercher les octets. Une bulle qui
+   * attendrait le réseau pour s'afficher serait pire que l'ancienne barre.
+   */
+  const [onde, setOnde] = useState<number[]>(() =>
+    ondeDeRepli(src, Math.round((durationMs ?? 0) / 1000))
+  )
+  const [vitesse, setVitesse] = useState(1)
+
+  useEffect(() => {
+    let vivant = true
+    setOnde(ondeDeRepli(src, Math.round((durationMs ?? 0) / 1000)))
+    void formeOnde(src, src, Math.round((durationMs ?? 0) / 1000)).then((o) => {
+      if (vivant) setOnde(o)
+    })
+    return () => {
+      vivant = false
+    }
+  }, [src, durationMs])
+
+  /** Se déplacer dans le son d'après l'abscisse du doigt ou du curseur. */
+  const allerA = (clientX: number, element: HTMLElement) => {
+    const audio = audioRef.current
+    if (!audio || !Number.isFinite(audio.duration) || audio.duration <= 0) return
+    const rect = element.getBoundingClientRect()
+    const part = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    audio.currentTime = part * audio.duration
+    setProgress(part)
+  }
+
+  /*
+   * ⚠️ LA VITESSE SE REPOSE À CHAQUE LECTURE. `playbackRate` est remis à 1 par
+   * le navigateur quand la source change ; sans cet effet, le bouton dirait
+   * « 2× » pendant une lecture redevenue normale.
+   */
+  useEffect(() => {
+    const audio = audioRef.current
+    if (audio) audio.playbackRate = vitesse
+  }, [vitesse, playing])
+
   const toggle = () => {
     const audio = audioRef.current
     if (!audio) return
@@ -1870,37 +1918,102 @@ function AudioPlayer({
         )}
       </button>
       <div style={{ flex: 1, minWidth: 110 }}>
+        {/*
+          ⚠️ LE GLISSEMENT SE CAPTURE SUR LA BARRE ELLE-MÊME (`setPointerCapture`) :
+          sans cela, le doigt qui sort de la bulle en se déplaçant emporte le
+          geste ailleurs — et sur téléphone, il fait défiler la conversation.
+        */}
         <div
+          role="slider"
+          aria-label={t("vu_vocal")}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progress * 100)}
+          tabIndex={0}
           style={{
-            height: 4,
-            borderRadius: 2,
-            background: isMe ? "#ffffff35" : "var(--border-default)",
-            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            height: 26,
             cursor: "pointer",
+            touchAction: "none",
           }}
-          onClick={(e) => {
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            allerA(e.clientX, e.currentTarget)
+          }}
+          onPointerMove={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              allerA(e.clientX, e.currentTarget)
+            }
+          }}
+          onKeyDown={(e) => {
             const audio = audioRef.current
             if (!audio || !Number.isFinite(audio.duration)) return
-            const rect = e.currentTarget.getBoundingClientRect()
-            audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration
+            if (e.key === "ArrowRight") audio.currentTime = Math.min(audio.duration, audio.currentTime + 5)
+            if (e.key === "ArrowLeft") audio.currentTime = Math.max(0, audio.currentTime - 5)
           }}
         >
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: `${Math.min(100, progress * 100)}%`,
-              borderRadius: 2,
-              background: isMe ? fg : "var(--accent)",
-            }}
-          />
+          {onde.map((hauteur, i) => {
+            const lue = i / onde.length < progress
+            return (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  height: `${Math.round(hauteur * 100)}%`,
+                  minHeight: 2,
+                  borderRadius: 1,
+                  background: lue
+                    ? isMe
+                      ? fg
+                      : "var(--accent)"
+                    : isMe
+                      ? "#ffffff45"
+                      : "var(--border-default)",
+                }}
+              />
+            )
+          })}
         </div>
-        <div style={{ fontSize: 10, opacity: 0.75, marginTop: 4 }}>
-          {playing || elapsedSec > 0
-            ? formatAudioDuration(elapsedSec * 1000)
-            : formatAudioDuration(durationMs)}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            marginTop: 2,
+          }}
+        >
+          <span style={{ fontSize: 10, opacity: 0.75 }}>
+            {playing || elapsedSec > 0
+              ? formatAudioDuration(elapsedSec * 1000)
+              : formatAudioDuration(durationMs)}
+          </span>
+          {/*
+            ⚠️ LA VITESSE NE PARAÎT QU'UNE FOIS LA LECTURE COMMENCÉE. Un bouton
+            « 1× » sur une bulle qu'on n'a pas encore écoutée n'apprend rien et
+            encombre une ligne déjà courte.
+          */}
+          {(playing || elapsedSec > 0) && (
+            <button
+              type="button"
+              onClick={() => setVitesse((v) => (v === 1 ? 1.5 : v === 1.5 ? 2 : 1))}
+              style={{
+                border: 0,
+                borderRadius: 9,
+                padding: "1px 6px",
+                fontSize: 10,
+                fontWeight: 600,
+                fontFamily: "inherit",
+                cursor: "pointer",
+                color: fg,
+                background: isMe ? "#ffffff2a" : "var(--border-subtle, #ffffff14)",
+              }}
+            >
+              {vitesse === 1 ? "1×" : vitesse === 1.5 ? "1,5×" : "2×"}
+            </button>
+          )}
         </div>
       </div>
     </div>
