@@ -55,6 +55,7 @@ import {
 import { isValidAlanyaNumber, normalizeAlanyaNumber } from "../lib/alanya-number"
 import { langueInitiale, traduire, type Cle } from "../i18n"
 import { qualitePourAppel, type Preset } from "./qualite-video"
+import { MoteurSfuWeb, PairSfu, moteurDeLaReunion } from "./sfu-web"
 
 /**
  * Traduction dans un service : la langue est relue a chaque appel, jamais
@@ -89,6 +90,8 @@ export interface IncomingCallInfo {
   memberCount: number
   /** Alanya ID du centre qui a route cet appel vers moi (agent) — voir CallManagerState.activeIvrFromId. */
   ivrFromId: string | null
+  /** `sfu` pour un appel de groupe que le serveur a place en SFU (07/11/2026). */
+  moteur?: "mesh" | "sfu"
 }
 
 /**
@@ -1918,7 +1921,19 @@ export function sendIvrBackToMenu() {
 
 /* ----------------- Mesh + signalisation ----------------- */
 
-const peers = new Map<string, PeerSession>()
+/**
+ * Les liaisons avec chaque pair. En SFU (07/11/2026), des pairs VIRTUELS
+ * (`PairSfu`) adosses au meme moteur : la meme surface, une seule connexion.
+ */
+const peers = new Map<string, PeerSession | PairSfu>()
+
+/**
+ * LE MOTEUR DE L'APPEL OU DE LA REUNION EN COURS (07/11/2026) : `mesh`, le
+ * systeme d'origine, ou `sfu`, le SFU de Cloudflare — fixe par le serveur
+ * selon le reglage de la console. Le tete-a-tete est toujours en mesh.
+ */
+let moteurCourant: "mesh" | "sfu" = "mesh"
+let moteurSfu: MoteurSfuWeb | null = null
 
 /*
  * Un ensemble et non un booleen : en groupe, un pair qui vacille ne doit pas
@@ -2070,6 +2085,16 @@ async function sonderParole() {
   sondageEnCours = true
   try {
     const parlent = new Set(state.parlent)
+    // En SFU, une seule connexion porte la voix de tous : c'est le moteur qui
+    // sait a qui appartient chaque piste recue.
+    if (moteurSfu) {
+      try {
+        const niveaux = await moteurSfu.niveauxAudio(ID_MOI, state.micOn)
+        for (const [id, niveau] of niveaux ?? []) mesurerParole(id, niveau, parlent)
+      } catch {
+        // Connexion en cours de fermeture.
+      }
+    }
     let moiLu = false
     for (const [id, session] of peers) {
       const pc = session.connexion
@@ -2715,21 +2740,51 @@ async function connectToPeer(peerId: string, asOfferer: boolean) {
     }
   }
   const iceServers = await loadIceServers()
+  const envoyer = (signal: WebrtcSignal) =>
+    salleReunion !== null
+      ? sendMeetingSignal(salleReunion, peerId, signal)
+      : sendCallSignal(callId, peerId, signal)
 
-  const session = new PeerSession(
-    peerId,
-    isVideo,
-    asOfferer,
-    stream,
-    iceServers,
-    (signal) =>
-      salleReunion !== null
-        ? sendMeetingSignal(salleReunion, peerId, signal)
-        : sendCallSignal(callId, peerId, signal),
-    publishRemoteStreams,
-    () => marquerReconnexion(peerId, true),
-    () => marquerReconnexion(peerId, false)
-  )
+  let session: PeerSession | PairSfu
+  if (moteurCourant === "sfu") {
+    // SFU (07/11/2026) : un moteur pour tout l'appel, un pair virtuel par
+    // participant. Le moteur se connecte au premier pair.
+    if (!moteurSfu) {
+      moteurSfu = new MoteurSfuWeb(
+        salleReunion !== null ? `meeting:${salleReunion}` : `call:${callId}`,
+        me,
+        iceServers,
+        () => {
+          majConnexionFaible()
+          publishRemoteStreams()
+        },
+        (actif) => {
+          for (const id of peers.keys()) marquerReconnexion(id, actif)
+        },
+        qualiteAppel().debitMax
+      )
+    }
+    session = new PairSfu(
+      peerId,
+      moteurSfu,
+      () => stream,
+      envoyer,
+      surPassageVideoDistant,
+      majCamerasCoupees
+    )
+  } else {
+    session = new PeerSession(
+      peerId,
+      isVideo,
+      asOfferer,
+      stream,
+      iceServers,
+      envoyer,
+      publishRemoteStreams,
+      () => marquerReconnexion(peerId, true),
+      () => marquerReconnexion(peerId, false)
+    )
+  }
   peers.set(peerId, session)
   // Groupe ou reunion : qui parle (06/11/2026). La sonde s'arrete d'elle-meme.
   if (state.isGroup || salleReunion !== null) demarrerSondeParole()
@@ -2824,6 +2879,8 @@ function removePeer(peerId: string) {
 function stopMesh() {
   for (const session of peers.values()) session.close()
   peers.clear()
+  moteurSfu?.fermer()
+  moteurSfu = null
   localStream?.getTracks().forEach((track) => track.stop())
   localStream = null
   // La piste d'ecran vit dans `localStream` et vient donc d'etre arretee ; ce
@@ -2856,6 +2913,7 @@ function clearCall(markEnded: boolean) {
   // l'appel suivant partirait des l'arrivee du premier participant.
   // (transferPending repart a faux avec initialState.)
   cibleDuTransfert = null
+  moteurCourant = "mesh"
   if (desabonnementSalle) {
     desabonnementSalle()
     desabonnementSalle = null
@@ -2944,6 +3002,12 @@ async function onPeerJoined(userId: string, displayName: string | null) {
 }
 
 async function handleServerEvent(event: CallServerEvent) {
+  // Groupe ou reunion en SFU (07/11/2026) : un participant vient de publier
+  // ses pistes, on va les chercher. Le moteur ignore une autre salle.
+  if (event.type === "sfu_pistes") {
+    await moteurSfu?.surPistes(event as Record<string, unknown>)
+    return
+  }
   if (event.type === "incoming_call") {
     const callId = String(event.callId ?? "")
     if (!callId) return
@@ -2973,6 +3037,7 @@ async function handleServerEvent(event: CallServerEvent) {
         groupName: (event.groupName as string | null) ?? null,
         memberCount: Number(event.memberCount ?? 2),
         ivrFromId: (event.ivrFromId as string | null) ?? null,
+        moteur: event.moteur === "sfu" ? "sfu" : "mesh",
       },
       endedAt: null,
       // 🐛 SANS CETTE REMISE A ZERO, L'ECRAN DU REPONDEUR DE L'APPEL
@@ -3606,6 +3671,8 @@ export async function startOutgoingCall(
     throw new AppelAbandonne()
   }
   sendCallRing(started.id)
+  // Le moteur fixe par le serveur (07/11/2026) : `sfu` pour un groupe en SFU.
+  moteurCourant = started.moteur === "sfu" ? "sfu" : "mesh"
 
   const participantNames: Record<string, string> = {}
   attendus.clear()
@@ -3826,7 +3893,17 @@ export async function joinMeetingRoom(
     await hangUp()
   }
 
+  // Le moteur de la reunion, demande AVANT d'entrer (07/11/2026) : les pairs
+  // se construisent des l'arrivee de `meeting_joined`. Echec : le mesh.
+  let moteur: "mesh" | "sfu" = "mesh"
+  try {
+    moteur = await moteurDeLaReunion(meetingId)
+  } catch (e) {
+    console.warn("[reunion] moteur inconnu, mesh", e)
+  }
+
   salleReunion = meetingId
+  moteurCourant = moteur
   attendus.clear()
 
   setState({
@@ -4138,6 +4215,8 @@ export async function acceptIncomingCall(): Promise<string | null> {
   if (!incoming || !me) return null
 
   const result = await acceptCallRest(incoming.callId)
+  // Le moteur de l'appel : la reponse du decroche fait foi (07/11/2026).
+  moteurCourant = result.moteur === "sfu" ? "sfu" : (incoming.moteur ?? "mesh")
 
   const participantNames: Record<string, string> = { ...state.participantNames }
   attendus.clear()
