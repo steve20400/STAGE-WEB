@@ -556,6 +556,21 @@ export function subscribeToMembreParti(handler: (convId: string) => void): () =>
 }
 
 /**
+ * Chiffrement des groupes v2 (lot 4, 11/11/2026) : une clé de groupe vient de
+ * m'être emballée (`e2ee_emballage`), ou des membres attendent la leur
+ * (`e2ee_manquants`). Le gestionnaire reçoit le verbe et le groupe.
+ */
+export function subscribeToEmballages(
+  handler: (verbe: "e2ee_emballage" | "e2ee_manquants", convId: string) => void,
+): () => void {
+  return addListener((event) => {
+    if ((event.type === "e2ee_emballage" || event.type === "e2ee_manquants") && typeof event.convId === "string") {
+      handler(event.type, event.convId)
+    }
+  })
+}
+
+/**
  * S'abonne a TOUS les nouveaux messages (toutes conversations).
  * Utilise par la liste des conversations et le dashboard pour se rafraichir en direct.
  */

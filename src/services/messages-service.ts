@@ -35,7 +35,7 @@ import {
   noteEtatChiffrement,
 } from "./e2ee-fil"
 import { releverEtRanger } from "./e2ee-releve"
-import { CleGroupeAbsente, lireMessageGroupe, type ChiffreGroupe } from "./e2ee-groupe-fil"
+import { CleGroupeAbsente, lireMessageGroupe, rattraper, type ChiffreGroupe } from "./e2ee-groupe-fil"
 
 /*
  * 🔁 UN MESSAGE DE GROUPE N'ÉCHOUE PLUS FAUTE DE CLÉ (11/11/2026, lot 1 du
@@ -140,6 +140,10 @@ async function eclairerGroupe(
   backend: BackendMessage[],
   messages: ChatMessageMock[],
 ): Promise<Set<string>> {
+  // v2 (lot 4) : des membres attendent peut-être leur emballage ; ce
+  // navigateur le leur dépose s'il a les clés. En arrière-plan, une fois par
+  // demi-minute.
+  void rattraper(chatId)
   const ouverts = new Set<string>()
   const parId = new Map(messages.map((m) => [m.id, m]))
   /*

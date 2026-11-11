@@ -16,7 +16,7 @@ import {
   type MotifTrousseau,
   type VersionCle,
 } from "./e2ee-groupe"
-import { noteGroupe, rangerTrousseau, trousseauAvecRepli } from "./e2ee-groupe-fil"
+import { noteGroupe, rangerTrousseau, rattraper, trousseauAvecRepli } from "./e2ee-groupe-fil"
 import { noteEtatChiffrement } from "./e2ee-fil"
 
 /**
@@ -197,6 +197,8 @@ export async function activerGroupe(
     versions,
     (await membres(convId)).map((m) => m.id),
   )
+  // v2 : les emballages, en plus de l'ancien envoi (lot 4).
+  void rattraper(convId, true)
   return { deja: false, bilan }
 }
 
@@ -212,6 +214,8 @@ export async function partagerAvecNouveaux(
   if (versions.length === 0) {
     throw new Error("Cet appareil n'a pas la clé du groupe : impossible de la partager.")
   }
+  // v2 : les emballages des nouveaux, en plus de l'ancien envoi (lot 4).
+  void rattraper(convId, true)
   return distribuerTrousseau(convId, "AJOUT", versions, userIds)
 }
 
@@ -248,6 +252,8 @@ export async function changerCle(
     versions,
     (await membres(convId)).map((m) => m.id),
   )
+  // v2 : la nouvelle version, emballée pour chacun (lot 4).
+  void rattraper(convId, true)
   return { version: attendue, bilan }
 }
 

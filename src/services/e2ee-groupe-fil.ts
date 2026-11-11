@@ -11,7 +11,14 @@ import {
 } from "./e2ee-service"
 import {
   chiffrerMessageGroupe,
+  chiffrerMessageGroupeV2,
+  deballerCle,
   dechiffrerMessageGroupe,
+  dechiffrerMessageGroupeSansSignature,
+  dechiffrerMessageGroupeV2,
+  emballerCle,
+  formatDuCorps,
+  FORMAT_GROUPE_V2,
   ecrireDemandeTrousseau,
   fusionnerTrousseau,
   ouvrirBoite,
@@ -21,6 +28,15 @@ import {
   type VersionCle,
 } from "./e2ee-groupe"
 import { ecrireCharge, lireCharge, type DescripteurMedia, type GenreCharge } from "./e2ee-media"
+import { assurerCleCompte } from "./e2ee-compte"
+
+/**
+ * ÉCRIRE AU FORMAT 2 (sans signature par appareil) — faux tant que des membres
+ * peuvent encore avoir une application qui ne lit que le format 1. Le lot 5
+ * le passe à vrai. LIRE les deux formats est actif dès maintenant. Jumeau de
+ * `GroupeChiffre.ecrireFormat2` (mobile).
+ */
+export const ECRIRE_FORMAT_2 = false
 
 /**
  * LE GROUPE CHIFFRÉ, BRANCHÉ AU FIL — lot 4 (web), cours chapitre 34.
@@ -122,8 +138,19 @@ export async function trousseauAvecRepli(convId: string, voulue?: number): Promi
   if (Date.now() - derniere < REPOS_RESTAURATION_MS) return local
   restaurations.set(convId, Date.now())
   /*
-   * 🔴 D'ABORD MA BOÎTE PERMANENTE (chapitre 39) : déposée par l'administrateur
-   * pour CET appareil, elle se relit sans personne en ligne.
+   * 🔴 D'ABORD MES EMBALLAGES (v2, lot 4) : la clé du compte les ouvre dans
+   * n'importe quel navigateur, sans personne en ligne.
+   */
+  try {
+    await releverEmballages(convId)
+    const apres = await trousseauLocal(convId)
+    if (apres.length > 0 && (voulue === undefined || apres.some((v) => v.n === voulue))) return apres
+  } catch (err) {
+    console.warn(`[e2ee] emballages du groupe ${convId.slice(0, 8)} illisibles :`, err)
+  }
+  /*
+   * Puis ma boîte permanente (chapitre 39), l'ancien chemin : déposée par
+   * l'administrateur pour CET appareil.
    */
   try {
     await releverBoites(convId)
@@ -304,6 +331,7 @@ export async function releverBoites(convId?: string): Promise<number> {
  * l'archive), puis toutes mes boîtes. Rend le nombre de groupes repris.
  */
 export async function restaurerTousLesTrousseaux(): Promise<number> {
+  await releverEmballages().catch((err) => console.warn("[e2ee] emballages illisibles :", err))
   await releverBoites().catch((err) => console.warn("[e2ee] boîtes illisibles :", err))
   const { lireToutesLesCopies } = await import("./e2ee-trousseau-perso")
   let n = 0
@@ -319,6 +347,132 @@ export async function restaurerTousLesTrousseaux(): Promise<number> {
     }
   }
   return n
+}
+
+/* ══════════════════ LES EMBALLAGES (v2, lot 4) ══════════════════ */
+
+interface EmballageServeur {
+  convId: string
+  version: number
+  versionCompte: number
+  corps: string
+}
+
+/**
+ * Relit MES emballages (tous, ou ceux d'un groupe) et range les clés qu'ils
+ * portent. Rend le nombre de versions ouvertes. Un emballage qui ne s'ouvre
+ * pas est retiré : le complément d'un autre membre en redéposera un bon.
+ * Sans clé de compte (archive fermée) : rien. Jumeau de `releverEmballages`
+ * (mobile).
+ */
+export async function releverEmballages(convId?: string): Promise<number> {
+  const cle = await assurerCleCompte()
+  const moi = getMyUserId()
+  if (!cle || !moi) return 0
+  const r = await apiRequest<{ emballages: EmballageServeur[] }>(
+    `/api/e2ee/emballages${convId ? `?convId=${encodeURIComponent(convId)}` : ""}`,
+    { cache: "no-store" },
+  )
+  const parGroupe = new Map<string, VersionCle[]>()
+  for (const e of r.emballages ?? []) {
+    if (e.versionCompte !== cle.version) continue
+    try {
+      const cleGroupe = await deballerCle(e.corps, cle.priv, {
+        convId: e.convId,
+        destinataireId: moi,
+        version: e.version,
+        versionCompte: e.versionCompte,
+      })
+      const liste = parGroupe.get(e.convId) ?? []
+      liste.push({ n: e.version, cle: cleGroupe, creeLe: Date.now() })
+      parGroupe.set(e.convId, liste)
+    } catch {
+      void apiRequest("/api/e2ee/emballages", {
+        method: "DELETE",
+        body: { convId: e.convId, version: e.version, versionCompte: e.versionCompte },
+      }).catch(() => undefined)
+    }
+  }
+  let n = 0
+  for (const [conv, versions] of parGroupe) {
+    try {
+      await rangerTrousseau(conv, versions)
+      noteGroupe(conv, true)
+      n += versions.length
+    } catch (err) {
+      // Une version déjà connue sous une autre clé : refusée, les autres continuent.
+      console.warn(`[e2ee] emballage du groupe ${conv.slice(0, 8)} refusé :`, err)
+    }
+  }
+  return n
+}
+
+const rattrapages = new Map<string, number>()
+const REPOS_RATTRAPAGE_MS = 30_000
+
+interface Manquant {
+  userId: string
+  versionCompte: number
+  publique: string
+  versions: number[]
+}
+
+/**
+ * COMPLÈTE LES EMBALLAGES MANQUANTS d'un groupe (conception § 5.6) avec les
+ * versions que ce navigateur connaît : pour moi d'abord (c'est ce qui prouve
+ * au serveur que je les détiens), puis pour les autres membres. Une fois par
+ * groupe et par demi-minute, sauf `force`. Ne lève jamais. Jumeau de
+ * `rattraper` (mobile).
+ */
+export async function rattraper(convId: string, force = false): Promise<number> {
+  const derniere = rattrapages.get(convId) ?? 0
+  if (!force && Date.now() - derniere < REPOS_RATTRAPAGE_MS) return 0
+  rattrapages.set(convId, Date.now())
+  try {
+    const moi = getMyUserId()
+    if (!moi || !(await assurerCleCompte())) return 0
+    const locales = new Map((await trousseauLocal(convId)).map((v) => [v.n, v.cle]))
+    if (locales.size === 0) return 0
+    const r = await apiRequest<{ manquants: Manquant[] }>(
+      `/api/conversations/${encodeURIComponent(convId)}/e2ee/manquants`,
+      { cache: "no-store" },
+    )
+    const pourMoi: object[] = []
+    const pourAutres: object[] = []
+    for (const m of r.manquants ?? []) {
+      const publique = depuisB64(m.publique)
+      for (const v of m.versions) {
+        const cleGroupe = locales.get(v)
+        if (!cleGroupe) continue
+        const corps = await emballerCle(cleGroupe, publique, {
+          convId,
+          destinataireId: m.userId,
+          version: v,
+          versionCompte: m.versionCompte,
+        })
+        ;(m.userId === moi ? pourMoi : pourAutres).push({
+          userId: m.userId,
+          version: v,
+          versionCompte: m.versionCompte,
+          corps,
+        })
+      }
+    }
+    let acceptes = 0
+    for (const lot of [pourMoi, pourAutres]) {
+      for (let i = 0; i < lot.length; i += 2000) {
+        const d = await apiRequest<{ deposes?: number }>("/api/e2ee/emballages", {
+          method: "PUT",
+          body: { convId, emballages: lot.slice(i, i + 2000) },
+        })
+        acceptes += d.deposes ?? 0
+      }
+    }
+    return acceptes
+  } catch (err) {
+    console.warn(`[e2ee] complément des emballages de ${convId.slice(0, 8)} impossible :`, err)
+    return 0
+  }
 }
 
 /**
@@ -397,13 +551,10 @@ export async function envoyerDansGroupe(
   const id = crypto.randomUUID()
   const appareil = idAppareil()
   const charge = ecrireCharge(id, texte, o.media, { reponseA: o.replyToId, genre: o.genre })
-  const { priv } = await maPaireIdentite()
-  const corps = await chiffrerMessageGroupe(
-    charge,
-    courante.cle,
-    { convId, messageId: id, version: courante.n, expediteurId: moi, deviceId: appareil },
-    priv,
-  )
+  const contexte = { convId, messageId: id, version: courante.n, expediteurId: moi, deviceId: appareil }
+  const corps = ECRIRE_FORMAT_2
+    ? await chiffrerMessageGroupeV2(charge, courante.cle, contexte)
+    : await chiffrerMessageGroupe(charge, courante.cle, contexte, (await maPaireIdentite()).priv)
 
   try {
     return await apiRequest<MessageGroupeCree>(
@@ -442,13 +593,10 @@ export async function modifierDansGroupe(
   if (!moi) throw new Error("Session inconnue")
   const appareil = idAppareil()
   const charge = ecrireCharge(messageId, texte, undefined, { modifie: true })
-  const { priv } = await maPaireIdentite()
-  const corps = await chiffrerMessageGroupe(
-    charge,
-    courante.cle,
-    { convId, messageId, version: courante.n, expediteurId: moi, deviceId: appareil },
-    priv,
-  )
+  const contexte = { convId, messageId, version: courante.n, expediteurId: moi, deviceId: appareil }
+  const corps = ECRIRE_FORMAT_2
+    ? await chiffrerMessageGroupeV2(charge, courante.cle, contexte)
+    : await chiffrerMessageGroupe(charge, courante.cle, contexte, (await maPaireIdentite()).priv)
   try {
     const r = await apiRequest<{ editedAt?: string }>(
       `/api/conversations/${encodeURIComponent(convId)}/messages/${encodeURIComponent(messageId)}`,
@@ -496,11 +644,15 @@ export interface ClairGroupe {
  * (avec l'alerte « clé changée » si elle bouge plus tard). On ne prend JAMAIS
  * une clé que le serveur servirait juste pour vérifier ce message.
  */
-async function cleSignataire(userId: string, deviceId: number): Promise<Uint8Array | undefined> {
+async function cleSignataire(
+  userId: string,
+  deviceId: number,
+  ouvrirSiInconnue = true,
+): Promise<Uint8Array | undefined> {
   const moi = getMyUserId()
   if (userId === moi && deviceId === idAppareil()) return (await maPaireIdentite()).pub
   const connue = await identiteConnue(userId, deviceId)
-  if (connue) return connue
+  if (connue || !ouvrirSiInconnue) return connue
   try {
     await ouvrirSessions(userId, userId === moi ? idAppareil() : undefined)
   } catch {
@@ -522,15 +674,23 @@ export async function lireMessageGroupe(
   const versions = await trousseauAvecRepli(convId, g.version)
   const version = versions.find((v) => v.n === g.version)
   if (!version) return "CLE_ABSENTE"
-  const cle = await cleSignataire(expediteurId, g.expediteurAppareil)
-  if (!cle) return "EXPEDITEUR_INCONNU"
+  const contexte = { convId, messageId, version: g.version, expediteurId, deviceId: g.expediteurAppareil }
   try {
-    const clair = await dechiffrerMessageGroupe(
-      g.corps,
-      version.cle,
-      { convId, messageId, version: g.version, expediteurId, deviceId: g.expediteurAppareil },
-      cle,
-    )
+    /*
+     * 🔁 DEUX FORMATS (chiffrement des groupes v2, lot 4) — jumeau du mobile.
+     * Format 2 : sans signature. Format 1 : signature vérifiée si l'identité
+     * de l'appareil auteur est DÉJÀ connue ; sinon lu sans elle, sans
+     * aller-retour réseau (conception § 3.3).
+     */
+    let clair: string
+    if (formatDuCorps(g.corps) === FORMAT_GROUPE_V2) {
+      clair = await dechiffrerMessageGroupeV2(g.corps, version.cle, contexte)
+    } else {
+      const cle = await cleSignataire(expediteurId, g.expediteurAppareil, false)
+      clair = cle
+        ? await dechiffrerMessageGroupe(g.corps, version.cle, contexte, cle)
+        : await dechiffrerMessageGroupeSansSignature(g.corps, version.cle, contexte)
+    }
     const charge = lireCharge(clair, messageId)
     return {
       texte: charge.texte,

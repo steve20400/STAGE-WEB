@@ -24,12 +24,13 @@ import {
 import {
   RAISON_EVICTION,
   disconnectRealtime,
+  subscribeToEmballages,
   subscribeToMembreParti,
   subscribeToTrousseau,
   subscribeToSessionRevoked,
   subscribeToWsConnected,
 } from "../services/websocket-service"
-import { oublierTrousseau } from "../services/e2ee-groupe-fil"
+import { oublierTrousseau, rattraper, releverEmballages } from "../services/e2ee-groupe-fil"
 import { releverEtRanger } from "../services/e2ee-releve"
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
 import { claimLocalCaches, purgeLocalAccountData } from "../services/session-reset"
@@ -215,12 +216,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void releverEtRanger().catch(() => undefined)
     })
 
+    /*
+     * Chiffrement des groupes v2 (lot 4) : une clé m'a été emballée — je la
+     * relis ; des membres attendent la leur — je la leur emballe si je l'ai.
+     */
+    const stopEmballages = subscribeToEmballages((verbe, convId) => {
+      void (verbe === "e2ee_emballage" ? releverEmballages(convId) : rattraper(convId, true)).catch(
+        () => undefined,
+      )
+    })
+
     return () => {
       window.clearInterval(minuterie)
       window.removeEventListener("online", drain)
       stopWs()
       stopParti()
       stopTrousseau()
+      stopEmballages()
     }
   }, [user])
 

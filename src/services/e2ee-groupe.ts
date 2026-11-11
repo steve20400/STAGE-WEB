@@ -504,3 +504,234 @@ export async function ouvrirBoite(
     throw new GroupeInvalide("boîte : déchiffrement refusé")
   }
 }
+
+/* ══════════════════ VERSION 2 (11/11/2026) ══════════════════
+ *
+ * Chiffrement des groupes v2 — conception côté serveur :
+ * `docs/2026-11-11-e2ee-groupes-v2-conception.md`. ⚠️ JUMEAU DE
+ * `alanya/lib/services/e2ee/e2ee_groupe.dart` : mêmes octets, mêmes données
+ * associées. Les vecteurs figés du mobile (`test/e2ee_groupe_v2_test.dart`)
+ * sont rejoués par `scripts/e2ee-groupe-v2-vecteur.mjs`.
+ */
+
+/** Le message de groupe au format 2 : sans signature par appareil. */
+export const FORMAT_GROUPE_V2 = 0x02
+
+/** Le format d'un corps de message de groupe (1 ou 2), ou `null` s'il est illisible. */
+export function formatDuCorps(corps: string): number | null {
+  try {
+    const brut = depuisB64(corps)
+    return brut.length === 0 ? null : brut[0]
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Les données associées du format 2 : le groupe, le message, la version et
+ * l'expéditeur — sans l'appareil, que le serveur ne garantit pas.
+ */
+export function donneesAssocieesV2(c: ContexteGroupe): Uint8Array<ArrayBuffer> {
+  for (const v of [c.convId, c.messageId, c.expediteurId]) {
+    if (!v || v.includes("\n")) throw new GroupeInvalide("contexte mal formé")
+  }
+  if (!Number.isInteger(c.version) || c.version < 1) throw new GroupeInvalide("version invalide")
+  return utf8.encode(
+    `alanya-groupe-v2\n${c.convId}\n${c.messageId}\n${c.version}\n${c.expediteurId}`,
+  ) as Uint8Array<ArrayBuffer>
+}
+
+async function gcm(
+  chiffrer: boolean,
+  cle: Uint8Array,
+  nonce: Uint8Array,
+  aad: Uint8Array<ArrayBuffer>,
+  entree: Uint8Array,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const k = await crypto.subtle.importKey("raw", tampon(cle), "AES-GCM", false, [chiffrer ? "encrypt" : "decrypt"])
+  const p = { name: "AES-GCM", iv: tampon(nonce), additionalData: aad, tagLength: 128 }
+  return new Uint8Array(
+    chiffrer ? await crypto.subtle.encrypt(p, k, tampon(entree)) : await crypto.subtle.decrypt(p, k, tampon(entree)),
+  )
+}
+
+/**
+ * Chiffre un message de groupe au format 2 :
+ * `base64( 0x02 | nonce(12) | AES-256-GCM(clé, charge) )`.
+ *
+ * 🔴 PAS DE SIGNATURE : le serveur garantit l'expéditeur (il écrit le message
+ * au nom du compte connecté), et l'AAD le colle au chiffré (conception § 3.3).
+ */
+export async function chiffrerMessageGroupeV2(
+  clair: string,
+  cle: Uint8Array,
+  contexte: ContexteGroupe,
+  nonceImpose?: Uint8Array,
+): Promise<string> {
+  if (cle.length !== TAILLE_CLE) throw new GroupeInvalide("clé de groupe invalide")
+  const nonce = nonceImpose ?? crypto.getRandomValues(new Uint8Array(TAILLE_NONCE))
+  if (nonce.length !== TAILLE_NONCE) throw new GroupeInvalide("nonce invalide")
+  const chiffre = await gcm(true, cle, nonce, donneesAssocieesV2(contexte), utf8.encode(clair))
+  return versB64(concat(new Uint8Array([FORMAT_GROUPE_V2]), nonce, chiffre))
+}
+
+/** Déchiffre un message de groupe au format 2. Lève `GroupeInvalide`. */
+export async function dechiffrerMessageGroupeV2(
+  corps: string,
+  cle: Uint8Array,
+  contexte: ContexteGroupe,
+): Promise<string> {
+  let brut: Uint8Array<ArrayBuffer>
+  try {
+    brut = depuisB64(corps)
+  } catch {
+    throw new GroupeInvalide("corps illisible")
+  }
+  if (brut.length < 1 + TAILLE_NONCE + TAILLE_ETIQUETTE) throw new GroupeInvalide("corps trop court")
+  if (brut[0] !== FORMAT_GROUPE_V2) throw new GroupeInvalide("format inconnu")
+  if (cle.length !== TAILLE_CLE) throw new GroupeInvalide("clé de groupe invalide")
+  try {
+    const clair = await gcm(
+      false,
+      cle,
+      brut.subarray(1, 1 + TAILLE_NONCE),
+      donneesAssocieesV2(contexte),
+      brut.subarray(1 + TAILLE_NONCE),
+    )
+    return new TextDecoder("utf-8", { fatal: true }).decode(clair)
+  } catch {
+    throw new GroupeInvalide("déchiffrement refusé : mauvaise clé, mauvaise version ou contexte déplacé")
+  }
+}
+
+/**
+ * Lit un message au FORMAT 1 sans vérifier sa signature — quand l'identité de
+ * l'appareil auteur n'est pas connue ici (conception § 3.3). Le déchiffrement
+ * contrôle déjà tout le contexte, appareil compris ; le serveur garantit
+ * l'expéditeur.
+ */
+export async function dechiffrerMessageGroupeSansSignature(
+  corps: string,
+  cle: Uint8Array,
+  contexte: ContexteGroupe,
+): Promise<string> {
+  let brut: Uint8Array<ArrayBuffer>
+  try {
+    brut = depuisB64(corps)
+  } catch {
+    throw new GroupeInvalide("corps illisible")
+  }
+  if (brut.length < 1 + TAILLE_NONCE + TAILLE_ETIQUETTE + TAILLE_SIGNATURE) {
+    throw new GroupeInvalide("corps trop court")
+  }
+  if (brut[0] !== FORMAT_GROUPE) throw new GroupeInvalide("format inconnu")
+  if (cle.length !== TAILLE_CLE) throw new GroupeInvalide("clé de groupe invalide")
+  try {
+    const clair = await gcm(
+      false,
+      cle,
+      brut.subarray(1, 1 + TAILLE_NONCE),
+      donneesAssociees(contexte),
+      brut.subarray(1 + TAILLE_NONCE, brut.length - TAILLE_SIGNATURE),
+    )
+    return new TextDecoder("utf-8", { fatal: true }).decode(clair)
+  } catch {
+    throw new GroupeInvalide("déchiffrement refusé : mauvaise clé, mauvaise version ou contexte déplacé")
+  }
+}
+
+/* ── L'emballage d'une clé de groupe pour un COMPTE (conception § 3.2) ──
+ *
+ *   corps = base64( 0x01 | éphémère 33 | nonce 12 | AES-256-GCM(K, clé de groupe 32) )
+ *   K     = HKDF-SHA256( X25519(éphémère, clé du compte), sel = 32 zéros, info = « alanya-emballage-v1 » )
+ *   AAD   = « alanya-emballage-v1 » \n convId \n destinataireId \n version \n versionCompte
+ */
+export const FORMAT_EMBALLAGE = 0x01
+const INFO_EMBALLAGE = "alanya-emballage-v1"
+
+export interface ContexteEmballage {
+  convId: string
+  destinataireId: string
+  version: number
+  versionCompte: number
+}
+
+export function donneesEmballage(c: ContexteEmballage): Uint8Array<ArrayBuffer> {
+  for (const v of [c.convId, c.destinataireId]) {
+    if (!v || v.includes("\n")) throw new GroupeInvalide("contexte d'emballage mal formé")
+  }
+  for (const n of [c.version, c.versionCompte]) {
+    if (!Number.isInteger(n) || n < 1) throw new GroupeInvalide("version invalide")
+  }
+  return utf8.encode(
+    `${INFO_EMBALLAGE}\n${c.convId}\n${c.destinataireId}\n${c.version}\n${c.versionCompte}`,
+  ) as Uint8Array<ArrayBuffer>
+}
+
+async function cleEmballage(partage: Uint8Array): Promise<Uint8Array> {
+  const base = await crypto.subtle.importKey("raw", tampon(partage), "HKDF", false, ["deriveBits"])
+  return new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: utf8.encode(INFO_EMBALLAGE) },
+      base,
+      256,
+    ),
+  )
+}
+
+/**
+ * Emballe `cleGroupe` (32 octets) pour le compte dont la clé publique est
+ * `clePubliqueCompte` (33 octets). `impose` : pour les vecteurs seulement.
+ */
+export async function emballerCle(
+  cleGroupe: Uint8Array,
+  clePubliqueCompte: Uint8Array,
+  contexte: ContexteEmballage,
+  impose?: { ephemere?: { pub: Uint8Array; priv: Uint8Array }; nonce?: Uint8Array },
+): Promise<string> {
+  if (cleGroupe.length !== TAILLE_CLE) throw new GroupeInvalide("clé de groupe invalide")
+  const c = await laCourbe()
+  const ephemere =
+    impose?.ephemere ??
+    (() => {
+      const k = c.generateKeyPair()
+      return { pub: new Uint8Array(k.pubKey), priv: new Uint8Array(k.privKey) }
+    })()
+  const partage = new Uint8Array(c.calculateAgreement(tampon(clePubliqueCompte), tampon(ephemere.priv)))
+  const nonce = impose?.nonce ?? crypto.getRandomValues(new Uint8Array(TAILLE_NONCE))
+  const chiffre = await gcm(true, await cleEmballage(partage), nonce, donneesEmballage(contexte), cleGroupe)
+  return versB64(concat(new Uint8Array([FORMAT_EMBALLAGE]), ephemere.pub, nonce, chiffre))
+}
+
+/** Ouvre un emballage avec la clé privée du compte (32 octets). Lève `GroupeInvalide`. */
+export async function deballerCle(
+  corps: string,
+  clePriveeCompte: Uint8Array,
+  contexte: ContexteEmballage,
+): Promise<Uint8Array> {
+  let brut: Uint8Array<ArrayBuffer>
+  try {
+    brut = depuisB64(corps)
+  } catch {
+    throw new GroupeInvalide("emballage illisible")
+  }
+  if (brut.length !== 1 + TAILLE_PUBLIQUE + TAILLE_NONCE + TAILLE_CLE + TAILLE_ETIQUETTE || brut[0] !== FORMAT_EMBALLAGE) {
+    throw new GroupeInvalide("emballage mal formé")
+  }
+  const ephemere = brut.slice(1, 1 + TAILLE_PUBLIQUE)
+  const nonce = brut.slice(1 + TAILLE_PUBLIQUE, 1 + TAILLE_PUBLIQUE + TAILLE_NONCE)
+  const chiffre = brut.slice(1 + TAILLE_PUBLIQUE + TAILLE_NONCE)
+  try {
+    const c = await laCourbe()
+    const partage = new Uint8Array(c.calculateAgreement(tampon(ephemere), tampon(clePriveeCompte)))
+    return await gcm(false, await cleEmballage(partage), nonce, donneesEmballage(contexte), chiffre)
+  } catch {
+    throw new GroupeInvalide("emballage : ouverture refusée")
+  }
+}
+
+/** Une paire Curve25519 neuve, au format Signal (publique 33 octets). */
+export async function genererPaireCompte(): Promise<{ pub: Uint8Array; priv: Uint8Array }> {
+  const k = (await laCourbe()).generateKeyPair()
+  return { pub: new Uint8Array(k.pubKey), priv: new Uint8Array(k.privKey) }
+}
