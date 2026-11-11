@@ -35,7 +35,30 @@ import {
   noteEtatChiffrement,
 } from "./e2ee-fil"
 import { releverEtRanger } from "./e2ee-releve"
-import { lireMessageGroupe, type ChiffreGroupe } from "./e2ee-groupe-fil"
+import { CleGroupeAbsente, lireMessageGroupe, type ChiffreGroupe } from "./e2ee-groupe-fil"
+
+/*
+ * 🔁 UN MESSAGE DE GROUPE N'ÉCHOUE PLUS FAUTE DE CLÉ (11/11/2026, lot 1 du
+ * chiffrement des groupes v2) — jumeau de `chat_screen.dart`. Clé du groupe
+ * pas encore là, ou qui vient de changer (`VERSION_PERIMEE`) : l'envoi attend
+ * et réessaie seul, de plus en plus espacé — la clé arrive le plus souvent en
+ * quelques secondes. La bulle reste « en cours d'envoi ». Au bout de ces
+ * délais (12 minutes et demie), l'erreur remonte comme avant.
+ */
+const DELAIS_CLE_GROUPE_MS = [3, 5, 10, 15, 30, 30, 60, 60, 120, 120, 300].map((s) => s * 1000)
+
+async function envoyerChiffreAvecAttente(
+  ...args: Parameters<typeof envoyerChiffre>
+): ReturnType<typeof envoyerChiffre> {
+  for (let tentative = 0; ; tentative++) {
+    try {
+      return await envoyerChiffre(...args)
+    } catch (err) {
+      if (!(err instanceof CleGroupeAbsente) || tentative >= DELAIS_CLE_GROUPE_MS.length) throw err
+      await new Promise((r) => setTimeout(r, DELAIS_CLE_GROUPE_MS[tentative]))
+    }
+  }
+}
 import { entreeCacheDechiffree } from "./e2ee-entree-cache"
 import { cacheClairRecu, cacheModificationRecue } from "./indexeddb-cache"
 import { archiver, rattraperDepuisArchive } from "./e2ee-sauvegarde"
@@ -119,10 +142,35 @@ async function eclairerGroupe(
 ): Promise<Set<string>> {
   const ouverts = new Set<string>()
   const parId = new Map(messages.map((m) => [m.id, m]))
+  /*
+   * 🔁 LE CACHE D'ABORD (11/11/2026, lot 1 du chiffrement des groupes v2) —
+   * jumeau de `e2ee_groupe_eclairage.dart`. Ce qui a déjà été déchiffré une
+   * fois dans ce navigateur n'est plus redéchiffré ni revérifié à chaque
+   * ouverture : c'était le coût de chaque chargement de groupe. Un message
+   * MODIFIÉ a un nouveau chiffré : il est toujours relu. L'expéditeur de la
+   * ligne en cache doit être le même.
+   */
+  const connus = new Map<string, { texte?: string; media?: DescripteurMedia; senderId?: string }>()
+  try {
+    for (const c of await loadCachedMessages(chatId, 1000)) {
+      const l = c as { id: string; content?: string | null; mediaChiffre?: DescripteurMedia; senderId?: string }
+      const r = chargeRangee(l.id, l.content, l.mediaChiffre)
+      if (r.texte || r.media) connus.set(l.id, { texte: r.texte || undefined, media: r.media, senderId: l.senderId })
+    }
+  } catch {
+    // Cache indisponible : on déchiffre comme avant.
+  }
   for (const b of backend) {
     if (!b.groupe || b.deletedAt) continue
     const m = parId.get(b.id)
     if (!m) continue
+    const connu = b.editedAt ? undefined : connus.get(b.id)
+    if (connu && connu.senderId === b.senderId) {
+      if (connu.texte) m.content = connu.texte
+      if (connu.media) m.mediaChiffre = connu.media
+      ouverts.add(b.id)
+      continue
+    }
     const r = await lireMessageGroupe(chatId, b.id, b.senderId, b.groupe)
     if (typeof r === "string") {
       if (r === "CLE_ABSENTE") m.attenteCle = true
@@ -770,7 +818,7 @@ export async function sendChatMessage(
         "Pas de réseau : un message chiffré ne peut pas être mis en attente.",
       )
     }
-    const cree = await envoyerChiffre(chatId, content, optionsChiffre(type, options))
+    const cree = await envoyerChiffreAvecAttente(chatId, content, optionsChiffre(type, options))
 
     /*
      * 🔴 LE CLAIR EST MIS EN CACHE, COMME N'IMPORTE QUEL MESSAGE — décision du
@@ -911,7 +959,7 @@ export async function sendChatMessage(
      */
     if (estRefusChiffrement(err) && chiffrable(type) && (content ?? "").trim() !== "") {
       noteEtatChiffrement(chatId, true)
-      const cree = await envoyerChiffre(chatId, content, optionsChiffre(type, options))
+      const cree = await envoyerChiffreAvecAttente(chatId, content, optionsChiffre(type, options))
       void cacheMessage({
         id: cree.id,
         conversationId: chatId,
