@@ -533,6 +533,17 @@ export function subscribeToToutesArriveesE2ee(
 }
 
 /**
+ * La clé d'un groupe vient d'être rangée ici (13/11/2026) : on sonne comme pour
+ * un message arrivé, et un fil ouvert sur ce groupe se relit avec elle.
+ *
+ * 🐛 Sans cela, une clé arrivée PENDANT que le fil était ouvert laissait ses
+ * bulles illisibles jusqu'à ce qu'on le quitte et le rouvre.
+ */
+export function annoncerCleGroupeArrivee(convId: string): void {
+  for (const listener of listeners) listener({ type: "e2ee_arrivee", convId, groupe: true })
+}
+
+/**
  * Une clé de groupe attend cet appareil (`e2ee_trousseau`, lot 7) : on relève,
  * et un fil ouvert sur ce groupe se rouvre avec elle.
  */

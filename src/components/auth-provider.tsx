@@ -23,6 +23,7 @@ import {
 } from "../services/appareils-service"
 import {
   RAISON_EVICTION,
+  annoncerCleGroupeArrivee,
   disconnectRealtime,
   subscribeToEmballages,
   subscribeToMembreParti,
@@ -212,8 +213,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     // Une clé de groupe m'attend : relevée tout de suite, écran ouvert ou non.
-    const stopTrousseau = subscribeToTrousseau(() => {
-      void releverEtRanger().catch(() => undefined)
+    // Puis le fil ouvert sur ce groupe se relit (13/11/2026).
+    const stopTrousseau = subscribeToTrousseau((convId) => {
+      void releverEtRanger()
+        .then(() => annoncerCleGroupeArrivee(convId))
+        .catch(() => undefined)
     })
 
     /*
@@ -221,9 +225,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * relis ; des membres attendent la leur — je la leur emballe si je l'ai.
      */
     const stopEmballages = subscribeToEmballages((verbe, convId) => {
-      void (verbe === "e2ee_emballage" ? releverEmballages(convId) : rattraper(convId, true)).catch(
-        () => undefined,
-      )
+      if (verbe === "e2ee_manquants") {
+        void rattraper(convId, true).catch(() => undefined)
+        return
+      }
+      // La clé est rangée : le fil ouvert sur ce groupe se relit (13/11/2026).
+      void releverEmballages(convId)
+        .then((n) => {
+          if (n > 0) annoncerCleGroupeArrivee(convId)
+        })
+        .catch(() => undefined)
     })
 
     return () => {
