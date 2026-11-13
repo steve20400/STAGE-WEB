@@ -687,9 +687,17 @@ export async function lireMessageGroupe(
       clair = await dechiffrerMessageGroupeV2(g.corps, version.cle, contexte)
     } else {
       const cle = await cleSignataire(expediteurId, g.expediteurAppareil, false)
+      /*
+       * 🐛 13/11/2026 — jumeau du mobile. Un appareil qui se réinstalle GARDE
+       * SON NUMÉRO mais change d'identité : qui connaissait l'ancienne
+       * refusait la signature et affichait « Déchiffrement en cours… ».
+       * Signature refusée = même confiance qu'un appareil inconnu : on lit sans
+       * elle. La clé du groupe reste exigée.
+       */
+      const sansSignature = () => dechiffrerMessageGroupeSansSignature(g.corps, version.cle, contexte)
       clair = cle
-        ? await dechiffrerMessageGroupe(g.corps, version.cle, contexte, cle)
-        : await dechiffrerMessageGroupeSansSignature(g.corps, version.cle, contexte)
+        ? await dechiffrerMessageGroupe(g.corps, version.cle, contexte, cle).catch(sansSignature)
+        : await sansSignature()
     }
     const charge = lireCharge(clair, messageId)
     return {
