@@ -16,6 +16,23 @@ import {
 } from "./e2ee-serrures"
 
 /**
+ * 🔴 LA CLÉ DU COMPTE DÈS QUE LA CLÉ MAÎTRESSE EST LÀ (groupes v2, 13/11/2026)
+ * — jumeau de `restauration_screen.dart` sur le mobile.
+ *
+ * 🐛 Elle n'était tirée qu'à l'ouverture d'un groupe chiffré. Un compte neuf
+ * ajouté à un groupe avant d'en avoir ouvert un n'avait donc aucune clé
+ * publique sur le serveur : personne ne pouvait lui emballer la clé du groupe,
+ * et il ne lisait rien tant qu'un membre ne revenait pas en ligne.
+ *
+ * Import dynamique : `e2ee-compte` importe ce module. En fond, ne lève jamais.
+ */
+function cleCompteDesMaintenant(): void {
+  void import("./e2ee-compte")
+    .then((m) => m.assurerCleCompte())
+    .catch((err) => console.warn("[e2ee] clé de compte non créée :", err))
+}
+
+/**
  * LA SAUVEGARDE, VUE DE L'APPLICATION.
  *
  * 🔴 CE FICHIER EST LA SEULE COUTURE entre le fil de discussion et l'archive.
@@ -316,6 +333,7 @@ export async function activerSauvegarde(opts: {
 
   maitresse = neuve
   await ranger(matiere)
+  cleCompteDesMaintenant()
 
   /*
    * 🔴 ON SAUVEGARDE CE QUI EXISTE DÉJÀ, PAS SEULEMENT CE QUI SUIVRA.
@@ -509,6 +527,7 @@ export async function ouvrir(
     const matiere = await ouvrirArchiveBrute(propre, serrure)
     await ranger(matiere)
     maitresse = await cleDepuisMatiere(matiere)
+    cleCompteDesMaintenant()
     if (!ecouteurPose) {
       surEffacement()
       ecouteurPose = true
