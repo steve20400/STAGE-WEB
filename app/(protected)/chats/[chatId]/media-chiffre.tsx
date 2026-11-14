@@ -8,6 +8,7 @@ import { formatBytes } from "../../../../src/services/messages-service"
 import { VisionneuseSensible } from "./visionneuse-sensible"
 import { InfosProtectionPdf } from "../../../../src/components/protection-pdf"
 import { MediaATelecharger } from "../../../../src/components/media-a-telecharger"
+import { useTelechargementAuto } from "../../../../src/hooks/use-telechargement-auto"
 import "./media-chiffre.css"
 
 /**
@@ -35,6 +36,9 @@ import "./media-chiffre.css"
  * la MÊME galerie que les albums et la MÊME visionneuse que les documents en
  * clair.
  */
+/** Au-delà, une vidéo ou un document attend toujours un clic. */
+const TAILLE_MAX_AUTO = 100 * 1024 * 1024
+
 export function MediaChiffre({
   d,
   isMe,
@@ -85,6 +89,27 @@ export function MediaChiffre({
     if (etat === "chargement" || etat === "pret") return
     lancer()
   }
+  /** Ouvert d'un clic : la vidéo démarre seule. Venue d'office, elle attend. */
+  const [demande, setDemande] = useState(false)
+  const chargerSurClic = () => {
+    setDemande(true)
+    charger()
+  }
+
+  /*
+   * 🔴 VIDÉOS ET DOCUMENTS D'OFFICE (14/11/2026, comme le mobile) : ils
+   * attendaient toujours un clic, même famille allumée. Ils viennent
+   * maintenant seuls quand leur famille l'est, sauf au-delà de 100 Mo et sauf
+   * un document sensible (sa visionneuse note chaque consultation).
+   */
+  const reglages = useTelechargementAuto()
+  useEffect(() => {
+    if (d.sensible || d.taille > TAILLE_MAX_AUTO) return
+    if (genre !== "video" && genre !== "document") return
+    if (!reglages[genre]) return
+    charger()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [d.id, reglages.video, reglages.document])
 
   // La photo se charge d'elle-même ; le reste attend un geste. Une photo
   // SENSIBLE aussi : elle ne s'affiche que dans sa visionneuse.
@@ -195,9 +220,9 @@ export function MediaChiffre({
 
   if (genre === "video") {
     return url ? (
-      <video className="mc-video" src={url} controls autoPlay style={{ aspectRatio: ratio }} />
+      <video className="mc-video" src={url} controls autoPlay={demande} style={{ aspectRatio: ratio }} />
     ) : (
-      <button type="button" className="mc-visuel" style={{ aspectRatio: ratio }} onClick={charger}>
+      <button type="button" className="mc-visuel" style={{ aspectRatio: ratio }} onClick={chargerSurClic}>
         {apercu && <img src={apercu} alt="" className="mc-apercu" />}
         <span className={`mc-lecture${etat === "chargement" ? " charge" : ""}`} aria-hidden="true" />
         {d.dureeMs ? <span className="mc-duree">{duree(d.dureeMs)}</span> : null}

@@ -1,4 +1,5 @@
 import { Icone } from "../../../../src/components/icone"
+import { EditeurStatut } from "../../../../src/components/editeur-statut"
 import {
   Component,
   useState,
@@ -3018,7 +3019,10 @@ function MediaComposer({
   onCancel,
   onSend,
   onBasculerNiveau,
+  onModifier,
 }: {
+  /** Ouvre l'éditeur des statuts sur cette photo (14/11/2026). */
+  onModifier: (index: number) => void
   items: PendingMedia[]
   index: number
   onIndexChange: (index: number) => void
@@ -3121,6 +3125,29 @@ function MediaComposer({
             </span>
           )}
         </span>
+        {/* Les outils des statuts sur une photo à envoyer : rogner, pivoter,
+            texte, dessin (14/11/2026, comme le mobile). */}
+        {current.kind === "image" && !current.sensible && current.mime !== "image/gif" && (
+          <button
+            onClick={() => onModifier(index)}
+            aria-label={t("edit_photo")}
+            title={t("edit_photo")}
+            style={{
+              marginLeft: "auto",
+              marginRight: 12,
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.85)",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+            }}
+          >
+            <Icone nom="crayon" taille={18} /> {t("edit_photo")}
+          </button>
+        )}
         <button
           onClick={onCancel}
           aria-label={t("thr_cancel_send")}
@@ -6129,6 +6156,8 @@ export default function ChatRoomPage() {
   /** Fichiers choisis mais pas encore envoyes : l'ecran de confirmation les porte. */
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([])
   const [pendingIndex, setPendingIndex] = useState(0)
+  /** La photo à envoyer ouverte dans l'éditeur, ou `null`. */
+  const [photoAModifier, setPhotoAModifier] = useState<number | null>(null)
   /** Lot de medias ouvert en galerie, avec la tuile par laquelle on y est entre. */
   const [gallery, setGallery] = useState<{ msgs: Message[]; index: number } | null>(null)
   // Message en cours de transfert (ouvre le selecteur de conversations)
@@ -10251,6 +10280,34 @@ export default function ChatRoomPage() {
         <MediaGallery msgs={gallery.msgs} index={gallery.index} onClose={() => setGallery(null)} />
       )}
 
+      {photoAModifier !== null && pendingMedia[photoAModifier] && (
+        <EditeurStatut
+          fichier={pendingMedia[photoAModifier].file}
+          onAnnuler={() => setPhotoAModifier(null)}
+          onValider={(modifie) => {
+            const i = photoAModifier
+            setPhotoAModifier(null)
+            if (modifie === pendingMedia[i]?.file) return
+            setPendingMedia((prev) =>
+              prev.map((item, j) => {
+                if (j !== i) return item
+                try {
+                  URL.revokeObjectURL(item.url)
+                } catch {
+                  /* deja libere */
+                }
+                return {
+                  ...item,
+                  file: modifie,
+                  url: URL.createObjectURL(modifie),
+                  mime: modifie.type || item.mime,
+                  compression: compresserImage(modifie, item.niveau),
+                }
+              })
+            )
+          }}
+        />
+      )}
       {pendingMedia.length > 0 && (
         <MediaComposer
           items={pendingMedia}
@@ -10264,6 +10321,7 @@ export default function ChatRoomPage() {
           onRemove={removePendingMedia}
           onCancel={closeMediaComposer}
           onSend={sendPendingMedia}
+          onModifier={setPhotoAModifier}
           /*
            * CHANGER DE NIVEAU RELANCE LA COMPRESSION, et il n'y a pas d'autre
            * voie : le résultat de l'autre niveau n'existe pas encore. On ne

@@ -1724,6 +1724,7 @@ export const WEB_TRANSLATION_KEYS = [
   "dl_documents",
   "dl_documents_sub",
   "dl_note",
+  "edit_photo",
   "dl_show_preview",
   "cinfo_groupes_communs",
   "rogner_titre",
@@ -3484,6 +3485,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "Documents",
     dl_documents_sub: "L'aperçu des PDF et des fichiers texte se charge à l'avance.",
     dl_note: "Désactivé, un média reçu ne se télécharge que lorsque vous le touchez. Ce que vous envoyez s'affiche toujours. Ce réglage ne vaut que pour cet appareil.",
+    edit_photo: "Modifier la photo",
     dl_show_preview: "Afficher l'aperçu",
   },
   en: {
@@ -5218,6 +5220,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "Documents",
     dl_documents_sub: "Previews of PDFs and text files load in advance.",
     dl_note: "When off, received media only downloads when you tap it. What you send is always shown. This setting applies to this device only.",
+    edit_photo: "Edit photo",
     dl_show_preview: "Show preview",
   },
   es: {
@@ -6952,6 +6955,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "Documentos",
     dl_documents_sub: "La vista previa de los PDF y archivos de texto se carga de antemano.",
     dl_note: "Desactivado, un archivo recibido solo se descarga cuando lo toca. Lo que usted envía se muestra siempre. Este ajuste solo se aplica a este dispositivo.",
+    edit_photo: "Editar foto",
     dl_show_preview: "Mostrar vista previa",
   },
   de: {
@@ -8699,6 +8703,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "Dokumente",
     dl_documents_sub: "Die Vorschau von PDFs und Textdateien wird vorab geladen.",
     dl_note: "Ausgeschaltet wird ein empfangenes Medium erst heruntergeladen, wenn Sie es antippen. Was Sie senden, wird immer angezeigt. Diese Einstellung gilt nur für dieses Gerät.",
+    edit_photo: "Foto bearbeiten",
     dl_show_preview: "Vorschau anzeigen",
   },
   pt: {
@@ -10433,6 +10438,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "Documentos",
     dl_documents_sub: "A pré-visualização de PDF e ficheiros de texto é carregada antecipadamente.",
     dl_note: "Desativado, um ficheiro recebido só é transferido quando lhe tocar. O que envia é sempre apresentado. Esta definição aplica-se apenas a este dispositivo.",
+    edit_photo: "Editar foto",
     dl_show_preview: "Mostrar pré-visualização",
   },
   ru: {
@@ -12160,6 +12166,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "Документы",
     dl_documents_sub: "Предпросмотр PDF и текстовых файлов загружается заранее.",
     dl_note: "Если выключено, полученный файл загружается, только когда вы на него нажмёте. Отправленное вами показывается всегда. Настройка действует только на этом устройстве.",
+    edit_photo: "Изменить фото",
     dl_show_preview: "Показать предпросмотр",
   },
   zh: {
@@ -13845,6 +13852,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "文档",
     dl_documents_sub: "提前加载 PDF 和文本文件的预览。",
     dl_note: "关闭后，收到的媒体只有在你点按时才会下载。你发送的内容始终显示。此设置仅对本设备有效。",
+    edit_photo: "编辑照片",
     dl_show_preview: "显示预览",
   },
   sv: {
@@ -15574,6 +15582,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "Dokument",
     dl_documents_sub: "Förhandsvisningar av PDF- och textfiler läses in i förväg.",
     dl_note: "Avstängt laddas mottagna medier bara ned när du trycker på dem. Det du skickar visas alltid. Inställningen gäller bara den här enheten.",
+    edit_photo: "Redigera foto",
     dl_show_preview: "Visa förhandsvisning",
   },
   no: {
@@ -17304,6 +17313,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_documents: "Dokumenter",
     dl_documents_sub: "Forhåndsvisninger av PDF- og tekstfiler lastes inn på forhånd.",
     dl_note: "Når det er av, lastes mottatte medier bare ned når du trykker på dem. Det du sender, vises alltid. Innstillingen gjelder bare denne enheten.",
+    edit_photo: "Rediger bilde",
     dl_show_preview: "Vis forhåndsvisning",
   },
 }
