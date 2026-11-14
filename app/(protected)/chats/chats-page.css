@@ -371,3 +371,51 @@
   background: var(--accent-dim);
   color: var(--accent);
 }
+
+/*
+ * QUELQU UN ECRIT (14/11/2026) : trois points et « Ana ecrit… » a la place de
+ * l apercu, dans la couleur d accent, comme l application de reference.
+ */
+.conv-frappe {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-style: italic;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.conv-frappe-points {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 9px;
+  flex: none;
+}
+.conv-frappe-points i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.55;
+  animation: conv-frappe-rebond 1.1s ease-in-out infinite;
+}
+.conv-frappe-points i:nth-child(2) {
+  animation-delay: 0.22s;
+}
+.conv-frappe-points i:nth-child(3) {
+  animation-delay: 0.44s;
+}
+@keyframes conv-frappe-rebond {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  40% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}

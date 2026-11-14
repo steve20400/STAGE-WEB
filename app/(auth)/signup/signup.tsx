@@ -8,6 +8,7 @@ import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from
 const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./signup-page.css"
 import { BrandName } from "../../../src/components/brand-name"
+import { nomPersonneValide } from "../../../src/lib/nom-personne"
 
 // Etape 4 : le CODE DE RECUPERATION, pour une inscription sans adresse. Elle
 // n'existe pas dans le parcours avec adresse, ou l'etape 3 (le code recu par
@@ -194,8 +195,9 @@ export default function SignUpPage() {
   const submitStep1 = (event: React.FormEvent) => {
     event.preventDefault()
     setError("")
-    // Le backend impose un pseudo d'au moins 2 caracteres (setupSchema).
-    if (form.name.trim().length < 2) return setError(t("auth_name_min_2"))
+    // Le backend impose un nom d'au moins 2 VRAIES lettres (setupSchema,
+    // 13/11/2026) : ni « .. », ni des caracteres invisibles.
+    if (!nomPersonneValide(form.name)) return setError(t("auth_name_min_2"))
     if (!form.email.trim()) return setError(t("auth_email_required"))
     if (!validEmail(form.email)) return setError(t("auth_email_invalid"))
 
@@ -522,7 +524,7 @@ export default function SignUpPage() {
                   setSansEmail(true)
                   setStep(2)
                 }}
-                disabled={form.name.trim().length < 2}
+                disabled={!nomPersonneValide(form.name)}
                 style={{
                   marginTop: 10, background: "none", border: "none",
                   textDecoration: "underline", cursor: "pointer",

@@ -17,6 +17,7 @@ import {
   subscribeToWsConnected,
 } from "../../../src/services/websocket-service"
 import { releverEtRanger } from "../../../src/services/e2ee-releve"
+import { useQuiEcrit } from "../../../src/services/frappes-en-direct"
 import { useAuth } from "../../../src/components/auth-provider"
 import { getMyUserId, toInitials } from "../../../src/data/session-user"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
@@ -1063,6 +1064,11 @@ function ConvItem({
   const { t } = useTranslation()
   const color = CHAT_COLORS[conv.colorIdx % CHAT_COLORS.length]
   const nom = nomConversation(conv)
+  const quiEcrit = useQuiEcrit(conv.id)
+  const ecrivain = quiEcrit ? conv.membersInfo?.find((m) => m.id === quiEcrit) : undefined
+  const nomEcrivain = (ecrivain?.pseudo ?? ecrivain?.publicNumber ?? "").trim()
+  const libelleFrappe =
+    conv.isGroup && nomEcrivain ? t("f2_typing_nom", { nom: nomEcrivain }) : t("f2_typing")
   /*
    * 🔴 L'ANNEAU DE STATUT (01/11/2026, repris d'Alanya). Un contact qui a des
    * statuts en ligne porte un anneau — accent ce qui reste a voir, discret ce
@@ -1183,7 +1189,20 @@ function ConvItem({
         <div className={`conv-preview ${conv.unread > 0 ? "unread" : ""}`}>
           {/* MIS EN FORME, comme le mobile (`home_screen.dart`) : un dernier
               message en gras s'affiche en gras, et non avec ses asterisques. */}
-          <TexteForme texte={apercuDernierMessage(conv)} />
+          {/* Quelqu'un ecrit (14/11/2026) : l'apercu cede la place aux trois
+              points et au nom, comme l'application de reference. */}
+          {quiEcrit ? (
+            <span className="conv-frappe">
+              <span className="conv-frappe-points" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              {libelleFrappe}
+            </span>
+          ) : (
+            <TexteForme texte={apercuDernierMessage(conv)} />
+          )}
         </div>
       </div>
       <div className="conv-right">

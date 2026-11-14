@@ -459,11 +459,14 @@ export async function createSelfChat(): Promise<{ id: string; isSelf: boolean }>
  */
 export async function createGroupChat(
   name: string,
-  memberNumbers: string[]
+  memberNumbers: string[],
+  /** Posee des la creation (14/11/2026) ; le serveur l'accepte depuis le 01/11. */
+  description?: string
 ): Promise<{ id: string }> {
+  const propre = description?.trim()
   const response = await apiRequest<{ id: string; isGroup: boolean }>("/api/conversations", {
     method: "POST",
-    body: { name, memberNumbers },
+    body: { name, memberNumbers, ...(propre ? { description: propre } : {}) },
   })
   return { id: response.id }
 }

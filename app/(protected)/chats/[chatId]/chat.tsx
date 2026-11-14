@@ -67,6 +67,7 @@ import {
   peutEncoreSupprimerPourTous,
 } from "../../../../src/lib/delais-message"
 import { FenetrePartage } from "./partage"
+import { FenetreInfosMessage } from "./infos-message"
 import { lirePartageRecu, oublierPartageRecu } from "../../../../src/services/partage-recu"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
@@ -3921,9 +3922,11 @@ function MessageBubble({
   isGroup,
   nbLectures,
   onOuvrirMention,
+  onInfos,
   estEpingle,
   onTogglePin,
   senderName,
+  senderAvatar,
   quoteAuthor,
   onJumpToMessage,
   albumMsgs,
@@ -3960,6 +3963,8 @@ function MessageBubble({
   onCopy: (m: Message) => void
   isGroup?: boolean
   senderName?: string
+  /** Photo de l'expediteur, a cote de son nom en tete de serie (14/11/2026). */
+  senderAvatar?: string | null
   /** Nom de l'auteur du message cite, affiche en tete du bloc de citation. */
   quoteAuthor?: string
   onJumpToMessage?: (messageId: string) => void
@@ -3992,6 +3997,8 @@ function MessageBubble({
   nbLectures?: number
   /** Clic sur une mention `@` : mene a la personne designee. */
   onOuvrirMention?: (userId: string, libelle: string) => void
+  /** « Infos » d'un de mes messages de groupe : qui l'a lu, recu, pas recu. */
+  onInfos?: (m: Message) => void
   /** Ce message est celui qui est epingle dans la conversation. */
   estEpingle?: boolean
   /** Epingle (id) ou detache (`null`). Absent = l'action n'est pas proposee. */
@@ -4499,6 +4506,11 @@ function MessageBubble({
                 >
                   {menuItem(t("reply"), () => onReply(msg))}
                   {msg.content ? menuItem(t("copy"), () => onCopy(msg)) : null}
+                  {/* Infos (14/11/2026) : mes messages de groupe deja enregistres. */}
+                  {onInfos && isMe && isGroup && !msg.isDeleted &&
+                  msg.status !== "sending" && msg.status !== "failed"
+                    ? menuItem(t("info_titre"), () => onInfos(msg))
+                    : null}
                   {/* Deux heures pour modifier (décision du user, 07/10/2026). */}
                   {onEdit ? menuItem(t("msg_modifier"), () => onEdit(msg)) : null}
                   {/* Toujours proposee quand la traduction se fait a la demande,
@@ -4593,22 +4605,25 @@ function MessageBubble({
                 {msg.nomAgent}
               </div>
             )}
-            {/* Nom de l'envoyeur en groupe (pas pour soi-meme) */}
+            {/* Photo et nom de l'envoyeur en groupe (pas pour soi-meme), en
+                tete de serie. Un clic ouvre sa fiche — le meme panneau que
+                les @mentions (14/11/2026, comme l'application de reference). */}
             {isGroup && !isMe && senderName && !msg.isDeleted && (
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: "var(--agent-name)",
-                  marginBottom: 2,
-                  padding: "2px 4px 0",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
+              <button
+                type="button"
+                className="expediteur-groupe"
+                onClick={onOuvrirMention ? () => onOuvrirMention(msg.senderId, senderName) : undefined}
+                title={senderName}
               >
-                {senderName}
-              </div>
+                <span className="expediteur-groupe-photo" aria-hidden="true">
+                  {avatarDisplaySrc(senderAvatar ?? undefined) ? (
+                    <img src={avatarDisplaySrc(senderAvatar ?? undefined)!} alt="" />
+                  ) : (
+                    senderName.trim().slice(0, 1).toUpperCase()
+                  )}
+                </span>
+                <span className="expediteur-groupe-nom">{senderName}</span>
+              </button>
             )}
             {/* Bulle */}
             <div
@@ -5758,8 +5773,13 @@ export default function ChatRoomPage() {
   const [callEvents, setCallEvents] = useState<CallRecord[]>([])
   const [input, setInput] = useState("")
   const [replyTo, setReplyTo] = useState<Message | null>(null)
-  // typing de l'interlocuteur (recu via WebSocket)
-  const [isTyping, setIsTyping] = useState(false)
+  /*
+   * QUI ECRIT, PAR PERSONNE (14/11/2026, jumeau du mobile). Dans un groupe,
+   * plusieurs membres peuvent ecrire a la fois, et l'ecran doit dire QUI
+   * (« Ana ecrit »). Le dernier a s'y etre mis est en fin de liste.
+   */
+  const [ecrivent, setEcrivent] = useState<string[]>([])
+  const isTyping = ecrivent.length > 0
   // Presence : le serveur temps reel diffuse { type: "presence" } et
   // GET /api/conversations porte deja isOnline. On garde le repli deduit de
   // l'activite reelle (message recu, frappe, lecture) quand le pair masque sa
@@ -5997,6 +6017,8 @@ export default function ChatRoomPage() {
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null)
   // Message en cours de PARTAGE (Alanya Work ou autre application).
   const [partageMsg, setPartageMsg] = useState<Message | null>(null)
+  // Message dont on consulte les INFOS (14/11/2026) : lu, recu, pas recu.
+  const [infosMsg, setInfosMsg] = useState<Message | null>(null)
   /*
    * Document SENSIBLE : ni transfert ni partage (18/10/2026). Permis du 22 au
    * 24/10, de nouveau bloqués depuis (user). Seul le téléchargement en sort
@@ -6457,17 +6479,28 @@ export default function ChatRoomPage() {
     })
 
     // Abonnement aux evenements "en train d'ecrire"
-    let typingTimeoutId: ReturnType<typeof setTimeout> | null = null
+    // Un filet par personne : si son « stop » n'arrive pas, on l'efface apres 6 s.
+    const filetsFrappe = new Map<string, ReturnType<typeof setTimeout>>()
     const unsubscribeTyping = subscribeToTyping(chatId, (event) => {
       if (cancelled) return
       // Ignore ses propres evenements
       if (myId && event.userId === myId) return
       setLastPeerActivity(Date.now())
-      setIsTyping(Boolean(event.isTyping))
-      if (typingTimeoutId) clearTimeout(typingTimeoutId)
-      // Failsafe : si on ne recoit pas le "stopped typing", on coupe apres 4s
+      const qui = typeof event.userId === "string" ? event.userId : ""
+      const avant = filetsFrappe.get(qui)
+      if (avant) clearTimeout(avant)
+      filetsFrappe.delete(qui)
       if (event.isTyping) {
-        typingTimeoutId = setTimeout(() => setIsTyping(false), 4000)
+        filetsFrappe.set(
+          qui,
+          setTimeout(() => {
+            filetsFrappe.delete(qui)
+            setEcrivent((l) => l.filter((x) => x !== qui))
+          }, 6000)
+        )
+        setEcrivent((l) => [...l.filter((x) => x !== qui), qui])
+      } else {
+        setEcrivent((l) => l.filter((x) => x !== qui))
       }
     })
 
@@ -6681,7 +6714,9 @@ export default function ChatRoomPage() {
       unsubscribeRefus()
       unsubscribeConnected()
       clearInterval(pollId)
-      if (typingTimeoutId) clearTimeout(typingTimeoutId)
+      for (const filet of filetsFrappe.values()) clearTimeout(filet)
+      filetsFrappe.clear()
+      setEcrivent([])
     }
   }, [chat, chatId, refreshMessages, refreshCallEvents, fallbackContact, fallbackGroup])
 
@@ -8479,6 +8514,11 @@ export default function ChatRoomPage() {
     [backendChat?.membersInfo, chatId, navigate]
   )
 
+  /** Photo d'un membre du groupe, depuis la liste des membres (14/11/2026). */
+  const resolveSenderAvatar = (senderId: string): string | null =>
+    chat?.membersInfo?.find((m: { id: string; avatarUrl?: string | null }) => m.id === senderId)
+      ?.avatarUrl ?? null
+
   const resolveSenderName = (senderId: string): string => {
     if (senderId === "me") return t("you")
 
@@ -8500,6 +8540,26 @@ export default function ChatRoomPage() {
     // tort. Un identifiant technique ne dit rien non plus a qui lit.
     return t("chat_member_unknown")
   }
+
+  /** « Ana ecrit… » dans un groupe ; `undefined` hors groupe ou si personne n'ecrit. */
+  const dernierEcrivain = ecrivent[ecrivent.length - 1]
+  const libelleFrappe =
+    chat?.isGroup && dernierEcrivain
+      ? t("f2_typing_nom", { nom: resolveSenderName(dernierEcrivain) })
+      : undefined
+
+  /** Les noms des membres, moi exclu ; repli sur « N membres ». */
+  const sousTitreGroupe = (() => {
+    const moi = getMyUserId()
+    const noms = (chat?.membersInfo ?? [])
+      .filter((m: { id: string }) => m.id !== moi)
+      .map((m: { pseudo?: string | null; publicNumber?: string }) => (m.pseudo ?? m.publicNumber ?? "").trim())
+      .filter(Boolean)
+    return noms.length > 0
+      ? noms.join(", ")
+      : t("cinfo_members_count", { count: chat?.members?.length ?? 0 })
+  })()
+
 
   /**
    * Remonte au message d'origine d'une citation et le fait briller brievement,
@@ -8632,8 +8692,10 @@ export default function ChatRoomPage() {
                 bandeau juste au-dessus du champ de saisie, comme l'app mobile
                 (`ActivityIndicatorBar`) et comme WhatsApp.
             */}
+            {/* Groupe (14/11/2026, jumeau du mobile) : « Ana ecrit… » pendant
+                qu'un membre ecrit, sinon les noms des membres, moi exclu. */}
             {chat.isGroup
-              ? t("cinfo_members_count", { count: chat.members?.length ?? 0 })
+              ? (libelleFrappe ?? sousTitreGroupe)
               : peerOnline
                 ? t("online")
                 : " "}
@@ -9145,6 +9207,10 @@ export default function ChatRoomPage() {
                       senderName={
                         !albumIsMe && chat?.isGroup ? resolveSenderName(head.senderId) : undefined
                       }
+                      senderAvatar={
+                        !albumIsMe && chat?.isGroup ? resolveSenderAvatar(head.senderId) : undefined
+                      }
+                      onOuvrirMention={ouvrirMention}
                       albumMsgs={lot}
                       onOpenAlbum={(index) => {
                         // Un lot chiffré s'ouvre sur ses copies déchiffrées : la
@@ -9238,9 +9304,11 @@ export default function ChatRoomPage() {
                     isGroup={chat?.isGroup}
                     nbLectures={compterLectures(msg)}
                     onOuvrirMention={ouvrirMention}
+                    onInfos={setInfosMsg}
                     estEpingle={messagesEpingles.includes(msg.id)}
                     onTogglePin={basculerEpingle}
                     senderName={resolvedName}
+                    senderAvatar={resolvedName ? resolveSenderAvatar(msg.senderId) : undefined}
                     quoteAuthor={quoteAuthor}
                     onJumpToMessage={jumpToMessage}
                     autoTraduction={autoTraduction}
@@ -9361,7 +9429,7 @@ export default function ChatRoomPage() {
               <i />
               <i />
             </span>
-            <span className="activite-texte">{t("f2_typing")}</span>
+            <span className="activite-texte">{libelleFrappe ?? t("f2_typing")}</span>
           </div>
         )}
       </div>
@@ -10125,6 +10193,11 @@ export default function ChatRoomPage() {
 
       {lightbox && (
         <ImageLightbox url={lightbox.url} name={lightbox.name} onClose={() => setLightbox(null)} />
+      )}
+
+      {/* Infos d'un de mes messages de groupe (14/11/2026). */}
+      {infosMsg && chatId && (
+        <FenetreInfosMessage convId={chatId} messageId={infosMsg.id} onFermer={() => setInfosMsg(null)} />
       )}
 
       {/* Partager : dans Alanya Work (le transfert) ou vers une autre application. */}

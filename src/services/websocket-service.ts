@@ -615,6 +615,20 @@ export function subscribeToTyping(
   })
 }
 
+/**
+ * Toutes les frappes, toutes conversations confondues (14/11/2026) : la liste
+ * des discussions affiche « Ana ecrit… » a la place du dernier message.
+ */
+export function subscribeToToutesFrappes(
+  handler: (convId: string, event: TypingEvent) => void
+): () => void {
+  return addListener((event) => {
+    if (event.type === "typing" && typeof event.convId === "string") {
+      handler(event.convId, { userId: String(event.userId ?? ""), isTyping: Boolean(event.isTyping) })
+    }
+  })
+}
+
 /** Publie un evenement "je suis en train d'ecrire" (ou j'ai arrete). */
 export function publishTyping(conversationId: string, isTyping: boolean) {
   sendRaw({ type: "typing", convId: conversationId, isTyping })

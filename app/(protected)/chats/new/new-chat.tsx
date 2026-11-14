@@ -14,6 +14,7 @@ import {
   createPrivateChat,
   createSelfChat,
 } from "../../../../src/services/chats-service"
+import { changerReglagesGroupe, type CleReglage } from "../../../../src/services/groupe-service"
 import {
   ALANYA_NUMBER_FORMATTED_MAX_LENGTH,
   formatAlanyaNumber,
@@ -21,6 +22,21 @@ import {
 } from "../../../../src/lib/alanya-number"
 
 type Mode = "chat" | "group"
+
+const REGLAGES_PAR_DEFAUT: Record<CleReglage, boolean> = {
+  adminsSeulsEcrivent: false,
+  adminsSeulsModifient: true,
+  adminsSeulsAjoutent: true,
+  historiqueCacheNouveaux: false,
+}
+
+/** Les quatre reglages, dans l'ordre de l'ecran d'infos du groupe. */
+const LIBELLES_REGLAGES = [
+  ["adminsSeulsEcrivent", "grp_set_admins_send", "grp_set_admins_send_sub"],
+  ["adminsSeulsModifient", "grp_set_admins_edit", "grp_set_admins_edit_sub"],
+  ["adminsSeulsAjoutent", "grp_set_admins_add", "grp_set_admins_add_sub"],
+  ["historiqueCacheNouveaux", "grp_set_hide_history", "grp_set_hide_history_sub"],
+] as const
 
 export function NewChatModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation()
@@ -36,6 +52,14 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [groupName, setGroupName] = useState("")
+  /*
+   * Description et reglages des la creation (14/11/2026, jumeau du mobile,
+   * comme l'application de reference). ⚠️ LES VALEURS PAR DEFAUT DU SERVEUR :
+   * un groupe neuf reserve deja aux admins la modification des infos et
+   * l'ajout de membres. Seul ce que la personne change part au serveur.
+   */
+  const [description, setDescription] = useState("")
+  const [reglages, setReglages] = useState<Record<CleReglage, boolean>>(REGLAGES_PAR_DEFAUT)
   const [loading, setLoading] = useState(false)
 
   const [showAdd, setShowAdd] = useState(false)
@@ -122,7 +146,16 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       const memberNumbers = contacts
         .filter((contact) => selected.has(contact.id))
         .map((contact) => contact.phone)
-      const conversation = await createGroupChat(groupName.trim(), memberNumbers)
+      const conversation = await createGroupChat(groupName.trim(), memberNumbers, description)
+      // Les reglages changes, s'il y en a. Un echec ici ne defait pas le
+      // groupe, deja cree : ils restent modifiables dans ses infos.
+      const changes: Partial<Record<CleReglage, boolean>> = {}
+      for (const cle of Object.keys(REGLAGES_PAR_DEFAUT) as CleReglage[]) {
+        if (reglages[cle] !== REGLAGES_PAR_DEFAUT[cle]) changes[cle] = reglages[cle]
+      }
+      if (Object.keys(changes).length > 0) {
+        await changerReglagesGroupe(conversation.id, changes).catch(() => undefined)
+      }
       success(t("l2_group_created"), t("cinfo_members_added", { count: selected.size }))
       navigate(`/chats/${conversation.id}`)
     } catch (e) {
@@ -218,6 +251,13 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
         .ncm-moi .ncm-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .ncm-foot { border-top: 1px solid var(--border-subtle); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .ncm-foot-label { color: var(--text-muted); font-size: 12px; }
+        .ncm-options { border-top: 1px solid var(--border-subtle); padding: 10px 18px 0; display: flex; flex-direction: column; gap: 8px; }
+        .ncm-options textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 38px; border: 1px solid var(--border-subtle); border-radius: 9px; background: var(--bg-input); color: var(--text-primary); font: inherit; font-size: 13px; padding: 8px 10px; }
+        .ncm-options summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); padding: 4px 0; }
+        .ncm-reglage { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; cursor: pointer; }
+        .ncm-reglage input { margin-top: 3px; accent-color: var(--accent); }
+        .ncm-reglage strong { display: block; font-size: 13px; font-weight: 600; }
+        .ncm-reglage span { display: block; font-size: 12px; color: var(--text-muted); }
         .ncm-main-btn { border: none; border-radius: 9px; background: var(--accent); color: var(--accent-text); font-weight: 700; font-size: 13px; padding: 10px 14px; cursor: pointer; }
         .ncm-main-btn:disabled { opacity: .45; cursor: not-allowed; }
       `}</style>
@@ -373,6 +413,34 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
               )
             })}
           </div>
+
+          {mode === "group" && (
+            <div className="ncm-options">
+              <textarea
+                rows={1}
+                maxLength={512}
+                placeholder={t("grp_add_description")}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+              <details>
+                <summary>{t("grp_settings")}</summary>
+                {LIBELLES_REGLAGES.map(([cle, titre, sous]) => (
+                  <label key={cle} className="ncm-reglage">
+                    <input
+                      type="checkbox"
+                      checked={reglages[cle]}
+                      onChange={(event) => setReglages((r) => ({ ...r, [cle]: event.target.checked }))}
+                    />
+                    <span>
+                      <strong>{t(titre)}</strong>
+                      <span>{t(sous)}</span>
+                    </span>
+                  </label>
+                ))}
+              </details>
+            </div>
+          )}
 
           {mode === "group" && (
             <div className="ncm-foot">
