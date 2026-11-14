@@ -27,6 +27,10 @@ export async function sendAiMessage(message: string): Promise<AiMessage> {
   const response = await apiRequest<{ threadId: string; reply: AiMessage }>("/api/ai/chat", {
     method: "POST",
     body: { message },
+    // ⚠️ 75 S ET NON 20 (14/11/2026) : l'assistant peut chercher sur Internet
+    // et lire des pages avant de repondre. Le serveur borne ce travail (35 s
+    // d'outils, puis une derniere reponse) ; le delai ordinaire l'aurait coupe.
+    signal: AbortSignal.timeout(75_000),
   })
   return response.reply
 }
