@@ -30,6 +30,11 @@ export type NomIcone =
   | "oeil"
   | "oeil-barre"
   | "envoyer"
+  | "rogner"
+  | "pivoter"
+  | "cadre-libre"
+  | "carre"
+  | "valider"
 
 const TRACES: Record<NomIcone, ReactNode> = {
   etincelles: (
@@ -127,6 +132,25 @@ const TRACES: Record<NomIcone, ReactNode> = {
       <path d="M2 2l20 20" />
     </>
   ),
+  rogner: (
+    <>
+      <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+      <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+    </>
+  ),
+  pivoter: (
+    <>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+    </>
+  ),
+  "cadre-libre": (
+    <>
+      <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
+    </>
+  ),
+  carre: <rect x="4" y="4" width="16" height="16" rx="2" />,
+  valider: <path d="M20 6L9 17l-5-5" />,
   envoyer: (
     <>
       <path d="M22 2L11 13" />

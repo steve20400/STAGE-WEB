@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Icone } from "./icone"
+import { RognageImage } from "./rognage-image"
 import { useTranslation } from "../i18n"
 import "./editeur-statut.css"
 
@@ -63,16 +64,23 @@ export function EditeurStatut({
   const [saisieOuverte, setSaisieOuverte] = useState(false)
   const [saisie, setSaisie] = useState("")
   const [enCours, setEnCours] = useState(false)
+  /*
+   * L'IMAGE DE TRAVAIL (14/11/2026) : l'originale, ou celle rendue par le
+   * rognage. C'est elle qu'on affiche, qu'on aplatit et qu'on publie.
+   */
+  const [source, setSource] = useState<File>(fichier)
+  /** L'image ouverte dans l'écran de rognage, ou `null`. */
+  const [aRogner, setARogner] = useState<File | null>(null)
 
   const cadre = useRef<HTMLDivElement>(null)
   const traceEnCours = useRef<Trace | null>(null)
   const deplace = useRef<number | null>(null)
 
   useEffect(() => {
-    const url = URL.createObjectURL(fichier)
+    const url = URL.createObjectURL(source)
     setUrlApercu(url)
     return () => URL.revokeObjectURL(url)
-  }, [fichier])
+  }, [source])
 
   /** Convertit un point de l'écran en fraction du cadre. */
   const enFraction = (e: { clientX: number; clientY: number }) => {
@@ -152,72 +160,92 @@ export function EditeurStatut({
    * les traits, puis les textes, en multipliant chaque fraction par les
    * dimensions réelles.
    */
+  const aplatir = async (): Promise<File | null> => {
+    const bitmap = await createImageBitmap(source)
+    const canvas = document.createElement("canvas")
+    canvas.width = bitmap.width
+    canvas.height = bitmap.height
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0)
+    bitmap.close()
+
+    const L = canvas.width
+    const H = canvas.height
+
+    for (const trace of traces) {
+      if (trace.points.length === 0) continue
+      ctx.strokeStyle = trace.couleur
+      ctx.lineWidth = Math.max(2, trace.epaisseur * H)
+      ctx.lineCap = "round"
+      ctx.lineJoin = "round"
+      ctx.beginPath()
+      ctx.moveTo(trace.points[0].x * L, trace.points[0].y * H)
+      for (const p of trace.points.slice(1)) ctx.lineTo(p.x * L, p.y * H)
+      ctx.stroke()
+    }
+
+    for (const tx of textes) {
+      const taille = tx.taille * H
+      ctx.font = `700 ${taille}px "DM Sans", sans-serif`
+      ctx.textAlign = "center"
+      ctx.textBaseline = "middle"
+      // Un liseré sombre sous le texte : un texte blanc sur ciel blanc, ou
+      // noir sur ombre, serait illisible. Il vaut mieux qu'un fond opaque,
+      // qui masquerait la photo.
+      ctx.lineWidth = Math.max(2, taille * 0.12)
+      ctx.strokeStyle = "rgba(0,0,0,0.55)"
+      ctx.strokeText(tx.contenu, tx.x * L, tx.y * H)
+      ctx.fillStyle = tx.couleur
+      ctx.fillText(tx.contenu, tx.x * L, tx.y * H)
+    }
+
+    const blob = await new Promise<Blob | null>((r) =>
+      canvas.toBlob(r, "image/jpeg", 0.9)
+    )
+    if (!blob) return null
+    const nom = source.name.replace(/\.[^.]+$/, "") + ".jpg"
+    return new File([blob], nom, { type: "image/jpeg" })
+  }
+
   const publier = async () => {
     if (enCours) return
     setEnCours(true)
     try {
-      // Rien n'a été ajouté : on renvoie le fichier d'origine, sans le
+      // Rien n'a été ajouté : on renvoie l'image de travail, sans la
       // ré-encoder. Un aller-retour par le canvas coûterait de la qualité pour
       // ne rien changer.
       if (textes.length === 0 && traces.length === 0) {
-        onValider(fichier)
+        onValider(source)
         return
       }
-
-      const bitmap = await createImageBitmap(fichier)
-      const canvas = document.createElement("canvas")
-      canvas.width = bitmap.width
-      canvas.height = bitmap.height
-      const ctx = canvas.getContext("2d")
-      if (!ctx) {
-        onValider(fichier)
-        return
-      }
-      ctx.drawImage(bitmap, 0, 0)
-      bitmap.close()
-
-      const L = canvas.width
-      const H = canvas.height
-
-      for (const trace of traces) {
-        if (trace.points.length === 0) continue
-        ctx.strokeStyle = trace.couleur
-        ctx.lineWidth = Math.max(2, trace.epaisseur * H)
-        ctx.lineCap = "round"
-        ctx.lineJoin = "round"
-        ctx.beginPath()
-        ctx.moveTo(trace.points[0].x * L, trace.points[0].y * H)
-        for (const p of trace.points.slice(1)) ctx.lineTo(p.x * L, p.y * H)
-        ctx.stroke()
-      }
-
-      for (const tx of textes) {
-        const taille = tx.taille * H
-        ctx.font = `700 ${taille}px "DM Sans", sans-serif`
-        ctx.textAlign = "center"
-        ctx.textBaseline = "middle"
-        // Un liseré sombre sous le texte : un texte blanc sur ciel blanc, ou
-        // noir sur ombre, serait illisible. Il vaut mieux qu'un fond opaque,
-        // qui masquerait la photo.
-        ctx.lineWidth = Math.max(2, taille * 0.12)
-        ctx.strokeStyle = "rgba(0,0,0,0.55)"
-        ctx.strokeText(tx.contenu, tx.x * L, tx.y * H)
-        ctx.fillStyle = tx.couleur
-        ctx.fillText(tx.contenu, tx.x * L, tx.y * H)
-      }
-
-      const blob = await new Promise<Blob | null>((r) =>
-        canvas.toBlob(r, "image/jpeg", 0.9)
-      )
-      if (!blob) {
-        onValider(fichier)
-        return
-      }
-      const nom = fichier.name.replace(/\.[^.]+$/, "") + ".jpg"
-      onValider(new File([blob], nom, { type: "image/jpeg" }))
+      onValider((await aplatir()) ?? source)
     } catch {
-      // L'édition a échoué : on publie l'original plutôt que de perdre la photo.
-      onValider(fichier)
+      // L'édition a échoué : on publie l'image de travail plutôt que de perdre la photo.
+      onValider(source)
+    } finally {
+      setEnCours(false)
+    }
+  }
+
+  /**
+   * ROGNER ET FAIRE PIVOTER, comme WhatsApp (demande du user, 14/11/2026).
+   *
+   * ⚠️ ON ROGNE CE QUE L'ON VOIT : textes et traits déjà posés sont d'abord
+   * incrustés. Leurs positions sont en fractions du cadre et ne voudraient plus
+   * rien dire sur une image recadrée ; ils deviennent partie de l'image.
+   */
+  const ouvrirRognage = async () => {
+    if (enCours) return
+    if (textes.length === 0 && traces.length === 0) {
+      setARogner(source)
+      return
+    }
+    setEnCours(true)
+    try {
+      setARogner((await aplatir()) ?? source)
+    } catch {
+      setARogner(source)
     } finally {
       setEnCours(false)
     }
@@ -230,6 +258,14 @@ export function EditeurStatut({
           ×
         </button>
         <div className="es-outils">
+          <button
+            type="button"
+            onClick={() => void ouvrirRognage()}
+            title={t("rogner_titre")}
+            aria-label={t("rogner_titre")}
+          >
+            <Icone nom="rogner" taille={18} />
+          </button>
           <button
             type="button"
             className={outil === "dessin" ? "on" : ""}
@@ -323,6 +359,20 @@ export function EditeurStatut({
           {t("l2_publish")}
         </button>
       </div>
+
+      {aRogner && (
+        <RognageImage
+          fichier={aRogner}
+          onAnnuler={() => setARogner(null)}
+          onValider={(rognee) => {
+            setSource(rognee)
+            setTextes([])
+            setTraces([])
+            setOutil("aucun")
+            setARogner(null)
+          }}
+        />
+      )}
 
       {saisieOuverte && (
         <div className="es-saisie">
