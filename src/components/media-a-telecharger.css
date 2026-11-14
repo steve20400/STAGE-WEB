@@ -1,0 +1,136 @@
+/* La place d'un média reçu non téléchargé (téléchargement automatique éteint). */
+.mat-tuile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  width: 260px;
+  max-width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 320px;
+  padding: 0;
+  margin-bottom: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.mat-tuile.avec-apercu {
+  border: 0;
+}
+
+.mat-apercu {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(8px);
+  transform: scale(1.08);
+}
+
+/* L'icône du genre, AU-DESSUS de la pastille : centrées toutes deux, la
+   pastille la recouvrait. */
+.mat-fond {
+  display: flex;
+  color: var(--text-faint, var(--text-muted));
+  opacity: 0.6;
+}
+
+.mat-pastille {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #000000a6;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(2px);
+}
+
+.mat-tuile:hover .mat-pastille {
+  background: #000000c4;
+}
+
+.mat-pastille.petite {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 6px;
+  pointer-events: none;
+}
+
+.mat-taille {
+  font-variant-numeric: tabular-nums;
+}
+
+.mat-duree {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #00000080;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mat-sablier {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ffffff55;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: mat-tourne 0.8s linear infinite;
+}
+
+@keyframes mat-tourne {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* L'aperçu d'un document, remplacé par un bouton. */
+.mat-apercu-doc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  margin-bottom: 6px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mat-apercu-doc:hover {
+  background: var(--accent-dim);
+}
+
+.mat-apercu-doc .mat-taille {
+  margin-left: auto;
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mat-sablier {
+    animation-duration: 2.4s;
+  }
+}

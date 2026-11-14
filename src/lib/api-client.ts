@@ -27,6 +27,21 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Le code d'erreur du backend (`{ error: { code } }`), quand il en donne un.
+ *
+ * C'est le CODE qu'on compare, jamais le message : un message de serveur
+ * n'est pas traduit, et le code, lui, ne change pas d'une langue à l'autre.
+ */
+export function codeErreurApi(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null
+  const charge = err.payload
+  if (charge === null || typeof charge !== "object") return null
+  const erreur = (charge as { error?: { code?: unknown } }).error
+  if (erreur && typeof erreur === "object" && typeof erreur.code === "string") return erreur.code
+  return null
+}
+
 interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: BodyInit | object | null
   /** Envoi de fichier : (octets partis, total), au fil de l'envoi. */

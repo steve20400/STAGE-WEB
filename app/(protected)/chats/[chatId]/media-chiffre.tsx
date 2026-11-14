@@ -7,6 +7,7 @@ import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouvertur
 import { formatBytes } from "../../../../src/services/messages-service"
 import { VisionneuseSensible } from "./visionneuse-sensible"
 import { InfosProtectionPdf } from "../../../../src/components/protection-pdf"
+import { MediaATelecharger } from "../../../../src/components/media-a-telecharger"
 import "./media-chiffre.css"
 
 /**
@@ -40,9 +41,16 @@ export function MediaChiffre({
   typeFichier,
   onOuvrirImage,
   onOuvrirDocument,
+  chargerSeul = true,
 }: {
   d: DescripteurMedia
   isMe: boolean
+  /**
+   * La photo peut-elle venir d'elle-même ? Faux quand le téléchargement
+   * automatique des photos est éteint (14/11/2026) : l'aperçu flouté de
+   * l'enveloppe reste, et un clic la fait venir.
+   */
+  chargerSeul?: boolean
   /** Pastille du type de document (« PDF », « ZIP »…), la même qu'en clair. */
   typeFichier?: { color: string; label: string }
   /** Ouvre la photo déchiffrée (adresse `blob:`) dans la galerie. */
@@ -81,9 +89,9 @@ export function MediaChiffre({
   // La photo se charge d'elle-même ; le reste attend un geste. Une photo
   // SENSIBLE aussi : elle ne s'affiche que dans sa visionneuse.
   useEffect(() => {
-    if (genre === "image" && !d.sensible) charger()
+    if (genre === "image" && !d.sensible && chargerSeul) charger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d.id])
+  }, [d.id, chargerSeul])
 
   // Le blob vit le temps de la bulle.
   useEffect(() => () => {
@@ -158,6 +166,18 @@ export function MediaChiffre({
   }
 
   if (genre === "image") {
+    if (!url && !chargerSeul) {
+      return (
+        <MediaATelecharger
+          famille="photo"
+          taille={formatBytes(d.taille)}
+          apercu={apercu}
+          ratio={ratio}
+          chargement={etat === "chargement"}
+          onTelecharger={charger}
+        />
+      )
+    }
     return (
       <button
         type="button"
@@ -316,11 +336,20 @@ function duree(ms: number): string {
  * Photo : déchiffrée et affichée nette ; vidéo : sa première image, venue de
  * l'enveloppe. En attendant, l'aperçu flouté.
  */
-export function TuileChiffree({ d, taille }: { d: DescripteurMedia; taille: number }) {
+export function TuileChiffree({
+  d,
+  taille,
+  charger = true,
+}: {
+  d: DescripteurMedia
+  taille: number
+  /** Faux : téléchargement automatique éteint, seul l'aperçu flouté s'affiche. */
+  charger?: boolean
+}) {
   const [url, setUrl] = useState<string | null>(null)
   const image = d.mime.startsWith("image/")
   useEffect(() => {
-    if (!image) return
+    if (!image || !charger) return
     let vivant = true
     let cree: string | null = null
     void ouvrirMediaChiffre(d)
@@ -334,7 +363,7 @@ export function TuileChiffree({ d, taille }: { d: DescripteurMedia; taille: numb
       vivant = false
       if (cree) URL.revokeObjectURL(cree)
     }
-  }, [d, image])
+  }, [d, image, charger])
   const apercu = d.apercu ? urlApercu(d.apercu) : null
   const style = { width: taille, height: taille, objectFit: "cover" as const, display: "block" }
   if (url) return <img src={url} alt="" style={style} />
