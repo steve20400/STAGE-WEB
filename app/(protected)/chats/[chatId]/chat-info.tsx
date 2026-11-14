@@ -43,6 +43,11 @@ import {
 } from "../../../../src/services/blocked-service"
 import { AvatarCircle } from "../../../../src/components/avatar-circle"
 import { MenuContact } from "../../../../src/components/menu-contact"
+import {
+  FormulaireEnregistrerContact,
+  IconeAjouterPersonne,
+} from "../../../../src/components/enregistrer-inconnu"
+import { useEstContact } from "../../../../src/hooks/use-est-contact"
 import { ChoixActions } from "../../../../src/components/photo-profil"
 import type { Cle } from "../../../../src/i18n"
 import {
@@ -115,6 +120,10 @@ interface ConvInfo {
    * compte à part, renseigné par chacun des deux constructeurs.
    */
   pairUserId?: string
+  /** Fil avec le compte officiel « Alanya Work » : il ne s'enregistre pas. */
+  officiel?: boolean
+  /** Le nom que le correspondant s'est donné — proposé quand on l'enregistre. */
+  pseudoPair?: string | null
 }
 
 interface PendingAction {
@@ -144,6 +153,19 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const navigate = useNavigate()
   const { success, warning, info, error } = useToast()
   const conv = propInfo
+
+  /*
+   * ENREGISTRER LE CORRESPONDANT, d'ici aussi (retour des testeurs, 14/11/2026 :
+   * il fallait recopier son ID dans « nouveau contact »). Le bandeau de la
+   * discussion propose le même geste ; celui-ci reste quand on l'a masqué.
+   *
+   * `pairUserId` n'existe qu'avec un VRAI correspondant : il manque dans mes
+   * notes, où il n'y a que moi.
+   */
+  const numeroAEnregistrer =
+    !conv.isGroup && conv.pairUserId && !conv.officiel && conv.alanyaId ? conv.alanyaId : null
+  const estContact = useEstContact(numeroAEnregistrer)
+  const [enregistrementOuvert, setEnregistrementOuvert] = useState(false)
 
   const [tab, setTab] = useState<"membres" | "fichiers">("membres")
   // Nombre de fichiers partagés, connu quand le panneau a fini de les relever.
@@ -779,6 +801,19 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 </div>
                 <span className="ca-label">{t("cinfo_message")}</span>
               </button>
+              {estContact === false && (
+                <button
+                  className="ca-btn"
+                  onClick={() => setEnregistrementOuvert((v) => !v)}
+                  aria-label={t("inc_save")}
+                  aria-expanded={enregistrementOuvert}
+                >
+                  <div className="ca-icon">
+                    <IconeAjouterPersonne />
+                  </div>
+                  <span className="ca-label">{t("fc_add")}</span>
+                </button>
+              )}
               {/* Les appels de groupe sont caches pour l'instant (06/11/2026) :
                   un groupe se retrouve en REUNION, pas en appel. */}
               {!conv.isGroup && (
@@ -870,6 +905,15 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 <span className="ca-label">{t("cinfo_search")}</span>
               </button>
             </div>
+            {estContact === false && enregistrementOuvert && numeroAEnregistrer && (
+              <div style={{ marginTop: 14, width: "100%" }}>
+                <FormulaireEnregistrerContact
+                  numero={numeroAEnregistrer}
+                  nomProfil={conv.pseudoPair ?? conv.name}
+                  onTermine={() => setEnregistrementOuvert(false)}
+                />
+              </div>
+            )}
           </div>
 
           <div className="cip-section">
@@ -1678,6 +1722,8 @@ async function buildConvInfoFromBackend(chatId: string): Promise<ConvInfo | null
     online: conv.online,
     alanyaId: alanyaIdPair,
     pairUserId: autre?.id,
+    officiel: conv.officiel === true,
+    pseudoPair: autre?.pseudo ?? null,
     // statusMsg reste vide : la mention de presence se compose au rendu, donc
     // elle suit la langue choisie.
     members: [

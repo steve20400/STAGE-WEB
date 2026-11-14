@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { ApiError } from "../lib/api-client"
+import { codeErreurApi } from "../lib/api-client"
 import {
   formatAlanyaNumber,
   isValidAlanyaNumber,
   normalizeAlanyaNumber,
 } from "../lib/alanya-number"
-import { loadContacts, persistContacts, type Contact } from "../data/contacts"
+import { loadContacts } from "../data/contacts"
 import { lancerAppel } from "../services/lancer-appel"
 import { createPrivateChat } from "../services/chats-service"
-import { addContactByPhone } from "../services/contacts-service"
+import { addContactByPhone, memoriserContact } from "../services/contacts-service"
 import {
   contactsDepuisContenu,
   nomAffichable,
@@ -133,7 +133,7 @@ function FicheUnique({ contact }: { contact: SharedContact }) {
       toast.success(t("contact_saved"), enregistre.name)
     } catch (err) {
       if (!monte.current) return
-      const code = codeErreur(err)
+      const code = codeErreurApi(err)
       if (code === "ALREADY_CONTACT") {
         // Le repertoire local etait en retard : la fiche dit desormais vrai.
         setEtat("present")
@@ -298,26 +298,6 @@ function BoutonAction({
 function dejaDansLeRepertoire(numero: string): boolean {
   if (numero === "") return false
   return loadContacts().some((c) => normalizeAlanyaNumber(c.phone) === numero)
-}
-
-/**
- * Range le contact fraichement ajoute dans le cache local, pour que les autres
- * ecrans le connaissent sans attendre un rechargement.
- */
-function memoriserContact(contact: Contact) {
-  const connus = loadContacts()
-  if (connus.some((c) => c.id === contact.id)) return
-  persistContacts([...connus, contact])
-}
-
-/** Code d'erreur du backend (`{ error: { code } }`), quand il en donne un. */
-function codeErreur(err: unknown): string | null {
-  if (!(err instanceof ApiError)) return null
-  const charge = err.payload
-  if (charge === null || typeof charge !== "object") return null
-  const erreur = (charge as { error?: { code?: unknown } }).error
-  if (erreur && typeof erreur === "object" && typeof erreur.code === "string") return erreur.code
-  return null
 }
 
 function IconeAjouter() {

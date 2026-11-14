@@ -135,12 +135,18 @@ import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { E2eeSauvegardePanneau } from "./e2ee-sauvegarde-panneau"
 import { EmpreintePanneau } from "./empreinte-panneau"
 import { suivreChangementMotDePasse } from "../../../src/services/e2ee-sauvegarde"
+import { useTelechargementAuto } from "../../../src/hooks/use-telechargement-auto"
+import {
+  changerTelechargement,
+  type FamilleMedia,
+} from "../../../src/services/telechargement-auto"
 
 type SettingsSection =
   | "profile"
   | "security"
   | "notifications"
   | "repondeur"
+  | "donnees"
   | "export"
   | "privacy"
   | "translation"
@@ -156,6 +162,7 @@ const SECTIONS_CONNUES: SettingsSection[] = [
   "security",
   "notifications",
   "repondeur",
+  "donnees",
   "export",
   "privacy",
   "translation",
@@ -921,6 +928,42 @@ function Field({
       {helper && !error && (
         <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 5 }}>{helper}</p>
       )}
+    </div>
+  )
+}
+
+/**
+ * TÉLÉCHARGEMENT AUTOMATIQUE DES MÉDIAS REÇUS (retour des testeurs du
+ * 14/11/2026 : « il n'y a pas d'option pour le désactiver »).
+ *
+ * Quatre familles, comme WhatsApp. Allumé = le comportement d'avant ; éteint =
+ * le média attend qu'on le touche. Réglage de CET appareil : un téléphone en
+ * 4G et un ordinateur au bureau n'ont pas le même forfait.
+ */
+function ReglagesTelechargementAuto() {
+  const { t } = useTranslation()
+  const reglages = useTelechargementAuto()
+  const lignes: Array<{ famille: FamilleMedia; libelle: string; detail: string }> = [
+    { famille: "photo", libelle: t("dl_photos"), detail: t("dl_photos_sub") },
+    { famille: "audio", libelle: t("dl_audio"), detail: t("dl_audio_sub") },
+    { famille: "video", libelle: t("dl_videos"), detail: t("dl_videos_sub") },
+    { famille: "document", libelle: t("dl_documents"), detail: t("dl_documents_sub") },
+  ]
+  return (
+    <div className="s-card">
+      <div className="s-card-title">{t("dl_card_title")}</div>
+      {lignes.map((l) => (
+        <Toggle
+          key={l.famille}
+          value={reglages[l.famille]}
+          onChange={(v) => changerTelechargement(l.famille, v)}
+          label={l.libelle}
+          description={l.detail}
+        />
+      ))}
+      <p style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6, margin: "12px 0 0" }}>
+        {t("dl_note")}
+      </p>
     </div>
   )
 }
@@ -2531,6 +2574,26 @@ export default function SettingsPage() {
       ),
     },
     {
+      id: "donnees",
+      label: t("settings_donnees"),
+      icon: (
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        >
+          {/* Le cylindre du stockage : ce qui vient sur l'appareil. */}
+          <ellipse cx="12" cy="5" rx="8" ry="3" />
+          <path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+          <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3" />
+        </svg>
+      ),
+    },
+    {
       id: "export",
       label: t("settings_export"),
       icon: (
@@ -3970,6 +4033,14 @@ export default function SettingsPage() {
               <div className="s-page-title">{t("settings_repondeur")}</div>
               <p className="s-page-sub">{t("rep_page_sub")}</p>
               <RepondeurReglages />
+            </>
+          )}
+
+          {section === "donnees" && (
+            <>
+              <div className="s-page-title">{t("settings_donnees")}</div>
+              <p className="s-page-sub">{t("dl_sub")}</p>
+              <ReglagesTelechargementAuto />
             </>
           )}
 

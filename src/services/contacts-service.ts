@@ -58,22 +58,36 @@ function toFrontContact(c: BackendContact): Contact {
  */
 export async function fetchContacts(): Promise<Contact[]> {
   try {
-    const response = await apiRequest<ContactsListResponse>("/api/contacts")
-    /*
-     * 🔴 LE REGISTRE DES NOMS DONNÉS SE REMPLIT ICI, et nulle part ailleurs :
-     * c'est le seul endroit qui voie passer les alias BRUTS. `toFrontContact`
-     * les fond aussitôt dans `name`, et après lui l'information est perdue.
-     * Un compte qui refuse d'être renommé arrive déjà avec `alias: null`.
-     */
-    depuisContacts(response.contacts ?? [])
-    const contacts = (response.contacts ?? []).map(toFrontContact)
-    persistContacts(contacts)
-    return contacts
+    return await fetchContactsDuServeur()
   } catch (error) {
     // eslint-disable-next-line no-console
     console.warn("[contacts] fetch a echoue", error)
     return loadContacts()
   }
+}
+
+/**
+ * La même lecture, mais SANS REPLI : elle échoue quand le serveur ne répond
+ * pas.
+ *
+ * ⚠️ À PRÉFÉRER DÈS QU'UNE ABSENCE DOIT SIGNIFIER QUELQUE CHOSE. Le repli de
+ * `fetchContacts` rend le cache local, qui peut être vide ou en retard : y
+ * chercher quelqu'un et ne pas l'y trouver ne prouve pas qu'il n'est pas un
+ * contact. Le bandeau « cette personne ne fait pas partie de vos contacts »
+ * ne doit rien affirmer sur une telle base.
+ */
+export async function fetchContactsDuServeur(): Promise<Contact[]> {
+  const response = await apiRequest<ContactsListResponse>("/api/contacts")
+  /*
+   * 🔴 LE REGISTRE DES NOMS DONNÉS SE REMPLIT ICI, et nulle part ailleurs :
+   * c'est le seul endroit qui voie passer les alias BRUTS. `toFrontContact`
+   * les fond aussitôt dans `name`, et après lui l'information est perdue.
+   * Un compte qui refuse d'être renommé arrive déjà avec `alias: null`.
+   */
+  depuisContacts(response.contacts ?? [])
+  const contacts = (response.contacts ?? []).map(toFrontContact)
+  persistContacts(contacts)
+  return contacts
 }
 
 /** POST /api/contacts — Ajoute un contact par son numero Alanya, avec alias optionnel. */
@@ -88,6 +102,16 @@ export async function addContactByPhone(rawNumber: string, alias?: string): Prom
   // dire la vérité plutôt que notre intention.
   poser(response.user?.id, response.alias)
   return toFrontContact(response)
+}
+
+/**
+ * Range un contact fraichement ajoute dans le cache local, pour que les autres
+ * ecrans le connaissent sans attendre un rechargement.
+ */
+export function memoriserContact(contact: Contact) {
+  const connus = loadContacts()
+  if (connus.some((c) => c.id === contact.id)) return
+  persistContacts([...connus, contact])
 }
 
 /** DELETE /api/contacts/{id} — Retire un contact. */

@@ -102,6 +102,14 @@ import {
 // La fiche de contact a quitte ce fichier : elle n'est plus une vignette de
 // rendu mais un objet qui agit (repertoire, appel, conversation).
 import { FicheContact } from "../../../../src/components/fiche-contact"
+import { BandeauInconnu } from "../../../../src/components/enregistrer-inconnu"
+import {
+  ApercuATelecharger,
+  MediaATelecharger,
+  PastilleATelecharger,
+} from "../../../../src/components/media-a-telecharger"
+import { useTelechargementAuto } from "../../../../src/hooks/use-telechargement-auto"
+import { familleDuMedia } from "../../../../src/services/telechargement-auto"
 import { BadgeCompteImage } from "../../../../src/components/badge-compte"
 import {
   fetchChatConversations,
@@ -1795,10 +1803,17 @@ function AudioPlayer({
   src,
   durationMs,
   isMe,
+  differe = false,
 }: {
   src: string
   durationMs?: number
   isMe: boolean
+  /**
+   * Téléchargement automatique des vocaux éteint : RIEN ne part avant la
+   * première lecture — ni la forme d'onde, qui lit le fichier entier, ni les
+   * métadonnées. L'onde dessinée tient la place d'ici là.
+   */
+  differe?: boolean
 }) {
   const { t } = useTranslation()
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -1821,17 +1836,24 @@ function AudioPlayer({
     ondeDeRepli(src, Math.round((durationMs ?? 0) / 1000))
   )
   const [vitesse, setVitesse] = useState(1)
+  /** Le fichier a-t-il le droit de venir ? Toujours, sauf vocal retenu pas encore lu. */
+  const [lance, setLance] = useState(!differe)
+  useEffect(() => {
+    // Réglage rallumé pendant que la bulle est à l'écran.
+    if (!differe) setLance(true)
+  }, [differe])
 
   useEffect(() => {
     let vivant = true
     setOnde(ondeDeRepli(src, Math.round((durationMs ?? 0) / 1000)))
+    if (!lance) return
     void formeOnde(src, src, Math.round((durationMs ?? 0) / 1000)).then((o) => {
       if (vivant) setOnde(o)
     })
     return () => {
       vivant = false
     }
-  }, [src, durationMs])
+  }, [src, durationMs, lance])
 
   /** Se déplacer dans le son d'après l'abscisse du doigt ou du curseur. */
   const allerA = (clientX: number, element: HTMLElement) => {
@@ -1856,6 +1878,7 @@ function AudioPlayer({
   const toggle = () => {
     const audio = audioRef.current
     if (!audio) return
+    setLance(true)
     if (playing) {
       audio.pause()
     } else {
@@ -1872,7 +1895,7 @@ function AudioPlayer({
       <audio
         ref={audioRef}
         src={src}
-        preload="metadata"
+        preload={lance ? "metadata" : "none"}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => {
@@ -2412,11 +2435,13 @@ function VideoPreview({
   name,
   size,
   durationMs,
+  autoPlay,
 }: {
   src: string
   name?: string
   size?: string
   durationMs?: number
+  autoPlay?: boolean
 }) {
   const { t } = useTranslation()
   const [failed, setFailed] = useState(false)
@@ -2443,6 +2468,7 @@ function VideoPreview({
       src={src}
       controls
       preload="metadata"
+      autoPlay={autoPlay}
       onError={() => setFailed(true)}
       style={{
         maxWidth: "100%",
@@ -3797,7 +3823,22 @@ function groupMediaRuns(items: TimelineItem[]): TimelineItem[] {
 const ALBUM_VISIBLE_TILES = 4
 
 /** Grille d'un lot de medias, facon WhatsApp : un seul cadre pour tout l'envoi. */
-function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: number) => void }) {
+function MediaAlbumGrid({
+  msgs,
+  onOpen,
+  retenue,
+  onTelecharger,
+}: {
+  msgs: Message[]
+  onOpen: (index: number) => void
+  /**
+   * Tuile dont le téléchargement automatique est éteint : elle ne montre que
+   * ce qui est déjà là (aperçu flouté d'un média chiffré), et un clic fait
+   * venir la grille au lieu d'ouvrir la galerie.
+   */
+  retenue?: (m: Message) => boolean
+  onTelecharger?: () => void
+}) {
   const { t } = useTranslation()
   const visible = msgs.slice(0, ALBUM_VISIBLE_TILES)
   const hidden = msgs.length - visible.length
@@ -3814,12 +3855,15 @@ function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: num
         marginBottom: 6,
       }}
     >
-      {visible.map((item, index) => (
+      {visible.map((item, index) => {
+        const retenu = retenue?.(item) ?? false
+        return (
         <button
           key={item.id}
           onClick={(e) => {
             e.stopPropagation()
-            onOpen(index)
+            if (retenu && onTelecharger) onTelecharger()
+            else onOpen(index)
           }}
           aria-label={t("f2_open_media_position", {
             nom: item.fileName ?? t("the_media"),
@@ -3839,11 +3883,14 @@ function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: num
           }}
         >
           {item.mediaChiffre ? (
-            <TuileChiffree d={item.mediaChiffre} taille={tile} />
+            <TuileChiffree d={item.mediaChiffre} taille={tile} charger={!retenu} />
+          ) : retenu ? (
+            <span style={{ display: "block", width: tile, height: tile, background: "var(--bg-elevated)" }} />
           ) : (
             <QuoteThumbnail msg={item} size={tile} />
           )}
-          {((item.mediaChiffre?.mime ?? item.mediaMime) ?? "").startsWith("video/") && (
+          {retenu && <PastilleATelecharger />}
+          {!retenu && ((item.mediaChiffre?.mime ?? item.mediaMime) ?? "").startsWith("video/") && (
             <span
               aria-hidden
               style={{
@@ -3879,7 +3926,8 @@ function MediaAlbumGrid({ msgs, onOpen }: { msgs: Message[]; onOpen: (index: num
             </span>
           )}
         </button>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -4145,6 +4193,25 @@ function MessageBubble({
     msg.mediaUrl && !msg.vueUnique && !msg.medias?.[0]?.chiffre ? resolveMediaUrl(msg.mediaUrl) : ""
   const isVideoFile = (msg.mediaMime ?? "").startsWith("video/")
   const canExpandMedia = Boolean(mediaSrc) && !msg.isDeleted
+
+  /*
+   * TÉLÉCHARGEMENT AUTOMATIQUE (retour des testeurs, 14/11/2026 : « il n'y a
+   * pas d'option pour le désactiver »). Sa famille éteinte dans les
+   * paramètres, un média REÇU attend qu'on le touche : la bulle montre sa
+   * place et son poids, rien ne part sur le réseau. Mes propres envois ne
+   * sont jamais retenus. Voir `services/telechargement-auto.ts`.
+   */
+  const autoMedias = useTelechargementAuto()
+  const [mediaDemande, setMediaDemande] = useState(false)
+  const familleMedia = familleDuMedia(msg.mediaChiffre?.mime ?? msg.mediaMime, msg.type)
+  const mediaRetenu =
+    !isMe && !mediaDemande && familleMedia !== null && !autoMedias[familleMedia]
+  /** Même règle, tuile par tuile, pour une grille de médias. */
+  const tuileRetenue = (m: Message) => {
+    if (isMe || mediaDemande) return false
+    const f = familleDuMedia(m.mediaChiffre?.mime ?? m.mediaMime, m.type)
+    return f !== null && !autoMedias[f]
+  }
   // La legende d'un lot vit sur l'un de ses messages, pas forcement le premier.
   // Le regroupement garantit qu'il n'y en a qu'une : la premiere trouvee est
   // donc bien celle du lot.
@@ -4822,7 +4889,12 @@ function MessageBubble({
                 // reste de la bulle (menu, glisser-pour-repondre, heure, statut)
                 // reste celui d'un message ordinaire.
                 <>
-                  <MediaAlbumGrid msgs={albumMsgs} onOpen={onOpenAlbum ?? (() => {})} />
+                  <MediaAlbumGrid
+                    msgs={albumMsgs}
+                    onOpen={onOpenAlbum ?? (() => {})}
+                    retenue={tuileRetenue}
+                    onTelecharger={() => setMediaDemande(true)}
+                  />
                   {albumCaption && (
                     <span style={{ display: "block", marginTop: 5 }}>{albumCaption}</span>
                   )}
@@ -4837,6 +4909,7 @@ function MessageBubble({
                     <MediaChiffre
                       d={msg.mediaChiffre}
                       isMe={isMe}
+                      chargerSeul={!mediaRetenu}
                       typeFichier={fileTypeInfo(msg.mediaChiffre.nom, msg.mediaChiffre.mime)}
                       // La galerie ne lit que des adresses : on lui donne la
                       // copie DÉCHIFFRÉE (blob:), jamais le fichier du serveur.
@@ -4861,7 +4934,14 @@ function MessageBubble({
                   ) : !msg.vueUnique && msg.medias?.[0]?.chiffre && !msg.isDeleted ? (
                     <MediaChiffreIndisponible />
                   ) : null}
-                  {msg.type === "image" && mediaSrc && (
+                  {msg.type === "image" && mediaSrc && mediaRetenu && (
+                    <MediaATelecharger
+                      famille="photo"
+                      taille={msg.fileSize}
+                      onTelecharger={() => setMediaDemande(true)}
+                    />
+                  )}
+                  {msg.type === "image" && mediaSrc && !mediaRetenu && (
                     <img
                       src={mediaSrc}
                       alt={msg.fileName ?? t("f2_image")}
@@ -4924,7 +5004,12 @@ function MessageBubble({
                         </div>
                       )}
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <AudioPlayer src={mediaSrc} durationMs={msg.durationMs} isMe={isMe} />
+                        <AudioPlayer
+                          src={mediaSrc}
+                          durationMs={msg.durationMs}
+                          isMe={isMe}
+                          differe={mediaRetenu}
+                        />
                         {/* Un vocal n'a plus de ligne d'informations sous lui : le
                           bouton de telechargement, jusqu'ici cache dans le menu
                           du message, devient donc visible. */}
@@ -4992,23 +5077,25 @@ function MessageBubble({
                     </div>
                   )}
 
-                  {msg.type === "video" && mediaSrc && (
-                    <VideoPreview
-                      src={mediaSrc}
-                      name={msg.fileName}
-                      size={msg.fileSize}
-                      durationMs={msg.durationMs}
-                    />
-                  )}
-
-                  {msg.type === "file" && mediaSrc && isVideoFile && (
-                    <VideoPreview
-                      src={mediaSrc}
-                      name={msg.fileName}
-                      size={msg.fileSize}
-                      durationMs={msg.durationMs}
-                    />
-                  )}
+                  {(msg.type === "video" || (msg.type === "file" && isVideoFile)) &&
+                    mediaSrc &&
+                    (mediaRetenu ? (
+                      <MediaATelecharger
+                        famille="video"
+                        taille={msg.fileSize}
+                        dureeMs={msg.durationMs}
+                        onTelecharger={() => setMediaDemande(true)}
+                      />
+                    ) : (
+                      <VideoPreview
+                        src={mediaSrc}
+                        name={msg.fileName}
+                        size={msg.fileSize}
+                        durationMs={msg.durationMs}
+                        // Venue d'un clic sur « Télécharger » : on la lance.
+                        autoPlay={mediaDemande}
+                      />
+                    ))}
 
                   {msg.type === "file" &&
                     // 🐛 Un document CHIFFRÉ a sa propre carte (MediaChiffre) : la
@@ -5055,6 +5142,20 @@ function MessageBubble({
                             ext === "webm" ||
                             mime.startsWith("video/"))
 
+                        // Téléchargement automatique éteint : l'aperçu attend un
+                        // geste. Word, Excel et PowerPoint demandaient déjà un
+                        // accord, et la carte de repli ne télécharge rien.
+                        if (
+                          mediaRetenu &&
+                          (isImageFile || isVideoFileLocal || isPdfFile || isTextOrCodeFile)
+                        ) {
+                          return (
+                            <ApercuATelecharger
+                              taille={msg.fileSize}
+                              onTelecharger={() => setMediaDemande(true)}
+                            />
+                          )
+                        }
                         if (isImageFile) {
                           return (
                             <img
@@ -5869,6 +5970,20 @@ export default function ChatRoomPage() {
   const peerIdPourCle = chat?.isGroup
     ? null
     : (chat?.membersInfo?.find((m) => m.id !== getMyUserId())?.id ?? null)
+
+  /*
+   * LE CORRESPONDANT, S'IL PEUT DEVENIR UN CONTACT — pour le bandeau
+   * « cette personne ne fait pas partie de vos contacts » (retour des
+   * testeurs, 14/11/2026 : il fallait recopier son ID dans « nouveau contact »).
+   *
+   * Ni en groupe, ni dans mes notes, ni avec le compte officiel : aucun des
+   * trois n'a de sens dans un répertoire. C'est le bandeau qui vérifie, auprès
+   * du serveur, que la personne n'y est pas déjà.
+   */
+  const correspondantAEnregistrer =
+    chat && !chat.isGroup && !cestMoiMeme && !compteOfficiel
+      ? (chat.membersInfo?.find((m) => m.id !== getMyUserId() && m.publicNumber) ?? null)
+      : null
 
   /** L'ecran de comparaison des codes de securite est-il ouvert ? */
   const [verifOuverte, setVerifOuverte] = useState(false)
@@ -8885,6 +9000,16 @@ export default function ChatRoomPage() {
             {t("grp_stay")}
           </button>
         </div>
+      )}
+
+      {/* Quelqu'un qui n'est pas dans mes contacts : l'enregistrer sans
+          recopier son ID, ou le bloquer (14/11/2026). */}
+      {correspondantAEnregistrer?.publicNumber && (
+        <BandeauInconnu
+          convId={chatId}
+          numero={correspondantAEnregistrer.publicNumber}
+          nomProfil={correspondantAEnregistrer.pseudo ?? ""}
+        />
       )}
 
       {/*

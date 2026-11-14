@@ -7,6 +7,7 @@ import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouvertur
 import { formatBytes } from "../../../../src/services/messages-service"
 import { VisionneuseSensible } from "./visionneuse-sensible"
 import { InfosProtectionPdf } from "../../../../src/components/protection-pdf"
+import { MediaATelecharger } from "../../../../src/components/media-a-telecharger"
 import "./media-chiffre.css"
 
 /**
@@ -40,9 +41,16 @@ export function MediaChiffre({
   typeFichier,
   onOuvrirImage,
   onOuvrirDocument,
+  chargerSeul = true,
 }: {
   d: DescripteurMedia
   isMe: boolean
+  /**
+   * La photo peut-elle venir d'elle-même ? Faux quand le téléchargement
+   * automatique des photos est éteint (14/11/2026) : l'aperçu flouté de
+   * l'enveloppe reste, et un clic la fait venir.
+   */
+  chargerSeul?: boolean
   /** Pastille du type de document (« PDF », « ZIP »…), la même qu'en clair. */
   typeFichier?: { color: string; label: string }
   /** Ouvre la photo déchiffrée (adresse `blob:`) dans la galerie. */
@@ -81,9 +89,9 @@ export function MediaChiffre({
   // La photo se charge d'elle-même ; le reste attend un geste. Une photo
   // SENSIBLE aussi : elle ne s'affiche que dans sa visionneuse.
   useEffect(() => {
-    if (genre === "image" && !d.sensible) charger()
+    if (genre === "image" && !d.sensible && chargerSeul) charger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d.id])
+  }, [d.id, chargerSeul])
 
   // Le blob vit le temps de la bulle.
   useEffect(() => () => {
@@ -158,6 +166,18 @@ export function MediaChiffre({
   }
 
   if (genre === "image") {
+    if (!url && !chargerSeul) {
+      return (
+        <MediaATelecharger
+          famille="photo"
+          taille={formatBytes(d.taille)}
+          apercu={apercu}
+          ratio={ratio}
+          chargement={etat === "chargement"}
+          onTelecharger={charger}
+        />
+      )
+    }
     return (
       <button
         type="button"
@@ -277,7 +297,30 @@ export function MediaChiffre({
  */
 export function MediaChiffreIndisponible() {
   const { t } = useTranslation()
-  return <span className="mc-erreur">{t("e2ee_media_indisponible")}</span>
+  /*
+   * 🔴 UNE TUILE, PLUS UNE PHRASE (E1 de la liste du professeur, 07/11/2026) :
+   * « l'affichage est inesthétique, avant il y avait un trait au milieu ».
+   *
+   * Une ligne de texte en italique à la place d'une photo se lit comme un
+   * défaut d'affichage — on croit que quelque chose a raté. Une tuile de la
+   * taille d'un média, avec un cadenas barré au-dessus d'un filet et la phrase
+   * dessous, dit la même chose en occupant la place que le média aurait prise :
+   * il manque quelque chose ICI, et ce n'est pas une panne.
+   *
+   * ⚠️ MÊME DESSIN SUR LES DEUX CLIENTS (`bulle_media_chiffre.dart`). Le
+   * professeur regardait le téléphone ; les deux affichaient la même phrase.
+   */
+  return (
+    <div className="mc-absent" role="note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+        <rect x="4" y="10" width="16" height="10" rx="2" />
+        <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        <line x1="3" y1="21" x2="21" y2="3" />
+      </svg>
+      <span className="mc-absent-trait" />
+      <span className="mc-absent-texte">{t("e2ee_media_indisponible")}</span>
+    </div>
+  )
 }
 
 function duree(ms: number): string {
@@ -293,11 +336,20 @@ function duree(ms: number): string {
  * Photo : déchiffrée et affichée nette ; vidéo : sa première image, venue de
  * l'enveloppe. En attendant, l'aperçu flouté.
  */
-export function TuileChiffree({ d, taille }: { d: DescripteurMedia; taille: number }) {
+export function TuileChiffree({
+  d,
+  taille,
+  charger = true,
+}: {
+  d: DescripteurMedia
+  taille: number
+  /** Faux : téléchargement automatique éteint, seul l'aperçu flouté s'affiche. */
+  charger?: boolean
+}) {
   const [url, setUrl] = useState<string | null>(null)
   const image = d.mime.startsWith("image/")
   useEffect(() => {
-    if (!image) return
+    if (!image || !charger) return
     let vivant = true
     let cree: string | null = null
     void ouvrirMediaChiffre(d)
@@ -311,7 +363,7 @@ export function TuileChiffree({ d, taille }: { d: DescripteurMedia; taille: numb
       vivant = false
       if (cree) URL.revokeObjectURL(cree)
     }
-  }, [d, image])
+  }, [d, image, charger])
   const apercu = d.apercu ? urlApercu(d.apercu) : null
   const style = { width: taille, height: taille, objectFit: "cover" as const, display: "block" }
   if (url) return <img src={url} alt="" style={style} />

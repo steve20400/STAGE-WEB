@@ -1,0 +1,145 @@
+/*
+ * Le bandeau « cette personne ne fait pas partie de vos contacts ».
+ * Même gabarit que celui de l'arrivée dans un groupe (`.bandeau-arrivee`) :
+ * une ligne sous l'en-tête, hors du fil qui défile.
+ */
+.bandeau-inconnu {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 8px 14px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.bandeau-inconnu .bi-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.bandeau-inconnu .bi-texte {
+  flex: 1 1 180px;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.bandeau-inconnu .bi-boutons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.bandeau-inconnu button {
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bandeau-inconnu button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.bandeau-inconnu .bi-principal {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.bandeau-inconnu .bi-secondaire {
+  background: none;
+  color: var(--text-secondary);
+}
+
+.bandeau-inconnu .bi-danger {
+  background: none;
+  color: var(--danger, #e5484d);
+}
+
+.bandeau-inconnu .bi-fermer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+}
+
+.bandeau-inconnu .bi-fermer:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* Le formulaire prend toute la ligne du bandeau, ou du panneau d'infos. */
+.bi-formulaire {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.bi-formulaire .bi-champ {
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* Hors du bandeau (panneau d'infos), mêmes boutons. */
+.bi-formulaire .bi-boutons {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.bi-formulaire button {
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bi-formulaire .bi-principal {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.bi-formulaire .bi-principal:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.bi-formulaire .bi-secondaire {
+  background: none;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 520px) {
+  .bandeau-inconnu .bi-boutons,
+  .bi-formulaire .bi-boutons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
