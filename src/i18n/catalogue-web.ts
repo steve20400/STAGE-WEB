@@ -1725,12 +1725,14 @@ export const WEB_TRANSLATION_KEYS = [
   "dl_documents_sub",
   "dl_note",
   "dl_show_preview",
+  "cinfo_groupes_communs",
 ] as const
 
 export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    cinfo_groupes_communs: "Groupes en commun",
     f2_typing_nom: "{nom} écrit…",
     info_titre: "Infos du message",
     info_indisponible: "Infos indisponibles pour le moment",
@@ -3471,6 +3473,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Afficher l'aperçu",
   },
   en: {
+    cinfo_groupes_communs: "Groups in common",
     f2_typing_nom: "{nom} is typing…",
     info_titre: "Message info",
     info_indisponible: "Info unavailable right now",
@@ -5197,6 +5200,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Show preview",
   },
   es: {
+    cinfo_groupes_communs: "Grupos en común",
     f2_typing_nom: "{nom} está escribiendo…",
     info_titre: "Info del mensaje",
     info_indisponible: "Info no disponible por ahora",
@@ -6923,6 +6927,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Mostrar vista previa",
   },
   de: {
+    cinfo_groupes_communs: "Gemeinsame Gruppen",
     f2_typing_nom: "{nom} schreibt…",
     info_titre: "Nachrichteninfo",
     info_indisponible: "Info derzeit nicht verfügbar",
@@ -8662,6 +8667,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Vorschau anzeigen",
   },
   pt: {
+    cinfo_groupes_communs: "Grupos em comum",
     f2_typing_nom: "{nom} está a escrever…",
     info_titre: "Info da mensagem",
     info_indisponible: "Info indisponível de momento",
@@ -10388,6 +10394,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Mostrar pré-visualização",
   },
   ru: {
+    cinfo_groupes_communs: "Общие группы",
     f2_typing_nom: "{nom} печатает…",
     info_titre: "Данные сообщения",
     info_indisponible: "Сведения сейчас недоступны",
@@ -12107,6 +12114,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Показать предпросмотр",
   },
   zh: {
+    cinfo_groupes_communs: "共同群组",
     f2_typing_nom: "{nom} 正在输入…",
     info_titre: "消息详情",
     info_indisponible: "暂时无法获取详情",
@@ -13784,6 +13792,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "显示预览",
   },
   sv: {
+    cinfo_groupes_communs: "Gemensamma grupper",
     f2_typing_nom: "{nom} skriver…",
     info_titre: "Meddelandeinfo",
     info_indisponible: "Info inte tillgänglig just nu",
@@ -15505,6 +15514,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Visa förhandsvisning",
   },
   no: {
+    cinfo_groupes_communs: "Felles grupper",
     f2_typing_nom: "{nom} skriver…",
     info_titre: "Meldingsinfo",
     info_indisponible: "Info er ikke tilgjengelig nå",

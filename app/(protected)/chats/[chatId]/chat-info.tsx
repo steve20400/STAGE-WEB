@@ -26,6 +26,7 @@ import { estChiffree } from "../../../../src/services/e2ee-fil"
 import { changerCle } from "../../../../src/services/e2ee-groupe-admin"
 import { E2eeVerification } from "./e2ee-verification"
 import { FichiersPartages } from "./fichiers-partages"
+import { GroupesCommuns } from "./groupes-communs"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
 import {
   LANGUAGE_CODES,
@@ -1424,6 +1425,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </div>
             </div>
           )}
+
+          {/* Les groupes que je partage avec cette personne (14/11/2026). */}
+          {!conv.isGroup && conv.pairUserId && <GroupesCommuns userId={conv.pairUserId} />}
 
           {(tab === "fichiers" || !conv.isGroup) && (
             <div className="cip-section">

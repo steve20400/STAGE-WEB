@@ -161,8 +161,10 @@
   color: var(--accent);
 }
 .pm-geste-icone {
-  font-size: 20px;
+  display: inline-flex;
   line-height: 1;
+  /* Icone en trait (14/11/2026) : plus d'emojis dans l'interface. */
+  color: var(--accent);
 }
 
 /* Un filet sépare la fiche des actions d'administration, qui n'ont pas la même

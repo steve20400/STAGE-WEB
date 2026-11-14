@@ -1,0 +1,62 @@
+/*
+ * « GROUPES EN COMMUN » (14/11/2026) — une ligne par groupe, qui l'ouvre.
+ * Jetons de thème uniquement.
+ */
+.groupes-communs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.groupes-communs button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.groupes-communs button:hover {
+  background: var(--bg-hover);
+}
+.gc-photo {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+}
+.gc-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gc-texte {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gc-nom {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.gc-membres {
+  font-size: 12px;
+  color: var(--text-muted);
+}

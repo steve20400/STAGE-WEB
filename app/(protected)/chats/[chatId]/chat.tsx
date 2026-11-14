@@ -8618,15 +8618,38 @@ export default function ChatRoomPage() {
         navigate(`/chats/${chatId}/info`)
         return
       }
-      setMentionOuverte({
-        id: membre.id,
-        nom: (membre.pseudo ?? membre.publicNumber) || t("chat_member_unknown"),
-        numero: membre.publicNumber,
-        avatar: membre.avatarUrl ?? null,
-        estAdmin: membre.role === "ADMIN",
-      })
+      /*
+       * 🔁 L'INFO CONTACT, ET NON PLUS LE PANNEAU « MEMBRES » (demande du user,
+       * 14/11/2026, comme le mobile et l'application de reference) : un clic
+       * sur un nom ou une @mention ouvre les infos de la discussion a deux
+       * avec cette personne — profil, appels, groupes en commun, fichiers.
+       *
+       * ⚠️ Le web n'a pas d'ecran « contact » sans conversation : on retrouve
+       * le tete-a-tete, ou on le cree s'il n'existe pas (meme chemin que
+       * « Envoyer un message »). Le retour ramene au groupe.
+       *
+       * Moi-meme : mes reglages (mon profil), pas une fiche qui proposerait de
+       * me bloquer. Sans numero (ancien membre), repli sur le panneau.
+       */
+      if (membre.id === getMyUserId()) {
+        navigate("/settings")
+        return
+      }
+      if (!membre.publicNumber) {
+        setMentionOuverte({
+          id: membre.id,
+          nom: (membre.pseudo ?? membre.publicNumber) || t("chat_member_unknown"),
+          numero: membre.publicNumber,
+          avatar: membre.avatarUrl ?? null,
+          estAdmin: membre.role === "ADMIN",
+        })
+        return
+      }
+      void createPrivateChat(membre.publicNumber)
+        .then((cree: { id: string }) => navigate(`/chats/${cree.id}/info`))
+        .catch(() => error(t("server_unreachable")))
     },
-    [backendChat?.membersInfo, chatId, navigate]
+    [backendChat?.membersInfo, chatId, navigate, error, t]
   )
 
   /** Photo d'un membre du groupe, depuis la liste des membres (14/11/2026). */
