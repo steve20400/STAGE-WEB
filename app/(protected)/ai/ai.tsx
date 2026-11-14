@@ -1,4 +1,5 @@
 import { useTranslation } from "../../../src/i18n"
+import { Icone } from "../../../src/components/icone"
 import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import { useToast } from "../../../src/components/toast"
 import {
@@ -148,7 +149,7 @@ export default function AiAssistantPage() {
 
         {!loading && messages.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
-            <div style={{ fontSize: 34, marginBottom: 12 }}>✨</div>
+            <div style={{ marginBottom: 12, color: "var(--accent)" }}><Icone nom="etincelles" taille={34} /></div>
             <div
               style={{
                 fontFamily: "'Bricolage Grotesque', sans-serif",

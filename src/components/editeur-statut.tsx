@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { Icone } from "./icone"
 import { useTranslation } from "../i18n"
 import "./editeur-statut.css"
 
@@ -236,7 +237,7 @@ export function EditeurStatut({
             title={t("statut_dessiner")}
             aria-pressed={outil === "dessin"}
           >
-            ✏️
+            <Icone nom="crayon" taille={18} />
           </button>
           <button
             type="button"

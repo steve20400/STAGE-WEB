@@ -1596,11 +1596,24 @@ textarea.room-textarea::placeholder {
  * L EXPEDITEUR EN GROUPE (14/11/2026, comme l application de reference) :
  * sa photo et son nom en tete de serie, cliquables, qui ouvrent sa fiche.
  */
+/*
+ * 🐛 LA LARGEUR DU NOM SUIVAIT CELLE DE LA BULLE (user, 14/11/2026) : « 70 % »
+ * se calculait sur la colonne, qui prend la largeur de la bulle — sous « cool »,
+ * il ne restait que « Do… ». La ligne a une largeur NULLE et laisse deborder le
+ * nom : il a sa propre limite, et n'elargit pas la bulle pour autant (elle
+ * s'etire sur sa colonne).
+ */
+.expediteur-groupe-ligne {
+  width: 0;
+  overflow: visible;
+  white-space: nowrap;
+}
 .expediteur-groupe {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  max-width: 70%;
+  width: max-content;
+  max-width: min(260px, 60vw);
   margin: 0 0 3px;
   padding: 2px 4px 0;
   border: 0;

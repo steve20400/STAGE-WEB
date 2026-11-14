@@ -1,4 +1,5 @@
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
+import { Icone } from "../../../src/components/icone"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { compresserImage } from "../../../src/lib/image-compression"
@@ -911,7 +912,7 @@ export default function StatusPage() {
                   cursor: "pointer",
                 }}
               >
-                🎙 {t("status_audio_btn")}
+                <Icone nom="micro" taille={15} /> {t("status_audio_btn")}
               </button>
             )}
             <button
@@ -1214,7 +1215,7 @@ export default function StatusPage() {
             */}
             {currentStatus.type === "AUDIO" && currentStatus.mediaUrl && (
               <div className="statut-audio">
-                <div className="statut-audio-disque" aria-hidden="true">🎵</div>
+                <div className="statut-audio-disque" aria-hidden="true"><Icone nom="musique" taille={28} /></div>
                 <audio
                   key={currentStatus.id}
                   ref={(el) => {
@@ -1374,7 +1375,7 @@ export default function StatusPage() {
                   aria-label={t("status_voice_reply")}
                   title={t("status_voice_reply")}
                 >
-                  {micro === "reponse" ? "➤" : "🎙"}
+                  <Icone nom={micro === "reponse" ? "envoyer" : "micro"} taille={18} />
                 </button>
                 {micro !== "reponse" && (
                   <button type="submit" disabled={envoiReponse || reponse.trim() === ""}>

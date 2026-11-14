@@ -1,4 +1,5 @@
 import { useMaintenance, verifierMaintenance } from "../lib/maintenance"
+import { Icone } from "./icone"
 import { useTranslation } from "../i18n"
 
 /**
@@ -32,7 +33,7 @@ export function EcranMaintenance() {
       }}
     >
       <div style={{ fontSize: 56 }} aria-hidden="true">
-        🛠️
+        <Icone nom="outil" taille={56} />
       </div>
       <h1 style={{ fontSize: 24, margin: 0 }}>{t("maintenance_titre")}</h1>
       <p style={{ maxWidth: 420, margin: 0, opacity: 0.75, lineHeight: 1.5 }}>{t("maintenance_texte")}</p>

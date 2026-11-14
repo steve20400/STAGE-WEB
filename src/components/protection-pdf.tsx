@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Icone } from "./icone"
 
 import { useTranslation } from "../i18n"
 import { proprietaireAuHasard, type ProtectionPdf } from "../services/e2ee-media"
@@ -117,23 +118,23 @@ export function InfosProtectionPdf({ protection, mediaId, isMe }: { protection: 
 
   return (
     <div className="ppdf-infos" onClick={(e) => e.stopPropagation()}>
-      {!protection.imprimer && <span>🖨️⃠ {t("pdfp_impression_interdite")}</span>}
+      {!protection.imprimer && <span><Icone nom="imprimante-barree" taille={14} /> {t("pdfp_impression_interdite")}</span>}
       {protection.ouverture && isMe && (
         <>
           <span data-info="ouverture">
-            🔓 {t("pdfp_ouverture")} : <code>{protection.ouverture}</code>
+            <Icone nom="cadenas-ouvert" taille={14} /> {t("pdfp_ouverture")} : <code>{protection.ouverture}</code>
           </span>
           <span>
-            🛡️ {t("pdfp_proprietaire")} : <code>{protection.proprietaire}</code>
+            <Icone nom="bouclier" taille={14} /> {t("pdfp_proprietaire")} : <code>{protection.proprietaire}</code>
           </span>
         </>
       )}
       {protection.ouverture && !isMe && !vu && (
         <button type="button" className="stk-action" onClick={voir} data-action="voir-mdp">
-          👁 {t("pdfp_voir_une_fois")}
+          <Icone nom="oeil" taille={14} /> {t("pdfp_voir_une_fois")}
         </button>
       )}
-      {protection.ouverture && !isMe && vu && !revele && <span>🙈 {t("pdfp_deja_vu")}</span>}
+      {protection.ouverture && !isMe && vu && !revele && <span><Icone nom="oeil-barre" taille={14} /> {t("pdfp_deja_vu")}</span>}
       {revele && protection.ouverture && (
         <FenetreSticker titre={t("pdfp_mdp_ouverture_titre")} onFermer={() => setRevele(false)} libelleFermer={t("close")}>
           <div className="stk-recu">

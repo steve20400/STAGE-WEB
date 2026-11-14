@@ -1,3 +1,4 @@
+import { Icone } from "../../../../src/components/icone"
 import {
   Component,
   useState,
@@ -1642,13 +1643,13 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
 function LocationCard({ content, isMe }: { content: string | null; isMe: boolean }) {
   const position = positionDepuisContenu(content)
   if (!position) {
-    return <div style={{ opacity: 0.8, fontSize: 13 }}>📍 Position</div>
+    return <div style={{ opacity: 0.8, fontSize: 13 }}><Icone nom="repere" taille={14} /> Position</div>
   }
   return (
     <div style={{ minWidth: 200 }}>
       {position.label && (
         <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>
-          📍 {position.label}
+          <Icone nom="repere" taille={14} /> {position.label}
         </div>
       )}
       <GpsPreview lat={position.lat} lng={position.lng} isMe={isMe} />
@@ -4676,21 +4677,23 @@ function MessageBubble({
                 tete de serie. Un clic ouvre sa fiche — le meme panneau que
                 les @mentions (14/11/2026, comme l'application de reference). */}
             {isGroup && !isMe && senderName && !msg.isDeleted && (
-              <button
-                type="button"
-                className="expediteur-groupe"
-                onClick={onOuvrirMention ? () => onOuvrirMention(msg.senderId, senderName) : undefined}
-                title={senderName}
-              >
-                <span className="expediteur-groupe-photo" aria-hidden="true">
-                  {avatarDisplaySrc(senderAvatar ?? undefined) ? (
-                    <img src={avatarDisplaySrc(senderAvatar ?? undefined)!} alt="" />
-                  ) : (
-                    senderName.trim().slice(0, 1).toUpperCase()
-                  )}
-                </span>
-                <span className="expediteur-groupe-nom">{senderName}</span>
-              </button>
+              <div className="expediteur-groupe-ligne">
+                <button
+                  type="button"
+                  className="expediteur-groupe"
+                  onClick={onOuvrirMention ? () => onOuvrirMention(msg.senderId, senderName) : undefined}
+                  title={senderName}
+                >
+                  <span className="expediteur-groupe-photo" aria-hidden="true">
+                    {avatarDisplaySrc(senderAvatar ?? undefined) ? (
+                      <img src={avatarDisplaySrc(senderAvatar ?? undefined)!} alt="" />
+                    ) : (
+                      senderName.trim().slice(0, 1).toUpperCase()
+                    )}
+                  </span>
+                  <span className="expediteur-groupe-nom">{senderName}</span>
+                </button>
+              </div>
             )}
             {/* Bulle */}
             <div
@@ -4830,7 +4833,7 @@ function MessageBubble({
                       au moins la nature du statut. */}
                   {msg.statutCite.type === "AUDIO" || msg.statutCite.type === "VIDEO" ? (
                     <span className="statut-cite-vignette icone" aria-hidden="true">
-                      {msg.statutCite.type === "AUDIO" ? "🎵" : "🎬"}
+                      <Icone nom={msg.statutCite.type === "AUDIO" ? "musique" : "film"} taille={18} />
                     </span>
                   ) : msg.statutCite.mediaUrl ? (
                     <img
@@ -9064,7 +9067,7 @@ export default function ChatRoomPage() {
                 title={t("chat_pinned_banner")}
               >
                 <span className="bandeau-epingle-icone" aria-hidden="true">
-                  📌
+                  <Icone nom="epingle" taille={16} />
                 </span>
                 <span className="bandeau-epingle-textes">
                   <span className="bandeau-epingle-titre">{t("chat_pinned_banner")}</span>

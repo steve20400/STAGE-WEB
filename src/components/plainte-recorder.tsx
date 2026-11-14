@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { Icone } from "./icone"
 import type { IvrSession } from "../services/call-manager"
 import { sendIvrBackToMenu } from "../services/call-manager"
 import { uploadMedia, urlSonStandard } from "../services/media-service"
@@ -296,7 +297,7 @@ export function PlainteRecorder({ session }: { session: IvrSession }) {
 
   return (
     <div style={styleBoite}>
-      <span style={{ fontSize: 16 }}>{etat === "echec" ? "⚠️" : "🎙️"}</span>
+      <Icone nom={etat === "echec" ? "alerte" : "micro"} taille={16} />
       <span style={styleTexte}>{libelle(etat, erreur)}</span>
       {etat !== "echec" && etat !== "envoye" && (
         <span style={styleChrono}>{mmss(duree)}</span>

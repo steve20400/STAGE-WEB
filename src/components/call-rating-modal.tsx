@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Icone } from "./icone"
 import { apiRequest } from "../lib/api-client"
 import { useTranslation } from "../i18n"
 
@@ -83,7 +84,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
       >
         {submitted ? (
           <div>
-            <div style={{ fontSize: 40, marginBottom: 8 }}>✨</div>
+            <div style={{ marginBottom: 8, color: "var(--accent)" }}><Icone nom="etincelles" taille={40} /></div>
             <h3 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0" }}>
               {t("rate_thanks")}
             </h3>

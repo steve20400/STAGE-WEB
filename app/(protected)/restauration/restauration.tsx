@@ -17,6 +17,7 @@
  * passe à vide et de sortir.
  */
 import { useEffect, useState } from "react"
+import { Icone } from "../../../src/components/icone"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
   restaurerALaConnexionSuivie,
@@ -129,7 +130,7 @@ export default function RestaurationPage() {
       <style>{STYLE}</style>
       <div className="carte" role="status" aria-live="polite">
         <div className="icone" aria-hidden>
-          🔒
+          <Icone nom="cadenas" taille={44} />
         </div>
         <h1>
           {issue === null

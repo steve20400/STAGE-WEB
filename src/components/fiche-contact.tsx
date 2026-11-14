@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Icone } from "./icone"
 import { useLocation, useNavigate } from "react-router-dom"
 import { codeErreurApi } from "../lib/api-client"
 import {
@@ -41,7 +42,7 @@ export function FicheContact({ content, isMe }: { content: string | null; isMe: 
   const contacts = useMemo(() => contactsDepuisContenu(content), [content])
 
   if (!contacts) {
-    return <div className="fc-illisible">👤 {t("fc_contact")}</div>
+    return <div className="fc-illisible"><Icone nom="personne" taille={14} /> {t("fc_contact")}</div>
   }
 
   return (

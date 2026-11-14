@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Icone } from "../../../src/components/icone"
 import { useNavigate } from "react-router-dom"
 import { useToast } from "../../../src/components/toast"
 import { useTranslation } from "../../../src/i18n"
@@ -223,7 +224,7 @@ export default function MeetingsPage() {
           </div>
         ) : error ? (
           <div className="empty-state">
-            <div className="empty-icon">⚠️</div>
+            <div className="empty-icon"><Icone nom="alerte" taille={32} /></div>
             <p>{error}</p>
             <button className="empty-retry" onClick={() => void loadMeetings()}>
               {t("retry")}
