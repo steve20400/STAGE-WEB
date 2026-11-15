@@ -28,9 +28,11 @@ import {
   subscribeToEmballages,
   subscribeToMembreParti,
   subscribeToTrousseau,
+  subscribeToRenvoi,
   subscribeToSessionRevoked,
   subscribeToWsConnected,
 } from "../services/websocket-service"
+import { demanderRenvois, servirRenvois } from "../services/e2ee-renvois"
 import { oublierTrousseau, rattraper, releverEmballages } from "../services/e2ee-groupe-fil"
 import { releverEtRanger } from "../services/e2ee-releve"
 import { MESSAGE_EVICTION, poseMessageDeconnexion } from "../data/session-message"
@@ -214,6 +216,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Une clé de groupe m'attend : relevée tout de suite, écran ouvert ou non.
     // Puis le fil ouvert sur ce groupe se relit (13/11/2026).
+    // Piste B (15/11/2026) : demander ce qui manque ici, servir ce que
+    // d'autres attendent, et servir de nouveau à chaque sonnette.
+    void demanderRenvois()
+    void servirRenvois()
+    const stopRenvoi = subscribeToRenvoi(() => void servirRenvois())
+
     const stopTrousseau = subscribeToTrousseau((convId) => {
       void releverEtRanger()
         .then(() => annoncerCleGroupeArrivee(convId))

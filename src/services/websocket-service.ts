@@ -571,6 +571,13 @@ export function subscribeToMembreParti(handler: (convId: string) => void): () =>
  * m'être emballée (`e2ee_emballage`), ou des membres attendent la leur
  * (`e2ee_manquants`). Le gestionnaire reçoit le verbe et le groupe.
  */
+/** Un correspondant attend un de mes messages sur un nouvel appareil (piste B). */
+export function subscribeToRenvoi(handler: () => void): () => void {
+  return addListener((event) => {
+    if (event.type === "e2ee_renvoi") handler()
+  })
+}
+
 export function subscribeToEmballages(
   handler: (verbe: "e2ee_emballage" | "e2ee_manquants", convId: string) => void,
 ): () => void {
