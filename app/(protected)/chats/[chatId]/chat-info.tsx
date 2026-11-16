@@ -1,3 +1,4 @@
+import { apiRequest } from "../../../../src/lib/api-client"
 import { useEffect, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
@@ -403,6 +404,25 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   }
 
   const numeroDuPair = conv?.alanyaId ?? null
+
+  /*
+   * LE STATUT (« bio ») DU CORRESPONDANT (15/11/2026, user). La liste des
+   * conversations ne le porte pas : la fiche le lit elle-même, comme le mobile
+   * (`GET /api/users/:id/fiche`).
+   */
+  const [statutPair, setStatutPair] = useState<string | null>(null)
+  useEffect(() => {
+    if (!pairId) return
+    let annule = false
+    void apiRequest<{ statusMsg: string | null }>(`/api/users/${encodeURIComponent(pairId)}/fiche`)
+      .then((f) => {
+        if (!annule) setStatutPair(f?.statusMsg?.trim() || null)
+      })
+      .catch(() => undefined)
+    return () => {
+      annule = true
+    }
+  }, [pairId])
   useEffect(() => {
     if (!numeroDuPair) return
     let annule = false
@@ -605,6 +625,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
            « Voir plus », reglages du groupe. */
         .notif-label small { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
         .notif-row + .notif-row { margin-top: 12px; }
+        .cip-statut { margin: -6px 0 14px; color: var(--text-secondary); font-size: 13px; line-height: 1.45; text-align: center; white-space: pre-wrap; word-break: break-word; }
         .cip-description { display: block; width: 100%; margin: -8px 0 16px; padding: 8px 10px; border: 1px dashed transparent; border-radius: 8px; background: none; color: var(--text-secondary); font: inherit; font-size: 13px; line-height: 1.5; text-align: center; white-space: pre-wrap; word-break: break-word; cursor: pointer; }
         .cip-description:hover:not(:disabled) { border-color: var(--border-default); }
         .cip-description:disabled { cursor: default; }
@@ -780,6 +801,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 {conv.statusMsg ?? (conv.online ? t("online") : t("cinfo_status_unknown"))}
               </div>
             )}
+            {!conv.isGroup && statutPair && <div className="cip-statut">{statutPair}</div>}
 
             <div className="cip-actions">
               <button
