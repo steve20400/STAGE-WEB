@@ -4371,8 +4371,8 @@ export default function SettingsPage() {
                   <div className="s-card-title">{t("set_tech_stack")}</div>
                   {[
                     { label: t("set_stack_frontend"), value: t("set_stack_frontend_value") },
-                    { label: t("set_stack_backend"), value: "Next.js (App Router, API Routes)" },
-                    { label: t("database"), value: "PostgreSQL  -  Prisma" },
+                    { label: t("set_stack_backend"), value: "Alanya (API)" },
+                    { label: t("database"), value: "Alanya" },
                     { label: t("set_stack_realtime"), value: t("set_stack_realtime_value") },
                     { label: t("set_stack_calls"), value: t("set_stack_calls_value") },
                     { label: t("set_stack_auth"), value: t("set_stack_auth_value") },
@@ -4414,7 +4414,8 @@ export default function SettingsPage() {
                   <RealtimeStatus />
                 </div>
 
-                {/* Comparateur de fournisseurs TURN (Metered, Cloudflare, coturn...) */}
+                {/* Comparateur de relais d'appel. Aucun nom de technologie ni de
+                    fournisseur à l'écran (décision du user, 18/11/2026). */}
                   <TurnTester />
                 </>
               )}

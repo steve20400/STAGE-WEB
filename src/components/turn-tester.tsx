@@ -201,8 +201,8 @@ export default function TurnTester() {
             {verdictOk ? t("turn_ok") : t("turn_ko")}
           </div>
           <div style={{ color: "var(--text-secondary)" }}>
-            {t(result.label)} — {t("turn_candidates")} : {result.data.relay} relay,{" "}
-            {result.data.srflx} srflx, {result.data.host} host
+            {t(result.label)} — {t("turn_candidates")} : {result.data.relay} / {result.data.srflx} /{" "}
+            {result.data.host}
             {result.data.firstRelayMs !== null && (
               <>
                 {" "}
