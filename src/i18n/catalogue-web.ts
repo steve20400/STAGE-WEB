@@ -2318,10 +2318,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "Appel vidéo entrant",
     wants_a_video_call: "Souhaite un appel vidéo",
     is_calling_you: "Vous appelle",
-    call_turn_blocked:
-      "Flux audio/vidéo bloqué malgré le relais TURN : réessayez ou changez de réseau.",
-    call_turn_missing:
-      "Aucun relais TURN dans ce déploiement : ajoutez les variables VITE_TURN_* puis redéployez.",
+    call_turn_blocked: "Le son et l'image restent bloqués malgré le relais d'appel : réessayez ou changez de réseau.",
+    call_turn_missing: "Les appels sont momentanément indisponibles sur ce réseau. Réessayez plus tard.",
     call_need_mic_cam: "Micro et caméra requis pour l'appel.",
     call_need_mic: "Micro requis pour l'appel.",
     call_answer_incoming_first: "Un appel entrant est en cours. Répondez-y d'abord.",
@@ -3272,20 +3270,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_remote:
       "Moteur actif : {moteur}. Le texte que vous faites traduire est envoyé à {moteur}.",
     trad_engine_name_navigateur: "Navigateur (sur cet appareil)",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "Traduction en ligne confidentielle",
+    trad_engine_name_google: "Traduction en ligne, toutes langues",
+    trad_engine_name_deepl: "Traduction en ligne, langues européennes",
+    trad_engine_name_libretranslate: "Traduction Alanya",
     trad_engine_note_navigateur:
       "Gratuit, et rien ne sort de cet appareil : c'est le navigateur qui traduit. Fonctionne sur Chrome et Edge, sur ordinateur.",
-    trad_engine_note_azure:
-      "Microsoft ne conserve pas le texte envoyé, ne l'utilise pas pour entraîner ses modèles et n'en garde aucune trace.",
-    trad_engine_note_google:
-      "Facturé au caractère quel que soit l'alphabet : une lettre cyrillique ou un idéogramme comptent comme une lettre latine. Le texte est envoyé à Google.",
-    trad_engine_note_deepl:
-      "Souvent la meilleure qualité sur les langues européennes, mais son catalogue de langues est plus étroit. Le texte est envoyé à DeepL.",
-    trad_engine_note_libretranslate:
-      "Logiciel libre, sur un serveur auto-hébergé : gratuit hors coût du serveur. Faute de modèle direct entre deux langues, la traduction passe par l'anglais et la qualité baisse.",
+    trad_engine_note_azure: "Notre prestataire de traduction ne conserve pas le texte envoyé, ne l'utilise pas pour entraîner ses modèles et n'en garde aucune trace.",
+    trad_engine_note_google: "Couvre presque toutes les langues. Facturé au caractère, quel que soit l'alphabet. Le texte est envoyé à notre prestataire de traduction.",
+    trad_engine_note_deepl: "Souvent la meilleure qualité sur les langues européennes, mais moins de langues. Le texte est envoyé à notre prestataire de traduction.",
+    trad_engine_note_libretranslate: "Sur nos propres serveurs : le texte ne quitte pas Alanya. Faute de traduction directe entre deux langues, elle passe par l'anglais et la qualité baisse.",
     trad_local_title: "Traduction sur cet appareil",
     trad_local_desc:
       "Votre navigateur télécharge les composants de langue et traduit sans rien envoyer. Choisissez les langues que vous recevez : elles seront traduites vers {langue}.",
@@ -4088,10 +4082,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "Incoming video call",
     wants_a_video_call: "Wants a video call",
     is_calling_you: "Is calling you",
-    call_turn_blocked:
-      "Audio/video stream blocked despite the TURN relay: try again or switch network.",
-    call_turn_missing:
-      "No TURN relay in this deployment: add the VITE_TURN_* variables, then redeploy.",
+    call_turn_blocked: "Audio and video are still blocked despite the call relay: try again or switch network.",
+    call_turn_missing: "Calls are temporarily unavailable on this network. Try again later.",
     call_need_mic_cam: "Microphone and camera are required for the call.",
     call_need_mic: "A microphone is required for the call.",
     call_answer_incoming_first: "There is an incoming call. Answer it first.",
@@ -5039,20 +5031,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_remote:
       "Active engine: {moteur}. The text you have translated is sent to {moteur}.",
     trad_engine_name_navigateur: "Browser (on this device)",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "Confidential online translation",
+    trad_engine_name_google: "Online translation, all languages",
+    trad_engine_name_deepl: "Online translation, European languages",
+    trad_engine_name_libretranslate: "Alanya translation",
     trad_engine_note_navigateur:
       "Free, and nothing leaves this device: the browser does the translating. Works in Chrome and Edge, on desktop.",
-    trad_engine_note_azure:
-      "Microsoft does not keep the text you send, does not use it to train its models and retains no trace of it.",
-    trad_engine_note_google:
-      "Billed per character whatever the alphabet: a Cyrillic letter or an ideogram counts the same as a Latin one. The text is sent to Google.",
-    trad_engine_note_deepl:
-      "Often the best quality on European languages, but its language catalogue is narrower. The text is sent to DeepL.",
-    trad_engine_note_libretranslate:
-      "Open-source software on a self-hosted server: free apart from the cost of the server. With no direct model between two languages, translation goes through English and quality drops.",
+    trad_engine_note_azure: "Our translation provider does not keep the text you send, does not use it to train its models and retains no trace of it.",
+    trad_engine_note_google: "Covers almost every language. Billed per character, whatever the alphabet. The text is sent to our translation provider.",
+    trad_engine_note_deepl: "Often the best quality for European languages, but fewer languages. The text is sent to our translation provider.",
+    trad_engine_note_libretranslate: "On our own servers: the text never leaves Alanya. Without a direct model between two languages, it goes through English and quality drops.",
     trad_local_title: "On-device translation",
     trad_local_desc:
       "Your browser downloads the language components and translates without sending anything. Pick the languages you receive: they will be translated into {langue}.",
@@ -5854,10 +5842,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "Videollamada entrante",
     wants_a_video_call: "Quiere una videollamada",
     is_calling_you: "Te está llamando",
-    call_turn_blocked:
-      "Flujo de audio/vídeo bloqueado pese al relé TURN: inténtalo de nuevo o cambia de red.",
-    call_turn_missing:
-      "No hay relé TURN en este despliegue: añade las variables VITE_TURN_* y vuelve a desplegar.",
+    call_turn_blocked: "El audio y el vídeo siguen bloqueados pese al relé de llamada: inténtelo de nuevo o cambie de red.",
+    call_turn_missing: "Las llamadas no están disponibles temporalmente en esta red. Inténtelo más tarde.",
     call_need_mic_cam: "Se necesitan micrófono y cámara para la llamada.",
     call_need_mic: "Se necesita un micrófono para la llamada.",
     call_answer_incoming_first: "Hay una llamada entrante. Respóndela primero.",
@@ -6799,20 +6785,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_remote:
       "Motor activo: {moteur}. El texto que mandas traducir se envía a {moteur}.",
     trad_engine_name_navigateur: "Navegador (en este dispositivo)",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "Traducción en línea confidencial",
+    trad_engine_name_google: "Traducción en línea, todos los idiomas",
+    trad_engine_name_deepl: "Traducción en línea, idiomas europeos",
+    trad_engine_name_libretranslate: "Traducción Alanya",
     trad_engine_note_navigateur:
       "Gratis, y nada sale de este dispositivo: traduce el propio navegador. Funciona en Chrome y Edge, en ordenador.",
-    trad_engine_note_azure:
-      "Microsoft no conserva el texto enviado, no lo usa para entrenar sus modelos y no guarda ningún rastro.",
-    trad_engine_note_google:
-      "Se factura por carácter sea cual sea el alfabeto: una letra cirílica o un ideograma cuentan igual que una letra latina. El texto se envía a Google.",
-    trad_engine_note_deepl:
-      "A menudo la mejor calidad en lenguas europeas, pero su catálogo de idiomas es más estrecho. El texto se envía a DeepL.",
-    trad_engine_note_libretranslate:
-      "Software libre en un servidor autoalojado: gratis salvo el coste del servidor. A falta de un modelo directo entre dos idiomas, la traducción pasa por el inglés y la calidad baja.",
+    trad_engine_note_azure: "Nuestro proveedor de traducción no conserva el texto enviado, no lo usa para entrenar sus modelos y no guarda ningún rastro.",
+    trad_engine_note_google: "Cubre casi todos los idiomas. Se factura por carácter, sea cual sea el alfabeto. El texto se envía a nuestro proveedor de traducción.",
+    trad_engine_note_deepl: "A menudo la mejor calidad en idiomas europeos, pero con menos idiomas. El texto se envía a nuestro proveedor de traducción.",
+    trad_engine_note_libretranslate: "En nuestros propios servidores: el texto no sale de Alanya. Sin traducción directa entre dos idiomas, pasa por el inglés y la calidad baja.",
     trad_local_title: "Traducción en este dispositivo",
     trad_local_desc:
       "Tu navegador descarga los componentes de idioma y traduce sin enviar nada. Elige los idiomas que recibes: se traducirán a {langue}.",
@@ -7622,10 +7604,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "Eingehender Videoanruf",
     wants_a_video_call: "Möchte einen Videoanruf",
     is_calling_you: "Ruft dich an",
-    call_turn_blocked:
-      "Audio-/Videostream trotz TURN-Relay blockiert: erneut versuchen oder Netzwerk wechseln.",
-    call_turn_missing:
-      "Kein TURN-Relay in dieser Bereitstellung: VITE_TURN_*-Variablen hinzufügen und neu bereitstellen.",
+    call_turn_blocked: "Ton und Bild bleiben trotz Anruf-Relais blockiert: Versuchen Sie es erneut oder wechseln Sie das Netz.",
+    call_turn_missing: "Anrufe sind in diesem Netz vorübergehend nicht verfügbar. Versuchen Sie es später erneut.",
     call_need_mic_cam: "Für den Anruf sind Mikrofon und Kamera erforderlich.",
     call_need_mic: "Für den Anruf ist ein Mikrofon erforderlich.",
     call_answer_incoming_first: "Es geht ein Anruf ein. Nimm ihn zuerst an.",
@@ -8572,20 +8552,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_remote:
       "Aktive Engine: {moteur}. Der Text, den Sie übersetzen lassen, wird an {moteur} gesendet.",
     trad_engine_name_navigateur: "Browser (auf diesem Gerät)",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "Vertrauliche Online-Übersetzung",
+    trad_engine_name_google: "Online-Übersetzung, alle Sprachen",
+    trad_engine_name_deepl: "Online-Übersetzung, europäische Sprachen",
+    trad_engine_name_libretranslate: "Alanya-Übersetzung",
     trad_engine_note_navigateur:
       "Kostenlos, und nichts verlässt dieses Gerät: Der Browser übersetzt selbst. Funktioniert in Chrome und Edge, auf dem Computer.",
-    trad_engine_note_azure:
-      "Microsoft speichert den gesendeten Text nicht, verwendet ihn nicht zum Trainieren seiner Modelle und bewahrt keine Spur davon auf.",
-    trad_engine_note_google:
-      "Abrechnung pro Zeichen, unabhängig vom Alphabet: Ein kyrillischer Buchstabe oder ein Schriftzeichen zählt wie ein lateinischer. Der Text wird an Google gesendet.",
-    trad_engine_note_deepl:
-      "Oft die beste Qualität bei europäischen Sprachen, aber der Sprachkatalog ist schmaler. Der Text wird an DeepL gesendet.",
-    trad_engine_note_libretranslate:
-      "Freie Software auf einem selbst gehosteten Server: kostenlos abgesehen von den Serverkosten. Fehlt ein direktes Modell zwischen zwei Sprachen, läuft die Übersetzung über Englisch und die Qualität sinkt.",
+    trad_engine_note_azure: "Unser Übersetzungsanbieter speichert den gesendeten Text nicht, nutzt ihn nicht zum Trainieren seiner Modelle und bewahrt keine Spur davon auf.",
+    trad_engine_note_google: "Deckt fast alle Sprachen ab. Abrechnung pro Zeichen, unabhängig vom Alphabet. Der Text wird an unseren Übersetzungsanbieter gesendet.",
+    trad_engine_note_deepl: "Oft die beste Qualität für europäische Sprachen, aber weniger Sprachen. Der Text wird an unseren Übersetzungsanbieter gesendet.",
+    trad_engine_note_libretranslate: "Auf unseren eigenen Servern: Der Text verlässt Alanya nicht. Ohne direkte Übersetzung zwischen zwei Sprachen geht sie über Englisch, und die Qualität sinkt.",
     trad_local_title: "Übersetzung auf diesem Gerät",
     trad_local_desc:
       "Ihr Browser lädt die Sprachkomponenten herunter und übersetzt, ohne etwas zu senden. Wählen Sie die Sprachen, die Sie empfangen: Sie werden nach {langue} übersetzt.",
@@ -9391,10 +9367,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "Videochamada recebida",
     wants_a_video_call: "Pretende uma videochamada",
     is_calling_you: "Está a ligar-lhe",
-    call_turn_blocked:
-      "Fluxo de áudio/vídeo bloqueado apesar do retransmissor TURN: tente novamente ou mude de rede.",
-    call_turn_missing:
-      "Sem retransmissor TURN nesta implantação: adicione as variáveis VITE_TURN_* e volte a implantar.",
+    call_turn_blocked: "O som e a imagem continuam bloqueados apesar do relé da chamada: tente novamente ou mude de rede.",
+    call_turn_missing: "As chamadas estão temporariamente indisponíveis nesta rede. Tente mais tarde.",
     call_need_mic_cam: "São necessários microfone e câmara para a chamada.",
     call_need_mic: "É necessário um microfone para a chamada.",
     call_answer_incoming_first: "Há uma chamada a entrar. Atenda-a primeiro.",
@@ -10337,20 +10311,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_remote:
       "Motor ativo: {moteur}. O texto que manda traduzir é enviado ao {moteur}.",
     trad_engine_name_navigateur: "Navegador (neste dispositivo)",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "Tradução online confidencial",
+    trad_engine_name_google: "Tradução online, todas as línguas",
+    trad_engine_name_deepl: "Tradução online, línguas europeias",
+    trad_engine_name_libretranslate: "Tradução Alanya",
     trad_engine_note_navigateur:
       "Gratuito, e nada sai deste dispositivo: é o navegador que traduz. Funciona no Chrome e no Edge, em computador.",
-    trad_engine_note_azure:
-      "A Microsoft não conserva o texto enviado, não o utiliza para treinar os seus modelos e não guarda qualquer registo.",
-    trad_engine_note_google:
-      "Faturado por caractere seja qual for o alfabeto: uma letra cirílica ou um ideograma contam como uma letra latina. O texto é enviado à Google.",
-    trad_engine_note_deepl:
-      "Muitas vezes a melhor qualidade nas línguas europeias, mas o seu catálogo de idiomas é mais estreito. O texto é enviado ao DeepL.",
-    trad_engine_note_libretranslate:
-      "Software livre num servidor autoalojado: gratuito além do custo do servidor. Sem um modelo direto entre dois idiomas, a tradução passa pelo inglês e a qualidade baixa.",
+    trad_engine_note_azure: "O nosso fornecedor de tradução não guarda o texto enviado, não o usa para treinar os seus modelos e não conserva nenhum registo.",
+    trad_engine_note_google: "Abrange quase todas as línguas. Faturado por carácter, seja qual for o alfabeto. O texto é enviado ao nosso fornecedor de tradução.",
+    trad_engine_note_deepl: "Muitas vezes a melhor qualidade nas línguas europeias, mas com menos línguas. O texto é enviado ao nosso fornecedor de tradução.",
+    trad_engine_note_libretranslate: "Nos nossos próprios servidores: o texto não sai da Alanya. Sem tradução direta entre duas línguas, passa pelo inglês e a qualidade baixa.",
     trad_local_title: "Tradução neste dispositivo",
     trad_local_desc:
       "O seu navegador descarrega os componentes de idioma e traduz sem enviar nada. Escolha os idiomas que recebe: serão traduzidos para {langue}.",
@@ -11149,10 +11119,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "Входящий видеозвонок",
     wants_a_video_call: "Хочет видеозвонок",
     is_calling_you: "Вам звонят",
-    call_turn_blocked:
-      "Аудио/видеопоток заблокирован несмотря на TURN-ретранслятор: повторите попытку или смените сеть.",
-    call_turn_missing:
-      "В этом развёртывании нет TURN-ретранслятора: добавьте переменные VITE_TURN_* и разверните заново.",
+    call_turn_blocked: "Звук и изображение заблокированы даже через ретранслятор звонка: попробуйте снова или смените сеть.",
+    call_turn_missing: "Звонки временно недоступны в этой сети. Попробуйте позже.",
     call_need_mic_cam: "Для звонка нужны микрофон и камера.",
     call_need_mic: "Для звонка нужен микрофон.",
     call_answer_incoming_first: "Есть входящий звонок. Сначала ответьте на него.",
@@ -12093,20 +12061,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_remote:
       "Активный движок: {moteur}. Текст, который вы переводите, отправляется в {moteur}.",
     trad_engine_name_navigateur: "Браузер (на этом устройстве)",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "Конфиденциальный онлайн-перевод",
+    trad_engine_name_google: "Онлайн-перевод, все языки",
+    trad_engine_name_deepl: "Онлайн-перевод, европейские языки",
+    trad_engine_name_libretranslate: "Перевод Alanya",
     trad_engine_note_navigateur:
       "Бесплатно, и ничего не покидает это устройство: переводит сам браузер. Работает в Chrome и Edge на компьютере.",
-    trad_engine_note_azure:
-      "Microsoft не хранит отправленный текст, не использует его для обучения своих моделей и не оставляет никаких следов.",
-    trad_engine_note_google:
-      "Оплата посимвольная независимо от алфавита: кириллическая буква или иероглиф считаются так же, как латинская буква. Текст отправляется в Google.",
-    trad_engine_note_deepl:
-      "Часто лучшее качество на европейских языках, но каталог языков уже. Текст отправляется в DeepL.",
-    trad_engine_note_libretranslate:
-      "Свободное ПО на собственном сервере: бесплатно, если не считать стоимости сервера. Без прямой модели между двумя языками перевод идёт через английский, и качество падает.",
+    trad_engine_note_azure: "Наш поставщик перевода не хранит отправленный текст, не использует его для обучения моделей и не оставляет никаких следов.",
+    trad_engine_note_google: "Поддерживает почти все языки. Оплата за символ независимо от алфавита. Текст отправляется нашему поставщику перевода.",
+    trad_engine_note_deepl: "Часто лучшее качество для европейских языков, но языков меньше. Текст отправляется нашему поставщику перевода.",
+    trad_engine_note_libretranslate: "На наших собственных серверах: текст не покидает Alanya. Без прямого перевода между двумя языками он идёт через английский, и качество снижается.",
     trad_local_title: "Перевод на устройстве",
     trad_local_desc:
       "Браузер скачивает языковые компоненты и переводит, ничего не отправляя. Выберите языки, на которых вам пишут: они будут переведены на {langue}.",
@@ -12891,8 +12855,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "视频来电",
     wants_a_video_call: "请求视频通话",
     is_calling_you: "正在呼叫您",
-    call_turn_blocked: "即使经过 TURN 中继，音视频流仍被阻断：请重试或更换网络。",
-    call_turn_missing: "此部署中没有 TURN 中继：请添加 VITE_TURN_* 变量后重新部署。",
+    call_turn_blocked: "即使经过通话中继，音视频仍被阻断：请重试或更换网络。",
+    call_turn_missing: "此网络暂时无法通话，请稍后再试。",
     call_need_mic_cam: "通话需要麦克风和摄像头。",
     call_need_mic: "通话需要麦克风。",
     call_answer_incoming_first: "有来电，请先接听。",
@@ -13817,18 +13781,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_local: "当前引擎：{moteur}。您的消息不会离开本设备。",
     trad_engine_active_remote: "当前引擎：{moteur}。您请求翻译的文本会发送到 {moteur}。",
     trad_engine_name_navigateur: "浏览器（本设备）",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "保密在线翻译",
+    trad_engine_name_google: "在线翻译（所有语言）",
+    trad_engine_name_deepl: "在线翻译（欧洲语言）",
+    trad_engine_name_libretranslate: "Alanya 翻译",
     trad_engine_note_navigateur:
       "免费，且没有任何内容离开本设备：由浏览器自己翻译。可在电脑版 Chrome 和 Edge 上使用。",
-    trad_engine_note_azure: "Microsoft 不保留所发送的文本、不将其用于训练模型，也不留下任何记录。",
-    trad_engine_note_google:
-      "无论使用哪种字母表，均按字符计费：一个西里尔字母或一个汉字与一个拉丁字母计数相同。文本会发送到 Google。",
-    trad_engine_note_deepl: "在欧洲语言上往往质量最佳，但支持的语言目录较窄。文本会发送到 DeepL。",
-    trad_engine_note_libretranslate:
-      "自托管服务器上的开源软件：除服务器成本外免费。若两种语言之间没有直连模型，翻译将经由英语中转，质量随之下降。",
+    trad_engine_note_azure: "我们的翻译服务商不会保存发送的文字，不会用它训练模型，也不会留下任何记录。",
+    trad_engine_note_google: "支持几乎所有语言。按字符计费，与文字系统无关。文字会发送给我们的翻译服务商。",
+    trad_engine_note_deepl: "欧洲语言质量通常最好，但支持的语言较少。文字会发送给我们的翻译服务商。",
+    trad_engine_note_libretranslate: "在我们自己的服务器上：文字不会离开 Alanya。两种语言之间没有直接翻译时会经由英语，质量会下降。",
     trad_local_title: "设备端翻译",
     trad_local_desc:
       "您的浏览器会下载语言组件并在本地翻译，不发送任何内容。请选择您收到的语言：它们将被翻译成{langue}。",
@@ -14617,10 +14579,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "Inkommande videosamtal",
     wants_a_video_call: "Vill ha ett videosamtal",
     is_calling_you: "Ringer dig",
-    call_turn_blocked:
-      "Ljud-/videoströmmen blockeras trots TURN-relä: försök igen eller byt nätverk.",
-    call_turn_missing:
-      "Inget TURN-relä i den här driftsättningen: lägg till VITE_TURN_*-variablerna och driftsätt igen.",
+    call_turn_blocked: "Ljud och bild är fortfarande blockerade trots samtalsreläet: försök igen eller byt nätverk.",
+    call_turn_missing: "Samtal är tillfälligt otillgängliga i det här nätverket. Försök igen senare.",
     call_need_mic_cam: "Mikrofon och kamera krävs för samtalet.",
     call_need_mic: "Mikrofon krävs för samtalet.",
     call_answer_incoming_first: "Det finns ett inkommande samtal. Svara på det först.",
@@ -15562,20 +15522,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_remote:
       "Aktiv motor: {moteur}. Texten du låter översätta skickas till {moteur}.",
     trad_engine_name_navigateur: "Webbläsaren (på den här enheten)",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "Konfidentiell onlineöversättning",
+    trad_engine_name_google: "Onlineöversättning, alla språk",
+    trad_engine_name_deepl: "Onlineöversättning, europeiska språk",
+    trad_engine_name_libretranslate: "Alanya-översättning",
     trad_engine_note_navigateur:
       "Gratis, och ingenting lämnar den här enheten: webbläsaren översätter själv. Fungerar i Chrome och Edge, på dator.",
-    trad_engine_note_azure:
-      "Microsoft sparar inte texten som skickas, använder den inte för att träna sina modeller och behåller inga spår av den.",
-    trad_engine_note_google:
-      "Debiteras per tecken oavsett alfabet: en kyrillisk bokstav eller ett tecken räknas som en latinsk bokstav. Texten skickas till Google.",
-    trad_engine_note_deepl:
-      "Ofta bäst kvalitet på europeiska språk, men språkkatalogen är smalare. Texten skickas till DeepL.",
-    trad_engine_note_libretranslate:
-      "Fri programvara på en egen server: gratis bortsett från serverkostnaden. Utan en direkt modell mellan två språk går översättningen via engelska och kvaliteten sjunker.",
+    trad_engine_note_azure: "Vår översättningsleverantör sparar inte texten du skickar, använder den inte för att träna sina modeller och behåller inga spår av den.",
+    trad_engine_note_google: "Täcker nästan alla språk. Debiteras per tecken, oavsett alfabet. Texten skickas till vår översättningsleverantör.",
+    trad_engine_note_deepl: "Ofta bäst kvalitet för europeiska språk, men färre språk. Texten skickas till vår översättningsleverantör.",
+    trad_engine_note_libretranslate: "På våra egna servrar: texten lämnar aldrig Alanya. Utan direkt översättning mellan två språk går den via engelska och kvaliteten sjunker.",
     trad_local_title: "Översättning på enheten",
     trad_local_desc:
       "Din webbläsare laddar ner språkkomponenterna och översätter utan att skicka något. Välj de språk du tar emot: de översätts till {langue}.",
@@ -16375,10 +16331,8 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     incoming_video_call: "Innkommende videoanrop",
     wants_a_video_call: "Ønsker en videosamtale",
     is_calling_you: "Ringer deg",
-    call_turn_blocked:
-      "Lyd-/videostrømmen er blokkert til tross for TURN-relé: prøv igjen eller bytt nettverk.",
-    call_turn_missing:
-      "Ingen TURN-relé i denne utrullingen: legg til VITE_TURN_*-variablene og rull ut på nytt.",
+    call_turn_blocked: "Lyd og bilde er fortsatt blokkert til tross for samtalereléet: prøv igjen eller bytt nettverk.",
+    call_turn_missing: "Samtaler er midlertidig utilgjengelige på dette nettverket. Prøv igjen senere.",
     call_need_mic_cam: "Mikrofon og kamera kreves for anropet.",
     call_need_mic: "Mikrofon kreves for anropet.",
     call_answer_incoming_first: "Det er et innkommende anrop. Svar på det først.",
@@ -17319,20 +17273,16 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     trad_engine_active_remote:
       "Aktiv motor: {moteur}. Teksten du får oversatt, sendes til {moteur}.",
     trad_engine_name_navigateur: "Nettleseren (på denne enheten)",
-    trad_engine_name_azure: "Azure AI Translator",
-    trad_engine_name_google: "Google Cloud Translation",
-    trad_engine_name_deepl: "DeepL",
-    trad_engine_name_libretranslate: "LibreTranslate",
+    trad_engine_name_azure: "Konfidensiell nettoversettelse",
+    trad_engine_name_google: "Nettoversettelse, alle språk",
+    trad_engine_name_deepl: "Nettoversettelse, europeiske språk",
+    trad_engine_name_libretranslate: "Alanya-oversettelse",
     trad_engine_note_navigateur:
       "Gratis, og ingenting forlater denne enheten: nettleseren oversetter selv. Fungerer i Chrome og Edge, på datamaskin.",
-    trad_engine_note_azure:
-      "Microsoft lagrer ikke teksten som sendes, bruker den ikke til å trene modellene sine og beholder ingen spor av den.",
-    trad_engine_note_google:
-      "Fakturert per tegn uansett alfabet: en kyrillisk bokstav eller et skrifttegn teller som en latinsk bokstav. Teksten sendes til Google.",
-    trad_engine_note_deepl:
-      "Ofte best kvalitet på europeiske språk, men språkkatalogen er smalere. Teksten sendes til DeepL.",
-    trad_engine_note_libretranslate:
-      "Fri programvare på en egen server: gratis bortsett fra serverkostnaden. Uten en direkte modell mellom to språk går oversettelsen via engelsk, og kvaliteten synker.",
+    trad_engine_note_azure: "Oversettelsesleverandøren vår lagrer ikke teksten du sender, bruker den ikke til å trene modellene sine og beholder ingen spor av den.",
+    trad_engine_note_google: "Dekker nesten alle språk. Faktureres per tegn, uansett alfabet. Teksten sendes til oversettelsesleverandøren vår.",
+    trad_engine_note_deepl: "Ofte best kvalitet for europeiske språk, men færre språk. Teksten sendes til oversettelsesleverandøren vår.",
+    trad_engine_note_libretranslate: "På våre egne servere: teksten forlater aldri Alanya. Uten direkte oversettelse mellom to språk går den via engelsk, og kvaliteten synker.",
     trad_local_title: "Oversettelse på enheten",
     trad_local_desc:
       "Nettleseren laster ned språkkomponentene og oversetter uten å sende noe. Velg språkene du mottar: de oversettes til {langue}.",
