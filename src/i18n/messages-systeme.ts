@@ -78,6 +78,16 @@ export function composerMessageSysteme(
         .replace("{target}", texte(charge.target))
         .replace("{actor}", texte(charge.actor))
 
+    // Entre par le lien du groupe (18/11/2026) ; avec `actor` quand un admin
+    // a accepte sa demande (groupe prive).
+    case "member_joined_link": {
+      const acteur = texte(charge.actor)
+      return (acteur === ""
+        ? t("system_member_joined_link")
+        : t("system_member_joined_link_approved").replace("{actor}", acteur)
+      ).replace("{target}", texte(charge.target))
+    }
+
     case "member_left":
       // Un depart volontaire ne nomme personne d'autre : pas d'auteur.
       return t("system_member_left").replace("{target}", texte(charge.target))

@@ -29,6 +29,7 @@ import RestaurationPage from "../app/(protected)/restauration/restauration"
 import AbandonedClientsPage from "../app/(protected)/abandoned-clients/abandoned-clients"
 import NewChatPage from "../app/(protected)/chats/new/new-chat"
 import ConvInfoPage from "../app/(protected)/chats/[chatId]/chat-info"
+import { RejoindreGroupePage } from "../app/(protected)/g/rejoindre-groupe"
 import ChatsSplit, { ChatEmptyState } from "../app/(protected)/chats/chats-split"
 import SectionSplit from "../app/(protected)/section-split"
 import ContactsPage from "../app/(protected)/contacts/contacts"
@@ -66,6 +67,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="/confidentialite" element={<PageLegale slug="confidentialite" />} />
                   <Route path="/conditions" element={<PageLegale slug="conditions" />} />
                   <Route path="/suppression-compte" element={<SuppressionComptePage />} />
+                  {/* Le lien d'un groupe (18/11/2026) : la page de secours du
+                  serveur (/g/<code>) envoie ici. Sans session, connexion puis retour. */}
+                  <Route
+                    path="/g/:code"
+                    element={
+                      <ProtectedRoute>
+                        <RejoindreGroupePage />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="/login"
                     element={

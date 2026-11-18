@@ -1,5 +1,8 @@
 import { apiRequest } from "../../../../src/lib/api-client"
 import { FenetreSignalement } from "../../../../src/components/signalement"
+import { FenetreDemandesGroupe, FenetreLienGroupe } from "../../../../src/components/groupe-lien"
+import { ChoixAccesGroupe } from "../../../../src/components/choix-acces-groupe"
+import { Icone } from "../../../../src/components/icone"
 import { useEffect, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
@@ -54,6 +57,7 @@ import { useEstContact } from "../../../../src/hooks/use-est-contact"
 import { ChoixActions } from "../../../../src/components/photo-profil"
 import type { Cle } from "../../../../src/i18n"
 import {
+  changerAccesGroupe,
   changerReglagesGroupe,
   definirSourdineDetail,
   lireGroupe,
@@ -346,6 +350,24 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
     void changerReglagesGroupe(conv.id, { [cle]: valeur })
       .then(setReglages)
       .catch(() => error(t("grp_settings_failed")))
+  }
+
+  /*
+   * PRIVÉ OU PUBLIC, LIEN, LISTE D'ATTENTE (18/11/2026). Le lien : ceux qui
+   * peuvent ajouter ; la liste d'attente et le type : les admins.
+   */
+  const [fenetreLien, setFenetreLien] = useState(false)
+  const [fenetreDemandes, setFenetreDemandes] = useState(false)
+  const changerAcces = (acces: "prive" | "public") => {
+    if (reglages?.acces === acces) return
+    void changerAccesGroupe(conv.id, acces)
+      .then(setReglages)
+      .catch(() => error(t("grp_settings_failed")))
+  }
+  const relireGroupe = () => {
+    void lireGroupe(conv.id)
+      .then(setReglages)
+      .catch(() => {})
   }
 
   // Sourdine pour un temps, et « mentions seulement » (01/11/2026).
@@ -1341,9 +1363,47 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                   {t("cinfo_add_members_cta")}
                 </button>
               )}
+              {conv.isGroup && peutAjouter && (
+                <button type="button" className="gl-ligne" onClick={() => setFenetreLien(true)}>
+                  <Icone nom="lien" taille={18} />
+                  <span>
+                    {t("grp_link_title")}
+                    <small>{t(reglages?.acces === "public" ? "grp_link_sub_public" : "grp_link_sub_private")}</small>
+                  </span>
+                </button>
+              )}
+              {conv.isGroup && isAdmin && reglages && (reglages.acces !== "public" || reglages.demandesEnAttente > 0) && (
+                <button type="button" className="gl-ligne" onClick={() => setFenetreDemandes(true)}>
+                  <Icone nom="personne" taille={18} />
+                  <span>{t("grp_requests_title")}</span>
+                  {reglages.demandesEnAttente > 0 && <b className="gl-pastille">{reglages.demandesEnAttente}</b>}
+                </button>
+              )}
+              {fenetreLien && (
+                <FenetreLienGroupe
+                  convId={conv.id}
+                  nom={conv.name}
+                  estAdmin={isAdmin}
+                  onFermer={() => setFenetreLien(false)}
+                />
+              )}
+              {fenetreDemandes && (
+                <FenetreDemandesGroupe
+                  convId={conv.id}
+                  onFermer={() => {
+                    setFenetreDemandes(false)
+                    relireGroupe()
+                  }}
+                  onChange={relireGroupe}
+                />
+              )}
               {conv.isGroup && isAdmin && reglages && (
                 <div className="cip-reglages">
                   <div className="cip-reglages-titre">{t("grp_settings")}</div>
+                  <div className="notif-row" style={{ display: "block" }}>
+                    <span className="notif-label">{t("grp_type_title")}</span>
+                    <ChoixAccesGroupe valeur={reglages.acces} onChange={changerAcces} />
+                  </div>
                   {REGLAGES_GROUPE.map(([cle, titre, sous]) => (
                     <div className="notif-row" key={cle}>
                       <span className="notif-label">

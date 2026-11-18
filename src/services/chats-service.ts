@@ -461,12 +461,14 @@ export async function createGroupChat(
   name: string,
   memberNumbers: string[],
   /** Posee des la creation (14/11/2026) ; le serveur l'accepte depuis le 01/11. */
-  description?: string
+  description?: string,
+  /** Prive (par defaut cote serveur) ou public (18/11/2026). */
+  acces?: "prive" | "public",
 ): Promise<{ id: string }> {
   const propre = description?.trim()
   const response = await apiRequest<{ id: string; isGroup: boolean }>("/api/conversations", {
     method: "POST",
-    body: { name, memberNumbers, ...(propre ? { description: propre } : {}) },
+    body: { name, memberNumbers, ...(propre ? { description: propre } : {}), ...(acces ? { acces } : {}) },
   })
   return { id: response.id }
 }

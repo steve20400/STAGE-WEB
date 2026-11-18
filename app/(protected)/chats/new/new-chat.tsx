@@ -15,6 +15,7 @@ import {
   createSelfChat,
 } from "../../../../src/services/chats-service"
 import { changerReglagesGroupe, type CleReglage } from "../../../../src/services/groupe-service"
+import { ChoixAccesGroupe } from "../../../../src/components/choix-acces-groupe"
 import {
   ALANYA_NUMBER_FORMATTED_MAX_LENGTH,
   formatAlanyaNumber,
@@ -60,6 +61,8 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
    */
   const [description, setDescription] = useState("")
   const [reglages, setReglages] = useState<Record<CleReglage, boolean>>(REGLAGES_PAR_DEFAUT)
+  // Privé (par défaut, comme le serveur) ou public : choisi à la création (18/11/2026).
+  const [acces, setAcces] = useState<"prive" | "public">("prive")
   const [loading, setLoading] = useState(false)
 
   const [showAdd, setShowAdd] = useState(false)
@@ -146,7 +149,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
       const memberNumbers = contacts
         .filter((contact) => selected.has(contact.id))
         .map((contact) => contact.phone)
-      const conversation = await createGroupChat(groupName.trim(), memberNumbers, description)
+      const conversation = await createGroupChat(groupName.trim(), memberNumbers, description, acces)
       // Les reglages changes, s'il y en a. Un echec ici ne defait pas le
       // groupe, deja cree : ils restent modifiables dans ses infos.
       const changes: Partial<Record<CleReglage, boolean>> = {}
@@ -423,6 +426,7 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
               />
+              <ChoixAccesGroupe valeur={acces} onChange={setAcces} />
               <details>
                 <summary>{t("grp_settings")}</summary>
                 {LIBELLES_REGLAGES.map(([cle, titre, sous]) => (

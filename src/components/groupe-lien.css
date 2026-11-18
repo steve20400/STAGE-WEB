@@ -1,0 +1,54 @@
+/* Le lien et le QR code d'un groupe, sa liste d'attente (18/11/2026). */
+.gl-voile { position: fixed; inset: 0; z-index: 9800; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.45); }
+.gl-fenetre { width: 100%; max-width: 420px; max-height: calc(100vh - 32px); overflow-y: auto; padding: 18px 20px 20px; border-radius: 14px; background: var(--bg-elevated); color: var(--text-primary); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); }
+.gl-entete { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.gl-entete h2 { margin: 0; font-size: 18px; }
+.gl-fermer { display: inline-flex; padding: 6px; border: 0; border-radius: 8px; background: none; color: var(--text-secondary); cursor: pointer; }
+.gl-fermer:hover { background: var(--bg-surface); }
+.gl-info { margin: 10px 0; color: var(--text-secondary); font-size: 13px; line-height: 1.45; text-align: center; }
+.gl-erreur { margin: 10px 0; color: #c62828; font-size: 14px; text-align: center; }
+/* Fond blanc dans tous les thèmes : un QR code sur fond sombre se lit mal. */
+.gl-carte { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px; border-radius: 14px; background: #fff; color: #1f2328; }
+.gl-nom { font-size: 17px; text-align: center; overflow-wrap: anywhere; }
+.gl-type { display: inline-flex; align-items: center; gap: 2px; color: #6b7280; font-size: 13px; }
+.gl-qr { width: 220px; height: 220px; max-width: 100%; margin-top: 8px; }
+.gl-astuce { color: #6b7280; font-size: 12px; text-align: center; }
+.gl-lien { padding: 8px 10px; border-radius: 8px; background: var(--bg-surface); font-family: ui-monospace, monospace; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.gl-actions button, .gl-actions .gl-bouton { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: none; color: inherit; font: inherit; font-size: 13.5px; text-decoration: none; cursor: pointer; }
+.gl-actions .gl-principal { border-color: transparent; background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.gl-danger { display: block; width: 100%; margin-top: 10px; padding: 8px; border: 0; border-radius: 8px; background: none; color: #c62828; font: inherit; font-size: 13.5px; cursor: pointer; }
+.gl-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.gl-demandes { margin: 0; padding: 0; list-style: none; }
+.gl-demandes li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+.gl-demandes li:last-child { border-bottom: 0; }
+.gl-avatar { width: 40px; height: 40px; flex: none; }
+.gl-demandeur { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gl-demandeur strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; }
+.gl-demandeur small { color: var(--text-muted); font-size: 12px; }
+.gl-refuser, .gl-accepter { display: inline-flex; padding: 8px; border: 1px solid var(--border-subtle); border-radius: 50%; background: none; cursor: pointer; }
+.gl-refuser { color: #c62828; }
+.gl-accepter { color: var(--accent); }
+.gl-refuser:disabled, .gl-accepter:disabled { opacity: 0.5; cursor: not-allowed; }
+/* La page « Rejoindre un groupe » (/webapp/g/<code>). */
+.gl-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--bg-base, var(--bg-surface)); color: var(--text-primary); }
+.gl-page .gl-fenetre { box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12); text-align: center; }
+.gl-page-avatar { width: 72px; height: 72px; margin: 4px auto 10px; }
+.gl-page h1 { margin: 0 0 4px; font-size: 20px; overflow-wrap: anywhere; }
+.gl-meta { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 13px; }
+.gl-description { margin: 12px 0 0; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gl-page .gl-actions { flex-direction: column; }
+/* Le choix privé / public. */
+.gl-acces { display: grid; gap: 6px; margin: 8px 0; }
+.gl-acces small { color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
+.gl-segments { display: flex; border: 1px solid var(--border-subtle); border-radius: 10px; overflow: hidden; }
+.gl-segments button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 10px; border: 0; background: none; color: inherit; font: inherit; font-size: 13.5px; cursor: pointer; }
+.gl-segments button + button { border-left: 1px solid var(--border-subtle); }
+.gl-segments button.actif { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.gl-segments button:disabled { cursor: not-allowed; opacity: 0.6; }
+/* Les lignes « Lien d'invitation » et « Demandes d'adhésion » des infos du groupe. */
+.gl-ligne { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 8px; padding: 9px 12px; border: 1px solid var(--border-subtle); border-radius: 9px; background: none; color: var(--text-primary); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.gl-ligne:hover { background: var(--bg-surface); }
+.gl-ligne span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gl-ligne small { color: var(--text-secondary); font-size: 12px; }
+.gl-pastille { min-width: 22px; padding: 2px 7px; border-radius: 11px; background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 700; text-align: center; }

@@ -35,6 +35,10 @@ export type NomIcone =
   | "cadre-libre"
   | "carre"
   | "valider"
+  | "lien"
+  | "globe"
+  | "qr"
+  | "fermer"
 
 const TRACES: Record<NomIcone, ReactNode> = {
   etincelles: (
@@ -151,6 +155,33 @@ const TRACES: Record<NomIcone, ReactNode> = {
   ),
   carre: <rect x="4" y="4" width="16" height="16" rx="2" />,
   valider: <path d="M20 6L9 17l-5-5" />,
+  lien: (
+    <>
+      <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+      <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z" />
+    </>
+  ),
+  qr: (
+    <>
+      <rect x="3" y="3" width="7" height="7" />
+      <rect x="14" y="3" width="7" height="7" />
+      <rect x="3" y="14" width="7" height="7" />
+      <path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3" />
+    </>
+  ),
+  fermer: (
+    <>
+      <path d="M18 6L6 18" />
+      <path d="M6 6l12 12" />
+    </>
+  ),
   envoyer: (
     <>
       <path d="M22 2L11 13" />
