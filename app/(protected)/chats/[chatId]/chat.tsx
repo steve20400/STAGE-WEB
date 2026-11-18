@@ -70,6 +70,7 @@ import {
 } from "../../../../src/lib/delais-message"
 import { FenetrePartage } from "./partage"
 import { FenetreInfosMessage } from "./infos-message"
+import { FenetreSignalement } from "../../../../src/components/signalement"
 import { lirePartageRecu, oublierPartageRecu } from "../../../../src/services/partage-recu"
 import {
   EVENEMENT_REGLAGES_TRADUCTION,
@@ -3991,6 +3992,7 @@ function MessageBubble({
   onOpenGalerie,
   onDelete,
   onForward,
+  onSignaler,
   onEdit,
   onShare,
   onReessayer,
@@ -4026,6 +4028,8 @@ function MessageBubble({
   onOpenImage: (url: string, name?: string) => void
   onDelete: (m: Message, scope: "me" | "everyone") => void
   onForward: (m: Message) => void
+  /** « Signaler » (18/11/2026) : seulement sur le message d'un autre. */
+  onSignaler?: (m: Message) => void
   /**
    * « Modifier » — absent quand le message ne se modifie pas (pas à moi, pas
    * du texte, plus de 2 heures). Le parent décide : lui seul sait si le fil
@@ -4659,6 +4663,11 @@ function MessageBubble({
                   !msg.vueUnique &&
                   (Boolean(msg.content) || Boolean(msg.mediaChiffre) || (!msg.chiffre && Boolean(msg.mediaUrl)))
                     ? menuItem(t("msg_partager"), () => onShare(msg))
+                    : null}
+                  {/* SIGNALER (18/11/2026, exigence du Play Store) : le message
+                    d'un autre, jamais le sien. */}
+                  {onSignaler && !isMe && !msg.isDeleted
+                    ? menuItem(t("sig_signaler"), () => onSignaler(msg))
                     : null}
                   {menuItem(t("delete_for_me"), () => onDelete(msg, "me"), true)}
                   {/* Vingt-quatre heures pour supprimer pour tous (07/10/2026) ;
@@ -6172,6 +6181,10 @@ export default function ChatRoomPage() {
    * une copie, signée, depuis sa visionneuse.
    */
   const estSensible = (m: Message | null) => Boolean(m?.mediaChiffre?.sensible)
+  /** Le message ouvert dans la fenêtre de signalement (18/11/2026). */
+  const [aSignaler, setASignaler] = useState<Message | null>(null)
+  const demanderSignalement = (m: Message) => setASignaler(m)
+
   const demanderTransfert = (m: Message | null) => {
     if (estSensible(m)) {
       error(t("sens_titre"), t("sens_pas_partage"))
@@ -9380,6 +9393,7 @@ export default function ChatRoomPage() {
                         })
                       }}
                       onForward={demanderTransfert}
+                      onSignaler={demanderSignalement}
                       onShare={demanderPartage}
                       onReessayer={reessayerEnvoi}
                       onCopy={handleCopy}
@@ -9477,6 +9491,7 @@ export default function ChatRoomPage() {
                     onOpenGalerie={(msgs, index) => setGallery({ msgs, index })}
                     onDelete={handleDelete}
                     onForward={demanderTransfert}
+                    onSignaler={demanderSignalement}
                     onShare={demanderPartage}
                     onEdit={peutModifier(msg) ? demarrerModification : undefined}
                     onReessayer={reessayerEnvoi}
@@ -10306,6 +10321,18 @@ export default function ChatRoomPage() {
               })
             )
           }}
+        />
+      )}
+      {aSignaler && (
+        <FenetreSignalement
+          cible={{
+            type: "message",
+            messageId: aSignaler.id,
+            extrait: aSignaler.content || undefined,
+            chiffre: Boolean(aSignaler.chiffre),
+            auteurNumero: chat?.membersInfo?.find((m) => m.id === aSignaler.senderId)?.publicNumber ?? null,
+          }}
+          onFermer={() => setASignaler(null)}
         />
       )}
       {pendingMedia.length > 0 && (

@@ -3979,6 +3979,15 @@ export default function SettingsPage() {
                   destructive
                 />
               </div>
+              {/* Informations légales (18/11/2026, exigence du Play Store). */}
+              <div className="s-card">
+                <div className="s-card-title">{t("legal_titre")}</div>
+                <p className="s-page-sub" style={{ margin: 0 }}>
+                  <a href="/conditions" target="_blank" rel="noreferrer">{t("legal_conditions")}</a>
+                  {" · "}
+                  <a href="/confidentialite" target="_blank" rel="noreferrer">{t("legal_confidentialite")}</a>
+                </p>
+              </div>
             </>
           )}
 

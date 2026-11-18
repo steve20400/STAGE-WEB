@@ -501,6 +501,14 @@ export default function SignUpPage() {
                 <label htmlFor="phone">{t("set_phone")}</label>
               </div>
 
+              {/* Les conditions et la confidentialité, avant de créer le compte
+                  (18/11/2026, exigence du Play Store). */}
+              <p style={{ fontSize: 12.5, lineHeight: 1.5, opacity: 0.8, margin: "4px 0 10px" }}>
+                {t("legal_acceptation")}{" "}
+                <a href="/conditions" target="_blank" rel="noreferrer">{t("legal_conditions")}</a>{" "}
+                {t("legal_et")}{" "}
+                <a href="/confidentialite" target="_blank" rel="noreferrer">{t("legal_confidentialite")}</a>.
+              </p>
               <button
                 type="submit"
                 className="btn-submit"

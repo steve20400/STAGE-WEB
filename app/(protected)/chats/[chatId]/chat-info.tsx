@@ -1,4 +1,5 @@
 import { apiRequest } from "../../../../src/lib/api-client"
+import { FenetreSignalement } from "../../../../src/components/signalement"
 import { useEffect, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { useToast } from "../../../../src/components/toast"
@@ -264,6 +265,8 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
    */
   const [blocage, setBlocage] = useState<PersonneBloquee | null>(null)
   const [blocageEnCours, setBlocageEnCours] = useState(false)
+  /** La fenêtre « Signaler » (18/11/2026). */
+  const [signalement, setSignalement] = useState(false)
   const { t, language: langueLecture } = useTranslation()
   const [members, setMembers] = useState<Member[]>(conv.members)
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
@@ -1486,6 +1489,44 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
           <div className="cip-section">
             <div className="cip-section-title">{t("cinfo_actions")}</div>
+            {/* SIGNALER (18/11/2026, exigence du Play Store) : le groupe, ou
+                le correspondant d'une discussion à deux. */}
+            {(conv.isGroup || pairId !== null) && (
+              <div
+                className="danger-item"
+                role="button"
+                tabIndex={0}
+                onClick={() => setSignalement(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    setSignalement(true)
+                  }
+                }}
+              >
+                <div className="di-icon" style={{ background: "var(--danger-dim)" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 22V4" />
+                    <path d="M4 4h12l-2 4 2 4H4" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="danger-label" style={{ color: "var(--danger)" }}>
+                    {conv.isGroup ? t("sig_titre_groupe") : t("sig_titre_compte")}
+                  </div>
+                </div>
+              </div>
+            )}
+            {signalement && (
+              <FenetreSignalement
+                cible={
+                  conv.isGroup
+                    ? { type: "group", convId: conv.id }
+                    : { type: "user", userId: pairId as string, numero: blocage ? null : numeroDuPair }
+                }
+                onFermer={() => setSignalement(false)}
+              />
+            )}
             {conv.isGroup && (
               <div className="danger-item" onClick={leaveGroup}>
                 <div className="di-icon" style={{ background: "var(--warning-dim,#fbbf2415)" }}>

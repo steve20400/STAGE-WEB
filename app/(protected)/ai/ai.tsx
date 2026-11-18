@@ -1,4 +1,5 @@
 import { useTranslation } from "../../../src/i18n"
+import { FenetreSignalement } from "../../../src/components/signalement"
 import { Icone } from "../../../src/components/icone"
 import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import { useToast } from "../../../src/components/toast"
@@ -19,7 +20,12 @@ const TexteMarkdown = lazy(() => import("../../../src/components/texte-markdown"
  * un fil unique par utilisateur, bulle terracotta pour soi, bulle claire
  * pour l'assistant.
  */
+/** Une réponse enregistrée a un identifiant serveur ; une réponse en cours, non. */
+const ID_SERVEUR = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export default function AiAssistantPage() {
+  /** La réponse ouverte dans la fenêtre « Signaler » (18/11/2026). */
+  const [aSignaler, setASignaler] = useState<string | null>(null)
   const { t } = useTranslation()
   const { error } = useToast()
   const [messages, setMessages] = useState<AiMessage[]>([])
@@ -202,6 +208,13 @@ export default function AiAssistantPage() {
                     <TexteMarkdown texte={msg.content} />
                   </Suspense>
                 )}
+                {/* SIGNALER UNE RÉPONSE (18/11/2026, exigence du Play Store pour
+                    l'IA générative). Seulement une réponse enregistrée. */}
+                {!isMe && ID_SERVEUR.test(msg.id) && (
+                  <button type="button" className="ai-signaler" onClick={() => setASignaler(msg.id)}>
+                    {t("sig_signaler")}
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -221,6 +234,7 @@ export default function AiAssistantPage() {
         )}
 
         <div ref={bottomRef} />
+        {aSignaler && (<FenetreSignalement cible={{ type: "ia", aiMessageId: aSignaler }} onFermer={() => setASignaler(null)} />)}
       </div>
 
       {/* Zone de saisie */}
