@@ -505,9 +505,9 @@ export default function SignUpPage() {
                   (18/11/2026, exigence du Play Store). */}
               <p style={{ fontSize: 12.5, lineHeight: 1.5, opacity: 0.8, margin: "4px 0 10px" }}>
                 {t("legal_acceptation")}{" "}
-                <a href="/conditions" target="_blank" rel="noreferrer">{t("legal_conditions")}</a>{" "}
+                <a href={`${import.meta.env.BASE_URL}conditions`} target="_blank" rel="noreferrer">{t("legal_conditions")}</a>{" "}
                 {t("legal_et")}{" "}
-                <a href="/confidentialite" target="_blank" rel="noreferrer">{t("legal_confidentialite")}</a>.
+                <a href={`${import.meta.env.BASE_URL}confidentialite`} target="_blank" rel="noreferrer">{t("legal_confidentialite")}</a>.
               </p>
               <button
                 type="submit"

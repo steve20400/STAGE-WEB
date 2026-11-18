@@ -3983,9 +3983,9 @@ export default function SettingsPage() {
               <div className="s-card">
                 <div className="s-card-title">{t("legal_titre")}</div>
                 <p className="s-page-sub" style={{ margin: 0 }}>
-                  <a href="/conditions" target="_blank" rel="noreferrer">{t("legal_conditions")}</a>
+                  <a href={`${import.meta.env.BASE_URL}conditions`} target="_blank" rel="noreferrer">{t("legal_conditions")}</a>
                   {" · "}
-                  <a href="/confidentialite" target="_blank" rel="noreferrer">{t("legal_confidentialite")}</a>
+                  <a href={`${import.meta.env.BASE_URL}confidentialite`} target="_blank" rel="noreferrer">{t("legal_confidentialite")}</a>
                 </p>
               </div>
             </>
