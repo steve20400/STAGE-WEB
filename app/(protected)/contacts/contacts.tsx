@@ -30,6 +30,7 @@ import {
 } from "../../../src/services/blocked-service"
 import { ContactListsSection } from "./contact-lists-section"
 import "../calls/calls-page.css"
+import "./contacts-ecran.css"
 
 /**
  * Repertoire : liste des contacts + formulaire d'enregistrement d'un contact
@@ -215,12 +216,49 @@ export default function ContactsPage() {
   }
 
   return (
-    <div className="calls-root" style={{ padding: "20px 0" }}>
+    <div className="calls-root contacts-ecran" style={{ padding: "20px 0" }}>
       <div className="calls-head" style={{ marginBottom: 14 }}>
         <div className="calls-title-row page-title-row">
           <h1 className="calls-title">{t("contacts")}</h1>
-          <button className="new-call-btn" onClick={() => setShowAdd((v) => !v)}>
-            {showAdd ? t("close") : t("new_contact")}
+        </div>
+
+        {/* Comme l'écran Contacts du mobile (20/11/2026) : trois tuiles en tête,
+            les listes de contacts ont leur propre écran. */}
+        <div className="contacts-tuiles">
+          <button className="contacts-tuile" onClick={() => navigate("/chats/new?mode=groupe")}>
+            <span className="contacts-tuile-icone" aria-hidden>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+              </svg>
+            </span>
+            <span className="contacts-tuile-libelle">{t("new_group")}</span>
+          </button>
+          <button
+            className={`contacts-tuile${showAdd ? " active" : ""}`}
+            onClick={() => setShowAdd((v) => !v)}
+            aria-expanded={showAdd}
+          >
+            <span className="contacts-tuile-icone" aria-hidden>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M19 8v6M22 11h-6" />
+              </svg>
+            </span>
+            <span className="contacts-tuile-libelle">{t("add_contact")}</span>
+          </button>
+          <button className="contacts-tuile" onClick={() => navigate("/contacts/listes")}>
+            <span className="contacts-tuile-icone" aria-hidden>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+                <path d="M8 6h13M8 12h13M8 18h13" />
+                <circle cx="3.5" cy="6" r="1.2" />
+                <circle cx="3.5" cy="12" r="1.2" />
+                <circle cx="3.5" cy="18" r="1.2" />
+              </svg>
+            </span>
+            <span className="contacts-tuile-libelle">{t("clist_title")}</span>
           </button>
         </div>
 
@@ -314,13 +352,6 @@ export default function ContactsPage() {
           </form>
         )}
 
-        {/* Les listes sont posees DANS l'en-tete de la page : elle porte deja le
-            retrait lateral, et son point de rupture, donc la section s'aligne sur
-            le titre a toutes les largeurs. Elles viennent avant la recherche, qui
-            appartient au repertoire juste en dessous. */}
-        <div style={{ marginTop: 20 }}>
-          <ContactListsSection contacts={contacts} />
-        </div>
 
         <div className="calls-controls" style={{ marginTop: 20 }}>
           <div className="search-wrap">
@@ -489,6 +520,32 @@ export default function ContactsPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * L'écran « Listes de contacts » (20/11/2026), à part comme sur le mobile : on
+ * y arrive par la tuile de l'écran Contacts, et on en revient par la flèche.
+ */
+export function ListesContactsPage() {
+  const navigate = useNavigate()
+  const { t } = useTranslation()
+  const { contacts } = useContacts()
+  return (
+    <div className="calls-root contacts-ecran" style={{ padding: "20px 0" }}>
+      {/* La flèche de retour, puis la section : son titre devient celui de
+          l'écran (le nom, le nombre de listes et « Nouvelle liste »). */}
+      <div className="calls-head contacts-listes">
+        <button className="contacts-retour" onClick={() => navigate("/contacts")} aria-label={t("back")} title={t("back")}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <div className="contacts-listes-corps">
+          <ContactListsSection contacts={contacts} />
+        </div>
+      </div>
     </div>
   )
 }

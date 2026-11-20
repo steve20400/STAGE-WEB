@@ -2729,16 +2729,17 @@ export default function SettingsPage() {
         }
         .s-back {
           display: flex; align-items: center; gap: 8px;
-          color: var(--text-muted); font-size: 0.75rem; cursor: pointer;
+          /* Lisible (20/11/2026) : encre secondaire et graisse, au lieu du gris pâle. */
+          color: var(--text-secondary); font-size: 0.875rem; font-weight: 600; cursor: pointer;
           background: none; border: none; padding: 8px 10px;
           border-radius: 8px; font-family: 'DM Sans', sans-serif;
           transition: color .15s, background .15s; margin-bottom: 16px;
           width: 100%; text-align: left;
         }
-        .s-back:hover { color: var(--text-secondary); background: var(--bg-surface); }
+        .s-back:hover { color: var(--accent); background: var(--bg-surface); }
         .s-nav-title {
-          font-size: 0.5625rem; color: var(--text-ghost); letter-spacing: 1.5px;
-          text-transform: uppercase; padding: 8px 12px 4px; font-weight: 500;
+          font-size: 0.6875rem; color: var(--text-secondary); letter-spacing: 1.5px;
+          text-transform: uppercase; padding: 8px 12px 4px; font-weight: 700;
         }
 
 

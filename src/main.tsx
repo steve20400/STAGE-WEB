@@ -34,7 +34,7 @@ import { RejoindreGroupePage } from "../app/(protected)/g/rejoindre-groupe"
 import ChatsSplit, { ChatEmptyState } from "../app/(protected)/chats/chats-split"
 import SectionSplit from "../app/(protected)/section-split"
 import PanneauComposeur from "../app/(protected)/calls/panneau-composeur"
-import ContactsPage from "../app/(protected)/contacts/contacts"
+import ContactsPage, { ListesContactsPage } from "../app/(protected)/contacts/contacts"
 import ColleguesPage from "../app/(protected)/collegues/collegues"
 import EntreprisesPage from "../app/(protected)/entreprises/entreprises"
 import StatusPage from "../app/(protected)/status/status"
@@ -224,6 +224,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                       <ProtectedRoute>
                         <ProtectedLayout>
                           <ContactsPage />
+                        </ProtectedLayout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/contacts/listes"
+                    element={
+                      <ProtectedRoute>
+                        <ProtectedLayout>
+                          <ListesContactsPage />
                         </ProtectedLayout>
                       </ProtectedRoute>
                     }

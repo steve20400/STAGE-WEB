@@ -1,0 +1,115 @@
+/*
+ * L'écran Contacts aligné sur le mobile (20/11/2026) : trois tuiles en tête
+ * (Nouveau groupe, Ajouter un contact, Listes de contacts) et le voile crème
+ * sous le texte, qui s'efface vers la droite où le motif reste visible.
+ */
+.layout-main > .calls-root.contacts-ecran {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--bg-base) 92%, transparent) 0%,
+      color-mix(in srgb, var(--bg-base) 78%, transparent) 45%,
+      transparent 80%
+    ),
+    linear-gradient(var(--motif-overlay), var(--motif-overlay)),
+    var(--motif-image) repeat;
+  background-size:
+    auto,
+    auto,
+    280px auto;
+}
+
+.contacts-tuiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.contacts-tuile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgb(43 27 18 / 0.06);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
+}
+.contacts-tuile.active {
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+}
+.contacts-tuile-icone {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #098084;
+  color: #ffffff;
+}
+.contacts-tuile-libelle {
+  font-size: 0.9375rem;
+  line-height: 1.25;
+}
+.contacts-tuile:focus-visible,
+.contacts-retour:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .contacts-tuile:hover {
+    border-color: var(--accent-border);
+    box-shadow: 0 8px 22px rgb(43 27 18 / 0.12);
+    transform: translateY(-1px);
+  }
+  .contacts-retour:hover {
+    background: var(--bg-hover);
+  }
+}
+@media (max-width: 640px) {
+  .contacts-tuiles {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* Écran des listes : la flèche, puis la section dont le titre prend la
+   taille d'un titre de page. */
+.contacts-listes {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.contacts-listes-corps {
+  flex: 1;
+  min-width: 0;
+}
+.contacts-listes .clist-titre {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 1.625rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.contacts-retour {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--text-primary);
+  cursor: pointer;
+}

@@ -49,7 +49,10 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
   /** Mon numero, en chiffres nus, pour comparer une saisie a lui. */
   const monNumero = normalizePhone(moi?.phone ?? "").replace(/\D/g, "")
 
-  const [mode, setMode] = useState<Mode>("chat")
+  // `?mode=groupe` (tuile « Nouveau groupe » des Contacts) ouvre l'onglet groupe.
+  const [mode, setMode] = useState<Mode>(() =>
+    new URLSearchParams(window.location.search).get("mode") === "groupe" ? "group" : "chat"
+  )
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [groupName, setGroupName] = useState("")

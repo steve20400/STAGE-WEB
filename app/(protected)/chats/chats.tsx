@@ -683,7 +683,7 @@ export default function ChatsPage() {
               {sessionUser?.name ?? t("my_profile")}
             </div>
             <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-              ID :{" "}
+              Alanya ID :{" "}
               <strong style={{ color: "var(--accent)" }}>
                 {sessionUser?.phone ? formatAlanyaNumber(sessionUser.phone) : "—"}
               </strong>
