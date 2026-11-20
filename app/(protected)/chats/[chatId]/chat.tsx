@@ -7802,7 +7802,9 @@ export default function ChatRoomPage() {
     const zone = inputRef.current
     if (!zone) return
     zone.style.height = "auto"
-    zone.style.height = `${Math.min(110, Math.max(22, zone.scrollHeight))}px`
+    // Les bornes (une ligne, cinq au plus) sont dans la feuille de style, en
+    // em : elles suivent la taille du texte, 16 px au doigt (20/11/2026).
+    zone.style.height = `${zone.scrollHeight}px`
   }, [input])
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -7814,7 +7816,7 @@ export default function ChatRoomPage() {
     setInput(valeur)
     majRequeteMention(valeur, e.target.selectionStart ?? valeur.length)
     e.target.style.height = "auto"
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"
+    e.target.style.height = e.target.scrollHeight + "px"
 
     publishTyping(chatId, true)
     clearTimeout(typingTimer.current)
