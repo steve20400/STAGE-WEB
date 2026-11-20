@@ -319,7 +319,7 @@ export default function CallsPage() {
                           style={{
                             background: "#ef444425",
                             color: "#ef4444",
-                            fontSize: 10,
+                            fontSize: "0.625rem",
                             padding: "1px 5px",
                             borderRadius: 4,
                             fontWeight: 600,
@@ -504,7 +504,7 @@ export default function CallsPage() {
                                 call.status === "missed"
                                   ? undefined
                                   : {
-                                      fontSize: 10,
+                                      fontSize: "0.625rem",
                                       background: "var(--border-subtle)",
                                       color: "var(--text-muted)",
                                       padding: "2px 7px",

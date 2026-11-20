@@ -45,8 +45,10 @@
   align-items: center;
   justify-content: center;
 }
-.dialer-close:hover {
-  background: var(--bg-surface);
+@media (hover: hover) and (pointer: fine) {
+  .dialer-close:hover {
+    background: var(--bg-surface);
+  }
 }
 
 /* Le pave garde la largeur du clavier qu'il dessine — `min(320px, 100%)`, la
@@ -77,7 +79,7 @@
    « puis-je appeler », quand la ligne du titulaire, elle, reste collee aux
    chiffres a l'interieur du pave et repond a « qui vais-je appeler ». */
 .dialer-hint {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-faint);
   text-align: center;
 }

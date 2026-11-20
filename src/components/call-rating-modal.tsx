@@ -85,19 +85,19 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
         {submitted ? (
           <div>
             <div style={{ marginBottom: 8, color: "var(--accent)" }}><Icone nom="etincelles" taille={40} /></div>
-            <h3 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 700, margin: "0 0 8px 0" }}>
               {t("rate_thanks")}
             </h3>
-            <p style={{ fontSize: 14, opacity: 0.75, margin: 0 }}>
+            <p style={{ fontSize: "0.875rem", opacity: 0.75, margin: 0 }}>
               {t("rate_saved")}
             </p>
           </div>
         ) : (
           <>
-            <h3 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: 700, margin: "0 0 8px 0" }}>
               {t("rate_title")}
             </h3>
-            <p style={{ fontSize: 13, opacity: 0.75, margin: "0 0 20px 0" }}>
+            <p style={{ fontSize: "0.8125rem", opacity: 0.75, margin: "0 0 20px 0" }}>
               {t("rate_subtitle")}
             </p>
 
@@ -109,7 +109,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
                   borderRadius: 10,
                   backgroundColor: "rgba(229, 57, 53, 0.2)",
                   color: "#E53935",
-                  fontSize: 13,
+                  fontSize: "0.8125rem",
                 }}
               >
                 {error}
@@ -133,7 +133,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
                   style={{
                     background: "none",
                     border: "none",
-                    fontSize: 36,
+                    fontSize: "2.25rem",
                     cursor: "pointer",
                     color: star <= rating ? "#F59E0B" : "rgba(255, 255, 255, 0.25)",
                     transition: "transform 150ms",
@@ -159,7 +159,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
                 backgroundColor: "#2A3942",
                 border: "none",
                 color: "#FFFFFF",
-                fontSize: 14,
+                fontSize: "0.875rem",
                 resize: "none",
                 boxSizing: "border-box",
                 outline: "none",
@@ -180,7 +180,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
                   border: "none",
                   backgroundColor: "transparent",
                   color: "rgba(255, 255, 255, 0.6)",
-                  fontSize: 14,
+                  fontSize: "0.875rem",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
@@ -198,7 +198,7 @@ export function CallRatingModal({ idHist, onClose, onSuccess }: CallRatingModalP
                   border: "none",
                   backgroundColor: "#F59E0B",
                   color: "#FFFFFF",
-                  fontSize: 14,
+                  fontSize: "0.875rem",
                   fontWeight: 700,
                   cursor: loading ? "wait" : "pointer",
                   boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",

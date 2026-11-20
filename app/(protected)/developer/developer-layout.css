@@ -1,48 +1,41 @@
 /* Layout Développeur Autonome — Sidebar Verticale & Arrière-plans Motif Africain Alanya (Optimisé) */
+/*
+ * LES COULEURS DE LA CONSOLE SONT CELLES D'ALANYA (20/11/2026). Elle avait sa
+ * propre palette (nuit bleu marine, accent bleu ciel) qui ne ressemblait pas au
+ * reste de l'application. Chaque variable `--dev-*` renvoie désormais au jeton
+ * Alanya correspondant de globals.css : crème et terre cuite en thème clair,
+ * chocolat en sombre, et le motif africain des autres écrans. Le thème sombre
+ * n'a plus de bloc à lui : les jetons Alanya changent d'eux-mêmes.
+ */
 :root {
-  /* Thème CLAIR (Sable & Crème Alanya Mobile + motif bg-clair.png avec fondu subtil) */
-  --dev-bg-page: #faf6f0;
-  --dev-bg-image: linear-gradient(rgba(250, 246, 240, 0.86), rgba(250, 246, 240, 0.86)), url('/bg-clair.png');
-  --dev-bg-sidebar: rgba(240, 230, 216, 0.92);
-  --dev-bg-card: rgba(255, 255, 255, 0.9);
-  --dev-bg-card-hover: #ffffff;
-  --dev-text-primary: #3d2b1f;
-  --dev-text-secondary: #786252;
-  --dev-border: rgba(230, 215, 195, 0.8);
-  --dev-accent: #098084;
-  --dev-accent-light: rgba(9, 128, 132, 0.12);
-  --dev-menu-active-bg: #e6d7c3;
-  --dev-menu-active-text: #098084;
-  --dev-shadow: 0 4px 16px rgba(92, 61, 46, 0.08);
-}
-
-[data-theme="dark"] {
-  /* Thème NUIT (Nuit Alanya Mobile & Screenshot + motif bg-nuit.png) */
-  --dev-bg-page: #0b0b18;
-  --dev-bg-image: linear-gradient(rgba(11, 11, 24, 0.88), rgba(11, 11, 24, 0.88)), url('/bg-nuit.png');
-  --dev-bg-sidebar: rgba(7, 7, 18, 0.92);
-  --dev-bg-card: rgba(20, 20, 42, 0.9);
-  --dev-bg-card-hover: #1a1a36;
-  --dev-text-primary: #ede7df;
-  --dev-text-secondary: #9a96ac;
-  --dev-border: #1e1e3d;
-  --dev-accent: #38bdf8;
-  --dev-accent-light: rgba(56, 189, 248, 0.15);
-  --dev-menu-active-bg: #1e1e3d;
-  --dev-menu-active-text: #38bdf8;
-  --dev-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --dev-bg-page: var(--bg-base);
+  --dev-bg-image: linear-gradient(var(--motif-overlay), var(--motif-overlay)), var(--motif-image);
+  --dev-bg-sidebar: var(--bg-surface);
+  --dev-bg-card: var(--bg-surface);
+  --dev-bg-card-hover: var(--bg-elevated);
+  --dev-text-primary: var(--text-primary);
+  --dev-text-secondary: var(--text-secondary);
+  --dev-border: var(--border-subtle);
+  --dev-accent: var(--accent);
+  --dev-accent-light: var(--accent-dim);
+  --dev-menu-active-bg: var(--accent-dim);
+  --dev-menu-active-text: var(--accent);
+  --dev-shadow: 0 4px 16px rgb(43 27 18 / 0.08);
 }
 
 .dev-layout-root {
   display: flex;
   min-height: 100vh;
-  width: 100vw;
+  min-height: 100dvh;
+  /* 100 % et non 100vw : 100vw compte la barre de défilement et faisait
+     déborder la page à l'horizontale. */
+  width: 100%;
   background-color: var(--dev-bg-page);
   background-image: var(--dev-bg-image);
   background-repeat: repeat;
-  background-size: auto, 340px auto;
+  background-size: auto, 280px auto;
   color: var(--dev-text-primary);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: "DM Sans", sans-serif;
   transition: background-color 0.25s ease, color 0.25s ease;
   overflow-x: hidden;
 }
@@ -58,7 +51,12 @@
   justify-content: space-between;
   padding: 24px 16px;
   box-sizing: border-box;
-  backdrop-filter: blur(8px);
+  /* Reste en place pendant que le contenu défile. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
 }
 
 .dev-sidebar-top {
@@ -81,7 +79,7 @@
 }
 
 .dev-sidebar-title {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 800;
   color: var(--dev-text-primary);
 }
@@ -101,16 +99,18 @@
   border: none;
   background: transparent;
   color: var(--dev-text-secondary);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
   transition: all 0.2s ease;
 }
 
-.dev-nav-item:hover {
-  background-color: var(--dev-bg-card);
-  color: var(--dev-text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .dev-nav-item:hover {
+    background-color: var(--dev-bg-card);
+    color: var(--dev-text-primary);
+  }
 }
 
 .dev-nav-item.active {
@@ -150,7 +150,7 @@
 }
 
 .dev-user-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -158,7 +158,7 @@
 }
 
 .dev-user-role {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--dev-text-secondary);
 }
 
@@ -175,14 +175,16 @@
   border: 1px solid #ef4444;
   background: transparent;
   color: #ef4444;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
-.dev-logout-btn:hover {
-  background: rgba(239, 68, 68, 0.1);
+@media (hover: hover) and (pointer: fine) {
+  .dev-logout-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+  }
 }
 
 /* ZONE CONTENU PRINCIPAL À DROITE */
@@ -193,4 +195,101 @@
   padding: 32px 36px;
   box-sizing: border-box;
   overflow-y: auto;
+}
+
+/* ============================================================
+   PETIT ÉCRAN : LA NAVIGATION PASSE EN TIROIR (20/11/2026)
+   Même seuil que l'application (900 px). Une barre en haut porte le bouton
+   de menu ; le tiroir glisse depuis la gauche, un voile ferme au toucher.
+   ============================================================ */
+.dev-topbar,
+.dev-voile,
+.dev-fermer {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .dev-layout-root {
+    flex-direction: column;
+  }
+  .dev-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
+    background: var(--entete-bg);
+    color: var(--entete-texte);
+    border-bottom: 1px solid var(--entete-bord);
+  }
+  .dev-topbar .dev-sidebar-logo {
+    width: 30px;
+    height: 30px;
+  }
+  .dev-topbar .dev-sidebar-title {
+    color: var(--entete-texte);
+    font-size: 1.0625rem;
+  }
+  .dev-menu-btn,
+  .dev-fermer {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 10px;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+  .dev-fermer {
+    margin-left: auto;
+    color: var(--dev-text-secondary);
+  }
+  .dev-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: min(300px, 86vw);
+    min-width: 0;
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 16px 0 36px rgb(0 0 0 / 0.2);
+  }
+  .dev-sidebar.ouvert {
+    transform: translateX(0);
+  }
+  .dev-voile.ouvert {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgb(0 0 0 / 0.5);
+  }
+  .dev-nav-item {
+    min-height: 44px;
+  }
+  .dev-main-content {
+    padding: 16px 14px calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dev-sidebar {
+    transition: none;
+  }
+}
+
+/* Grand écran : le contenu reste centré au lieu de s'étirer. */
+.dev-main-content > * {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
 }

@@ -55,14 +55,14 @@
   gap: 1px;
 }
 .brand-name {
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   line-height: 1;
 }
 .brand-subtitle {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1;
@@ -87,7 +87,7 @@
   align-items: center;
   gap: 8px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 .welcome-theme-label {
@@ -100,16 +100,22 @@
 }
 .nav-links a {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-decoration: none;
   transition: color 0.2s;
 }
-.nav-links a:hover {
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .nav-links a:hover {
+    color: var(--accent);
+  }
 }
-.nav-links a.btn-nav,
-.nav-links a.btn-nav:hover {
+.nav-links a.btn-nav {
   color: var(--accent-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  .nav-links a.btn-nav:hover {
+    color: var(--accent-text);
+  }
 }
 .btn-nav {
   display: inline-flex;
@@ -124,7 +130,7 @@
     0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent),
     0 10px 24px color-mix(in srgb, var(--accent) 18%, transparent);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.875rem;
   letter-spacing: 0.01em;
   text-decoration: none;
   transition:
@@ -132,12 +138,14 @@
     box-shadow 0.18s,
     filter 0.18s;
 }
-.btn-nav:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.03);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
-    0 14px 30px color-mix(in srgb, var(--accent) 24%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .btn-nav:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.03);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent),
+      0 14px 30px color-mix(in srgb, var(--accent) 24%, transparent);
+  }
 }
 
 /* --- hero layout --- */
@@ -182,7 +190,7 @@
   }
 }
 .badge span {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--accent);
   font-weight: 500;
   letter-spacing: 0.3px;
@@ -190,7 +198,7 @@
 
 .headline {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: clamp(44px, 5vw, 68px);
+  font-size: clamp(2.75rem, 5vw, 4.25rem);
   font-weight: 800;
   line-height: 1.05;
   letter-spacing: -2px;
@@ -209,7 +217,7 @@
 }
 
 .subline {
-  font-size: 16px;
+  font-size: 1rem;
   color: var(--text-secondary);
   line-height: 1.75;
   max-width: 420px;
@@ -222,7 +230,7 @@
   gap: 16px;
   flex-wrap: wrap;
 }
-.btn-primary {
+.alanya-root .btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -231,17 +239,19 @@
   padding: 15px 28px;
   border-radius: 10px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 0.9375rem;
   text-decoration: none;
   transition:
     transform 0.15s,
     opacity 0.15s;
 }
-.btn-primary:hover {
-  transform: translateY(-1px);
-  opacity: 0.9;
+@media (hover: hover) and (pointer: fine) {
+  .alanya-root .btn-primary:hover {
+    transform: translateY(-1px);
+    opacity: 0.9;
+  }
 }
-.btn-primary:active {
+.alanya-root .btn-primary:active {
   transform: translateY(0);
 }
 .btn-ghost {
@@ -249,7 +259,7 @@
   align-items: center;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-decoration: none;
   border-bottom: 1px solid var(--text-primary) fff15;
   padding-bottom: 2px;
@@ -257,9 +267,11 @@
     color 0.2s,
     border-color 0.2s;
 }
-.btn-ghost:hover {
-  color: var(--text-primary);
-  border-color: var(--text-primary) fff40;
+@media (hover: hover) and (pointer: fine) {
+  .btn-ghost:hover {
+    color: var(--text-primary);
+    border-color: var(--text-primary) fff40;
+  }
 }
 
 /* --- features strip --- */
@@ -280,14 +292,14 @@
   border-right: none;
 }
 .feat-label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 6px;
 }
 .feat-val {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-secondary);
   font-weight: 400;
 }
@@ -343,18 +355,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--accent-text);
   flex-shrink: 0;
 }
 .phone-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 .phone-status {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--success);
 }
 
@@ -367,7 +379,7 @@
 .bubble {
   max-width: 80%;
   padding: 10px 14px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   border-radius: 16px;
 }
@@ -386,7 +398,7 @@
   align-self: flex-end;
 }
 .meta {
-  font-size: 10px;
+  font-size: 0.625rem;
   opacity: 0.5;
   margin-top: 4px;
 }
@@ -444,11 +456,11 @@
   background: color-mix(in srgb, var(--bg-surface) 72%, var(--accent-dim));
   border-radius: 20px;
   padding: 8px 14px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
 }
-.send-btn {
+.alanya-root .send-btn {
   width: 30px;
   height: 30px;
   border-radius: 50%;
@@ -488,17 +500,17 @@
     gap: 14px;
   }
   .nav-links a {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .welcome-theme-label {
     display: none;
   }
   .btn-nav {
     padding: 9px 15px;
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .headline {
-    font-size: clamp(34px, 11vw, 48px);
+    font-size: clamp(2.125rem, 11vw, 3rem);
     letter-spacing: -1px;
     margin-bottom: 16px;
   }
@@ -506,14 +518,14 @@
     left: 0;
   }
   .subline {
-    font-size: 15px;
+    font-size: 0.9375rem;
     max-width: 100%;
     margin-bottom: 28px;
   }
   .cta-row {
     gap: 10px;
   }
-  .btn-primary {
+  .alanya-root .btn-primary {
     width: 100%;
     justify-content: center;
     padding: 13px 18px;
@@ -552,7 +564,7 @@
     height: 32px !important;
   }
   .brand-name {
-    font-size: 18px !important;
+    font-size: 1.125rem !important;
   }
   .brand-subtitle {
     display: none;
@@ -571,13 +583,13 @@
     margin-bottom: 20px;
   }
   .badge span {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
   .chat-body {
     padding: 14px 12px;
   }
   .bubble {
-    font-size: 12px;
+    font-size: 0.75rem;
     max-width: 88%;
   }
   .phone-bar {

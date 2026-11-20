@@ -343,11 +343,11 @@ export function RepondeurAppel({
           width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
           background: var(--accent); color: var(--accent-text);
-          font-size: 12px; font-weight: 700;
+          font-size: 0.75rem; font-weight: 700;
         }
         .rep-tete-texte { flex: 1; min-width: 0; }
         .rep-titre {
-          font-size: 14px; font-weight: 700;
+          font-size: 0.875rem; font-weight: 700;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         /* ⚠️ CETTE LIGNE CHANGE DE LONGUEUR SELON LA LANGUE — « Lecture
@@ -355,7 +355,7 @@ export function RepondeurAppel({
            chinois et sur deux lignes en allemand. Elle passe donc à la ligne au
            lieu d'être coupée : c'est une phrase, pas une étiquette. */
         .rep-etat {
-          font-size: 12px; color: var(--text-muted); margin-top: 1px;
+          font-size: 0.75rem; color: var(--text-muted); margin-top: 1px;
           overflow-wrap: anywhere;
         }
         .rep-etat.tnum { font-variant-numeric: tabular-nums; }
@@ -398,7 +398,7 @@ export function RepondeurAppel({
         .rep-btn-p, .rep-btn-s {
           flex: 1 1 auto; min-width: 124px;
           padding: 12px 16px; border-radius: 999px; cursor: pointer;
-          font-family: inherit; font-size: 14px; font-weight: 700;
+          font-family: inherit; font-size: 0.875rem; font-weight: 700;
           line-height: 1.25; overflow-wrap: anywhere;
         }
         .rep-btn-p { border: none; background: var(--accent); color: var(--accent-text); }

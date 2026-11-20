@@ -217,7 +217,7 @@ export default function DeveloperAuthPage() {
                 placeholder="123456"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                style={{ letterSpacing: "6px", textAlign: "center", fontSize: "20px" }}
+                style={{ letterSpacing: "6px", textAlign: "center", fontSize: "1.25rem" }}
                 autoFocus
               />
             </div>

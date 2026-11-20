@@ -26,7 +26,7 @@
 }
 .ch-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 26px;
+  font-size: 1.625rem;
   font-weight: 800;
   letter-spacing: -1px;
 }
@@ -38,15 +38,17 @@
   color: var(--bg-base);
   padding: 10px 18px;
   border-radius: 9px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   border: none;
   cursor: pointer;
   font-family: "DM Sans", sans-serif;
   transition: opacity 0.15s;
 }
-.new-chat-btn:hover {
-  opacity: 0.88;
+@media (hover: hover) and (pointer: fine) {
+  .new-chat-btn:hover {
+    opacity: 0.88;
+  }
 }
 
 /* search */
@@ -68,7 +70,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 11px 14px 11px 38px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
   outline: none;
@@ -120,16 +122,18 @@
   border-radius: 20px;
   border: 1px solid var(--border-subtle);
   background: transparent;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
   font-family: "DM Sans", sans-serif;
   transition: all 0.15s;
 }
-.filter-btn:hover {
-  border-color: var(--border-default);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .filter-btn:hover {
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+  }
 }
 .filter-btn.active {
   background: var(--accent-dim);
@@ -163,10 +167,12 @@
     color 0.15s,
     background 0.15s;
 }
-.filter-ajout:hover {
-  border-color: var(--accent-border);
-  background: var(--accent-dim);
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .filter-ajout:hover {
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
 }
 .filter-ajout:focus-visible {
   outline: 2px solid var(--accent);
@@ -191,7 +197,7 @@
 }
 
 .section-label {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-faint);
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -211,8 +217,10 @@
   color: inherit;
   position: relative;
 }
-.conv-item:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .conv-item:hover {
+    background: var(--bg-elevated);
+  }
 }
 .conv-item.active {
   background: var(--accent-dim);
@@ -225,7 +233,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   flex-shrink: 0;
   position: relative;
@@ -269,7 +277,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 8px;
+  font-size: 0.5rem;
   color: var(--text-secondary);
   font-weight: 700;
 }
@@ -279,7 +287,7 @@
   min-width: 0;
 }
 .conv-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 3px;
@@ -288,7 +296,7 @@
   gap: 6px;
 }
 .conv-preview {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -306,7 +314,7 @@
   flex-shrink: 0;
 }
 .conv-time {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-faint);
 }
 .conv-time.unread {
@@ -315,7 +323,7 @@
 .unread-badge {
   background: var(--accent);
   color: var(--bg-base);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 20px;
@@ -325,11 +333,11 @@
 
 .pin-icon {
   color: var(--text-faint);
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .muted-icon {
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 /* empty state */
@@ -343,12 +351,12 @@
   text-align: center;
 }
 .empty-icon {
-  font-size: 36px;
+  font-size: 2.25rem;
   margin-bottom: 12px;
   opacity: 0.5;
 }
 .empty-txt {
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 
@@ -364,7 +372,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 500;
   padding: 1px 5px;
   border-radius: 3px;

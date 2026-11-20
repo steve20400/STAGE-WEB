@@ -255,7 +255,7 @@ export default function ContactsPage() {
                 onChange={(e) => setNewNumber(formatAlanyaNumber(e.target.value))}
                 inputMode="numeric"
                 maxLength={ALANYA_NUMBER_FORMATTED_MAX_LENGTH}
-                style={{ padding: "10px 12px", width: "100%", fontSize: 13 }}
+                style={{ padding: "10px 12px", width: "100%", fontSize: "0.8125rem" }}
               />
               {/* On enregistre un contact sous un alias : savoir QUI porte ce
                   numero avant de le nommer evite de baptiser un inconnu. */}
@@ -267,7 +267,7 @@ export default function ContactsPage() {
               value={newAlias}
               onChange={(e) => setNewAlias(e.target.value)}
               maxLength={100}
-              style={{ padding: "10px 12px", width: 220, fontSize: 13 }}
+              style={{ padding: "10px 12px", width: 220, fontSize: "0.8125rem" }}
             />
             {/*
               RANGER DANS UNE LISTE, des la creation.
@@ -286,7 +286,7 @@ export default function ContactsPage() {
                   value={listeChoisie ?? ""}
                   onChange={(e) => setListeChoisie(e.target.value || null)}
                   aria-label={t("clist_ranger_dans")}
-                  style={{ padding: "10px 12px", width: "100%", fontSize: 13 }}
+                  style={{ padding: "10px 12px", width: "100%", fontSize: "0.8125rem" }}
                 >
                   <option value="">{t("clist_aucune_liste")}</option>
                   {listes.map((liste) => (
@@ -295,7 +295,7 @@ export default function ContactsPage() {
                     </option>
                   ))}
                 </select>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>
                   {t("clist_ranger_dans")}
                 </span>
               </div>
@@ -308,7 +308,7 @@ export default function ContactsPage() {
                 rien de CE numero-la, elle explique ou trouver un Alanya ID. La
                 remonter en tete de rangee, avec les champs, la ferait lire
                 comme leur etiquette. */}
-            <span style={{ fontSize: 11, color: "var(--text-muted)", alignSelf: "center" }}>
+            <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)", alignSelf: "center" }}>
               {t("alanya_id_hint")}
             </span>
           </form>
@@ -445,14 +445,14 @@ export default function ContactsPage() {
             <div
               style={{
                 fontWeight: 700,
-                fontSize: 15,
+                fontSize: "0.9375rem",
                 color: "var(--text-primary)",
                 marginBottom: 8,
               }}
             >
               {t("delete_contact_confirm")}
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 16 }}>
               {t("delete_contact_detail")}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
@@ -464,7 +464,7 @@ export default function ContactsPage() {
                   borderRadius: 8,
                   padding: "8px 14px",
                   color: "var(--text-secondary)",
-                  fontSize: 12,
+                  fontSize: "0.75rem",
                   cursor: "pointer",
                 }}
               >
@@ -478,7 +478,7 @@ export default function ContactsPage() {
                   borderRadius: 8,
                   padding: "8px 14px",
                   color: "#fff",
-                  fontSize: 12,
+                  fontSize: "0.75rem",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}

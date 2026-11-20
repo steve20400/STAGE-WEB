@@ -642,7 +642,7 @@ export default function ChatsPage() {
               justifyContent: "center",
               fontFamily: "'Bricolage Grotesque', sans-serif",
               fontWeight: 800,
-              fontSize: 15,
+              fontSize: "0.9375rem",
               flexShrink: 0,
               overflow: "hidden",
             }}
@@ -669,7 +669,7 @@ export default function ChatsPage() {
             <div
               style={{
                 fontWeight: 700,
-                fontSize: 14,
+                fontSize: "0.875rem",
                 color: "var(--text-primary)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -678,7 +678,7 @@ export default function ChatsPage() {
             >
               {sessionUser?.name ?? t("my_profile")}
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
               Alanya ID :{" "}
               <strong style={{ color: "var(--accent)" }}>
                 {sessionUser?.phone ? formatAlanyaNumber(sessionUser.phone) : "—"}
@@ -1146,7 +1146,7 @@ function ConvItem({
           {conv.isGroup && (
             <span
               style={{
-                fontSize: 9,
+                fontSize: "0.5625rem",
                 background: "var(--border-subtle)",
                 color: "var(--text-muted)",
                 padding: "1px 5px",

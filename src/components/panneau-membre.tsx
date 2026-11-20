@@ -130,7 +130,7 @@ export function PanneauMembre({
                 <AvatarCircle
                   avatar={membre.avatar}
                   initials={toInitials(membre.nom)}
-                  style={{ width: 88, height: 88, fontSize: 30 }}
+                  style={{ width: 88, height: 88, fontSize: "1.875rem" }}
                 />
                 <div className="pm-fiche-nom">{membre.nom}</div>
                 {membre.numero && <div className="pm-fiche-numero">{membre.numero}</div>}
@@ -187,7 +187,7 @@ export function PanneauMembre({
                       <AvatarCircle
                         avatar={m.avatar}
                         initials={toInitials(m.nom)}
-                        style={{ width: 36, height: 36, fontSize: 12 }}
+                        style={{ width: 36, height: 36, fontSize: "0.75rem" }}
                       />
                       <div className="pm-liste-textes">
                         <span className="pm-liste-nom">

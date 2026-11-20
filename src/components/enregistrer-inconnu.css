@@ -11,7 +11,7 @@
   padding: 8px 14px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
 }
 
@@ -45,7 +45,7 @@
   border-radius: 8px;
   padding: 6px 12px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -83,9 +83,11 @@
   color: var(--text-muted);
 }
 
-.bandeau-inconnu .bi-fermer:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .bandeau-inconnu .bi-fermer:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
 }
 
 /* Le formulaire prend toute la ligne du bandeau, ou du panneau d'infos. */
@@ -101,7 +103,7 @@
   flex: 1 1 200px;
   min-width: 0;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* Hors du bandeau (panneau d'infos), mêmes boutons. */
@@ -116,7 +118,7 @@
   border-radius: 8px;
   padding: 7px 12px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
 }

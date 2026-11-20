@@ -7,9 +7,47 @@
   margin: 0;
   padding: 0;
 }
+/*
+ * LA TAILLE DE BASE DU TEXTE (20/11/2026). Toutes les polices sont en rem :
+ * elles suivent le réglage de taille du navigateur (accessibilité) et grandissent
+ * un peu sur les très grands écrans — 16 px jusqu'à 1600 px de large, puis
+ * jusqu'à 18 px à 2560 px — au lieu de rester minuscules au milieu de l'écran.
+ */
 html {
+  font-size: clamp(100%, 0.7917rem + 0.2083vw, 112.5%);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/*
+ * LES POINTS DE RUPTURE, les mêmes partout (une variable CSS ne peut pas servir
+ * dans @media : ils sont écrits en clair, et repris côté code par
+ * src/styles/points-de-rupture.ts).
+ *   600 px   téléphone / petite tablette
+ *   900 px   en dessous : navigation repliée en tiroir ET une seule colonne
+ *            (liste OU conversation) ; au-dessus, la barre latérale et la vue
+ *            deux colonnes apparaissent ensemble
+ *   1280 px  bureau
+ *   1400 px  la colonne de liste s'élargit avec l'écran
+ *   1600 px  grand écran : le panneau d'informations de la conversation
+ *            s'ouvre d'office
+ */
+
+/*
+ * AU DOIGT, UN CHAMP DE SAISIE FAIT AU MOINS 16 PX. En dessous, Safari sur
+ * iPhone agrandit toute la page dès qu'on touche le champ, et ne la ramène pas.
+ * `!important` : la règle doit l'emporter sur la taille propre à chaque champ,
+ * y compris celles posées en style dans le code. Elle ne vise que les écrans
+ * tactiles ; à la souris, les champs gardent leur taille.
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  textarea,
+  select {
+    font-size: max(1rem, 16px) !important;
+  }
 }
 img,
 video {
@@ -319,7 +357,7 @@ body {
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.6;
   transition:
     background 0.25s ease,
@@ -603,7 +641,7 @@ body {
 
 .pseudo-gate-titre {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 19px;
+  font-size: 1.1875rem;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--text-primary);
@@ -611,7 +649,7 @@ body {
 
 .pseudo-gate-sous {
   margin: 8px 0 18px;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   line-height: 1.55;
   color: var(--text-muted);
 }
@@ -624,7 +662,7 @@ body {
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .pseudo-gate-champ:focus-visible {
   outline: 2px solid var(--accent);
@@ -633,7 +671,7 @@ body {
 
 .pseudo-gate-erreur {
   margin-top: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--danger);
 }
 
@@ -646,7 +684,7 @@ body {
   background: var(--accent);
   color: var(--accent-text);
   font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -658,7 +696,7 @@ body {
 .pseudo-gate-note {
   margin: 12px 0 0;
   text-align: center;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-ghost);
 }
 

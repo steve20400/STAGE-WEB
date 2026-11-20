@@ -200,8 +200,32 @@ import { estVerifie } from "../../../../src/services/e2ee-empreinte"
 import { oublierAvertissement } from "../../../../src/services/e2ee-store"
 import { PartagerContact } from "./partager-contact"
 import "./chat-room-page.css"
+import { MEDIA_GRAND_ECRAN, MEDIA_LARGE } from "../../../../src/styles/points-de-rupture"
 
 type Message = ChatMessageMock
+
+/*
+ * LE PANNEAU D'INFORMATIONS SUR GRAND ÉCRAN (20/11/2026). Au-delà de 1600 px,
+ * la place ne manque pas : il s'ouvre d'office en troisième colonne, à côté de
+ * la conversation. Si l'utilisateur le ferme, ce choix est retenu (sur cet
+ * appareil) et il ne se rouvre plus tout seul.
+ */
+const CLE_PANNEAU_INFOS = "alanya-panneau-infos"
+function panneauInfosParDefaut(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia(MEDIA_GRAND_ECRAN).matches) return false
+  try {
+    return localStorage.getItem(CLE_PANNEAU_INFOS) !== "ferme"
+  } catch {
+    return true
+  }
+}
+function retenirPanneauInfos(ouvert: boolean) {
+  try {
+    localStorage.setItem(CLE_PANNEAU_INFOS, ouvert ? "ouvert" : "ferme")
+  } catch {
+    /* stockage indisponible (navigation privée) : le choix vaut pour la session */
+  }
+}
 
 /** Une carte média défectueuse ne doit jamais faire tomber toute la discussion. */
 class MessageErrorBoundary extends Component<
@@ -233,7 +257,7 @@ class MessageErrorBoundary extends Component<
           borderRadius: 9,
           border: "1px solid var(--border-subtle)",
           background: "var(--bg-elevated)",
-          fontSize: 11,
+          fontSize: "0.6875rem",
           color: "var(--text-secondary)",
         }}
       >
@@ -544,7 +568,7 @@ export function DocumentViewer({
             borderBottom: `1px solid ${isMe ? "#ffffff15" : "#1a1f24"}`,
             fontFamily: "'Bricolage Grotesque', sans-serif",
             fontWeight: 700,
-            fontSize: 15,
+            fontSize: "0.9375rem",
             color: isMe ? "#fff" : "var(--text-primary)",
           }}
         >
@@ -572,7 +596,7 @@ export function DocumentViewer({
                 border: "none",
                 color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)",
                 cursor: "pointer",
-                fontSize: 20,
+                fontSize: "1.25rem",
                 lineHeight: 1,
               }}
             >
@@ -661,7 +685,7 @@ export function DocumentViewer({
                     borderRadius: 8,
                     padding: 12,
                     fontFamily: "'Fira Code', monospace",
-                    fontSize: 13,
+                    fontSize: "0.8125rem",
                     lineHeight: 1.5,
                     resize: "none",
                   }}
@@ -719,7 +743,7 @@ export function DocumentViewer({
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
               </svg>
-              <div style={{ fontSize: 13, opacity: 0.8 }}>{name ?? t("file")}</div>
+              <div style={{ fontSize: "0.8125rem", opacity: 0.8 }}>{name ?? t("file")}</div>
               <a
                 href={url}
                 target="_blank"
@@ -853,7 +877,7 @@ function PdfViewer({
           style={{
             display: "block",
             padding: "6px 2px 0",
-            fontSize: 10,
+            fontSize: "0.625rem",
             color: isMe ? "rgba(255,255,255,0.85)" : "var(--text-secondary)",
           }}
         >
@@ -1477,7 +1501,7 @@ function RichText({ text, isMe }: { text: string; isMe: boolean }) {
           <div style={{ minWidth: 0, flex: 1 }}>
             <div
               style={{
-                fontSize: 11,
+                fontSize: "0.6875rem",
                 fontWeight: 600,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1488,7 +1512,7 @@ function RichText({ text, isMe }: { text: string; isMe: boolean }) {
             </div>
             <div
               style={{
-                fontSize: 10,
+                fontSize: "0.625rem",
                 opacity: 0.6,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1619,7 +1643,7 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
             alignItems: "center",
             gap: 6,
             marginTop: 4,
-            fontSize: 10,
+            fontSize: "0.625rem",
             opacity: 0.75,
           }}
         >
@@ -1646,12 +1670,12 @@ function GpsPreview({ lat, lng, isMe }: { lat: number; lng: number; isMe: boolea
 function LocationCard({ content, isMe }: { content: string | null; isMe: boolean }) {
   const position = positionDepuisContenu(content)
   if (!position) {
-    return <div style={{ opacity: 0.8, fontSize: 13 }}><Icone nom="repere" taille={14} /> Position</div>
+    return <div style={{ opacity: 0.8, fontSize: "0.8125rem" }}><Icone nom="repere" taille={14} /> Position</div>
   }
   return (
     <div style={{ minWidth: 200 }}>
       {position.label && (
-        <div style={{ fontWeight: 600, fontSize: 13.5, marginBottom: 2 }}>
+        <div style={{ fontWeight: 600, fontSize: "0.8438rem", marginBottom: 2 }}>
           <Icone nom="repere" taille={14} /> {position.label}
         </div>
       )}
@@ -1659,7 +1683,7 @@ function LocationCard({ content, isMe }: { content: string | null; isMe: boolean
       {position.accuracy !== null && (
         // La précision change le sens de ce qu'on reçoit : une position à
         // 1 200 m près désigne un quartier, pas un lieu.
-        <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>
+        <div style={{ fontSize: "0.6562rem", opacity: 0.7, marginTop: 2 }}>
           Précision {Math.round(position.accuracy)} m
         </div>
       )}
@@ -1714,7 +1738,7 @@ function CallEventChip({ call, enfant }: { call: CallRecord; enfant?: ReactNode 
           border: `1px solid ${tint}22`,
           borderRadius: isOutgoing ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
           padding: "8px 14px",
-          fontSize: 12,
+          fontSize: "0.75rem",
           color: tint,
           maxWidth: "min(78%, 360px)",
         }}
@@ -1761,7 +1785,7 @@ function CallEventChip({ call, enfant }: { call: CallRecord; enfant?: ReactNode 
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
-            style={{ fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
+            style={{ fontWeight: 600, fontSize: "0.75rem", display: "flex", alignItems: "center", gap: 4 }}
           >
             {/* Fleche de direction */}
             <svg
@@ -1787,7 +1811,7 @@ function CallEventChip({ call, enfant }: { call: CallRecord; enfant?: ReactNode 
             </svg>
             {label}
           </div>
-          <div style={{ fontSize: 10, opacity: 0.75, marginTop: 1 }}>
+          <div style={{ fontSize: "0.625rem", opacity: 0.75, marginTop: 1 }}>
             {formatTime(call.ts)}
             {call.duration ? ` — ${call.duration}` : ""}
           </div>
@@ -2013,7 +2037,7 @@ function AudioPlayer({
             marginTop: 2,
           }}
         >
-          <span style={{ fontSize: 10, opacity: 0.75 }}>
+          <span style={{ fontSize: "0.625rem", opacity: 0.75 }}>
             {playing || elapsedSec > 0
               ? formatAudioDuration(elapsedSec * 1000)
               : formatAudioDuration(durationMs)}
@@ -2031,7 +2055,7 @@ function AudioPlayer({
                 border: 0,
                 borderRadius: 9,
                 padding: "1px 6px",
-                fontSize: 10,
+                fontSize: "0.625rem",
                 fontWeight: 600,
                 fontFamily: "inherit",
                 cursor: "pointer",
@@ -2149,7 +2173,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
           background: isMe ? "#00000018" : "#171d27",
         }}
       >
-        <span style={{ fontFamily: "monospace", fontSize: 10, opacity: 0.75, fontWeight: 700 }}>
+        <span style={{ fontFamily: "monospace", fontSize: "0.625rem", opacity: 0.75, fontWeight: 700 }}>
           {ext.toUpperCase()}
         </span>
         <input
@@ -2165,7 +2189,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
             padding: "4px 6px",
             background: "#ffffff14",
             color: tone,
-            fontSize: 10,
+            fontSize: "0.625rem",
             outline: "none",
           }}
         />
@@ -2179,20 +2203,20 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
             padding: "4px 6px",
             background: "#ffffff18",
             color: tone,
-            fontSize: 10,
+            fontSize: "0.625rem",
           }}
         >
           {t("copy")}
         </button>
       </div>
       {loading ? (
-        <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11 }}>
+        <div style={{ padding: 12, fontFamily: "monospace", fontSize: "0.6875rem" }}>
           {t("loading_preview")}
         </div>
       ) : errorMessage ? (
         // Le visionneur a besoin du texte : sans les octets il n'a rien a rendre.
         // On laisse au moins une porte de sortie vers le fichier lui-meme.
-        <div style={{ padding: 12, fontFamily: "monospace", fontSize: 11, color: "#ffb4a2" }}>
+        <div style={{ padding: 12, fontFamily: "monospace", fontSize: "0.6875rem", color: "#ffb4a2" }}>
           {errorMessage}
           <a
             href={url}
@@ -2205,7 +2229,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
         </div>
       ) : isCsv ? (
         <div style={{ overflow: "auto", maxHeight: 180 }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 10 }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.625rem" }}>
             <tbody>
               {rows.map((row, i) => (
                 <tr key={i}>
@@ -2226,7 +2250,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
             </tbody>
           </table>
           {text.split(/\r?\n/).filter(Boolean).length > 30 && (
-            <div style={{ padding: 6, fontSize: 10, opacity: 0.65 }}>{t("first_lines_shown")}</div>
+            <div style={{ padding: 6, fontSize: "0.625rem", opacity: 0.65 }}>{t("first_lines_shown")}</div>
           )}
         </div>
       ) : (
@@ -2235,7 +2259,7 @@ function TextFilePreview({ url, isMe, name }: { url: string; isMe: boolean; name
             maxHeight: 180,
             overflow: "auto",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: 11,
+            fontSize: "0.6875rem",
             lineHeight: 1.48,
             padding: "6px 0",
           }}
@@ -2383,8 +2407,8 @@ function OfficePreview({
       }}
     >
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 11, fontWeight: 600 }}>{t("f2_preview_of", { format: label })}</div>
-        <div style={{ fontSize: 9.5, opacity: 0.78, marginTop: 2, lineHeight: 1.4 }}>
+        <div style={{ fontSize: "0.6875rem", fontWeight: 600 }}>{t("f2_preview_of", { format: label })}</div>
+        <div style={{ fontSize: "0.5938rem", opacity: 0.78, marginTop: 2, lineHeight: 1.4 }}>
           {t("office_warning")}
         </div>
       </div>
@@ -2401,7 +2425,7 @@ function OfficePreview({
           border: "none",
           background: isMe ? "#ffffff28" : "var(--accent)",
           color: isMe ? "#fff" : "var(--accent-text)",
-          fontSize: 10,
+          fontSize: "0.625rem",
           fontWeight: 600,
           cursor: "pointer",
         }}
@@ -2422,7 +2446,7 @@ function OfficePreview({
             borderRadius: 6,
             border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`,
             color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)",
-            fontSize: 10,
+            fontSize: "0.625rem",
             fontWeight: 500,
             textDecoration: "none",
           }}
@@ -2457,7 +2481,7 @@ function VideoPreview({
           padding: "10px 12px",
           borderRadius: 9,
           background: "#00000012",
-          fontSize: 11,
+          fontSize: "0.6875rem",
         }}
       >
         <div style={{ fontWeight: 600 }}>{name ?? t("video_label")}</div>
@@ -2640,12 +2664,12 @@ function FullMediaPreview({
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 11, fontWeight: 800, color: fti.color }}>{fti.label}</span>
+        <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: fti.color }}>{fti.label}</span>
       </div>
       <div style={{ minWidth: 0 }}>
         <div
           style={{
-            fontSize: 14,
+            fontSize: "0.875rem",
             fontWeight: 600,
             color: "#fff",
             overflow: "hidden",
@@ -2654,7 +2678,7 @@ function FullMediaPreview({
         >
           {name}
         </div>
-        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
+        <div style={{ fontSize: "0.6875rem", color: "rgba(255,255,255,0.65)", marginTop: 3 }}>
           {subject.note ? `${subject.note} — ` : ""}
           {t("f2_no_browser_preview")}
         </div>
@@ -2752,7 +2776,7 @@ function MediaGallery({
       >
         <span
           style={{
-            fontSize: 13,
+            fontSize: "0.8125rem",
             fontWeight: 600,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -2774,7 +2798,7 @@ function MediaGallery({
               download={shown.fileName ?? ""}
               target="_blank"
               rel="noreferrer"
-              style={{ color: "rgba(255,255,255,0.85)", fontSize: 12 }}
+              style={{ color: "rgba(255,255,255,0.85)", fontSize: "0.75rem" }}
             >
               {t("download")}
             </a>
@@ -2792,7 +2816,7 @@ function MediaGallery({
               border: "none",
               color: "rgba(255,255,255,0.85)",
               cursor: "pointer",
-              fontSize: 22,
+              fontSize: "1.375rem",
               lineHeight: 1,
             }}
           >
@@ -3112,7 +3136,7 @@ function MediaComposer({
       >
         <span
           style={{
-            fontSize: 13,
+            fontSize: "0.8125rem",
             fontWeight: 600,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -3144,7 +3168,7 @@ function MediaComposer({
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              fontSize: 13,
+              fontSize: "0.8125rem",
             }}
           >
             <Icone nom="crayon" taille={18} /> {t("edit_photo")}
@@ -3158,7 +3182,7 @@ function MediaComposer({
             border: "none",
             color: "rgba(255,255,255,0.85)",
             cursor: "pointer",
-            fontSize: 22,
+            fontSize: "1.375rem",
             lineHeight: 1,
           }}
         >
@@ -3236,7 +3260,7 @@ function MediaComposer({
                 ) : (
                   <span
                     style={{
-                      fontSize: 8,
+                      fontSize: "0.5rem",
                       fontWeight: 800,
                       color: fileTypeInfo(item.file.name, item.mime).color,
                     }}
@@ -3258,7 +3282,7 @@ function MediaComposer({
                   border: "none",
                   background: "#000000cc",
                   color: "#fff",
-                  fontSize: 11,
+                  fontSize: "0.6875rem",
                   lineHeight: 1,
                   cursor: "pointer",
                 }}
@@ -3289,7 +3313,7 @@ function MediaComposer({
           une ligne « 280 Ko → 280 Ko » serait du bruit.
         */}
         {current.kind === "video" && current.compression && !gain && (
-          <div style={{ flexBasis: "100%", fontSize: 12, color: "rgba(255,255,255,0.72)" }} role="status">
+          <div style={{ flexBasis: "100%", fontSize: "0.75rem", color: "rgba(255,255,255,0.72)" }} role="status">
             {t("media_compression_video", { pct: avancement ?? 0 })}
           </div>
         )}
@@ -3311,7 +3335,7 @@ function MediaComposer({
               flexBasis: "100%",
               alignItems: "center",
               gap: 10,
-              fontSize: 12,
+              fontSize: "0.75rem",
               color: "rgba(255,255,255,0.72)",
             }}
           >
@@ -3336,7 +3360,7 @@ function MediaComposer({
                   borderRadius: 7,
                   padding: "3px 9px",
                   fontFamily: "inherit",
-                  fontSize: 11.5,
+                  fontSize: "0.7188rem",
                   fontWeight: 600,
                   cursor: "pointer",
                   background: current.niveau === "haute" ? "var(--accent)" : "rgba(255,255,255,0.16)",
@@ -3387,7 +3411,7 @@ function MediaComposer({
             border: "1px solid #ffffff25",
             background: "#ffffff12",
             color: "#fff",
-            fontSize: 14,
+            fontSize: "0.875rem",
             fontFamily: "inherit",
             outline: "none",
           }}
@@ -3747,13 +3771,13 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
           <polyline points="14 2 14 8 20 8" />
         </svg>
-        <span style={{ fontSize: 9, fontWeight: 800, color: fti.color, letterSpacing: 0.5 }}>
+        <span style={{ fontSize: "0.5625rem", fontWeight: 800, color: fti.color, letterSpacing: 0.5 }}>
           {fti.label}
         </span>
         {nomFichier && (
           <span
             style={{
-              fontSize: 8,
+              fontSize: "0.5rem",
               lineHeight: 1.25,
               color: "#4a5058",
               maxWidth: "100%",
@@ -3784,7 +3808,7 @@ function QuoteThumbnail({ msg, size = 32 }: { msg: Message; size?: number }) {
         overflow: "hidden",
       }}
     >
-      <span style={{ fontSize: 8, fontWeight: 800, color: fti.color, letterSpacing: 0.4 }}>
+      <span style={{ fontSize: "0.5rem", fontWeight: 800, color: fti.color, letterSpacing: 0.4 }}>
         {fti.label}
       </span>
     </div>
@@ -3998,7 +4022,7 @@ function MediaAlbumGrid({
                 justifyContent: "center",
                 background: "#000000a8",
                 color: "#fff",
-                fontSize: 20,
+                fontSize: "1.25rem",
                 fontWeight: 700,
                 pointerEvents: "none",
               }}
@@ -4487,7 +4511,7 @@ function MessageBubble({
         background: "none",
         border: "none",
         color: danger ? "var(--danger)" : "var(--text-primary)",
-        fontSize: 12,
+        fontSize: "0.75rem",
         cursor: "pointer",
         fontFamily: "'DM Sans', sans-serif",
         whiteSpace: "nowrap",
@@ -4514,7 +4538,7 @@ function MessageBubble({
             border: "1px solid var(--border-subtle)",
             color: "var(--text-muted)",
             textAlign: "center",
-            fontSize: 11,
+            fontSize: "0.6875rem",
             lineHeight: 1.35,
           }}
         >
@@ -4631,7 +4655,7 @@ function MessageBubble({
                   borderRadius: 8,
                   padding: "4px 7px",
                   color: "var(--text-secondary)",
-                  fontSize: 12,
+                  fontSize: "0.75rem",
                   cursor: "pointer",
                   lineHeight: 1,
                   boxShadow: "0 2px 8px #00000024",
@@ -4746,7 +4770,7 @@ function MessageBubble({
             {msg.nomAgent && msg.appareilId !== appareilCourantId() && !msg.isDeleted && (
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: "0.625rem",
                   fontWeight: 600,
                   letterSpacing: 0.2,
                   color: "var(--agent-name)",
@@ -4793,7 +4817,7 @@ function MessageBubble({
                 boxShadow: stickerRecu ? "none" : "0 1px 1px rgba(0, 0, 0, 0.06)",
                 padding: stickerRecu ? 0 : msg.type === "image" && mediaSrc ? 4 : "6px 9px 5px",
                 borderRadius: isMe ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-                fontSize: 13.5,
+                fontSize: "0.8438rem",
                 lineHeight: 1.4,
                 wordBreak: "break-word",
                 // flow-root : contient l'heure flottante facon WhatsApp
@@ -4835,7 +4859,7 @@ function MessageBubble({
                     {quoteAuthor && (
                       <div
                         style={{
-                          fontSize: 11.5,
+                          fontSize: "0.7188rem",
                           fontWeight: 700,
                           lineHeight: 1.3,
                           marginBottom: 1,
@@ -4851,7 +4875,7 @@ function MessageBubble({
                     )}
                     <div
                       style={{
-                        fontSize: 12,
+                        fontSize: "0.75rem",
                         lineHeight: 1.35,
                         color: "inherit",
                         opacity: 0.75,
@@ -4972,7 +4996,7 @@ function MessageBubble({
               )}
 
               {msg.isDeleted ? (
-                <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: 12 }}>
+                <span style={{ fontStyle: "italic", opacity: 0.65, fontSize: "0.75rem" }}>
                   {t("message_deleted")}
                 </span>
               ) : albumMsgs ? (
@@ -5073,7 +5097,7 @@ function MessageBubble({
                             alignItems: "center",
                             gap: 5,
                             marginBottom: 5,
-                            fontSize: 11,
+                            fontSize: "0.6875rem",
                             fontWeight: 600,
                             letterSpacing: 0.2,
                             opacity: 0.75,
@@ -5144,7 +5168,7 @@ function MessageBubble({
                         <div
                           style={{
                             marginTop: 5,
-                            fontSize: 10,
+                            fontSize: "0.625rem",
                             opacity: 0.76,
                             display: "flex",
                             gap: 7,
@@ -5408,7 +5432,7 @@ function MessageBubble({
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div
                                 style={{
-                                  fontSize: 13,
+                                  fontSize: "0.8125rem",
                                   fontWeight: 600,
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
@@ -5418,10 +5442,10 @@ function MessageBubble({
                                 {msg.fileName ?? msg.content ?? t("file")}
                               </div>
                               {msg.fileSize && (
-                                <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
+                                <div style={{ fontSize: "0.625rem", opacity: 0.7 }}>{msg.fileSize}</div>
                               )}
                               {msg.fileSize && msg.fileName ? (
-                                <div style={{ fontSize: 9, opacity: 0.7, marginTop: 1 }}>
+                                <div style={{ fontSize: "0.5625rem", opacity: 0.7, marginTop: 1 }}>
                                   {t("f2_pages_approx", {
                                     n: estimatePages(msg.fileName, msg.fileSize),
                                   })}
@@ -5429,7 +5453,7 @@ function MessageBubble({
                               ) : null}
                               <div
                                 style={{
-                                  fontSize: 9,
+                                  fontSize: "0.5625rem",
                                   opacity: 0.85,
                                   marginTop: 2,
                                   color: isMe ? "rgba(255,255,255,0.9)" : "var(--text-secondary)",
@@ -5444,7 +5468,7 @@ function MessageBubble({
                                     display: "flex",
                                     alignItems: "center",
                                     gap: 6,
-                                    fontSize: 10,
+                                    fontSize: "0.625rem",
                                     opacity: 0.8,
                                   }}
                                 >
@@ -5488,7 +5512,7 @@ function MessageBubble({
                                     border: "none",
                                     background: isMe ? "#ffffff25" : "var(--accent)",
                                     color: isMe ? "#fff" : "var(--accent-text)",
-                                    fontSize: 10,
+                                    fontSize: "0.625rem",
                                     fontWeight: 600,
                                     cursor: "pointer",
                                   }}
@@ -5510,7 +5534,7 @@ function MessageBubble({
                                     border: `1px solid ${isMe ? "#ffffff30" : "var(--border-default)"}`,
                                     background: "transparent",
                                     color: isMe ? "rgba(255,255,255,0.8)" : "var(--text-secondary)",
-                                    fontSize: 10,
+                                    fontSize: "0.625rem",
                                     fontWeight: 500,
                                     textDecoration: "none",
                                     display: "inline-block",
@@ -5582,7 +5606,7 @@ function MessageBubble({
                               </svg>
                               <span
                                 style={{
-                                  fontSize: 7,
+                                  fontSize: "0.4375rem",
                                   fontWeight: 700,
                                   color: fti.color,
                                   letterSpacing: 0.5,
@@ -5594,7 +5618,7 @@ function MessageBubble({
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div
                                 style={{
-                                  fontSize: 12,
+                                  fontSize: "0.75rem",
                                   fontWeight: 500,
                                   overflow: "hidden",
                                   textOverflow: "ellipsis",
@@ -5604,7 +5628,7 @@ function MessageBubble({
                                 {msg.fileName ?? msg.content ?? t("file")}
                               </div>
                               {msg.fileSize && (
-                                <div style={{ fontSize: 10, opacity: 0.7 }}>{msg.fileSize}</div>
+                                <div style={{ fontSize: "0.625rem", opacity: 0.7 }}>{msg.fileSize}</div>
                               )}
                             </div>
                             <svg
@@ -5731,7 +5755,7 @@ function MessageBubble({
                                     border: `1px solid ${isMe ? "rgba(255,255,255,0.4)" : "var(--accent)"}`,
                                     background: isMe ? "rgba(255,255,255,0.15)" : "rgba(181, 123, 99, 0.12)",
                                     color: isMe ? "#ffffff" : "var(--accent)",
-                                    fontSize: 12,
+                                    fontSize: "0.75rem",
                                     fontWeight: 600,
                                     cursor: "pointer",
                                   }}
@@ -5767,7 +5791,7 @@ function MessageBubble({
                           gap: 3,
                           marginLeft: 8,
                           transform: "translateY(4px)",
-                          fontSize: 10,
+                          fontSize: "0.625rem",
                           lineHeight: 1,
                           whiteSpace: "nowrap",
                           color: isMe ? "rgba(255, 255, 255, 0.75)" : "var(--text-faint)",
@@ -6029,7 +6053,7 @@ export default function ChatRoomPage() {
   const [barreFormatOuverte, setBarreFormatOuverte] = useState(false)
   /** Fenetre de choix du contact a envoyer (repertoire ou numero compose). */
   const [partageContact, setPartageContact] = useState(false)
-  const [infoPanelOpen, setInfoPanelOpen] = useState(false)
+  const [infoPanelOpen, setInfoPanelOpen] = useState(panneauInfosParDefaut)
 
   /*
    * ⚠️ REMONTE ICI depuis une cinquantaine de lignes plus bas : la traduction
@@ -9113,8 +9137,10 @@ export default function ChatRoomPage() {
               aria-label={t("cinfo_title")}
               title={t("cinfo_title")}
               onClick={() => {
-                if (window.matchMedia("(min-width: 901px)").matches) setInfoPanelOpen(true)
-                else navigate(`/chats/${chatId}/info`)
+                if (window.matchMedia(MEDIA_LARGE).matches) {
+                  setInfoPanelOpen(true)
+                  retenirPanneauInfos(true)
+                } else navigate(`/chats/${chatId}/info`)
               }}
             >
               <svg
@@ -9395,7 +9421,7 @@ export default function ChatRoomPage() {
                         <div>
                           <div
                             style={{
-                              fontSize: 11,
+                              fontSize: "0.6875rem",
                               fontWeight: 600,
                               opacity: 0.8,
                               marginBottom: 4,
@@ -9430,7 +9456,7 @@ export default function ChatRoomPage() {
                             /* Le media peut manquer — envoi encore en cours, ou
                                efface. Dire qu'il y a eu un message vaut mieux
                                qu'un lecteur qui ne jouerait rien. */
-                            <div style={{ fontSize: 11, opacity: 0.7 }}>{t("rep_envoi")}</div>
+                            <div style={{ fontSize: "0.6875rem", opacity: 0.7 }}>{t("rep_envoi")}</div>
                           )}
                         </div>
                       }
@@ -10170,13 +10196,13 @@ export default function ChatRoomPage() {
                 <span
                   style={{
                     color: "var(--text-primary)",
-                    fontSize: 13,
+                    fontSize: "0.8125rem",
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
                   {formatAudioDuration(recordSec * 1000)}
                 </span>
-                <span style={{ color: "var(--text-muted)", fontSize: 12, flex: 1 }}>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.75rem", flex: 1 }}>
                   {t("recording_voice")}
                 </span>
                 <button
@@ -10188,7 +10214,7 @@ export default function ChatRoomPage() {
                     borderRadius: 8,
                     padding: "6px 12px",
                     color: "var(--text-secondary)",
-                    fontSize: 12,
+                    fontSize: "0.75rem",
                     cursor: "pointer",
                   }}
                 >
@@ -10300,7 +10326,7 @@ export default function ChatRoomPage() {
                     className="compteur-longueur"
                     aria-live="polite"
                     style={{
-                      fontSize: "11px",
+                      fontSize: "0.6875rem",
                       marginRight: "6px",
                       alignSelf: "flex-end",
                       // A zero la saisie est bloquee : le rouge explique
@@ -10364,7 +10390,13 @@ export default function ChatRoomPage() {
 
       {infoPanelOpen && (
         <aside className="chat-info-drawer">
-          <ChatInfoPage embedded onEmbeddedClose={() => setInfoPanelOpen(false)} />
+          <ChatInfoPage
+            embedded
+            onEmbeddedClose={() => {
+              setInfoPanelOpen(false)
+              retenirPanneauInfos(false)
+            }}
+          />
         </aside>
       )}
 
@@ -10664,7 +10696,7 @@ function ForwardDialog({
             borderBottom: "1px solid var(--border-subtle)",
             fontFamily: "'Bricolage Grotesque', sans-serif",
             fontWeight: 800,
-            fontSize: 17,
+            fontSize: "1.0625rem",
             color: "var(--text-primary)",
           }}
         >
@@ -10672,12 +10704,12 @@ function ForwardDialog({
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
           {loading && (
-            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: "0.8125rem" }}>
               {t("loading")}
             </div>
           )}
           {!loading && conversations.length === 0 && (
-            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: "0.8125rem" }}>
               {t("no_conversation_available")}
             </div>
           )}
@@ -10709,14 +10741,14 @@ function ForwardDialog({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 11,
+                  fontSize: "0.6875rem",
                   fontWeight: 700,
                   flexShrink: 0,
                 }}
               >
                 {conv.initials}
               </span>
-              <span style={{ color: "var(--text-primary)", fontSize: 13 }}>{conv.name}</span>
+              <span style={{ color: "var(--text-primary)", fontSize: "0.8125rem" }}>{conv.name}</span>
             </label>
           ))}
         </div>
@@ -10737,7 +10769,7 @@ function ForwardDialog({
               borderRadius: 8,
               padding: "8px 14px",
               color: "var(--text-secondary)",
-              fontSize: 12,
+              fontSize: "0.75rem",
               cursor: "pointer",
             }}
           >
@@ -10755,7 +10787,7 @@ function ForwardDialog({
               borderRadius: 8,
               padding: "8px 16px",
               color: "var(--accent-text)",
-              fontSize: 12,
+              fontSize: "0.75rem",
               fontWeight: 600,
               cursor: selected.size === 0 || sending ? "not-allowed" : "pointer",
               opacity: selected.size === 0 || sending ? 0.6 : 1,

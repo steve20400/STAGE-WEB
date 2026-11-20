@@ -1,11 +1,12 @@
 import { useEffect } from "react"
+import { MEDIA_ETROIT } from "../styles/points-de-rupture"
 
 /**
  * Largeur d'ecran en dessous de laquelle le tiroir de navigation existe.
  * Miroir exact de `app/(protected)/layout.css` : au-dela, `.sidebar-mobile-wrap`
  * est en `display: none` et un glissement ouvrirait un panneau invisible.
  */
-const DRAWER_MEDIA_QUERY = "(max-width: 860px)"
+const DRAWER_MEDIA_QUERY = MEDIA_ETROIT
 
 /** Deplacement horizontal a partir duquel le geste est reconnu. */
 const SWIPE_DISTANCE = 60

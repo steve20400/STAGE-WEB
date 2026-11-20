@@ -219,7 +219,7 @@ export default function IncomingCallOverlay({
           justify-content: center;
           font-family: 'Bricolage Grotesque', sans-serif;
           font-weight: 800;
-          font-size: 28px;
+          font-size: 1.75rem;
           position: relative;
         }
 
@@ -249,7 +249,7 @@ export default function IncomingCallOverlay({
         }
 
         .ical-type {
-          font-size: 11px;
+          font-size: 0.6875rem;
           text-transform: uppercase;
           letter-spacing: 1.2px;
           color: var(--accent);
@@ -259,7 +259,7 @@ export default function IncomingCallOverlay({
 
         .ical-name {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 26px;
+          font-size: 1.625rem;
           font-weight: 800;
           letter-spacing: -.6px;
           color: var(--text-primary);
@@ -268,7 +268,7 @@ export default function IncomingCallOverlay({
 
         .ical-sub {
           color: var(--text-muted);
-          font-size: 13px;
+          font-size: 0.8125rem;
           margin-bottom: 24px;
         }
 
@@ -307,13 +307,13 @@ export default function IncomingCallOverlay({
 
         .ical-action-label {
           color: var(--text-muted);
-          font-size: 12px;
+          font-size: 0.75rem;
         }
 
         .ical-timer {
           margin-top: 16px;
           color: var(--text-faint);
-          font-size: 11px;
+          font-size: 0.6875rem;
         }
 
         /* Appel video : plein ecran, notre camera derriere. */
@@ -412,7 +412,7 @@ export default function IncomingCallOverlay({
           background: none;
           color: var(--text-primary);
           font: inherit;
-          font-size: 14px;
+          font-size: 0.875rem;
           cursor: pointer;
         }
 
@@ -433,7 +433,7 @@ export default function IncomingCallOverlay({
           background: transparent;
           color: var(--text-primary);
           font: inherit;
-          font-size: 14px;
+          font-size: 0.875rem;
         }
 
         .ical-bouton {
@@ -441,7 +441,7 @@ export default function IncomingCallOverlay({
           border-radius: 10px;
           padding: 10px 14px;
           font: inherit;
-          font-size: 14px;
+          font-size: 0.875rem;
           font-weight: 600;
           cursor: pointer;
           background: var(--accent);

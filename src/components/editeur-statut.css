@@ -31,7 +31,7 @@
   border-radius: 10px;
   background: #ffffff1a;
   color: #fff;
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -48,14 +48,16 @@
   background: #ffffff1a;
   color: #fff;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
   transition: background 0.15s;
 }
-.es-outils button:hover:not(:disabled) {
-  background: #ffffff33;
+@media (hover: hover) and (pointer: fine) {
+  .es-outils button:hover:not(:disabled) {
+    background: #ffffff33;
+  }
 }
 /* L'outil actif se VOIT : sans marque, on dessine en croyant déplacer, ou
    l'inverse — et le trait de trop se corrige à l'annulation. */
@@ -157,7 +159,7 @@
   background: var(--accent);
   color: var(--accent-text);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -188,7 +190,7 @@
   background: #ffffff14;
   color: #fff;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .es-saisie input:focus {
   outline: none;

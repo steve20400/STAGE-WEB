@@ -53,7 +53,7 @@ function LecteurAccueil({ src }: { src: string }) {
         style={{ width: "100%", height: 34 }}
       />
       {casse && (
-        <div style={{ fontSize: 11.5, color: "var(--danger)" }}>
+        <div style={{ fontSize: "0.7188rem", color: "var(--danger)" }}>
           {t("rep_lecture_impossible")}{" "}
           <a href={src} download style={{ color: "inherit", textDecoration: "underline" }}>
             {t("download")}
@@ -704,14 +704,14 @@ function libellePlage(
           padding: 10px 16px; border-radius: 9px; cursor: pointer;
           border: 1px solid var(--accent); background: var(--accent);
           color: var(--accent-text); font-family: 'DM Sans', sans-serif;
-          font-size: 12.5px; font-weight: 600;
+          font-size: 0.7812rem; font-weight: 600;
         }
         .rep-btn:disabled { cursor: progress; opacity: 0.6; }
         .rep-nom {
           width: 100%; padding: 9px 12px; border-radius: 9px;
           border: 1px solid var(--border-subtle); background: var(--bg-surface);
           color: var(--text-primary); font-family: 'DM Sans', sans-serif;
-          font-size: 12.5px; outline: none;
+          font-size: 0.7812rem; outline: none;
         }
         .rep-btn-ghost {
           border: 1px dashed var(--border-default); background: var(--bg-elevated);
@@ -724,7 +724,7 @@ function libellePlage(
           display: flex; align-items: center; justify-content: space-between;
           gap: 14px; width: 100%; padding: 16px 18px; border-radius: 14px;
           margin-bottom: 16px; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 14.5px; font-weight: 600;
+          font-family: 'DM Sans', sans-serif; font-size: 0.9062rem; font-weight: 600;
           text-align: left; border: 1.5px solid var(--border-subtle);
           background: var(--bg-elevated); color: var(--text-primary);
           transition: background .15s, border-color .15s, color .15s;
@@ -736,7 +736,7 @@ function libellePlage(
         .rep-bascule-texte { flex: 1; min-width: 0; }
         .rep-bascule-sous {
           display: block; margin-top: 2px;
-          font-size: 12px; font-weight: 400; opacity: .8;
+          font-size: 0.75rem; font-weight: 400; opacity: .8;
         }
         .rep-bascule-piste {
           position: relative; flex-shrink: 0;
@@ -763,8 +763,8 @@ function libellePlage(
         }
         .rep-mode.choisi { border-color: var(--accent); background: var(--accent-dim); }
         .rep-mode:disabled { cursor: progress; opacity: .6; }
-        .rep-mode-n { font-size: 13px; font-weight: 700; }
-        .rep-mode-d { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; }
+        .rep-mode-n { font-size: 0.8125rem; font-weight: 700; }
+        .rep-mode-d { font-size: 0.7188rem; color: var(--text-muted); line-height: 1.35; }
         /* Au pouce, deux cartes cote a cote deviennent illisibles : elles
            passent l'une sous l'autre plutot que de se serrer. */
         @media (max-width: 480px) {
@@ -784,7 +784,7 @@ function libellePlage(
         .rep-jour {
           flex: 1 1 auto; min-width: 44px;
           padding: 8px 6px; border-radius: 9px; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+          font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 600;
           text-transform: capitalize;
           border: 1.5px solid var(--border-subtle);
           background: var(--bg-surface); color: var(--text-secondary);
@@ -798,31 +798,31 @@ function libellePlage(
         /* L'aide qui n'apparaît QUE si la saisie traverse minuit. Discrète : elle
            informe, elle n'alerte pas — ce n'est pas une erreur. */
         .rep-prog-aide {
-          margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: var(--text-muted);
+          margin: 6px 0 0; font-size: 0.75rem; line-height: 1.4; color: var(--text-muted);
         }
         .rep-prog-champ {
           flex: 1 1 130px; display: flex; align-items: center; gap: 8px;
           padding: 6px 11px; border-radius: 9px;
           border: 1px solid var(--border-subtle); background: var(--bg-surface);
         }
-        .rep-prog-champ > span { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .rep-prog-champ > span { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
         .rep-prog-champ input, .rep-prog-champ select {
           flex: 1; min-width: 0; border: none; background: transparent; outline: none;
           color: var(--text-primary); font-family: 'DM Sans', sans-serif;
-          font-size: 13.5px; font-weight: 600;
+          font-size: 0.8438rem; font-weight: 600;
         }
         .rep-prog-accueil { flex-basis: 100%; }
         .rep-prog-accueil select { font-weight: 500; }
 
-        .rep-prog-vide { font-size: 12.5px; color: var(--text-muted); }
+        .rep-prog-vide { font-size: 0.7812rem; color: var(--text-muted); }
         .rep-prog-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
         .rep-prog-ligne {
           display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
           padding: 10px 0; border-top: 1px solid var(--border-subtle);
         }
-        .rep-prog-quand { flex: 1; min-width: 150px; font-size: 13px; color: var(--text-primary); }
+        .rep-prog-quand { flex: 1; min-width: 150px; font-size: 0.8125rem; color: var(--text-primary); }
         .rep-prog-quand b { text-transform: capitalize; }
-        .rep-prog-quand span { display: block; font-size: 11.5px; color: var(--text-muted); }
+        .rep-prog-quand span { display: block; font-size: 0.7188rem; color: var(--text-muted); }
         /* Une plage perimee reste LISIBLE mais s'efface : elle ne s'applique
            plus, et doit se distinguer d'un coup d'oeil de celles qui courent. */
         .rep-prog-ligne.morte .rep-prog-quand b { opacity: .55; text-decoration: line-through; }
@@ -832,10 +832,10 @@ function libellePlage(
           margin-bottom: 16px; padding: 13px 14px; border-radius: 12px;
           border: 1px solid var(--border-subtle); background: var(--bg-elevated);
         }
-        .rep-abs-titre { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
-        .rep-abs-sub { font-size: 12px; color: var(--text-muted); margin: 2px 0 11px; }
+        .rep-abs-titre { font-size: 0.8438rem; font-weight: 700; color: var(--text-primary); }
+        .rep-abs-sub { font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 11px; }
         .rep-abs-duree {
-          font-size: 11px; font-weight: 700; letter-spacing: .06em;
+          font-size: 0.6875rem; font-weight: 700; letter-spacing: .06em;
           text-transform: uppercase; color: var(--text-muted); margin-bottom: 7px;
         }
         .rep-abs-champs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -847,10 +847,10 @@ function libellePlage(
         .rep-abs-champ input {
           width: 46px; border: none; background: transparent; outline: none;
           color: var(--text-primary); font-family: 'DM Sans', sans-serif;
-          font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums;
+          font-size: 0.875rem; font-weight: 600; font-variant-numeric: tabular-nums;
         }
-        .rep-abs-champ span { font-size: 12px; color: var(--text-muted); }
-        .rep-abs-bornes { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; }
+        .rep-abs-champ span { font-size: 0.75rem; color: var(--text-muted); }
+        .rep-abs-bornes { font-size: 0.7188rem; color: var(--text-muted); margin-top: 8px; }
         /* Le bandeau se détache de ce qui le précède : collé aux deux cartes de
            mode, on lisait une seule masse et l'on ne voyait plus ce qui était
            l'état en cours et ce qui était le choix. */
@@ -863,14 +863,14 @@ function libellePlage(
         .rep-abs-ligne { display: flex; align-items: flex-start; gap: 10px; }
         .rep-abs-bandeau .rep-abs-pt { margin-top: 6px; }
         .rep-abs-retour {
-          font-size: 11.5px; color: var(--text-muted); text-align: center;
+          font-size: 0.7188rem; color: var(--text-muted); text-align: center;
         }
         /* Le bouton d'annulation est PLEIN et pleine largeur : c'est la sortie
            d'un etat qui rend injoignable, pas une option parmi d'autres. */
         .rep-abs-annuler {
           width: 100%; padding: 12px 16px; border-radius: 10px; cursor: pointer;
           border: none; background: var(--danger); color: #fff;
-          font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 700;
+          font-family: 'DM Sans', sans-serif; font-size: 0.8438rem; font-weight: 700;
         }
         .rep-abs-annuler:disabled { cursor: progress; opacity: .6; }
         .rep-abs-annuler:focus-visible { outline: 2px solid var(--danger); outline-offset: 2px; }
@@ -878,8 +878,8 @@ function libellePlage(
           width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
           background: var(--accent);
         }
-        .rep-abs-txt { flex: 1; min-width: 140px; font-size: 13px; color: var(--text-primary); }
-        .rep-abs-txt span { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+        .rep-abs-txt { flex: 1; min-width: 140px; font-size: 0.8125rem; color: var(--text-primary); }
+        .rep-abs-txt span { display: block; font-size: 0.7188rem; color: var(--text-muted); margin-top: 1px; }
         /* Sur un telephone, les boutons prennent la ligne entiere plutot que de
            se serrer a deux ou trois par rangee, ou aucun n'est atteignable au
            pouce. */
@@ -1192,7 +1192,7 @@ function libellePlage(
             <>
               <div
                 style={{
-                  fontSize: 11.5,
+                  fontSize: "0.7188rem",
                   fontWeight: 600,
                   color: "var(--text-muted)",
                   letterSpacing: 0.2,
@@ -1222,7 +1222,7 @@ function libellePlage(
                           style={{
                             flex: 1,
                             minWidth: 0,
-                            fontSize: 13,
+                            fontSize: "0.8125rem",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             whiteSpace: "nowrap",
@@ -1233,7 +1233,7 @@ function libellePlage(
                         {estActif && (
                           <span
                             style={{
-                              fontSize: 10.5,
+                              fontSize: "0.6562rem",
                               fontWeight: 700,
                               padding: "2px 8px",
                               borderRadius: 999,
@@ -1271,7 +1271,7 @@ function libellePlage(
               </ul>
             </>
           ) : (
-            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{t("rep_aucun")}</div>
+            <div style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>{t("rep_aucun")}</div>
           )}
 
           {/* Le nom du PROCHAIN accueil. Facultatif : sans lui la ligne
@@ -1320,12 +1320,12 @@ function libellePlage(
               flexShrink: 0,
             }}
           />
-          <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 15 }}>
+          <span style={{ fontVariantNumeric: "tabular-nums", fontSize: "0.9375rem" }}>
             {mmss(secondes)}
           </span>
           {/* Le reste du temps disponible, pour qu'on sache où l'on va plutôt
               que d'être coupé sans prévenir. */}
-          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
             / {mmss(Math.floor(ACCUEIL_MAX_MS / 1000))}
           </span>
           <button className="rep-btn" onClick={arreter}>

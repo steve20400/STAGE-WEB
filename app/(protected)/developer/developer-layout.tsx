@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext } from "react"
+import React, { useState, createContext, useContext, useEffect } from "react"
 import { useAuth } from "../../../src/components/auth-provider"
 import { ThemeToggle } from "../../../src/components/theme-toggle"
 import { useNavigate } from "react-router-dom"
@@ -30,6 +30,24 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<DeveloperTab>("dashboard")
+  /** Le tiroir de navigation, sous 900 px de large (20/11/2026). */
+  const [menuOuvert, setMenuOuvert] = useState(false)
+
+  // Échap referme le tiroir, comme celui de l'application.
+  useEffect(() => {
+    if (!menuOuvert) return
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOuvert(false)
+    }
+    window.addEventListener("keydown", surTouche)
+    return () => window.removeEventListener("keydown", surTouche)
+  }, [menuOuvert])
+
+  /** Choisir un onglet referme le tiroir : on veut voir la page choisie. */
+  const choisir = (onglet: DeveloperTab) => {
+    setActiveTab(onglet)
+    setMenuOuvert(false)
+  }
 
   const handleLogout = async () => {
     await logout()
@@ -42,19 +60,45 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
   return (
     <DeveloperTabContext.Provider value={{ activeTab, setActiveTab }}>
       <div className="dev-layout-root">
-        {/* SIDEBAR VERTICALE À GAUCHE */}
-        <aside className="dev-sidebar">
+        {/* BARRE DU HAUT, sous 900 px seulement : elle porte le bouton du tiroir. */}
+        <header className="dev-topbar">
+          <button
+            type="button"
+            className="dev-menu-btn"
+            aria-label="Ouvrir le menu"
+            aria-expanded={menuOuvert}
+            onClick={() => setMenuOuvert(true)}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="4" y1="7" x2="20" y2="7" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="17" x2="20" y2="17" />
+            </svg>
+          </button>
+          <img src={logoDev} alt="" className="dev-sidebar-logo" />
+          <span className="dev-sidebar-title">Alanya Dev</span>
+        </header>
+        <div className={`dev-voile ${menuOuvert ? "ouvert" : ""}`} onClick={() => setMenuOuvert(false)} />
+
+        {/* SIDEBAR VERTICALE À GAUCHE (tiroir sous 900 px) */}
+        <aside className={`dev-sidebar ${menuOuvert ? "ouvert" : ""}`}>
           <div className="dev-sidebar-top">
             <div className="dev-sidebar-brand">
               <img src={logoDev} alt="Alanya Dev Logo" className="dev-sidebar-logo" />
               <span className="dev-sidebar-title">Alanya Dev</span>
+              <button type="button" className="dev-fermer" aria-label="Fermer le menu" onClick={() => setMenuOuvert(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                </svg>
+              </button>
             </div>
 
             {/* MENU NAVIGATION VERTICALE DANS LA SIDEBAR */}
             <nav className="dev-sidebar-nav">
               <button
                 className={`dev-nav-item ${activeTab === "dashboard" ? "active" : ""}`}
-                onClick={() => setActiveTab("dashboard")}
+                onClick={() => choisir("dashboard")}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -65,7 +109,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
 
               <button
                 className={`dev-nav-item ${activeTab === "enseignes" ? "active" : ""}`}
-                onClick={() => setActiveTab("enseignes")}
+                onClick={() => choisir("enseignes")}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M3 9l1.5-5h15L21 9" />
@@ -78,7 +122,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
 
               <button
                 className={`dev-nav-item ${activeTab === "keys" ? "active" : ""}`}
-                onClick={() => setActiveTab("keys")}
+                onClick={() => choisir("keys")}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="7.5" cy="16.5" r="3.5" />
@@ -90,7 +134,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
 
               <button
                 className={`dev-nav-item ${activeTab === "logs" ? "active" : ""}`}
-                onClick={() => setActiveTab("logs")}
+                onClick={() => choisir("logs")}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="20" x2="18" y2="10" />
@@ -102,7 +146,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
 
               <button
                 className={`dev-nav-item ${activeTab === "webhooks" ? "active" : ""}`}
-                onClick={() => setActiveTab("webhooks")}
+                onClick={() => choisir("webhooks")}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -113,7 +157,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
 
               <button
                 className={`dev-nav-item ${activeTab === "docs" ? "active" : ""}`}
-                onClick={() => setActiveTab("docs")}
+                onClick={() => choisir("docs")}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="16 18 22 12 16 6" />

@@ -49,7 +49,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             {traduire(langueInitiale(), "core_crash_title")}
           </div>
           <div
-            style={{ color: "var(--text-muted)", fontSize: 13, lineHeight: 1.5, marginBottom: 18 }}
+            style={{ color: "var(--text-muted)", fontSize: "0.8125rem", lineHeight: 1.5, marginBottom: 18 }}
           >
             {traduire(langueInitiale(), "core_crash_detail")}
           </div>

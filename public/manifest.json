@@ -1,23 +1,35 @@
 {
+  "id": "/",
   "short_name": "Alanya Work",
   "name": "Alanya Work",
+  "description": "Messagerie, appels et réunions pour les équipes.",
+  "lang": "fr",
+  "dir": "ltr",
   "icons": [
     {
       "src": "icone-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "icone-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "icone-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
   "start_url": "/",
-  "background_color": "#0B141A",
-  "theme_color": "#0B141A",
+  "scope": "/",
+  "background_color": "#f5efe6",
+  "theme_color": "#8a4b2b",
   "display": "standalone",
-  "orientation": "portrait",
   "gcm_sender_id": "103953800507",
   "share_target": {
     "action": "partage-recu",

@@ -22,8 +22,10 @@
 .emoji-pied button[aria-selected="true"] {
   color: var(--accent);
 }
-.emoji-pied button:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .emoji-pied button:hover {
+    background: var(--bg-hover);
+  }
 }
 .emoji-pied svg {
   width: 20px;
@@ -59,8 +61,10 @@
   color: var(--text-muted);
   cursor: pointer;
 }
-.stk-onglet:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .stk-onglet:hover {
+    background: var(--bg-hover);
+  }
 }
 .stk-onglet[aria-selected="true"] {
   border-bottom-color: var(--accent);
@@ -89,7 +93,7 @@
   background: var(--bg-surface);
   color: var(--text-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .stk-recherche input:focus {
   outline: none;
@@ -114,9 +118,13 @@
   background: none;
   cursor: pointer;
 }
-.stk-case:hover,
 .stk-case:focus-visible {
   background: var(--bg-hover);
+}
+@media (hover: hover) and (pointer: fine) {
+  .stk-case:hover {
+    background: var(--bg-hover);
+  }
 }
 .stk-case img,
 .stk-image {
@@ -129,7 +137,7 @@
   padding: 24px 16px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* ── Fenêtres (boutique, pack, sticker reçu) ── */
@@ -164,14 +172,14 @@
 .stk-entete h2 {
   flex: 1;
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
 }
 .stk-fermer {
   border: none;
   background: none;
   color: var(--text-muted);
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -207,8 +215,10 @@
   gap: 12px;
   padding: 8px 16px;
 }
-.stk-ligne:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .stk-ligne:hover {
+    background: var(--bg-hover);
+  }
 }
 .stk-ligne-ouvrir {
   flex: 1;
@@ -242,7 +252,7 @@
 }
 .stk-ligne-texte span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .stk-action {
   flex-shrink: 0;
@@ -252,7 +262,7 @@
   background: none;
   color: var(--accent);
   font: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -287,12 +297,12 @@
 .stk-pied .stk-action {
   width: 100%;
   padding: 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .stk-description {
   padding: 8px 16px 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .stk-recu {
   display: flex;
@@ -333,7 +343,7 @@
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.4);
   color: #fff;
-  font-size: 10px;
+  font-size: 0.625rem;
   line-height: 1;
   white-space: nowrap;
 }
@@ -395,7 +405,7 @@
   background: none;
   color: var(--accent);
   font: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 .stk-creer svg {
@@ -425,13 +435,13 @@
 .ppdf-champ small {
   display: block;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .ppdf-champ {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .ppdf-champ input {
   padding: 8px 10px;
@@ -443,7 +453,7 @@
 }
 .ppdf-erreur {
   color: #d64545;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-style: normal;
 }
 .ppdf-infos {
@@ -451,7 +461,7 @@
   flex-direction: column;
   gap: 4px;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .ppdf-infos code,
 .ppdf-revele {
@@ -459,6 +469,6 @@
   font-weight: 700;
 }
 .ppdf-revele {
-  font-size: 22px;
+  font-size: 1.375rem;
   user-select: all;
 }

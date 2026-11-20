@@ -8,11 +8,11 @@
 }
 .partage-recu h1 {
   margin: 0 0 14px;
-  font-size: 20px;
+  font-size: 1.25rem;
 }
 .partage-recu h2 {
   margin: 18px 0 8px;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .partage-recu-resume {
   padding: 12px;
@@ -28,7 +28,7 @@
 }
 .partage-recu-nom {
   overflow: hidden;
-  font-size: 13px;
+  font-size: 0.8125rem;
   opacity: 0.8;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -57,9 +57,13 @@
   text-align: left;
   cursor: pointer;
 }
-.partage-recu-conv:hover,
 .partage-recu-conv:focus-visible {
   background: var(--bg-surface);
+}
+@media (hover: hover) and (pointer: fine) {
+  .partage-recu-conv:hover {
+    background: var(--bg-surface);
+  }
 }
 .partage-recu-initiales {
   display: flex;
@@ -71,7 +75,7 @@
   border-radius: 50%;
   background: var(--accent-dim);
   color: var(--accent);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
 }
 .partage-recu-nomconv {

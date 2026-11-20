@@ -35,9 +35,11 @@
     background 0.15s ease,
     color 0.15s ease;
 }
-.mc-bouton:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .mc-bouton:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
 }
 /* Ouvert : le bouton reste marque, sinon on perd de vue d'ou sort
    le panneau quand plusieurs lignes se ressemblent. */
@@ -94,12 +96,14 @@
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   text-align: left;
   cursor: pointer;
 }
-.mc-item:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .mc-item:hover {
+    background: var(--bg-hover);
+  }
 }
 .mc-item:focus-visible {
   outline: none;

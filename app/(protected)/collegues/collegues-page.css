@@ -68,7 +68,7 @@
 .cl-head h1 {
   margin: 0;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   /* Un nom de service long ne doit pas repousser le compteur hors du cadre. */
@@ -81,7 +81,7 @@
    se lit comme sa precision et non comme une donnee separee. */
 .cl-head-compte {
   flex: none;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   color: var(--text-muted);
   padding-top: 4px;
 }
@@ -114,9 +114,11 @@
     color 0.15s;
 }
 
-.cl-back:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .cl-back:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
 }
 
 .cl-back:focus-visible {
@@ -160,7 +162,7 @@
   background: var(--bg-surface);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -197,9 +199,11 @@
   cursor: pointer;
 }
 
-.cl-champ-effacer:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .cl-champ-effacer:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
 }
 
 .cl-champ-effacer svg {
@@ -255,7 +259,7 @@
   background: var(--bg-surface);
   color: inherit;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: left;
   cursor: pointer;
   transition:
@@ -264,9 +268,11 @@
     transform 0.15s;
 }
 
-.cl-service:hover {
-  background: var(--bg-elevated);
-  border-color: var(--border-default);
+@media (hover: hover) and (pointer: fine) {
+  .cl-service:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-default);
+  }
 }
 
 .cl-service:focus-visible {
@@ -315,7 +321,7 @@
 }
 
 .cl-service-effectif {
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   color: var(--text-muted);
 }
 
@@ -378,7 +384,7 @@
   background: var(--accent-dim);
   color: var(--accent);
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
 }
 
@@ -392,7 +398,7 @@
 
 .cl-membre-nom {
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -400,7 +406,7 @@
 
 .cl-membre-num {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .cl-membre-agence {
@@ -409,7 +415,7 @@
   gap: 5px;
   min-width: 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .cl-membre-agence svg {
@@ -454,7 +460,7 @@
   background: transparent;
   color: var(--accent);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -470,9 +476,11 @@
   text-overflow: ellipsis;
 }
 
-.cl-action:hover:not(:disabled) {
-  background: var(--accent-dim);
-  border-color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .cl-action:hover:not(:disabled) {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
 }
 
 /* « Appeler » est le geste principal : plein, comme le `FilledButton`. */
@@ -482,9 +490,11 @@
   color: var(--accent-text);
 }
 
-.cl-action-pleine:hover:not(:disabled) {
-  background: var(--accent);
-  filter: brightness(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .cl-action-pleine:hover:not(:disabled) {
+    background: var(--accent);
+    filter: brightness(1.08);
+  }
 }
 
 .cl-action:disabled {
@@ -508,7 +518,7 @@
 .cl-hint {
   padding: 16px 2px;
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 
 .cl-hint button {
@@ -518,7 +528,7 @@
   background: var(--bg-elevated);
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
 
@@ -545,7 +555,7 @@
 
 .cl-vide-droite p {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   max-width: 260px;
 }
 

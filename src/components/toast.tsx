@@ -182,7 +182,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            fontSize: 13,
+            fontSize: "0.8125rem",
             fontWeight: 600,
             color: "#E2E8F0",
             marginBottom: toast.message ? 2 : 0,
@@ -191,7 +191,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
           {toast.title}
         </div>
         {toast.message && (
-          <div style={{ fontSize: 11, color: "#4B5563", lineHeight: 1.55 }}>{toast.message}</div>
+          <div style={{ fontSize: "0.6875rem", color: "#4B5563", lineHeight: 1.55 }}>{toast.message}</div>
         )}
       </div>
 

@@ -407,13 +407,13 @@ export function ExportMedias() {
           padding: 10px 12px; border-radius: 10px; margin-bottom: 18px;
           background: var(--accent-dim); color: var(--text-primary);
           border-left: 3px solid var(--accent);
-          font-size: 12.5px; line-height: 1.45;
+          font-size: 0.7812rem; line-height: 1.45;
         }
 
         .exp-bloc { margin-bottom: 20px; }
         .exp-titre {
           display: flex; align-items: center; gap: 9px; margin-bottom: 10px;
-          font-size: 13.5px; font-weight: 700; color: var(--text-primary);
+          font-size: 0.8438rem; font-weight: 700; color: var(--text-primary);
         }
         /* Le numero encode une SEQUENCE reelle — on choisit les discussions,
            puis les types, puis la periode — et non une decoration. */
@@ -421,14 +421,14 @@ export function ExportMedias() {
           width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
           background: var(--accent); color: var(--accent-text);
-          font-size: 11.5px; font-weight: 700;
+          font-size: 0.7188rem; font-weight: 700;
         }
 
         .exp-choix2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .exp-opt {
           display: flex; align-items: center; justify-content: center; gap: 7px;
           padding: 11px 14px; border-radius: 11px; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+          font-family: 'DM Sans', sans-serif; font-size: 0.8125rem; font-weight: 600;
           border: 1.5px solid var(--border-subtle);
           background: var(--bg-surface); color: var(--text-secondary);
         }
@@ -436,7 +436,7 @@ export function ExportMedias() {
           border-color: var(--accent); background: var(--accent); color: var(--accent-text);
         }
         .exp-compteur {
-          padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700;
+          padding: 1px 7px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700;
           background: rgba(255,255,255,.28);
         }
 
@@ -445,13 +445,13 @@ export function ExportMedias() {
           width: 100%; padding: 10px 12px; border-radius: 10px;
           border: 1px solid var(--border-subtle); background: var(--bg-surface);
           color: var(--text-primary); font-family: 'DM Sans', sans-serif;
-          font-size: 13px; outline: none;
+          font-size: 0.8125rem; outline: none;
         }
         .exp-recherche:focus { border-color: var(--accent); }
         .exp-effacer {
           padding: 5px 10px; border-radius: 8px; cursor: pointer;
           border: none; background: transparent; color: var(--accent);
-          font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+          font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 600;
         }
         /* Hauteur bornee : trois cents discussions pousseraient tout le reste
            de l'ecran hors de vue, y compris le bouton d'export. */
@@ -465,7 +465,7 @@ export function ExportMedias() {
           display: flex; align-items: center; gap: 10px; width: 100%;
           padding: 10px 12px; cursor: pointer; text-align: left;
           border: none; background: transparent; color: var(--text-primary);
-          font-family: 'DM Sans', sans-serif; font-size: 13px;
+          font-family: 'DM Sans', sans-serif; font-size: 0.8125rem;
           border-bottom: 1px solid var(--border-subtle);
         }
         .exp-liste li:last-child .exp-ligne { border-bottom: none; }
@@ -474,23 +474,23 @@ export function ExportMedias() {
           width: 19px; height: 19px; border-radius: 5px; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
           border: 1.5px solid var(--border-default);
-          font-size: 12px; font-weight: 700; color: var(--accent-text);
+          font-size: 0.75rem; font-weight: 700; color: var(--accent-text);
         }
         .exp-ligne.coche .exp-case { background: var(--accent); border-color: var(--accent); }
         .exp-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .exp-vide { padding: 14px; font-size: 12.5px; color: var(--text-muted); text-align: center; }
+        .exp-vide { padding: 14px; font-size: 0.7812rem; color: var(--text-muted); text-align: center; }
 
         .exp-tous { margin-bottom: 8px; }
         .exp-tous.coche { border-color: var(--accent); color: var(--accent); }
         .exp-barre-sel {
           display: flex; align-items: center; justify-content: space-between; gap: 8px;
-          font-size: 12px; color: var(--text-muted);
+          font-size: 0.75rem; color: var(--text-muted);
         }
         .exp-resume-txt.alerte { color: var(--danger); font-weight: 600; }
         .exp-familles { display: flex; gap: 8px; flex-wrap: wrap; }
         .exp-famille {
           flex: 1 1 120px; padding: 10px 12px; border-radius: 10px; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 12.5px; font-weight: 600;
+          font-family: 'DM Sans', sans-serif; font-size: 0.7812rem; font-weight: 600;
           border: 1.5px solid var(--border-subtle);
           background: var(--bg-surface); color: var(--text-secondary);
         }
@@ -501,7 +501,7 @@ export function ExportMedias() {
         .exp-raccourcis { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 10px; }
         .exp-raccourci {
           padding: 7px 13px; border-radius: 999px; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+          font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500;
           border: 1px solid var(--border-subtle);
           background: transparent; color: var(--text-secondary);
         }
@@ -513,30 +513,30 @@ export function ExportMedias() {
           padding: 7px 12px; border-radius: 10px;
           border: 1px solid var(--border-subtle); background: var(--bg-surface);
         }
-        .exp-date > span { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+        .exp-date > span { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
         .exp-date input {
           flex: 1; min-width: 0; border: none; background: transparent; outline: none;
-          color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 13px;
+          color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 0.8125rem;
         }
 
-        .exp-note { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; }
+        .exp-note { font-size: 0.7188rem; color: var(--text-muted); margin-top: 8px; }
         .exp-note-bas { text-align: center; margin-top: 10px; }
-        .exp-erreur { font-size: 12px; color: var(--danger); margin-top: 8px; }
+        .exp-erreur { font-size: 0.75rem; color: var(--danger); margin-top: 8px; }
 
         .exp-resume {
           display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
           padding: 14px; border-radius: 12px; margin-top: 4px;
           border: 1px solid var(--border-subtle); background: var(--bg-elevated);
         }
-        .exp-resume-txt { flex: 1; min-width: 150px; font-size: 13px; color: var(--text-muted); }
+        .exp-resume-txt { flex: 1; min-width: 150px; font-size: 0.8125rem; color: var(--text-muted); }
         .exp-resume-txt.fort {
-          color: var(--text-primary); font-weight: 700; font-size: 14.5px;
+          color: var(--text-primary); font-weight: 700; font-size: 0.9062rem;
           font-variant-numeric: tabular-nums;
         }
         .exp-lancer {
           padding: 12px 24px; border-radius: 10px; cursor: pointer; border: none;
           background: var(--accent); color: var(--accent-text);
-          font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 700;
+          font-family: 'DM Sans', sans-serif; font-size: 0.8438rem; font-weight: 700;
         }
         .exp-lancer:disabled { opacity: .45; cursor: not-allowed; }
         .exp-lancer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -544,7 +544,7 @@ export function ExportMedias() {
         .exp-lance {
           margin-top: 10px; padding: 11px 13px; border-radius: 10px;
           background: var(--accent-dim); color: var(--text-primary);
-          font-size: 12.5px; text-align: center;
+          font-size: 0.7812rem; text-align: center;
         }
 
         /* Au pouce : les paires de colonnes passent l'une sous l'autre plutot

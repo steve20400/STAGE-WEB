@@ -44,7 +44,7 @@
   background: var(--bg-surface);
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /*
@@ -116,8 +116,10 @@
   text-align: left;
   cursor: inherit;
 }
-.fr-poignee:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .fr-poignee:hover {
+    background: var(--bg-hover);
+  }
 }
 .fr-poignee svg {
   flex: none;
@@ -130,7 +132,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-secondary);
 }
@@ -155,9 +157,11 @@
     background 0.15s,
     color 0.15s;
 }
-.fr-fermer:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .fr-fermer:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
 }
 
 /* ---------- Le contenu ---------- */
@@ -238,8 +242,10 @@
     background 0.15s,
     border-color 0.15s;
 }
-.fr-bouton:hover {
-  border-color: var(--border-default);
+@media (hover: hover) and (pointer: fine) {
+  .fr-bouton:hover {
+    border-color: var(--border-default);
+  }
 }
 /* Coupe : l'etat se voit sans lire, comme dans la salle. */
 .fr-bouton.coupe {
@@ -292,12 +298,14 @@
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   text-align: left;
   cursor: pointer;
 }
-.fr-menu-item:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .fr-menu-item:hover {
+    background: var(--bg-hover);
+  }
 }
 .fr-menu-item.danger {
   color: var(--danger);

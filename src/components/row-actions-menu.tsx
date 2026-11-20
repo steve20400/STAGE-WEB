@@ -189,7 +189,7 @@ export function RowActionsMenu({
                 background: "none",
                 cursor: "pointer",
                 fontFamily: "inherit",
-                fontSize: 13,
+                fontSize: "0.8125rem",
                 color: action.danger ? "var(--danger)" : "var(--text-primary)",
               }}
             >

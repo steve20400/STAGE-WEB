@@ -38,7 +38,7 @@
 }
 
 .fc-illisible {
-  font-size: 13px;
+  font-size: 0.8125rem;
   opacity: 0.8;
 }
 
@@ -75,7 +75,7 @@
   justify-content: center;
   overflow: hidden;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
   color: var(--accent);
   background: var(--accent-dim);
 }
@@ -97,7 +97,7 @@
 }
 
 .fc-nom {
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -105,7 +105,7 @@
 }
 
 .fc-numero {
-  font-size: 12px;
+  font-size: 0.75rem;
   opacity: 0.75;
   white-space: nowrap;
   overflow: hidden;
@@ -113,7 +113,7 @@
 }
 
 .fc-mention {
-  font-size: 10.5px;
+  font-size: 0.6562rem;
   opacity: 0.7;
 }
 .fc-mention.sur-alanya {
@@ -169,7 +169,7 @@
   border-radius: 8px;
   background: none;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   line-height: 1.2;
   color: var(--accent);
@@ -182,11 +182,15 @@
   color: inherit;
 }
 
-.fc-action:hover:not(:disabled) {
-  background: var(--accent-dim);
+@media (hover: hover) and (pointer: fine) {
+  .fc-action:hover:not(:disabled) {
+    background: var(--accent-dim);
+  }
 }
-.fc-liste.est-moi .fc-action:hover:not(:disabled) {
-  background: color-mix(in srgb, currentColor 14%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .fc-liste.est-moi .fc-action:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+  }
 }
 
 .fc-action:focus-visible {
@@ -245,6 +249,6 @@
     min-width: 232px;
   }
   .fc-action {
-    font-size: 10.5px;
+    font-size: 0.6562rem;
   }
 }

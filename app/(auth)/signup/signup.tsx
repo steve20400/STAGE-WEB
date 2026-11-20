@@ -503,7 +503,7 @@ export default function SignUpPage() {
 
               {/* Les conditions et la confidentialité, avant de créer le compte
                   (18/11/2026, exigence du Play Store). */}
-              <p style={{ fontSize: 12.5, lineHeight: 1.5, opacity: 0.8, margin: "4px 0 10px" }}>
+              <p style={{ fontSize: "0.7812rem", lineHeight: 1.5, opacity: 0.8, margin: "4px 0 10px" }}>
                 {t("legal_acceptation")}{" "}
                 <a href={`${import.meta.env.BASE_URL}conditions`} target="_blank" rel="noreferrer">{t("legal_conditions")}</a>{" "}
                 {t("legal_et")}{" "}
@@ -536,7 +536,7 @@ export default function SignUpPage() {
                 style={{
                   marginTop: 10, background: "none", border: "none",
                   textDecoration: "underline", cursor: "pointer",
-                  fontSize: 13, width: "100%",
+                  fontSize: "0.8125rem", width: "100%",
                 }}
               >
                 {t("auth_no_email_link")}
@@ -642,7 +642,7 @@ export default function SignUpPage() {
                 seulement a qui a fait ce choix.
               */}
               {sansEmail && (
-                <p style={{ fontSize: 12, opacity: 0.7, marginTop: 10 }}>
+                <p style={{ fontSize: "0.75rem", opacity: 0.7, marginTop: 10 }}>
                   {t("auth_no_email_warning")}
                 </p>
               )}
@@ -665,7 +665,7 @@ export default function SignUpPage() {
               <div
                 style={{
                   fontFamily: "monospace",
-                  fontSize: 26,
+                  fontSize: "1.625rem",
                   fontWeight: 700,
                   letterSpacing: 4,
                   textAlign: "center",
@@ -694,11 +694,11 @@ export default function SignUpPage() {
                 le code sert a reinitialiser le mot de passe, mais le serveur
                 exige aussi le numero du compte. Meme rappel que sur le mobile.
               */}
-              <div style={{ textAlign: "center", fontSize: 13, opacity: 0.75, marginTop: 8 }}>
+              <div style={{ textAlign: "center", fontSize: "0.8125rem", opacity: 0.75, marginTop: 8 }}>
                 {t("auth_recovery_code_your_number", { number: alanyaId })}
               </div>
 
-              <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "16px 0", fontSize: 14 }}>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "16px 0", fontSize: "0.875rem" }}>
                 <input
                   type="checkbox"
                   checked={codeNote}

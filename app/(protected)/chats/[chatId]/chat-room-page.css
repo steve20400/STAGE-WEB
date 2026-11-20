@@ -36,9 +36,11 @@
   align-items: center;
   transition: all 0.15s;
 }
-.back-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .back-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
 }
 .room-av {
   width: 38px;
@@ -47,7 +49,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
   position: relative;
@@ -72,14 +74,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.3px;
   margin-bottom: 1px;
 }
 .room-sub {
-  font-size: 11px;
+  font-size: 0.6875rem;
   /*
    * 🐛 LA LISTE DES MEMBRES D'UN GROUPE COUVRAIT TOUT L'ÉCRAN (signalé par le
    * user, 20/11/2026) : 80 noms sur une douzaine de lignes. Une seule ligne,
@@ -107,10 +109,12 @@
   color: var(--text-muted);
   transition: all 0.15s;
 }
-.action-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  border-color: var(--border-default);
+@media (hover: hover) and (pointer: fine) {
+  .action-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border-color: var(--border-default);
+  }
 }
 
 /* messages */
@@ -145,7 +149,7 @@
   background: var(--border-subtle);
 }
 .date-sep-txt {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-faint);
   padding: 3px 10px;
   background: var(--bg-elevated);
@@ -178,7 +182,7 @@
   background: linear-gradient(270deg, transparent, var(--accent));
 }
 .separateur-non-lus span {
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -226,10 +230,12 @@
     border-color 0.16s;
   animation: apparition-retour-fil 0.2s ease-out;
 }
-.retour-fil:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .retour-fil:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
 }
 .retour-fil:active {
   transform: translateY(0);
@@ -251,7 +257,7 @@
   border-radius: 20px;
   background: var(--accent);
   color: var(--bg-base);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   text-align: center;
   border: 2px solid var(--bg-base);
@@ -290,7 +296,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -368,14 +374,12 @@
   border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   animation: activite-entree 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-@media (prefers-color-scheme: dark) {
-  .activite-pastille {
-    background: color-mix(in srgb, var(--accent) 16%, transparent);
-  }
+:root[data-theme="dark"] .activite-pastille {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .activite-texte {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--accent);
   white-space: nowrap;
@@ -458,13 +462,13 @@
   min-width: 0;
 }
 .reply-bar-label {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--accent);
   font-weight: 500;
   margin-bottom: 2px;
 }
 .reply-bar-txt {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -480,8 +484,10 @@
   align-items: center;
   transition: color 0.15s;
 }
-.reply-cancel:hover {
-  color: var(--danger);
+@media (hover: hover) and (pointer: fine) {
+  .reply-cancel:hover {
+    color: var(--danger);
+  }
 }
 
 /* zone de saisie */
@@ -519,9 +525,11 @@
     color 0.15s,
     background 0.15s;
 }
-.attach-btn:hover {
-  color: var(--accent);
-  background: var(--accent-dim);
+@media (hover: hover) and (pointer: fine) {
+  .attach-btn:hover {
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
 }
 
 /* Bouton ouvert (emojis, mise en forme) : il reste teinte tant que son
@@ -536,7 +544,7 @@
   display: block;
   width: 17px;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   line-height: 1;
   text-align: center;
@@ -564,17 +572,19 @@
   background: var(--bg-elevated);
   color: var(--text-secondary);
   font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.barre-format-btn:hover {
-  border-color: var(--accent-border);
-  background: var(--accent-dim);
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .barre-format-btn:hover {
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
 }
 .barre-format-btn.mf-manuscrit {
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1;
 }
 
@@ -599,7 +609,7 @@
   padding: 9px 12px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   transition: background 0.15s;
   background: none;
@@ -608,9 +618,11 @@
   width: 100%;
   text-align: left;
 }
-.attach-opt:hover {
-  background: var(--border-subtle);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .attach-opt:hover {
+    background: var(--border-subtle);
+    color: var(--text-primary);
+  }
 }
 .attach-icon {
   width: 28px;
@@ -628,7 +640,7 @@ textarea.room-textarea {
   border: none;
   outline: none;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-family: "DM Sans", sans-serif;
   resize: none;
   /*
@@ -642,8 +654,10 @@ textarea.room-textarea {
    * pose la hauteur exacte d'après le contenu (`ajusterHauteurSaisie`), et une
    * hauteur figée ici l'écraserait.
    */
-  min-height: 22px;
-  max-height: 110px;
+  /* En em (20/11/2026) : une ligne, puis cinq au plus, quelle que soit la
+     taille du texte — 13 px à la souris, 16 px au doigt. */
+  min-height: calc(1.6em + 4px);
+  max-height: calc(8em + 4px);
   overflow-y: auto;
   line-height: 1.6;
   padding: 2px 0;
@@ -655,7 +669,11 @@ textarea.room-textarea::placeholder {
 .send-btn {
   width: 36px;
   height: 36px;
-  border-radius: 9px;
+  /* Rond, comme sur le mobile. Il l'était déjà à l'écran, mais par accident :
+     une règle `.send-btn` de la page d'accueil (son illustration) s'appliquait
+     à toute l'application et le réduisait à 30 px. Elle est désormais limitée
+     à la page d'accueil (20/11/2026). */
+  border-radius: 50%;
   background: var(--accent);
   border: none;
   cursor: pointer;
@@ -667,9 +685,11 @@ textarea.room-textarea::placeholder {
     opacity 0.15s,
     transform 0.1s;
 }
-.send-btn:hover:not(:disabled) {
-  opacity: 0.88;
-  transform: scale(1.05);
+@media (hover: hover) and (pointer: fine) {
+  .send-btn:hover:not(:disabled) {
+    opacity: 0.88;
+    transform: scale(1.05);
+  }
 }
 .send-btn:disabled {
   opacity: 0.35;
@@ -677,7 +697,7 @@ textarea.room-textarea::placeholder {
 }
 
 .input-hint {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--border-subtle);
   text-align: center;
   margin-top: 6px;
@@ -750,7 +770,7 @@ textarea.room-textarea::placeholder {
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(420px, 42vw);
+  width: clamp(300px, 22vw, 380px);
   z-index: 80;
   background: var(--bg-base);
   border-left: 1px solid var(--border-subtle);
@@ -777,7 +797,7 @@ textarea.room-textarea::placeholder {
 
 @media (min-width: 901px) {
   .room-root.info-panel-open {
-    padding-right: min(420px, 42vw);
+    padding-right: clamp(300px, 22vw, 380px);
     transition: padding-right 0.22s ease;
   }
   .room-root.info-panel-open .chat-info-drawer {
@@ -805,8 +825,10 @@ textarea.room-textarea::placeholder {
   z-index: 1;
   transition: background 0.15s ease;
 }
-.gallery-nav:hover {
-  background: rgba(0, 0, 0, 0.8);
+@media (hover: hover) and (pointer: fine) {
+  .gallery-nav:hover {
+    background: rgba(0, 0, 0, 0.8);
+  }
 }
 .gallery-nav:focus-visible {
   outline: 2px solid var(--accent);
@@ -831,7 +853,7 @@ textarea.room-textarea::placeholder {
   justify-content: center;
   gap: 8px;
   padding: 10px 0 14px;
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   color: var(--text-faint);
 }
 
@@ -857,12 +879,14 @@ textarea.room-textarea::placeholder {
   border-radius: 999px;
   padding: 6px 14px;
   font-family: "DM Sans", sans-serif;
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   cursor: pointer;
 }
-.room-body .older-retry:hover {
-  color: var(--accent);
-  border-color: var(--accent-border);
+@media (hover: hover) and (pointer: fine) {
+  .room-body .older-retry:hover {
+    color: var(--accent);
+    border-color: var(--accent-border);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -883,9 +907,11 @@ textarea.room-textarea::placeholder {
   border-color: var(--accent-border);
   color: var(--accent);
 }
-.action-btn-on:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .action-btn-on:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+  }
 }
 
 /* Bandeau qui remplace la zone de saisie chez les appareils qui subissent le
@@ -903,7 +929,7 @@ textarea.room-textarea::placeholder {
   background: var(--bg-muted);
   border: 1px dashed var(--border-default);
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   line-height: 1.35;
 }
 .room-locked svg {
@@ -915,7 +941,7 @@ textarea.room-textarea::placeholder {
 .room-locked-detail {
   display: block;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-ghost);
 }
 
@@ -968,16 +994,16 @@ textarea.room-textarea::placeholder {
   align-items: center;
   gap: 6px;
   margin-top: 4px;
-  font-size: 10px;
+  font-size: 0.625rem;
   opacity: 0.72;
 }
 .msg-trad-note {
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   line-height: 1.35;
   opacity: 0.85;
 }
 .msg-trad-attente {
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   animation: msg-trad-pulse 1.1s ease-in-out infinite;
 }
 @keyframes msg-trad-pulse {
@@ -1006,13 +1032,15 @@ textarea.room-textarea::placeholder {
   border: none;
   background: none;
   font-family: "DM Sans", sans-serif;
-  font-size: 10.5px;
+  font-size: 0.6562rem;
   color: var(--text-faint);
   cursor: pointer;
   transition: color 0.15s ease;
 }
-.msg-trad-bouton:hover {
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .msg-trad-bouton:hover {
+    color: var(--accent);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .msg-trad-attente {
@@ -1065,8 +1093,10 @@ textarea.room-textarea::placeholder {
   text-align: left;
   cursor: pointer;
 }
-.bandeau-epingle:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .bandeau-epingle:hover {
+    background: var(--bg-elevated);
+  }
 }
 
 /*
@@ -1084,15 +1114,20 @@ textarea.room-textarea::placeholder {
   background: var(--accent-dim);
   color: var(--accent);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s;
 }
-.bandeau-epingle-compteur:hover,
 .bandeau-epingle-compteur.ouvert {
   background: var(--accent);
   color: var(--accent-text);
+}
+@media (hover: hover) and (pointer: fine) {
+  .bandeau-epingle-compteur:hover {
+    background: var(--accent);
+    color: var(--accent-text);
+  }
 }
 
 /*
@@ -1126,23 +1161,25 @@ textarea.room-textarea::placeholder {
   text-align: left;
   cursor: pointer;
 }
-.bandeau-epingle-liste button:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .bandeau-epingle-liste button:hover {
+    background: var(--bg-elevated);
+  }
 }
 .bandeau-epingle-liste-auteur {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   color: var(--accent);
 }
 .bandeau-epingle-liste-apercu {
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .bandeau-epingle-icone {
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -1155,13 +1192,13 @@ textarea.room-textarea::placeholder {
   min-width: 0;
 }
 .bandeau-epingle-titre {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   color: var(--accent);
   letter-spacing: 0.02em;
 }
 .bandeau-epingle-apercu {
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1196,13 +1233,17 @@ textarea.room-textarea::placeholder {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text, inherit);
 }
 
-.room-mention-item:hover,
 .room-mention-item:focus-visible {
   background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+}
+@media (hover: hover) and (pointer: fine) {
+  .room-mention-item:hover {
+    background: var(--surface-hover, rgba(0, 0, 0, 0.05));
+  }
 }
 
 /* La mention dans une bulle : jamais une couleur en dur — le fond change avec
@@ -1236,8 +1277,10 @@ textarea.room-textarea::placeholder {
   text-align: inherit;
   cursor: pointer;
 }
-.msg-mention.actionnable:hover {
-  text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .msg-mention.actionnable:hover {
+    text-decoration: underline;
+  }
 }
 .msg-mention.actionnable:focus-visible {
   outline: 2px solid currentColor;
@@ -1264,7 +1307,7 @@ textarea.room-textarea::placeholder {
   color: var(--accent);
 }
 .room-mention-tous-aide {
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   color: var(--text-muted);
 }
 
@@ -1304,7 +1347,7 @@ textarea.room-textarea::placeholder {
   padding: 8px 14px;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
 }
 .bandeau-arrivee span {
@@ -1316,7 +1359,7 @@ textarea.room-textarea::placeholder {
   border-radius: 8px;
   padding: 6px 12px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1334,15 +1377,17 @@ textarea.room-textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 1rem;
   background: color-mix(in srgb, currentColor 14%, transparent);
 }
 /* La citation rouvre le statut (01/11/2026). */
 .statut-cite.cliquable {
   cursor: pointer;
 }
-.statut-cite.cliquable:hover {
-  background: color-mix(in srgb, currentColor 15%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .statut-cite.cliquable:hover {
+    background: color-mix(in srgb, currentColor 15%, transparent);
+  }
 }
 .statut-cite-textes {
   display: flex;
@@ -1353,13 +1398,13 @@ textarea.room-textarea::placeholder {
   min-width: 0;
 }
 .statut-cite-titre {
-  font-size: 10.5px;
+  font-size: 0.6562rem;
   font-weight: 700;
   opacity: 0.8;
   letter-spacing: 0.02em;
 }
 .statut-cite-apercu {
-  font-size: 12px;
+  font-size: 0.75rem;
   opacity: 0.85;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1386,7 +1431,7 @@ textarea.room-textarea::placeholder {
   background: #fff4e5;
   border: 1px solid #f0d5b8;
   color: #6b4b2a;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   line-height: 1.4;
   text-align: left;
 }
@@ -1402,12 +1447,10 @@ textarea.room-textarea::placeholder {
   stroke-linejoin: round;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .e2ee-banniere {
-    background: #2a2118;
-    border-color: #4a3a28;
-    color: #e0cdb5;
-  }
+:root[data-theme="dark"] .e2ee-banniere {
+  background: #2a2118;
+  border-color: #4a3a28;
+  color: #e0cdb5;
 }
 
 /* ══════════════════ L'ALERTE DE CHANGEMENT DE CLÉ ══════════════════
@@ -1440,7 +1483,7 @@ textarea.room-textarea::placeholder {
   border: 1px solid var(--alerte-bord);
   box-shadow: 0 2px 10px rgba(124, 45, 18, 0.06);
   color: var(--alerte-texte);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.45;
 }
 
@@ -1472,7 +1515,7 @@ textarea.room-textarea::placeholder {
 }
 
 .e2ee-alerte-texte strong {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--alerte-titre);
 }
@@ -1490,7 +1533,7 @@ textarea.room-textarea::placeholder {
   padding: 6px 14px;
   border-radius: 10px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -1502,8 +1545,10 @@ textarea.room-textarea::placeholder {
   color: var(--alerte-texte);
 }
 
-.e2ee-alerte .e2ee-alerte-plus-tard:hover {
-  background: var(--alerte-pastille);
+@media (hover: hover) and (pointer: fine) {
+  .e2ee-alerte .e2ee-alerte-plus-tard:hover {
+    background: var(--alerte-pastille);
+  }
 }
 
 .e2ee-alerte .e2ee-alerte-action {
@@ -1512,8 +1557,10 @@ textarea.room-textarea::placeholder {
   color: #fff;
 }
 
-.e2ee-alerte .e2ee-alerte-action:hover {
-  filter: brightness(1.06);
+@media (hover: hover) and (pointer: fine) {
+  .e2ee-alerte .e2ee-alerte-action:hover {
+    filter: brightness(1.06);
+  }
 }
 
 :root[data-theme="dark"] .e2ee-alerte {
@@ -1526,16 +1573,14 @@ textarea.room-textarea::placeholder {
   box-shadow: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .e2ee-alerte {
-    --alerte-fond: #2a1d14;
-    --alerte-bord: #4a2e18;
-    --alerte-titre: #fcd9b6;
-    --alerte-texte: #e8c3a3;
-    --alerte-pastille: #4a2e18;
-    --alerte-icone: #fdba74;
-    box-shadow: none;
-  }
+:root[data-theme="dark"] .e2ee-alerte {
+  --alerte-fond: #2a1d14;
+  --alerte-bord: #4a2e18;
+  --alerte-titre: #fcd9b6;
+  --alerte-texte: #e8c3a3;
+  --alerte-pastille: #4a2e18;
+  --alerte-icone: #fdba74;
+  box-shadow: none;
 }
 
 /* ══════════════════ « LES FICHIERS NE SONT PAS CHIFFRÉS » ══════════════════
@@ -1558,7 +1603,7 @@ textarea.room-textarea::placeholder {
   background: #fff4e5;
   border: 1px solid #f0d5b8;
   color: #6b4b2a;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.35;
   text-align: left;
 }
@@ -1575,12 +1620,10 @@ textarea.room-textarea::placeholder {
   stroke-linejoin: round;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .attach-avertissement {
-    background: #2a2118;
-    border-color: #4a3a28;
-    color: #e0cdb5;
-  }
+:root[data-theme="dark"] .attach-avertissement {
+  background: #2a2118;
+  border-color: #4a3a28;
+  color: #e0cdb5;
 }
 
 /*
@@ -1660,7 +1703,7 @@ textarea.room-textarea::placeholder {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   color: #fff;
   background: var(--accent);
@@ -1671,12 +1714,13 @@ textarea.room-textarea::placeholder {
   object-fit: cover;
 }
 .expediteur-groupe-nom {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--agent-name);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
 /* ═══════════ UN LONG MESSAGE SE REPLIE (testeurs, 20/11/2026) ═══════════
  *
  * Huit lignes : assez pour qu'un message ordinaire ne soit jamais coupé, trop
@@ -1705,6 +1749,62 @@ textarea.room-textarea::placeholder {
   cursor: pointer;
   text-decoration: underline;
 }
-.texte-voir-plus:hover {
-  opacity: 1;
+@media (hover: hover) and (pointer: fine) {
+  .texte-voir-plus:hover {
+    opacity: 1;
+  }
+}
+
+/* ============================================================
+   AU DOIGT ET SOUS LA BARRE D'ACCUEIL (20/11/2026)
+   ============================================================ */
+/* La zone de saisie reste au-dessus de la barre d'accueil des iPhone. */
+.room-input-wrap {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Au doigt, chaque bouton offre 44 px. Pour que le champ et le titre gardent
+   leur place sur un téléphone de 360 px, les marges autour se resserrent
+   d'autant : la surface à toucher grandit, pas l'encombrement. */
+@media (pointer: coarse) {
+  .room-top {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .room-actions {
+    gap: 2px;
+  }
+  .back-btn,
+  .attach-btn {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+  .action-btn,
+  .send-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .room-input-wrap {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .room-input-row {
+    gap: 0;
+    padding: 2px 4px;
+  }
+  /* Centré sur les boutons tant qu'il n'a qu'une ligne. */
+  textarea.room-textarea {
+    margin-block: 7px;
+    padding-inline: 4px;
+  }
+}
+
+/* Au-delà de 1600 px, le panneau d'informations est une colonne à part entière,
+   ouverte d'office : ni ombre de tiroir, ni glissement à chaque conversation. */
+@media (min-width: 1600px) {
+  .chat-info-drawer {
+    box-shadow: none;
+    animation: none;
+  }
 }

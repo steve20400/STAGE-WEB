@@ -26,18 +26,18 @@
   background: #ffffff1a;
   color: #fff;
   font: inherit;
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
 }
 .ri-barre > .ri-texte {
-  font-size: 14px;
+  font-size: 0.875rem;
   padding: 0 12px;
 }
 .ri-titre {
   flex: 1;
   font-weight: 600;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 .ri-zone {
   position: relative;
@@ -172,7 +172,7 @@
   background: #ffffff1a;
   color: #fff;
   font: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   cursor: pointer;
 }
 .ri-bas > button.on {

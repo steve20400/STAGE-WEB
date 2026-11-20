@@ -163,7 +163,7 @@
   border-radius: 20px;
   background: var(--accent);
   color: var(--accent-text);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   line-height: 1.4;
 }
@@ -250,7 +250,7 @@
   justify-content: center;
   padding: 0 8px;
   text-align: center;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 .meeting-room-root .meeting-apercu-nom {
@@ -261,7 +261,7 @@
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 
@@ -301,7 +301,7 @@
   background: var(--accent-dim);
   color: var(--accent);
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
 }
 .meeting-seul-mention {
@@ -311,7 +311,7 @@
   /* Posee sur une image : voile sombre, texte clair, dans les quatre themes. */
   background: var(--overlay);
   color: var(--brand-text);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -350,10 +350,12 @@
     background 0.15s,
     color 0.15s;
 }
-.meeting-room-root .meeting-media-bouton:hover {
-  opacity: 1;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .meeting-media-bouton:hover {
+    opacity: 1;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
 }
 .meeting-room-root .meeting-media-bouton.actif {
   background: var(--accent-dim);
@@ -374,7 +376,7 @@
   border-radius: 10px;
   background: var(--bg-elevated);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .meeting-room-root .meeting-media-deporte button {
   padding: 7px 16px;
@@ -383,7 +385,7 @@
   background: var(--accent-dim);
   color: var(--accent);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -402,7 +404,7 @@
   background: var(--accent);
   color: var(--accent-text);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -485,7 +487,7 @@
   background: var(--bg-elevated);
   color: var(--text-secondary);
   box-shadow: 0 2px 10px var(--overlay);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 18px;
 }
 .salle-avis > svg {
@@ -549,13 +551,15 @@
   background: var(--accent-dim);
   color: var(--accent);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
 }
-.salle-avis-action:hover:not(:disabled) {
-  background: var(--accent);
-  color: var(--accent-text);
+@media (hover: hover) and (pointer: fine) {
+  .salle-avis-action:hover:not(:disabled) {
+    background: var(--accent);
+    color: var(--accent-text);
+  }
 }
 .salle-avis-action:disabled {
   opacity: 0.6;
@@ -566,9 +570,11 @@
   background: var(--warning-dim);
   color: var(--warning);
 }
-.salle-avis.grave .salle-avis-action:hover:not(:disabled) {
-  background: var(--warning);
-  color: var(--accent-text);
+@media (hover: hover) and (pointer: fine) {
+  .salle-avis.grave .salle-avis-action:hover:not(:disabled) {
+    background: var(--warning);
+    color: var(--accent-text);
+  }
 }
 
 .salle-avis-bascule {
@@ -585,9 +591,11 @@
   color: var(--text-muted);
   cursor: pointer;
 }
-.salle-avis-bascule:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .salle-avis-bascule:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
 }
 
 /* Le cadre de la fenetre reduite n'est pas positionne dans sa propre feuille :
@@ -630,7 +638,7 @@
 .meeting-room-root .meeting-header h1 {
   margin: 0;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 19px;
+  font-size: 1.1875rem;
   font-weight: 800;
   letter-spacing: -0.4px;
   line-height: 1.2;
@@ -665,9 +673,11 @@
     border-color 0.15s,
     color 0.15s;
 }
-.meeting-room-root .meeting-entete-bouton:hover {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .meeting-entete-bouton:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
 }
 /* Deplie : le bouton reste allume, sinon rien ne dit que c'est LUI qui a ouvert
    la colonne, ni comment la refermer. */
@@ -688,7 +698,7 @@
   border-radius: 20px;
   background: var(--danger);
   color: var(--bg-base);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   line-height: 1.4;
   border: 2px solid var(--bg-base);
@@ -706,15 +716,17 @@
   background: none;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   cursor: pointer;
   transition:
     background 0.15s,
     color 0.15s;
 }
-.meeting-room-root .btn-back:hover {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .btn-back:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
 }
 
 /* ---------- Informations et participants ---------- */
@@ -730,7 +742,7 @@
 }
 .meeting-room-root .meeting-info p {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 .meeting-room-root .meeting-info p:last-of-type {
@@ -787,7 +799,7 @@
 .meeting-room-root.en-salle .meeting-info p,
 .meeting-room-root.en-salle .meeting-info p:last-of-type {
   margin: 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -796,7 +808,7 @@
 .meeting-room-root.en-salle .call-status {
   margin-top: 3px;
   padding: 2px 8px;
-  font-size: 10px;
+  font-size: 0.625rem;
   align-self: flex-start;
 }
 
@@ -825,10 +837,10 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .meeting-room-root.en-salle .participant-name {
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 /* La pastille verte du rond dit deja la presence : la ligne de texte qui la
    repetait couterait ici le tiers de la hauteur de la bande. */
@@ -901,7 +913,7 @@
   justify-content: center;
   background: var(--accent-dim);
   color: var(--accent);
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -925,7 +937,7 @@
   justify-content: center;
   border-radius: 50%;
   background: var(--warning, #c04d29);
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1;
   border: 2px solid var(--bg-elevated);
 }
@@ -984,20 +996,24 @@
     background 0.15s,
     color 0.15s;
 }
-.meeting-room-root .participant-exclure:hover {
-  background: var(--danger-dim);
-  color: var(--danger);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .participant-exclure:hover {
+    background: var(--danger-dim);
+    color: var(--danger);
+  }
 }
 /* Couper n'est pas exclure : le survol prend l'accent et non le rouge. Deux
    gestes voisins sur la meme ligne, dont un seul est sans retour — la couleur
    est ce qui les distingue avant qu'on ait lu l'infobulle. */
-.meeting-room-root .participant-couper:hover {
-  background: var(--accent-dim);
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .participant-couper:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
 }
 
 .meeting-room-root .participant-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
@@ -1012,7 +1028,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .meeting-room-root .participant-status::before {
   content: "";
@@ -1037,7 +1053,7 @@
   border-radius: 20px;
   background: var(--success-dim);
   color: var(--success);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 .meeting-room-root .status-indicator {
@@ -1098,15 +1114,17 @@
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   background: var(--bg-elevated);
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1;
   cursor: pointer;
   transition:
     border-color 0.15s,
     background 0.15s;
 }
-.meeting-room-root .meeting-controle:hover {
-  border-color: var(--border-default);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .meeting-controle:hover {
+    border-color: var(--border-default);
+  }
 }
 /* Coupe : l'etat se voit sans lire, comme sur un tableau de bord. */
 .meeting-room-root .meeting-controle.coupe {
@@ -1132,7 +1150,7 @@
   border-radius: 10px;
   border: 1px solid transparent;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -1143,16 +1161,20 @@
   background: var(--accent);
   color: var(--accent-text);
 }
-.meeting-room-root .btn-join:hover {
-  filter: brightness(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .btn-join:hover {
+    filter: brightness(1.08);
+  }
 }
 .meeting-room-root .btn-leave {
   background: none;
   border-color: var(--danger-border);
   color: var(--danger);
 }
-.meeting-room-root .btn-leave:hover {
-  background: var(--danger-dim);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .btn-leave:hover {
+    background: var(--danger-dim);
+  }
 }
 
 /* ---------- Etats de chargement ---------- */
@@ -1162,7 +1184,7 @@
   grid-column: 1 / -1;
   margin: auto;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
 }
 .meeting-room-root .error {
@@ -1316,8 +1338,10 @@
       transform 0.24s cubic-bezier(0.32, 0.72, 0, 1),
       filter 0.15s;
   }
-  .salle-fil-bascule:hover {
-    filter: brightness(1.08);
+  @media (hover: hover) and (pointer: fine) {
+    .salle-fil-bascule:hover {
+      filter: brightness(1.08);
+    }
   }
   /* Ouvert, le bouton monte avec le panneau : il reste sous le pouce et devient
      la fermeture, au lieu de disparaitre derriere le fil. */
@@ -1333,7 +1357,7 @@
     border-radius: 20px;
     background: var(--danger);
     color: #fff;
-    font-size: 10px;
+    font-size: 0.625rem;
     font-weight: 700;
     border: 2px solid var(--bg-base);
   }
@@ -1374,7 +1398,7 @@
   border-radius: 12px;
   background: var(--bg-surface);
   padding: 12px;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 /* Ces deux blocs vivent DANS la barre du bas, pas dans la cellule de grille :
@@ -1436,7 +1460,7 @@
   align-items: center;
 }
 .meeting-invite-head label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   display: flex;
   gap: 6px;
@@ -1469,7 +1493,7 @@
 .meeting-room-root .participant-vignette {
   width: 76px;
   height: 76px;
-  font-size: 23px;
+  font-size: 1.4375rem;
 }
 .meeting-room-root .participant-vignette:has(.meeting-remote-video) {
   width: 100%;
@@ -1477,7 +1501,7 @@
   border-radius: 12px;
 }
 .meeting-room-root .participant-name {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .meeting-room-root .participant-status {
   padding: 3px 8px;
@@ -1499,10 +1523,10 @@
   .meeting-room-root .participant-vignette {
     width: 58px;
     height: 58px;
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .meeting-room-root .participant-name {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
 }
 
@@ -1528,7 +1552,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-primary);
   padding: 4px 0;
@@ -1546,7 +1570,7 @@
   justify-content: center;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
   transition: filter 0.15s, background 0.15s;
@@ -1555,16 +1579,20 @@
   background: var(--accent);
   color: var(--accent-text);
 }
-.meeting-room-root .meeting-invite-banner-actions button:first-child:hover {
-  filter: brightness(1.1);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .meeting-invite-banner-actions button:first-child:hover {
+    filter: brightness(1.1);
+  }
 }
 .meeting-room-root .meeting-invite-banner-actions button:last-child {
   background: var(--danger-dim);
   color: var(--danger);
 }
-.meeting-room-root .meeting-invite-banner-actions button:last-child:hover {
-  background: var(--danger);
-  color: #fff;
+@media (hover: hover) and (pointer: fine) {
+  .meeting-room-root .meeting-invite-banner-actions button:last-child:hover {
+    background: var(--danger);
+    color: #fff;
+  }
 }
 
 /* ---------- Panneaux flottants (ajout + paramètres) ---------- */
@@ -1599,7 +1627,7 @@
 .meeting-panneau-titre {
   padding: 14px 16px 10px;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--text-primary);
@@ -1612,13 +1640,15 @@
   background: none;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
 }
-.meeting-panneau-fermer:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-panneau-fermer:hover {
+    background: var(--bg-hover);
+  }
 }
 
 /* Onglets contacts / pavé */
@@ -1633,7 +1663,7 @@
   background: none;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   position: relative;
@@ -1652,8 +1682,10 @@
   border-radius: 2px;
   background: var(--accent);
 }
-.meeting-panneau-onglets button:hover {
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-panneau-onglets button:hover {
+    color: var(--text-primary);
+  }
 }
 
 /* Recherche contacts */
@@ -1666,7 +1698,7 @@
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   outline: none;
 }
 .meeting-panneau-search::placeholder {
@@ -1688,15 +1720,17 @@
   background: none;
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
   gap: 12px;
   align-items: center;
   text-align: left;
   transition: background 0.12s;
 }
-.meeting-panneau-contact:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .meeting-panneau-contact:hover {
+    background: var(--bg-hover);
+  }
 }
 /* Salle pleine : le contact reste lisible, mais cesse d'etre un bouton. Le
    retirer de la liste ferait croire a un defaut de recherche. */
@@ -1704,8 +1738,10 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
-.meeting-panneau-contact:disabled:hover {
-  background: none;
+@media (hover: hover) and (pointer: fine) {
+  .meeting-panneau-contact:disabled:hover {
+    background: none;
+  }
 }
 
 /* PLACES RESTANTES — en tete du panneau, avant la recherche : le compteur doit
@@ -1715,7 +1751,7 @@
 .meeting-panneau-places {
   padding: 8px 16px;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -1732,13 +1768,13 @@
 }
 .meeting-panneau-contact span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
   flex-shrink: 0;
 }
 .meeting-panneau-vide {
   padding: 24px 16px;
   text-align: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-faint);
 }
 
@@ -1772,7 +1808,7 @@
 .meeting-panneau-aide {
   text-align: center;
   min-height: 18px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 .meeting-panneau-pave-actions {
@@ -1791,7 +1827,7 @@
   background: var(--border-subtle);
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   transition: filter 0.15s, background 0.15s;
@@ -1811,7 +1847,7 @@
   gap: 10px;
   align-items: flex-start;
   padding: 14px 16px;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 .meeting-panneau-toggle input {
@@ -1838,5 +1874,21 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
+  }
+}
+
+/* La barre des commandes reste au-dessus de la barre d'accueil (20/11/2026). */
+.meeting-room-root {
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 900px) {
+  .meeting-room-root {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  .meeting-room-root .salle-fil {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .salle-fil-bascule {
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }

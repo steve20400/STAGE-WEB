@@ -1,5 +1,10 @@
 /* Vue deux colonnes facon WhatsApp Web */
 .chats-split {
+  /* Conteneur de requête : la bascule une / deux colonnes dépend de la place
+     RÉELLEMENT disponible (fenêtre moins la navigation), pas de la fenêtre. Avec
+     la navigation dépliée à 901 px de large, la conversation ne recevait que
+     301 px. Ne capture pas les fenêtres en position fixe (vérifié). */
+  container: discussions / inline-size;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -9,7 +14,8 @@
 
 /* Colonne de gauche : liste des discussions (largeur fixe) */
 .chats-split-list {
-  width: 360px;
+  /* La colonne suit la largeur de l'écran, entre 320 et 440 px. */
+  width: clamp(320px, 26vw, 440px);
   flex-shrink: 0;
   min-height: 0;
   display: flex;
@@ -77,14 +83,14 @@
 
 .chats-empty-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--text-primary);
 }
 
 .chats-empty-sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
   max-width: 320px;
   line-height: 1.6;
@@ -95,15 +101,16 @@
   background: var(--accent-dim);
 }
 
-/* Sur desktop, la liste est toujours visible : la fleche retour est inutile */
-@media (min-width: 901px) {
+/* Deux colonnes : la liste est toujours visible, la fleche retour est inutile */
+@container discussions (min-width: 720px) {
   .chats-split-room .back-btn {
     display: none;
   }
 }
 
-/* Sur ecran etroit (web ouvert sur telephone) : une seule colonne a la fois */
-@media (max-width: 900px) {
+/* Moins de 720 px disponibles (telephone, ou fenetre etroite avec la navigation
+   depliee) : une seule colonne a la fois */
+@container discussions (max-width: 719.98px) {
   .chats-split-list {
     width: 100%;
     border-right: none;

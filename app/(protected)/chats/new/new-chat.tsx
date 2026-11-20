@@ -216,19 +216,19 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
         .ncm-card { width: min(480px, 100%); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border-radius: 16px; border: 1px solid var(--border-subtle); background: var(--bg-surface); box-shadow: 0 24px 64px #00000080; }
         .ncm-head { padding: 18px; border-bottom: 1px solid var(--border-subtle); }
         .ncm-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-        .ncm-title { font-family: 'Bricolage Grotesque', sans-serif; font-size: 20px; font-weight: 800; color: var(--text-primary); }
+        .ncm-title { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.25rem; font-weight: 800; color: var(--text-primary); }
         .ncm-actions { display: flex; align-items: center; gap: 8px; }
-        .ncm-close, .ncm-add-btn { border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); border-radius: 8px; padding: 7px 10px; font-size: 12px; cursor: pointer; }
+        .ncm-close, .ncm-add-btn { border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); border-radius: 8px; padding: 7px 10px; font-size: 0.75rem; cursor: pointer; }
         .ncm-close:hover, .ncm-add-btn:hover { border-color: var(--accent-border); color: var(--accent); }
         .ncm-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
-        .ncm-tab { flex: 1; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); border-radius: 8px; padding: 9px; font-size: 12px; cursor: pointer; }
+        .ncm-tab { flex: 1; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); border-radius: 8px; padding: 9px; font-size: 0.75rem; cursor: pointer; }
         .ncm-tab.on { border-color: var(--accent-border); background: var(--accent-dim); color: var(--accent); font-weight: 600; }
         .ncm-search { width: 100%; border: 1px solid var(--border-subtle); background: var(--bg-input); color: var(--text-primary); border-radius: 9px; padding: 10px 12px; outline: none; }
         .ncm-search:focus { border-color: var(--accent-border); }
         .ncm-add-box { margin-top: 10px; padding: 10px; border: 1px solid var(--border-subtle); border-radius: 10px; display: grid; gap: 8px; background: var(--bg-elevated); }
         .ncm-add-box input { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px 10px; background: var(--bg-input); color: var(--text-primary); outline: none; }
         .ncm-add-row { display: flex; gap: 8px; }
-        .ncm-add-row button { border: none; border-radius: 7px; font-size: 12px; cursor: pointer; padding: 7px 10px; }
+        .ncm-add-row button { border: none; border-radius: 7px; font-size: 0.75rem; cursor: pointer; padding: 7px 10px; }
         .ncm-add-row .cancel { background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-secondary); }
         .ncm-add-row .confirm { background: var(--accent); color: var(--accent-text); font-weight: 700; }
         .ncm-list { overflow: auto; padding: 8px 0; }
@@ -237,14 +237,14 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
         .ncm-item { display: flex; align-items: center; gap: 12px; padding: 10px 18px; cursor: pointer; }
         .ncm-item:hover { background: var(--bg-hover); }
         .ncm-item.checked { background: var(--accent-dim); }
-        .ncm-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; position: relative; }
+        .ncm-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; position: relative; }
         .ncm-online { position: absolute; right: 1px; bottom: 1px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--bg-surface); background: var(--success); }
         .ncm-meta { flex: 1; min-width: 0; }
-        .ncm-name { color: var(--text-primary); font-size: 13px; font-weight: 500; }
-        .ncm-phone { color: var(--text-muted); font-size: 11px; }
+        .ncm-name { color: var(--text-primary); font-size: 0.8125rem; font-weight: 500; }
+        .ncm-phone { color: var(--text-muted); font-size: 0.6875rem; }
         .ncm-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-default); display: flex; align-items: center; justify-content: center; }
         .ncm-item.checked .ncm-check { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-        .ncm-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 28px 12px; }
+        .ncm-empty { text-align: center; color: var(--text-muted); font-size: 0.8125rem; padding: 28px 12px; }
         /* L'entree « Moi » : meme ligne que les contacts, mais detachee d'eux
            par un filet — elle n'en est pas un, et le repertoire commence en
            dessous. */
@@ -253,15 +253,15 @@ export function NewChatModal({ onClose }: { onClose: () => void }) {
         .ncm-moi .ncm-avatar { overflow: hidden; background: var(--brand); color: var(--brand-text); }
         .ncm-moi .ncm-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .ncm-foot { border-top: 1px solid var(--border-subtle); padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .ncm-foot-label { color: var(--text-muted); font-size: 12px; }
+        .ncm-foot-label { color: var(--text-muted); font-size: 0.75rem; }
         .ncm-options { border-top: 1px solid var(--border-subtle); padding: 10px 18px 0; display: flex; flex-direction: column; gap: 8px; }
-        .ncm-options textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 38px; border: 1px solid var(--border-subtle); border-radius: 9px; background: var(--bg-input); color: var(--text-primary); font: inherit; font-size: 13px; padding: 8px 10px; }
-        .ncm-options summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-secondary); padding: 4px 0; }
+        .ncm-options textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 38px; border: 1px solid var(--border-subtle); border-radius: 9px; background: var(--bg-input); color: var(--text-primary); font: inherit; font-size: 0.8125rem; padding: 8px 10px; }
+        .ncm-options summary { cursor: pointer; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); padding: 4px 0; }
         .ncm-reglage { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; cursor: pointer; }
         .ncm-reglage input { margin-top: 3px; accent-color: var(--accent); }
-        .ncm-reglage strong { display: block; font-size: 13px; font-weight: 600; }
-        .ncm-reglage span { display: block; font-size: 12px; color: var(--text-muted); }
-        .ncm-main-btn { border: none; border-radius: 9px; background: var(--accent); color: var(--accent-text); font-weight: 700; font-size: 13px; padding: 10px 14px; cursor: pointer; }
+        .ncm-reglage strong { display: block; font-size: 0.8125rem; font-weight: 600; }
+        .ncm-reglage span { display: block; font-size: 0.75rem; color: var(--text-muted); }
+        .ncm-main-btn { border: none; border-radius: 9px; background: var(--accent); color: var(--accent-text); font-weight: 700; font-size: 0.8125rem; padding: 10px 14px; cursor: pointer; }
         .ncm-main-btn:disabled { opacity: .45; cursor: not-allowed; }
       `}</style>
 

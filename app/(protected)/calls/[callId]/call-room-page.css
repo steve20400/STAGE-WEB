@@ -107,7 +107,7 @@
   border-radius: 9px;
   padding: 8px 14px;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -115,8 +115,10 @@
   font-family: "DM Sans", sans-serif;
   transition: background 0.15s;
 }
-.call-room-root .back-btn:hover {
-  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .call-room-root .back-btn:hover {
+    background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  }
 }
 
 .call-room-root .room-top-left {
@@ -131,7 +133,7 @@
   border-radius: 9px;
   padding: 8px 14px;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -139,8 +141,10 @@
   font-family: "DM Sans", sans-serif;
   transition: background 0.15s;
 }
-.call-room-root .queue-status-btn:hover {
-  background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .call-room-root .queue-status-btn:hover {
+    background: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  }
 }
 
 .queue-status-overlay {
@@ -176,7 +180,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 700;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -185,13 +189,15 @@
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 16px;
+  font-size: 1rem;
   cursor: pointer;
   padding: 6px 10px;
   border-radius: 8px;
 }
-.queue-status-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+@media (hover: hover) and (pointer: fine) {
+  .queue-status-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
 }
 
 .queue-status-body {
@@ -201,7 +207,7 @@
 }
 
 .queue-status-section-title {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.5);
   margin: 8px 0;
@@ -211,7 +217,7 @@
 
 .queue-status-empty {
   color: rgba(255, 255, 255, 0.4);
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 8px 0;
 }
 
@@ -224,12 +230,12 @@
 }
 
 .queue-status-name {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
 .queue-status-sub {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.5);
   margin-top: 2px;
 }
@@ -255,7 +261,7 @@
   border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
   border-radius: 20px;
   padding: 6px 14px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-primary);
 }
@@ -298,7 +304,7 @@
   align-items: center;
   justify-content: center;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 32px;
+  font-size: 2rem;
   font-weight: 800;
   position: relative;
   z-index: 1;
@@ -341,7 +347,7 @@
 
 .call-room-root .contact-name {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -1px;
   color: var(--text-primary);
@@ -350,7 +356,7 @@
 }
 
 .call-room-root .call-status {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   display: flex;
   align-items: center;
@@ -396,7 +402,7 @@
 }
 .call-room-root .video-name-chip-name {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.2px;
@@ -405,7 +411,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.85);
 }
 .call-room-root .local-video-pip video {
@@ -422,7 +428,7 @@
   justify-content: center;
   background: var(--bg-muted);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .call-room-root .controls-bar {
@@ -485,7 +491,7 @@
 }
 
 .call-room-root .ctrl-btn-label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-secondary);
 }
 
@@ -503,8 +509,10 @@
   height: 60px;
   color: #ffffff;
 }
-.call-room-root .ctrl-end:hover {
-  background: #dc2626 !important;
+@media (hover: hover) and (pointer: fine) {
+  .call-room-root .ctrl-end:hover {
+    background: #dc2626 !important;
+  }
 }
 
 .call-room-root .ended-overlay {
@@ -532,14 +540,14 @@
 
 .call-room-root .ended-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--text-primary);
 }
 
 .call-room-root .ended-duration {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-muted);
 }
 
@@ -565,7 +573,7 @@
 
 .call-room-root .confirm-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--text-primary);
@@ -573,7 +581,7 @@
 }
 
 .call-room-root .confirm-sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
   margin-bottom: 24px;
   line-height: 1.6;
@@ -591,14 +599,16 @@
   border-radius: 9px;
   padding: 12px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   font-family: "DM Sans", sans-serif;
   transition: background 0.15s;
 }
-.call-room-root .confirm-cancel:hover {
-  background: var(--border-default);
+@media (hover: hover) and (pointer: fine) {
+  .call-room-root .confirm-cancel:hover {
+    background: var(--border-default);
+  }
 }
 
 .call-room-root .confirm-end {
@@ -608,14 +618,16 @@
   border-radius: 9px;
   padding: 12px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
   font-family: "DM Sans", sans-serif;
   transition: background 0.15s;
 }
-.call-room-root .confirm-end:hover {
-  background: #dc2626;
+@media (hover: hover) and (pointer: fine) {
+  .call-room-root .confirm-end:hover {
+    background: #dc2626;
+  }
 }
 
 /* Bandeau de deblocage du son. Il n'apparait que si le navigateur a refuse la
@@ -630,7 +642,7 @@
   background: var(--accent);
   color: var(--accent-text);
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1.35;
   text-align: center;
@@ -655,7 +667,7 @@
   border-radius: 14px;
   background: color-mix(in srgb, #000 55%, transparent);
   color: #fff;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .call-room-root .passage-video span {
@@ -712,15 +724,25 @@
   background: none;
   color: var(--text-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
 
-.call-room-root .sortie-audio-menu button:hover {
-  background: var(--bg-hover, color-mix(in srgb, var(--text-primary) 8%, transparent));
+@media (hover: hover) and (pointer: fine) {
+  .call-room-root .sortie-audio-menu button:hover {
+    background: var(--bg-hover, color-mix(in srgb, var(--text-primary) 8%, transparent));
+  }
 }
 
 .call-room-root .sortie-audio-menu button.choisie {
   color: var(--accent);
   font-weight: 600;
+}
+
+/* Sous l'encoche et au-dessus de la barre d'accueil (20/11/2026). */
+.call-room-root .room-top {
+  padding-top: calc(20px + env(safe-area-inset-top, 0px));
+}
+.call-room-root .controls-bar {
+  padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
 }

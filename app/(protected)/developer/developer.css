@@ -22,7 +22,7 @@
 }
 
 .dev-main-title {
-  font-size: 26px;
+  font-size: 1.625rem;
   font-weight: 800;
   color: var(--dev-text-primary);
   margin: 0;
@@ -30,7 +30,7 @@
 }
 
 .dev-main-subtitle {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--dev-text-secondary);
   margin: 0;
 }
@@ -50,14 +50,16 @@
   border: 1px solid var(--dev-border);
   background-color: var(--dev-bg-card);
   color: var(--dev-text-primary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.dev-refresh-btn:hover {
-  background-color: var(--dev-bg-card-hover);
+@media (hover: hover) and (pointer: fine) {
+  .dev-refresh-btn:hover {
+    background-color: var(--dev-bg-card-hover);
+  }
 }
 
 /* GRILLE DE CARTES MÉTRIQUES (Alignement parfait en 4 colonnes) */
@@ -92,8 +94,10 @@
   transition: transform 0.2s ease;
 }
 
-.dev-metric-card:hover {
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .dev-metric-card:hover {
+    transform: translateY(-2px);
+  }
 }
 
 .dev-metric-header {
@@ -118,7 +122,7 @@
 }
 
 .dev-metric-label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   color: var(--dev-text-secondary);
   text-transform: uppercase;
@@ -126,7 +130,7 @@
 }
 
 .dev-metric-value {
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 800;
   color: var(--dev-text-primary);
   margin-top: 2px;
@@ -142,14 +146,16 @@
   border: none;
   background-color: var(--dev-accent-light);
   color: var(--dev-accent);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   transition: opacity 0.2s ease;
 }
 
-.dev-metric-btn:hover {
-  opacity: 0.85;
+@media (hover: hover) and (pointer: fine) {
+  .dev-metric-btn:hover {
+    opacity: 0.85;
+  }
 }
 
 /* PANNEAU DE CONTENU INTERNE */
@@ -162,7 +168,7 @@
 }
 
 .dev-panel-title {
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 700;
   margin: 0 0 16px 0;
   color: var(--dev-text-primary);
@@ -181,7 +187,7 @@
 .dev-table th {
   border-bottom: 1px solid var(--dev-border);
   color: var(--dev-text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 12px 10px;
   text-transform: uppercase;
 }
@@ -189,7 +195,7 @@
 .dev-table td {
   padding: 14px 10px;
   border-bottom: 1px solid var(--dev-border);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 /* Titre d'un exemple, au-dessus d'un .dev-code-block. Les anciens exemples
@@ -197,7 +203,7 @@
    déjà divergentes entre deux d'entre eux. */
 .dev-doc-title {
   margin: 0 0 8px 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--dev-accent);
 }
@@ -207,7 +213,7 @@
   padding: 18px;
   border-radius: 10px;
   font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--dev-text-primary);
   overflow-x: auto;
   border: 1px solid var(--dev-border);

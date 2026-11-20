@@ -183,14 +183,14 @@ const LIGNE: React.CSSProperties = {
  */
 const STYLE_NOM: React.CSSProperties = {
   ...LIGNE,
-  fontSize: 12,
+  fontSize: "0.75rem",
   fontWeight: 600,
   color: "var(--text-primary)",
 }
 
 const STYLE_DISCRET: React.CSSProperties = {
   ...LIGNE,
-  fontSize: 11,
+  fontSize: "0.6875rem",
   color: "var(--text-muted)",
 }
 

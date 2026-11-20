@@ -40,7 +40,7 @@
 
 .e2ee-verif h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 650;
 }
 
@@ -65,7 +65,7 @@
 
 .e2ee-verif-mode-emploi {
   margin: 0 0 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   color: #55555a;
 }
@@ -73,7 +73,7 @@
 .e2ee-verif-calcul,
 .e2ee-verif-vide {
   margin: 20px 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: center;
   color: #77777c;
 }
@@ -87,7 +87,7 @@
 
 .e2ee-verif-appareil-nom {
   margin-bottom: 8px;
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -104,7 +104,7 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 6px 10px;
   font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
-  font-size: 16px;
+  font-size: 1rem;
   letter-spacing: 0.08em;
   text-align: center;
   color: #1c1c1e;
@@ -113,7 +113,7 @@
 @media (min-width: 380px) {
   .e2ee-verif-code {
     grid-template-columns: repeat(6, 1fr);
-    font-size: 15px;
+    font-size: 0.9375rem;
   }
 }
 
@@ -128,7 +128,7 @@
   border: 1px solid #d5d5da;
   border-radius: 10px;
   background: #fff;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   font-weight: 550;
   color: #1c1c1e;
   cursor: pointer;
@@ -158,46 +158,44 @@
 
 .e2ee-verif-limite {
   margin: 4px 0 0;
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   line-height: 1.45;
   color: #8a8a90;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .e2ee-verif {
-    background: #1b1b22;
-    color: #ececf1;
-  }
+:root[data-theme="dark"] .e2ee-verif {
+  background: #1b1b22;
+  color: #ececf1;
+}
 
-  :root:not([data-theme="light"]) .e2ee-verif-mode-emploi {
-    color: #a9a9b4;
-  }
+:root[data-theme="dark"] .e2ee-verif-mode-emploi {
+  color: #a9a9b4;
+}
 
-  :root:not([data-theme="light"]) .e2ee-verif-appareil {
-    background: #24242c;
-  }
+:root[data-theme="dark"] .e2ee-verif-appareil {
+  background: #24242c;
+}
 
-  :root:not([data-theme="light"]) .e2ee-verif-code {
-    color: #ececf1;
-  }
+:root[data-theme="dark"] .e2ee-verif-code {
+  color: #ececf1;
+}
 
-  :root:not([data-theme="light"]) .e2ee-verif-btn {
-    border-color: #3a3a44;
-    background: #24242c;
-    color: #ececf1;
-  }
+:root[data-theme="dark"] .e2ee-verif-btn {
+  border-color: #3a3a44;
+  background: #24242c;
+  color: #ececf1;
+}
 
-  :root:not([data-theme="light"]) .e2ee-verif-btn.verifie {
-    border-color: #35603a;
-    background: #1e2a20;
-    color: #9fd3a6;
-  }
+:root[data-theme="dark"] .e2ee-verif-btn.verifie {
+  border-color: #35603a;
+  background: #1e2a20;
+  color: #9fd3a6;
+}
 
-  :root:not([data-theme="light"]) .e2ee-verif-limite,
-  :root:not([data-theme="light"]) .e2ee-verif-calcul,
-  :root:not([data-theme="light"]) .e2ee-verif-vide {
-    color: #86868f;
-  }
+:root[data-theme="dark"] .e2ee-verif-limite,
+:root[data-theme="dark"] .e2ee-verif-calcul,
+:root[data-theme="dark"] .e2ee-verif-vide {
+  color: #86868f;
 }
 
 /* ── Le lien depuis l'alerte de changement de clé ── */
@@ -214,7 +212,7 @@
   border-radius: 8px;
   background: transparent;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   font-weight: 600;
   color: inherit;
   white-space: nowrap;
@@ -237,7 +235,7 @@
   border-radius: 999px;
   background: #eef7ef;
   border: 1px solid #b7ddb9;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: #2c6b34;
   white-space: nowrap;
@@ -254,12 +252,10 @@
   stroke-linejoin: round;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .e2ee-badge-verifie {
-    background: #1e2a20;
-    border-color: #35603a;
-    color: #9fd3a6;
-  }
+:root[data-theme="dark"] .e2ee-badge-verifie {
+  background: #1e2a20;
+  border-color: #35603a;
+  color: #9fd3a6;
 }
 
 /*

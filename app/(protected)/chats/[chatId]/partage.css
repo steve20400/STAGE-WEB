@@ -23,7 +23,7 @@
 }
 .partage-titre {
   margin: 2px 4px 10px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 .partage-option {
@@ -40,9 +40,13 @@
   text-align: left;
   cursor: pointer;
 }
-.partage-option:hover,
 .partage-option:focus-visible {
   background: var(--bg-surface);
+}
+@media (hover: hover) and (pointer: fine) {
+  .partage-option:hover {
+    background: var(--bg-surface);
+  }
 }
 .partage-icone {
   display: flex;
@@ -68,7 +72,7 @@
   font-weight: 600;
 }
 .partage-detail {
-  font-size: 12px;
+  font-size: 0.75rem;
   opacity: 0.7;
 }
 .partage-attente {
@@ -76,7 +80,7 @@
   align-items: center;
   gap: 10px;
   padding: 14px 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .partage-sablier {
   flex: none;

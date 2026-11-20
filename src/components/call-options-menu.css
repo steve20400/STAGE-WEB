@@ -48,7 +48,7 @@
   background: none;
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1.3;
   white-space: nowrap;
@@ -58,8 +58,10 @@
 .call-opt-menu .call-opt-item + .call-opt-item {
   margin-top: 2px;
 }
-.call-opt-menu .call-opt-item:hover {
-  background: var(--bg-surface);
+@media (hover: hover) and (pointer: fine) {
+  .call-opt-menu .call-opt-item:hover {
+    background: var(--bg-surface);
+  }
 }
 .call-opt-menu .call-opt-item:focus-visible {
   outline: 2px solid var(--accent);
@@ -68,7 +70,7 @@
 
 .call-opt-menu .call-opt-chevron {
   color: var(--text-ghost);
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -87,15 +89,17 @@
   background: none;
   color: var(--text-ghost);
   font-family: "DM Sans", sans-serif;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.7px;
   text-transform: uppercase;
   white-space: nowrap;
   cursor: pointer;
 }
-.call-opt-menu .call-opt-retour:hover {
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .call-opt-menu .call-opt-retour:hover {
+    color: var(--text-secondary);
+  }
 }
 
 /* ============================================================
@@ -130,7 +134,7 @@
 
 .call-opt-overlay .call-opt-dialog-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--text-primary);
@@ -156,15 +160,17 @@
   background: none;
   color: var(--text-muted);
   font-family: "DM Sans", sans-serif;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 600;
   cursor: pointer;
   transition:
     background 0.15s,
     color 0.15s;
 }
-.call-opt-overlay .call-opt-onglet:hover {
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .call-opt-overlay .call-opt-onglet:hover {
+    color: var(--text-secondary);
+  }
 }
 .call-opt-overlay .call-opt-onglet.on {
   background: var(--bg-elevated);
@@ -200,7 +206,7 @@
 .call-opt-overlay .call-opt-numero-aide {
   min-height: 18px;
   margin-top: 10px;
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   color: var(--text-muted);
   text-align: center;
 }
@@ -217,15 +223,17 @@
   background: var(--accent);
   color: var(--accent-text);
   font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
   transition:
     filter 0.15s,
     opacity 0.15s;
 }
-.call-opt-overlay .call-opt-valider:hover:not(:disabled) {
-  filter: brightness(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .call-opt-overlay .call-opt-valider:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
 }
 .call-opt-overlay .call-opt-valider:disabled {
   opacity: 0.45;
@@ -240,7 +248,7 @@
   background: var(--bg-base);
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin-bottom: 12px;
 }
 .call-opt-overlay .call-opt-search:focus-visible {
@@ -266,29 +274,31 @@
   border: none;
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
   transition: background 0.15s;
 }
 .call-opt-overlay .call-opt-contact + .call-opt-contact {
   border-top: 1px solid var(--border-subtle);
 }
-.call-opt-overlay .call-opt-contact:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .call-opt-overlay .call-opt-contact:hover {
+    background: var(--bg-elevated);
+  }
 }
 .call-opt-overlay .call-opt-contact b {
   display: block;
   font-weight: 600;
 }
 .call-opt-overlay .call-opt-contact span {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 
 .call-opt-overlay .call-opt-vide {
   padding: 12px 10px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .call-opt-overlay .call-opt-annuler {
@@ -299,11 +309,13 @@
   padding: 11px;
   color: var(--text-secondary);
   font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
 }
-.call-opt-overlay .call-opt-annuler:hover {
-  background: var(--border-default);
+@media (hover: hover) and (pointer: fine) {
+  .call-opt-overlay .call-opt-annuler:hover {
+    background: var(--border-default);
+  }
 }

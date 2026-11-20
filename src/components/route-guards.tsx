@@ -15,7 +15,7 @@ function RouteGuardFallback() {
         background: "var(--bg-base)",
         color: "var(--text-muted)",
         fontFamily: "'DM Sans', sans-serif",
-        fontSize: 14,
+        fontSize: "0.875rem",
       }}
     >
       {t("loading")}

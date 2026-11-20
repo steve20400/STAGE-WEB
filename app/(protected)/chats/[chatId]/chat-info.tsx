@@ -578,7 +578,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           transition: all .15s;
         }
         .cip-back:hover { background: var(--bg-elevated); color: var(--text-primary); }
-        .cip-head-title { font-family: 'Bricolage Grotesque', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: -.3px; }
+        .cip-head-title { font-family: 'Bricolage Grotesque', sans-serif; font-size: 0.9375rem; font-weight: 700; letter-spacing: -.3px; }
 
         .cip-hero { padding: 24px 18px 16px; text-align: center; flex-shrink: 0; }
         .cip-av {
@@ -589,7 +589,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           align-items: center;
           justify-content: center;
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 22px;
+          font-size: 1.375rem;
           font-weight: 800;
           margin: 0 auto 14px;
           position: relative;
@@ -604,12 +604,12 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           background: var(--success);
           border: 3px solid var(--bg-surface);
         }
-        .cip-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 5px; }
-        .cip-sub { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px; }
+        .cip-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.125rem; font-weight: 800; letter-spacing: -.5px; margin-bottom: 5px; }
+        .cip-sub { font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px; }
         /* Alanya ID sous le pseudo. Selectionnable au doigt comme a la souris :
            on le communique, donc on doit pouvoir le copier. */
         .cip-alanya-id {
-          font-size: 12px; color: var(--text-muted); margin-bottom: 10px;
+          font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;
           user-select: all; -webkit-user-select: all;
         }
         .cip-alanya-id strong { color: var(--text-secondary); font-weight: 600; letter-spacing: 0.4px; }
@@ -635,53 +635,53 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
         .ca-btn:hover .ca-icon { background: var(--accent-dim); border-color: var(--accent-border); }
         /* Le libelle ne se coupe jamais : il impose sa largeur au bouton, et
            c'est la rangee qui s'adapte. */
-        .ca-label { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+        .ca-label { font-size: 0.625rem; color: var(--text-muted); white-space: nowrap; }
 
         .cip-body { flex: 1; overflow-y: auto; }
         .cip-body::-webkit-scrollbar { width: 3px; }
         .cip-body::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
 
         .cip-section { padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); }
-        .cip-section-title { font-size: 10px; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; font-weight: 500; margin-bottom: 10px; }
+        .cip-section-title { font-size: 0.625rem; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; font-weight: 500; margin-bottom: 10px; }
 
         .notif-row { display: flex; align-items: center; justify-content: space-between; }
-        .notif-label { font-size: 13px; color: var(--text-primary); }
+        .notif-label { font-size: 0.8125rem; color: var(--text-primary); }
         /* Groupes (01/11/2026) : explication sous un reglage, description,
            « Voir plus », reglages du groupe. */
-        .notif-label small { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .notif-label small { display: block; font-size: 0.6875rem; color: var(--text-muted); margin-top: 2px; }
         .notif-row + .notif-row { margin-top: 12px; }
-        .cip-statut { margin: -6px 0 14px; color: var(--text-secondary); font-size: 13px; line-height: 1.45; text-align: center; white-space: pre-wrap; word-break: break-word; }
-        .cip-description { display: block; width: 100%; margin: -8px 0 16px; padding: 8px 10px; border: 1px dashed transparent; border-radius: 8px; background: none; color: var(--text-secondary); font: inherit; font-size: 13px; line-height: 1.5; text-align: center; white-space: pre-wrap; word-break: break-word; cursor: pointer; }
+        .cip-statut { margin: -6px 0 14px; color: var(--text-secondary); font-size: 0.8125rem; line-height: 1.45; text-align: center; white-space: pre-wrap; word-break: break-word; }
+        .cip-description { display: block; width: 100%; margin: -8px 0 16px; padding: 8px 10px; border: 1px dashed transparent; border-radius: 8px; background: none; color: var(--text-secondary); font: inherit; font-size: 0.8125rem; line-height: 1.5; text-align: center; white-space: pre-wrap; word-break: break-word; cursor: pointer; }
         .cip-description:hover:not(:disabled) { border-color: var(--border-default); }
         .cip-description:disabled { cursor: default; }
         .cip-description.vide { color: var(--accent); font-weight: 600; }
         .cip-description-edition { margin: -8px 0 16px; display: flex; flex-direction: column; gap: 8px; }
-        .cip-description-edition textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-elevated); color: var(--text-primary); font: inherit; font-size: 13px; resize: vertical; }
+        .cip-description-edition textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border-default); border-radius: 8px; background: var(--bg-elevated); color: var(--text-primary); font: inherit; font-size: 0.8125rem; resize: vertical; }
         .cip-description-edition div { display: flex; justify-content: flex-end; gap: 8px; }
-        .cip-description-edition button { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 6px 12px; background: var(--bg-elevated); color: var(--text-primary); font: inherit; font-size: 12px; cursor: pointer; }
+        .cip-description-edition button { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 6px 12px; background: var(--bg-elevated); color: var(--text-primary); font: inherit; font-size: 0.75rem; cursor: pointer; }
         .cip-description-edition button.principal { border: 0; background: var(--accent); color: var(--accent-text); font-weight: 600; }
-        .cip-voir-plus { width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: 8px; background: var(--bg-elevated); color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .cip-voir-plus { width: 100%; margin-top: 8px; padding: 8px; border: 0; border-radius: 8px; background: var(--bg-elevated); color: var(--accent); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
         .cip-reglages { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
-        .cip-reglages-titre { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+        .cip-reglages-titre { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
         .tgl { width: 38px; height: 21px; border-radius: 20px; border: none; cursor: pointer; position: relative; transition: background .2s; }
         .tgl-knob { position: absolute; top: 2.5px; width: 16px; height: 16px; border-radius: 50%; transition: left .2s; }
 
         .cip-tabs { display: flex; background: var(--bg-elevated); border-radius: 8px; padding: 2px; margin: 0 18px 12px; }
-        .cip-tab { flex: 1; padding: 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; transition: all .2s; background: transparent; color: var(--text-muted); }
+        .cip-tab { flex: 1; padding: 6px; border-radius: 6px; border: none; cursor: pointer; font-size: 0.6875rem; font-weight: 500; font-family: 'DM Sans', sans-serif; transition: all .2s; background: transparent; color: var(--text-muted); }
         .cip-tab.on { background: var(--bg-surface); color: var(--text-primary); }
 
         .member-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); }
         .member-item:last-child { border-bottom: none; }
-        .m-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; position: relative; }
+        .m-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6875rem; font-weight: 700; flex-shrink: 0; position: relative; }
         .m-dot { position: absolute; bottom: 0; right: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--success); border: 2px solid var(--bg-surface); }
         .m-info { flex: 1; min-width: 0; }
-        .m-name { font-size: 12px; font-weight: 500; color: var(--text-primary); display: flex; align-items: center; gap: 5px; }
+        .m-name { font-size: 0.75rem; font-weight: 500; color: var(--text-primary); display: flex; align-items: center; gap: 5px; }
         /* Sous le nom du membre, discret : le nom reste l'information premiere. */
         .m-alanya-id {
-          font-size: 10.5px; color: var(--text-faint); margin-top: 2px;
+          font-size: 0.6562rem; color: var(--text-faint); margin-top: 2px;
           letter-spacing: 0.3px; user-select: all; -webkit-user-select: all;
         }
-        .m-role { font-size: 9px; background: var(--accent-dim); color: var(--accent); padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+        .m-role { font-size: 0.5625rem; background: var(--accent-dim); color: var(--accent); padding: 1px 6px; border-radius: 4px; font-weight: 600; }
         .m-role.me-badge { background: var(--info-dim); color: var(--info); }
         .m-actions { display: flex; gap: 3px; }
         .m-action { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; border-radius: 5px; display: flex; transition: all .15s; }
@@ -693,8 +693,8 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
         .file-item:hover { opacity: .8; }
         .f-icon { width: 34px; height: 34px; border-radius: 8px; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .f-info { flex: 1; min-width: 0; }
-        .f-name { font-size: 12px; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
-        .f-meta { font-size: 10px; color: var(--text-muted); }
+        .f-name { font-size: 0.75rem; font-weight: 500; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
+        .f-meta { font-size: 0.625rem; color: var(--text-muted); }
         .f-dl { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; border-radius: 5px; display: flex; transition: color .15s; flex-shrink: 0; }
         .f-dl:hover { color: var(--accent); }
 
@@ -702,8 +702,8 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
         .danger-item:last-child { border-bottom: none; padding-bottom: 0; }
         .danger-item:hover { opacity: .75; }
         .di-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .danger-label { font-size: 13px; font-weight: 500; }
-        .danger-sub { font-size: 10px; margin-top: 1px; color: var(--text-muted); }
+        .danger-label { font-size: 0.8125rem; font-weight: 500; }
+        .danger-sub { font-size: 0.625rem; margin-top: 1px; color: var(--text-muted); }
 
         .cip-confirm-overlay {
           position: fixed;
@@ -723,10 +723,10 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           box-shadow: 0 24px 64px #00000080;
           padding: 18px;
         }
-        .cip-confirm-title { font-family: 'Bricolage Grotesque', sans-serif; font-size: 18px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; }
-        .cip-confirm-text { font-size: 13px; line-height: 1.6; color: var(--text-muted); }
+        .cip-confirm-title { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.125rem; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; }
+        .cip-confirm-text { font-size: 0.8125rem; line-height: 1.6; color: var(--text-muted); }
         .cip-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
-        .cip-confirm-btn { border-radius: 9px; padding: 10px 13px; font-size: 12px; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all .15s; }
+        .cip-confirm-btn { border-radius: 9px; padding: 10px 13px; font-size: 0.75rem; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all .15s; }
         .cip-confirm-btn.cancel { border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); }
         .cip-confirm-btn.cancel:hover { border-color: var(--border-default); color: var(--text-primary); }
         .cip-confirm-btn.confirm { border: 1px solid transparent; color: var(--bg-base); }
@@ -1113,7 +1113,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                   <span
                     style={{
                       display: "block",
-                      fontSize: 11,
+                      fontSize: "0.6875rem",
                       color: "var(--text-muted)",
                       marginTop: 2,
                     }}
@@ -1325,7 +1325,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     border: "none",
                     borderRadius: 9,
                     padding: "10px",
-                    fontSize: 13,
+                    fontSize: "0.8125rem",
                     fontWeight: 700,
                     color: "var(--accent-text)",
                     cursor: "pointer",
@@ -1439,7 +1439,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     border: "1px solid var(--border-subtle)",
                     borderRadius: 9,
                     padding: "9px",
-                    fontSize: 13,
+                    fontSize: "0.8125rem",
                     fontWeight: 600,
                     color: "var(--text-primary)",
                     cursor: "pointer",
@@ -1534,7 +1534,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           {conv.isGroup && (
             <div className="cip-section">
               <div className="cip-section-title">{t("cinfo_information")}</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
                   <span style={{ color: "var(--text-ghost)" }}>{t("cinfo_created_on")}</span>
                   <span>{conv.createdAt}</span>
@@ -1652,7 +1652,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               <div className="cip-section-title">{t("trad_langue_titre")}</div>
               <div
                 className="s-hint"
-                style={{ margin: "0 0 10px", fontSize: 12, color: "var(--text-muted)" }}
+                style={{ margin: "0 0 10px", fontSize: "0.75rem", color: "var(--text-muted)" }}
               >
                 {t("trad_langue_aide")}
               </div>
@@ -1672,7 +1672,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                   border: "1px solid var(--border-subtle)",
                   borderRadius: 10,
                   padding: "11px 13px",
-                  fontSize: 13,
+                  fontSize: "0.8125rem",
                   color: "var(--text-primary)",
                   fontFamily: "'DM Sans', sans-serif",
                   outline: "none",
@@ -1696,7 +1696,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                 <div
                   style={{
                     marginTop: 8,
-                    fontSize: 12,
+                    fontSize: "0.75rem",
                     color: "var(--text-muted)",
                     lineHeight: 1.5,
                   }}
@@ -2053,7 +2053,7 @@ function AddMemberDialog({
             borderBottom: "1px solid var(--border-subtle)",
             fontFamily: "'Bricolage Grotesque', sans-serif",
             fontWeight: 800,
-            fontSize: 17,
+            fontSize: "1.0625rem",
             color: "var(--text-primary)",
           }}
         >
@@ -2061,12 +2061,12 @@ function AddMemberDialog({
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
           {loading && (
-            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: "0.8125rem" }}>
               {t("cinfo_loading_contacts")}
             </div>
           )}
           {!loading && allContacts.length === 0 && (
-            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: 13 }}>
+            <div style={{ padding: 16, color: "var(--text-muted)", fontSize: "0.8125rem" }}>
               {t("cinfo_no_contact_to_add")}
             </div>
           )}
@@ -2100,7 +2100,7 @@ function AddMemberDialog({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 11,
+                    fontSize: "0.6875rem",
                     fontWeight: 700,
                     flexShrink: 0,
                     overflow: "hidden",
@@ -2121,7 +2121,7 @@ function AddMemberDialog({
                     contact.initials
                   )}
                 </span>
-                <span style={{ color: "var(--text-primary)", fontSize: 13 }}>{contact.name}</span>
+                <span style={{ color: "var(--text-primary)", fontSize: "0.8125rem" }}>{contact.name}</span>
               </label>
             )
           })}
@@ -2143,7 +2143,7 @@ function AddMemberDialog({
               borderRadius: 8,
               padding: "8px 14px",
               color: "var(--text-secondary)",
-              fontSize: 12,
+              fontSize: "0.75rem",
               cursor: "pointer",
               fontFamily: "'DM Sans', sans-serif",
             }}
@@ -2159,7 +2159,7 @@ function AddMemberDialog({
               borderRadius: 8,
               padding: "8px 16px",
               color: "var(--accent-text)",
-              fontSize: 12,
+              fontSize: "0.75rem",
               fontWeight: 600,
               fontFamily: "'DM Sans', sans-serif",
               cursor: selected.size === 0 || sending ? "not-allowed" : "pointer",
@@ -2240,7 +2240,7 @@ export default function ConvInfoPage({
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>?</div>
+          <div style={{ fontSize: "2rem", marginBottom: 12 }}>?</div>
           <div>{t("cinfo_conversation_not_found")}</div>
           <button onClick={() => navigate("/chats")} style={{ marginTop: 16, padding: "8px 16px" }}>
             {t("cinfo_back_to_chats")}

@@ -116,7 +116,7 @@
 
 .sb-logo-txt {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 800;
   color: var(--entete-texte);
   letter-spacing: -0.5px;
@@ -125,7 +125,7 @@
 
 .sb-logo-subtitle {
   color: var(--entete-texte-doux);
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1;
@@ -142,7 +142,7 @@
   display: none;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .sb-close {
     display: flex;
   }
@@ -161,9 +161,11 @@
   align-items: center;
   flex-shrink: 0;
 }
-.sb-collapse:hover {
-  background: var(--entete-bouton-survol);
-  color: var(--entete-bouton-survol-texte);
+@media (hover: hover) and (pointer: fine) {
+  .sb-collapse:hover {
+    background: var(--entete-bouton-survol);
+    color: var(--entete-bouton-survol-texte);
+  }
 }
 
 .sb-link-label {
@@ -254,8 +256,10 @@
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
-.sb-nav:hover {
-  scrollbar-color: var(--border-subtle) transparent;
+@media (hover: hover) and (pointer: fine) {
+  .sb-nav:hover {
+    scrollbar-color: var(--border-subtle) transparent;
+  }
 }
 .sb-nav::-webkit-scrollbar {
   width: 6px;
@@ -267,13 +271,15 @@
   background: transparent;
   border-radius: 6px;
 }
-.sb-nav:hover::-webkit-scrollbar-thumb {
-  background: var(--border-subtle);
+@media (hover: hover) and (pointer: fine) {
+  .sb-nav:hover::-webkit-scrollbar-thumb {
+    background: var(--border-subtle);
+  }
 }
 
 /* Titre de section ("Navigation", "Compte") */
 .sb-nav-section {
-  font-size: 9px;
+  font-size: 0.5625rem;
   color: var(--text-faint);
   letter-spacing: 1.5px;
   text-transform: uppercase;
@@ -293,15 +299,17 @@
   border-radius: var(--radius);
   color: var(--text-dim);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   transition:
     background 0.15s,
     color 0.15s;
 }
-.sb-link:hover {
-  background: var(--bg-card);
-  color: var(--text-muted);
+@media (hover: hover) and (pointer: fine) {
+  .sb-link:hover {
+    background: var(--bg-card);
+    color: var(--text-muted);
+  }
 }
 .sb-link.active {
   background: var(--accent-dim);
@@ -316,7 +324,7 @@
   margin-left: auto;
   background: var(--gold);
   color: var(--accent-text);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 20px;
@@ -333,7 +341,7 @@
 
 .sb-theme-label {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 /* --- Pied de sidebar : profil + deconnexion --- */
@@ -353,8 +361,10 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.sb-profile:hover {
-  background: var(--bg-card);
+@media (hover: hover) and (pointer: fine) {
+  .sb-profile:hover {
+    background: var(--bg-card);
+  }
 }
 
 .sb-avatar {
@@ -365,7 +375,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--accent-text);
   flex-shrink: 0;
@@ -390,7 +400,7 @@
 }
 
 .sb-user-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
@@ -399,7 +409,7 @@
 }
 
 .sb-user-status {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--color-online);
 }
 
@@ -416,9 +426,11 @@
     color 0.15s,
     background 0.15s;
 }
-.sb-logout:hover {
-  color: var(--color-error);
-  background: var(--danger-dim);
+@media (hover: hover) and (pointer: fine) {
+  .sb-logout:hover {
+    color: var(--color-error);
+    background: var(--danger-dim);
+  }
 }
 
 .mobile-overlay {
@@ -496,7 +508,7 @@
 
 .topbar-title {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 800;
   color: var(--entete-texte);
   letter-spacing: -0.4px;
@@ -505,14 +517,14 @@
 
 .topbar-subtitle {
   color: var(--entete-texte-doux);
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1;
   text-transform: uppercase;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   /* On cache la sidebar statique et on affiche la topbar */
   .layout-sidebar-static {
     display: none;
@@ -522,7 +534,7 @@
   }
 }
 
-@media (min-width: 861px) {
+@media (min-width: 901px) {
   /* Sur desktop, plus besoin de la sidebar mobile */
   .sidebar-mobile-wrap {
     display: none;
@@ -606,7 +618,7 @@
 }
 .active-call-audio b {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   letter-spacing: -0.2px;
   max-width: 100%;
@@ -616,7 +628,7 @@
 }
 .active-call-audio span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .active-call-avatar {
@@ -633,7 +645,7 @@
   color: var(--accent);
   font-family: "Bricolage Grotesque", sans-serif;
   font-weight: 800;
-  font-size: 21px;
+  font-size: 1.3125rem;
 }
 .active-call-avatar img {
   width: 100%;
@@ -666,19 +678,23 @@
   padding: 7px 9px;
   background: #ffffff24;
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-family: "DM Sans", sans-serif;
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.active-call-controls button:hover {
-  background: #ffffff36;
+@media (hover: hover) and (pointer: fine) {
+  .active-call-controls button:hover {
+    background: #ffffff36;
+  }
 }
 .active-call-controls .end {
   background: #dc2626;
 }
-.active-call-controls .end:hover {
-  background: #ef4444;
+@media (hover: hover) and (pointer: fine) {
+  .active-call-controls .end:hover {
+    background: #ef4444;
+  }
 }
 
 /* Note : la fenetre reduite n'affiche plus d'apercu de sa propre camera.
@@ -695,7 +711,47 @@
 /* Le quatrieme bouton reste discret : c'est une porte vers d'autres actions, pas
    une action en soi. */
 .active-call-controls .more {
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1;
   padding-inline: 10px;
+}
+
+/* ============================================================
+   BORDS DE L'ÉCRAN ET CIBLES AU DOIGT (20/11/2026)
+   Avec `viewport-fit=cover` (index.html), la page s'étend sous l'encoche, les
+   coins arrondis et la barre d'accueil des téléphones : chaque bord garde sa
+   marge `env(safe-area-inset-*)`, nulle sur un écran sans découpe.
+   ============================================================ */
+.layout-root {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.topbar {
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+}
+.sidebar-mobile-wrap .sidebar {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (min-width: 901px) {
+  .layout-root {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+.active-call-floating {
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Au doigt, 44 px au moins par bouton (recommandation Apple et WCAG 2.5.5). */
+@media (pointer: coarse) {
+  .topbar {
+    padding-left: 10px;
+  }
+  .topbar-menu,
+  .sb-close {
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+  }
 }

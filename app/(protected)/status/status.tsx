@@ -127,7 +127,7 @@ function StatusAvatar({
             alignItems: "center",
             justifyContent: "center",
             fontWeight: 800,
-            fontSize: 16,
+            fontSize: "1rem",
             fontFamily: "'Bricolage Grotesque', sans-serif",
           }}
         >
@@ -136,7 +136,7 @@ function StatusAvatar({
       </div>
       <span
         style={{
-          fontSize: 11,
+          fontSize: "0.6875rem",
           color: "var(--text-secondary)",
           maxWidth: 84,
           overflow: "hidden",
@@ -776,7 +776,7 @@ export default function StatusPage() {
             <span
               title={t("statut_attente_detail")}
               style={{
-                fontSize: 12,
+                fontSize: "0.75rem",
                 padding: "3px 9px",
                 borderRadius: 999,
                 border: "1px solid var(--border-subtle)",
@@ -803,7 +803,7 @@ export default function StatusPage() {
             marginBottom: 20,
           }}
         >
-          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 10 }}>
             {t("status_help")}
           </div>
           <textarea
@@ -813,7 +813,7 @@ export default function StatusPage() {
             onChange={(e) => setComposerText(e.target.value)}
             maxLength={700}
             rows={3}
-            style={{ width: "100%", padding: 12, fontSize: 13, resize: "vertical" }}
+            style={{ width: "100%", padding: 12, fontSize: "0.8125rem", resize: "vertical" }}
           />
           <div
             style={{
@@ -867,7 +867,7 @@ export default function StatusPage() {
                 borderRadius: 8,
                 padding: "8px 14px",
                 color: "var(--text-secondary)",
-                fontSize: 12,
+                fontSize: "0.75rem",
                 cursor: "pointer",
               }}
             >
@@ -876,7 +876,7 @@ export default function StatusPage() {
             {/* STATUT AUDIO (01/11/2026) : un clic enregistre, le second publie. */}
             {micro === "statut" ? (
               <>
-                <span style={{ fontSize: 12, color: "var(--danger, #e5484d)", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--danger, #e5484d)", whiteSpace: "nowrap" }}>
                   ● {t("status_recording")} {formatSecondes(secondesMicro)} / {formatSecondes(DUREE_AUDIO_MAX_MS / 1000)}
                 </span>
                 <button
@@ -887,7 +887,7 @@ export default function StatusPage() {
                     borderRadius: 8,
                     padding: "8px 14px",
                     color: "var(--text-secondary)",
-                    fontSize: 12,
+                    fontSize: "0.75rem",
                     cursor: "pointer",
                   }}
                 >
@@ -908,7 +908,7 @@ export default function StatusPage() {
                   borderRadius: 8,
                   padding: "8px 14px",
                   color: "var(--text-secondary)",
-                  fontSize: 12,
+                  fontSize: "0.75rem",
                   cursor: "pointer",
                 }}
               >
@@ -945,7 +945,7 @@ export default function StatusPage() {
       </div>
 
       {loading && (
-        <div style={{ color: "var(--text-muted)", fontSize: 13, padding: 12 }}>{t("loading")}</div>
+        <div style={{ color: "var(--text-muted)", fontSize: "0.8125rem", padding: 12 }}>{t("loading")}</div>
       )}
       {!loading && !feed.me?.statuses.length && feed.others.length === 0 && (
         <div className="empty-state">
@@ -998,16 +998,16 @@ export default function StatusPage() {
                 alignItems: "center",
                 justifyContent: "center",
                 fontWeight: 700,
-                fontSize: 13,
+                fontSize: "0.8125rem",
               }}
             >
               {toInitials(viewer.isMine ? t("l2_me") : groupLabel(viewer.group))}
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>
+              <div style={{ color: "#fff", fontSize: "0.875rem", fontWeight: 600 }}>
                 {viewer.isMine ? t("l2_my_status") : groupLabel(viewer.group)}
               </div>
-              <div style={{ color: "#ffffff90", fontSize: 11 }}>
+              <div style={{ color: "#ffffff90", fontSize: "0.6875rem" }}>
                 {timeAgo(currentStatus.createdAt)}
               </div>
             </div>
@@ -1178,7 +1178,7 @@ export default function StatusPage() {
                 <div
                   style={{
                     color: "#fff",
-                    fontSize: 26,
+                    fontSize: "1.625rem",
                     fontWeight: 700,
                     textAlign: "center",
                     fontFamily: "'Bricolage Grotesque', sans-serif",

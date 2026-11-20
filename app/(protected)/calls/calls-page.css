@@ -33,7 +33,7 @@
 }
 .calls-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -1px;
   color: var(--text-primary);
@@ -47,7 +47,7 @@
   color: var(--accent-text);
   padding: 10px 20px;
   border-radius: 9px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   border: none;
   cursor: pointer;
@@ -56,9 +56,11 @@
     opacity 0.15s,
     transform 0.1s;
 }
-.new-call-btn:hover {
-  opacity: 0.88;
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .new-call-btn:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+  }
 }
 
 .calls-controls {
@@ -91,7 +93,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 9px;
   padding: 9px 12px 9px 34px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
   outline: none;
@@ -127,7 +129,7 @@
   border-radius: 20px;
   border: 1px solid var(--border-subtle);
   background: transparent;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
@@ -138,9 +140,11 @@
   align-items: center;
   gap: 5px;
 }
-.filter-btn:hover {
-  border-color: var(--border-default);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .filter-btn:hover {
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+  }
 }
 .filter-btn.on {
   background: var(--accent-dim);
@@ -173,13 +177,13 @@
 }
 .stat-chip-val {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   line-height: 1;
 }
 .stat-chip-lbl {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -190,7 +194,7 @@
 }
 
 .date-header {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   font-weight: 500;
   letter-spacing: 0.5px;
@@ -210,9 +214,11 @@
   cursor: pointer;
   border: 1px solid transparent;
 }
-.call-item:hover {
-  background: var(--bg-surface);
-  border-color: var(--border-subtle);
+@media (hover: hover) and (pointer: fine) {
+  .call-item:hover {
+    background: var(--bg-surface);
+    border-color: var(--border-subtle);
+  }
 }
 
 .call-av {
@@ -222,7 +228,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -232,7 +238,7 @@
   min-width: 0;
 }
 .call-name {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 4px;
@@ -244,7 +250,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -252,7 +258,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   padding: 2px 8px;
   border-radius: 5px;
   background: var(--border-subtle);
@@ -268,7 +274,7 @@
   flex-shrink: 0;
 }
 .call-ts {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-faint);
 }
 
@@ -291,26 +297,32 @@
 .call-action-btn.audio {
   color: var(--text-secondary);
 }
-.call-action-btn.audio:hover {
-  background: var(--success-dim);
-  border-color: var(--success-border);
-  color: var(--success);
+@media (hover: hover) and (pointer: fine) {
+  .call-action-btn.audio:hover {
+    background: var(--success-dim);
+    border-color: var(--success-border);
+    color: var(--success);
+  }
 }
 .call-action-btn.video {
   color: var(--text-secondary);
 }
-.call-action-btn.video:hover {
-  background: var(--info-dim);
-  border-color: color-mix(in srgb, var(--info) 35%, transparent);
-  color: var(--info);
+@media (hover: hover) and (pointer: fine) {
+  .call-action-btn.video:hover {
+    background: var(--info-dim);
+    border-color: color-mix(in srgb, var(--info) 35%, transparent);
+    color: var(--info);
+  }
 }
 .call-action-btn.chat {
   color: var(--text-secondary);
 }
-.call-action-btn.chat:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .call-action-btn.chat:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
 }
 
 .empty-state {
@@ -336,7 +348,7 @@
 }
 
 .empty-txt {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-muted);
   line-height: 1.6;
 }
@@ -344,7 +356,7 @@
 .missed-badge {
   background: var(--danger-dim);
   color: var(--danger);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 5px;
@@ -409,13 +421,15 @@
   background: var(--bg-elevated);
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.dial-btn:hover {
-  background: var(--bg-surface);
+@media (hover: hover) and (pointer: fine) {
+  .dial-btn:hover {
+    background: var(--bg-surface);
+  }
 }
 .dial-btn:focus-visible {
   outline: 2px solid var(--accent);
@@ -431,7 +445,7 @@
   margin-top: 10px;
 }
 .sort-label {
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -464,13 +478,15 @@
     border-radius: 50%;
     background: #ffffff22;
     color: #fff;
-    font-size: 26px;
+    font-size: 1.625rem;
     line-height: 1;
     cursor: pointer;
     transition: background 0.15s, opacity 0.15s;
   }
-  .statut-fleche:hover:not(:disabled) {
-    background: #ffffff3a;
+  @media (hover: hover) and (pointer: fine) {
+    .statut-fleche:hover:not(:disabled) {
+      background: #ffffff3a;
+    }
   }
   /*
    * DÉSACTIVÉES aux extrémités, jamais masquées : un bouton qui disparaît
@@ -556,16 +572,18 @@
   border: 0;
   border-radius: 10px;
   background: none;
-  font-size: 24px;
+  font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
   transition: transform 0.12s, background 0.15s;
 }
-.statut-emojis button:hover:not(:disabled) {
-  background: #ffffff1a;
-  /* Il grandit au survol : sur une rangée de six, rien d'autre ne dit lequel
-     est visé — ils n'ont ni bordure ni fond au repos. */
-  transform: scale(1.18);
+@media (hover: hover) and (pointer: fine) {
+  .statut-emojis button:hover:not(:disabled) {
+    background: #ffffff1a;
+    /* Il grandit au survol : sur une rangée de six, rien d'autre ne dit lequel
+       est visé — ils n'ont ni bordure ni fond au repos. */
+    transform: scale(1.18);
+  }
 }
 .statut-emojis button:disabled {
   opacity: 0.5;
@@ -585,7 +603,7 @@
   background: #ffffff14;
   color: #fff;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .statut-saisie input::placeholder {
   color: #ffffff80;
@@ -602,7 +620,7 @@
   background: var(--accent);
   color: var(--accent-text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -618,7 +636,7 @@
   padding: 0;
   background: #ffffff14;
   color: #fff;
-  font-size: 18px;
+  font-size: 1.125rem;
 }
 .statut-saisie button.statut-icone.aime {
   color: #ff4d6d;
@@ -635,7 +653,7 @@
   border-radius: 22px;
   background: #ffffff14;
   color: #fff;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .statut-micro span {
   color: #ff8a8a;
@@ -661,7 +679,7 @@
   background: #ffffff1f;
   color: #fff;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
 .statut-vues-coeur {
@@ -678,12 +696,12 @@
 }
 .statut-vues-titre {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
 }
 .statut-vues-vide {
   padding: 14px 16px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
 }
 .statut-vues-ligne {
@@ -703,7 +721,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 .statut-vues-avatar img {
@@ -714,13 +732,13 @@
 .statut-vues-nom {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .statut-vues-quand {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -740,12 +758,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 64px;
+  font-size: 4rem;
 }
 .statut-audio-legende {
   color: #fff;
-  font-size: 16px;
+  font-size: 1rem;
   text-align: center;
   max-width: 520px;
   word-break: break-word;
+}
+
+/* Contacts, nouvel appel, statuts en pleine page : sur un grand écran, le
+   contenu ne s'étire pas sur toute la largeur, il reste centré (20/11/2026).
+   Le fond à motif, lui, continue de couvrir toute la zone. */
+.layout-main > .calls-root > * {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
 }

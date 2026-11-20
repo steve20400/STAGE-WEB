@@ -1,5 +1,7 @@
 /* Cadre deux colonnes facon WhatsApp Web (Appels, Statuts) */
 .section-split {
+  /* Comme la liste des discussions : la bascule suit la place disponible. */
+  container: sections / inline-size;
   display: flex;
   flex: 1;
   min-height: 0;
@@ -9,7 +11,7 @@
 
 /* Colonne de gauche : liste (fond uni comme la navigation, pas de motif) */
 .section-split-list {
-  width: 380px;
+  width: clamp(320px, 26vw, 440px);
   flex-shrink: 0;
   min-height: 0;
   overflow: hidden;
@@ -76,21 +78,21 @@
 
 .section-split-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--text-primary);
 }
 
 .section-split-sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
   max-width: 320px;
   line-height: 1.6;
 }
 
-/* Sur ecran etroit : une seule colonne (la liste) */
-@media (max-width: 900px) {
+/* Moins de 720 px disponibles : une seule colonne (la liste) */
+@container sections (max-width: 719.98px) {
   .section-split-list {
     width: 100%;
     border-right: none;

@@ -157,7 +157,7 @@ export default function LoginPage() {
                 background: "color-mix(in srgb, var(--accent) 12%, transparent)",
                 borderRadius: 10,
                 padding: "10px 12px",
-                fontSize: 12,
+                fontSize: "0.75rem",
               }}
             >
               {messageDeconnexion}
@@ -173,7 +173,7 @@ export default function LoginPage() {
                 color: "var(--danger, #ef4444)",
                 borderRadius: 10,
                 padding: "10px 12px",
-                fontSize: 12,
+                fontSize: "0.75rem",
               }}
             >
               {error}
@@ -182,7 +182,7 @@ export default function LoginPage() {
 
           {defiId ? (
             <>
-              <h3 className="form-title" style={{ fontSize: 18, marginTop: 4 }}>
+              <h3 className="form-title" style={{ fontSize: "1.125rem", marginTop: 4 }}>
                 {t("dx_titre")}
               </h3>
               <p className="form-subtitle">{t("dx_corps")}</p>
@@ -197,11 +197,11 @@ export default function LoginPage() {
                   maxLength={7}
                   value={code}
                   onChange={(event) => setCode(event.target.value.replace(/[^\d\s]/g, ""))}
-                  style={{ letterSpacing: 6, fontSize: 20, fontWeight: 600 }}
+                  style={{ letterSpacing: 6, fontSize: "1.25rem", fontWeight: 600 }}
                 />
                 <label htmlFor="code">{t("dx_code")}</label>
               </div>
-              <p className="form-subtitle" style={{ fontSize: 12 }}>
+              <p className="form-subtitle" style={{ fontSize: "0.75rem" }}>
                 {t("dx_validite")}
               </p>
               <button type="submit" className="btn-submit" disabled={loading || !codeValide}>

@@ -79,7 +79,7 @@ export default function WelcomePage() {
               </Link>
               <a href="#features" className="btn-ghost">
                 {t("welcome_features")}
-                <span style={{ fontSize: 14 }}>-&gt;</span>
+                <span style={{ fontSize: "0.875rem" }}>-&gt;</span>
               </a>
             </div>
 

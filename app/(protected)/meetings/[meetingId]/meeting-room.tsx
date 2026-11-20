@@ -63,6 +63,7 @@ import {
 } from "../../../../src/lib/alanya-number"
 import type { ParticipantReunion, Reunion } from "../../../../src/services/meetings-service"
 import "./meeting-room.css"
+import { MEDIA_ETROIT } from "../../../../src/styles/points-de-rupture"
 
 /**
  * INTITULES QUE LE CATALOGUE NE PORTE PAS ENCORE. Voir le compte-rendu du lot :
@@ -331,10 +332,10 @@ let sortieProgrammee: { salle: string; minuteur: ReturnType<typeof setTimeout> }
 /** Vrai sous 900 px, la largeur ou la colonne du fil cesse d'etre lisible. */
 function useEcranEtroit(): boolean {
   const [etroit, setEtroit] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches
+    () => typeof window !== "undefined" && window.matchMedia(MEDIA_ETROIT).matches
   )
   useEffect(() => {
-    const requete = window.matchMedia("(max-width: 900px)")
+    const requete = window.matchMedia(MEDIA_ETROIT)
     const suivre = () => setEtroit(requete.matches)
     requete.addEventListener("change", suivre)
     return () => requete.removeEventListener("change", suivre)

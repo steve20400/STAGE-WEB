@@ -619,7 +619,7 @@ function PushDiagnostic() {
     >
       <div
         style={{
-          fontSize: 14,
+          fontSize: "0.875rem",
           fontWeight: 700,
           marginBottom: 12,
           color: "var(--text-primary)",
@@ -638,7 +638,7 @@ function PushDiagnostic() {
             border: "none",
             borderRadius: 6,
             padding: "5px 10px",
-            fontSize: 11,
+            fontSize: "0.6875rem",
             fontWeight: 700,
             cursor: "pointer",
             opacity: loading ? 0.6 : 1,
@@ -650,7 +650,7 @@ function PushDiagnostic() {
 
       <div
         style={{
-          fontSize: 12,
+          fontSize: "0.75rem",
           display: "flex",
           flexDirection: "column",
           gap: 8,
@@ -754,7 +754,7 @@ function SectionLink({
         border: `1px solid ${active ? "var(--accent-border)" : "transparent"}`,
         cursor: "pointer",
         color: active ? "var(--accent)" : "var(--text-muted)",
-        fontSize: 13,
+        fontSize: "0.8125rem",
         fontWeight: 500,
         fontFamily: "'DM Sans', sans-serif",
         textAlign: "left",
@@ -781,7 +781,7 @@ function SectionLink({
           style={{
             background: "var(--danger)",
             color: "var(--text-primary)",
-            fontSize: 10,
+            fontSize: "0.625rem",
             fontWeight: 700,
             padding: "1px 6px",
             borderRadius: 20,
@@ -840,7 +840,7 @@ function Field({
       <label
         style={{
           display: "block",
-          fontSize: 11,
+          fontSize: "0.6875rem",
           color: "var(--text-muted)",
           letterSpacing: ".5px",
           textTransform: "uppercase",
@@ -877,7 +877,7 @@ function Field({
             border: `1px solid ${error ? "var(--danger-border)" : focused ? "var(--accent-border)" : "var(--border-subtle)"}`,
             borderRadius: 10,
             padding: type === "password" ? "12px 48px 12px 14px" : "12px 14px",
-            fontSize: 13,
+            fontSize: "0.8125rem",
             color: disabled ? "var(--text-faint)" : "var(--text-primary)",
             fontFamily: "'DM Sans', sans-serif",
             outline: "none",
@@ -899,7 +899,7 @@ function Field({
               border: "none",
               cursor: "pointer",
               color: "var(--text-faint)",
-              fontSize: 11,
+              fontSize: "0.6875rem",
               fontFamily: "'DM Sans', sans-serif",
               transition: "color .15s",
             }}
@@ -913,7 +913,7 @@ function Field({
       {error && (
         <p
           style={{
-            fontSize: 11,
+            fontSize: "0.6875rem",
             color: "var(--danger)",
             marginTop: 5,
             display: "flex",
@@ -926,7 +926,7 @@ function Field({
         </p>
       )}
       {helper && !error && (
-        <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 5 }}>{helper}</p>
+        <p style={{ fontSize: "0.6875rem", color: "var(--text-faint)", marginTop: 5 }}>{helper}</p>
       )}
     </div>
   )
@@ -961,7 +961,7 @@ function ReglagesTelechargementAuto() {
           description={l.detail}
         />
       ))}
-      <p style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.6, margin: "12px 0 0" }}>
+      <p style={{ fontSize: "0.6875rem", color: "var(--text-faint)", lineHeight: 1.6, margin: "12px 0 0" }}>
         {t("dl_note")}
       </p>
     </div>
@@ -994,7 +994,7 @@ function Toggle({
       <div>
         <div
           style={{
-            fontSize: 13,
+            fontSize: "0.8125rem",
             fontWeight: 500,
             color: "var(--text-primary)",
             marginBottom: description ? 2 : 0,
@@ -1003,7 +1003,7 @@ function Toggle({
           {label}
         </div>
         {description && (
-          <div style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.5 }}>
+          <div style={{ fontSize: "0.6875rem", color: "var(--text-faint)", lineHeight: 1.5 }}>
             {description}
           </div>
         )}
@@ -1073,7 +1073,7 @@ function DangerZoneItem({
       <div style={{ flex: 1, minWidth: 0, marginRight: 20 }}>
         <div
           style={{
-            fontSize: 13,
+            fontSize: "0.8125rem",
             fontWeight: 500,
             color: destructive ? "var(--danger)" : "var(--text-primary)",
             marginBottom: 3,
@@ -1081,7 +1081,7 @@ function DangerZoneItem({
         >
           {label}
         </div>
-        <div style={{ fontSize: 11, color: "var(--text-faint)", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "0.6875rem", color: "var(--text-faint)", lineHeight: 1.5 }}>
           {description}
         </div>
       </div>
@@ -1092,7 +1092,7 @@ function DangerZoneItem({
           border: `1px solid ${destructive ? "var(--danger-border)" : "var(--border-default)"}`,
           borderRadius: 8,
           padding: "8px 14px",
-          fontSize: 12,
+          fontSize: "0.75rem",
           fontWeight: 600,
           color: destructive ? "var(--danger)" : "var(--text-secondary)",
           cursor: "pointer",
@@ -1151,7 +1151,7 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
         <div
           style={{
             fontFamily: "'Bricolage Grotesque', sans-serif",
-            fontSize: 20,
+            fontSize: "1.25rem",
             fontWeight: 800,
             color: "var(--text-primary)",
             marginBottom: 8,
@@ -1159,7 +1159,7 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
         >
           {state.title}
         </div>
-        <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.6 }}>
+        <div style={{ fontSize: "0.8125rem", color: "var(--text-muted)", lineHeight: 1.6 }}>
           {state.description}
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
@@ -1171,7 +1171,7 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
               color: "var(--text-secondary)",
               borderRadius: 9,
               padding: "10px 14px",
-              fontSize: 12,
+              fontSize: "0.75rem",
               fontWeight: 600,
               cursor: "pointer",
               fontFamily: "'DM Sans', sans-serif",
@@ -1190,7 +1190,7 @@ function ConfirmDialog({ state, onCancel }: { state: ConfirmState; onCancel: () 
               color: "var(--bg-base)",
               borderRadius: 9,
               padding: "10px 14px",
-              fontSize: 12,
+              fontSize: "0.75rem",
               fontWeight: 700,
               cursor: "pointer",
               fontFamily: "'DM Sans', sans-serif",
@@ -1277,7 +1277,7 @@ function TranslationConsentDialog({
         <div
           style={{
             fontFamily: "'Bricolage Grotesque', sans-serif",
-            fontSize: 20,
+            fontSize: "1.25rem",
             fontWeight: 800,
             color: "var(--text-primary)",
             marginBottom: 14,
@@ -1638,7 +1638,7 @@ function TranslationSettings() {
             display: flex; align-items: center; justify-content: space-between;
             gap: 14px; width: 100%; padding: 16px 18px; border-radius: 14px;
             cursor: pointer; font-family: 'DM Sans', sans-serif;
-            font-size: 14.5px; font-weight: 600; text-align: left;
+            font-size: 0.9062rem; font-weight: 600; text-align: left;
             border: 1.5px solid var(--border-subtle);
             background: var(--bg-elevated); color: var(--text-primary);
             transition: background .15s, border-color .15s, color .15s;
@@ -2727,7 +2727,7 @@ export default function SettingsPage() {
         }
         .s-back {
           display: flex; align-items: center; gap: 8px;
-          color: var(--text-muted); font-size: 12px; cursor: pointer;
+          color: var(--text-muted); font-size: 0.75rem; cursor: pointer;
           background: none; border: none; padding: 8px 10px;
           border-radius: 8px; font-family: 'DM Sans', sans-serif;
           transition: color .15s, background .15s; margin-bottom: 16px;
@@ -2735,7 +2735,7 @@ export default function SettingsPage() {
         }
         .s-back:hover { color: var(--text-secondary); background: var(--bg-surface); }
         .s-nav-title {
-          font-size: 9px; color: var(--text-ghost); letter-spacing: 1.5px;
+          font-size: 0.5625rem; color: var(--text-ghost); letter-spacing: 1.5px;
           text-transform: uppercase; padding: 8px 12px 4px; font-weight: 500;
         }
 
@@ -2745,10 +2745,10 @@ export default function SettingsPage() {
 
         .s-page-title {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 26px; font-weight: 800; letter-spacing: -1px;
+          font-size: 1.625rem; font-weight: 800; letter-spacing: -1px;
           color: var(--text-primary); margin-bottom: 6px;
         }
-        .s-page-sub { font-size: 13px; color: var(--text-faint); margin-bottom: 32px; line-height: 1.6; }
+        .s-page-sub { font-size: 0.8125rem; color: var(--text-faint); margin-bottom: 32px; line-height: 1.6; }
 
         /* Sortie de secours sous le champ « mot de passe actuel ». Discrete et
            courte : c'est un recours, pas l'action principale de la carte. Alignee
@@ -2762,7 +2762,7 @@ export default function SettingsPage() {
           padding: 7px 12px; border-radius: 8px;
           border: 1px solid transparent; background: none;
           color: var(--accent); font-family: 'DM Sans', sans-serif;
-          font-size: 12px; font-weight: 600; cursor: pointer;
+          font-size: 0.75rem; font-weight: 600; cursor: pointer;
           transition: background .15s, border-color .15s;
         }
         .pwd-oubli:hover:not(:disabled) {
@@ -2784,10 +2784,10 @@ export default function SettingsPage() {
           margin-top: 6px;
         }
         .privacy-choice-label {
-          font-size: 13px; font-weight: 600; color: var(--text-primary);
+          font-size: 0.8125rem; font-weight: 600; color: var(--text-primary);
         }
         .privacy-choice-desc {
-          font-size: 11.5px; color: var(--text-faint); line-height: 1.5; margin-top: 3px;
+          font-size: 0.7188rem; color: var(--text-faint); line-height: 1.5; margin-top: 3px;
         }
         .privacy-choice-opts {
           display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
@@ -2803,14 +2803,14 @@ export default function SettingsPage() {
           width: 100%; padding: 10px 14px; border-radius: 9px;
           border: 1px dashed var(--border-default); background: var(--bg-elevated);
           color: var(--text-secondary); font-family: 'DM Sans', sans-serif;
-          font-size: 12.5px; font-weight: 600; cursor: pointer;
+          font-size: 0.7812rem; font-weight: 600; cursor: pointer;
         }
         .ringtone-import-btn:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-border); }
         .ringtone-import-btn:disabled { cursor: progress; opacity: 0.7; }
         .ringtone-imported-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
         .ringtone-imported-list li { display: flex; align-items: center; gap: 8px; }
         .ringtone-imported-name {
-          flex: 1; min-width: 0; font-size: 12px; color: var(--text-primary);
+          flex: 1; min-width: 0; font-size: 0.75rem; color: var(--text-primary);
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         .ringtone-remove {
@@ -2827,12 +2827,12 @@ export default function SettingsPage() {
           gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle);
         }
         .ringtone-row:last-of-type { border-bottom: none; }
-        .ringtone-row-label { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+        .ringtone-row-label { font-size: 0.8125rem; color: var(--text-primary); font-weight: 600; }
         .ringtone-row-controls { display: flex; align-items: center; gap: 8px; min-width: 0; }
         .ringtone-select {
           max-width: 230px; padding: 7px 10px; border-radius: 8px;
           border: 1px solid var(--border-subtle); background: var(--bg-base);
-          color: var(--text-primary); font-family: inherit; font-size: 12px;
+          color: var(--text-primary); font-family: inherit; font-size: 0.75rem;
         }
         .ringtone-listen {
           width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
@@ -2849,12 +2849,12 @@ export default function SettingsPage() {
         }
         .s-card-title {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 14px; font-weight: 700; color: var(--text-primary);
+          font-size: 0.875rem; font-weight: 700; color: var(--text-primary);
           letter-spacing: -.3px; margin-bottom: 18px;
           display: flex; align-items: center; gap: 8px;
         }
         .s-card-title-badge {
-          font-size: 9px; background: var(--border-subtle); color: var(--text-muted);
+          font-size: 0.5625rem; background: var(--border-subtle); color: var(--text-muted);
           padding: 2px 8px; border-radius: 5px; font-weight: 500;
           font-family: 'DM Sans', sans-serif; letter-spacing: .3px;
         }
@@ -2869,7 +2869,7 @@ export default function SettingsPage() {
           background: var(--av-0-bg); color: var(--accent);
           display: flex; align-items: center; justify-content: center;
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 22px; font-weight: 800;
+          font-size: 1.375rem; font-weight: 800;
           overflow: hidden;
         }
         .avatar-edit-overlay {
@@ -2882,15 +2882,15 @@ export default function SettingsPage() {
         .avatar-info { flex: 1; }
         .avatar-name {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 18px; font-weight: 800; color: var(--text-primary);
+          font-size: 1.125rem; font-weight: 800; color: var(--text-primary);
           letter-spacing: -.3px; margin-bottom: 3px;
         }
-        .avatar-email { font-size: 12px; color: var(--text-faint); margin-bottom: 10px; }
+        .avatar-email { font-size: 0.75rem; color: var(--text-faint); margin-bottom: 10px; }
         .avatar-btn {
           display: inline-flex; align-items: center; gap: 6px;
           background: var(--border-subtle); border: 1px solid var(--border-default);
           border-radius: 8px; padding: 7px 14px;
-          font-size: 12px; color: var(--text-secondary); cursor: pointer;
+          font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;
           font-family: 'DM Sans', sans-serif; font-weight: 500;
           transition: all .15s;
         }
@@ -2905,18 +2905,18 @@ export default function SettingsPage() {
           animation: fadeIn .2s ease;
         }
         @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
-        .save-bar-txt { font-size: 13px; color: var(--accent); font-weight: 500; }
+        .save-bar-txt { font-size: 0.8125rem; color: var(--accent); font-weight: 500; }
         .save-btns { display: flex; gap: 8px; }
         .btn-discard {
           background: none; border: 1px solid var(--border-default); border-radius: 8px;
-          padding: 8px 16px; font-size: 12px; color: "var(--text-muted)"; cursor: pointer;
+          padding: 8px 16px; font-size: 0.75rem; color: "var(--text-muted)"; cursor: pointer;
           font-family: 'DM Sans', sans-serif; font-weight: 500; color: var(--text-muted);
           transition: all .15s;
         }
         .btn-discard:hover { background: var(--border-subtle); color: var(--text-secondary); }
         .btn-save {
           background: var(--accent); border: none; border-radius: 8px;
-          padding: 8px 18px; font-size: 12px; color: var(--bg-base);
+          padding: 8px 18px; font-size: 0.75rem; color: var(--bg-base);
           font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif;
           display: flex; align-items: center; gap: 6px; transition: opacity .15s;
         }
@@ -2929,12 +2929,12 @@ export default function SettingsPage() {
 
         /* Traduction : notes, etat des couples de langues, consentement. */
         .trad-note {
-          font-size: 11.5px; color: var(--text-faint); line-height: 1.55; margin-top: 12px;
+          font-size: 0.7188rem; color: var(--text-faint); line-height: 1.55; margin-top: 12px;
         }
         .trad-mode-state {
           display: flex; align-items: center; gap: 8px;
           margin-top: 14px; padding: 10px 12px; border-radius: 9px;
-          font-size: 12px; line-height: 1.5;
+          font-size: 0.75rem; line-height: 1.5;
           background: var(--accent-dim); border: 1px solid var(--accent-border);
           color: var(--accent);
         }
@@ -2979,21 +2979,21 @@ export default function SettingsPage() {
           display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; row-gap: 4px;
         }
         .trad-engine-name {
-          font-size: 13px; font-weight: 600; color: var(--text-primary);
+          font-size: 0.8125rem; font-weight: 600; color: var(--text-primary);
         }
         .trad-engine-badge {
-          font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+          font-size: 0.6562rem; font-weight: 700; padding: 2px 7px; border-radius: 99px;
           background: var(--success-dim); color: var(--success);
         }
         .trad-engine-price {
-          margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-secondary);
+          margin-left: auto; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);
         }
-        .trad-engine-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.55; }
-        .trad-engine-off { font-size: 11.5px; color: var(--danger); line-height: 1.55; }
+        .trad-engine-note { font-size: 0.7188rem; color: var(--text-faint); line-height: 1.55; }
+        .trad-engine-off { font-size: 0.7188rem; color: var(--danger); line-height: 1.55; }
         .trad-relire {
           border: none; background: none; padding: 0; cursor: pointer;
           color: var(--accent); font-family: 'DM Sans', sans-serif;
-          font-size: 11.5px; font-weight: 600; text-decoration: underline;
+          font-size: 0.7188rem; font-weight: 600; text-decoration: underline;
         }
 
         .trad-pairs { list-style: none; margin: 0; padding: 0; }
@@ -3003,15 +3003,15 @@ export default function SettingsPage() {
           display: flex; align-items: center; gap: 10px; flex-wrap: wrap; row-gap: 6px;
         }
         .trad-pair-lang {
-          flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text-primary);
+          flex: 1; min-width: 0; font-size: 0.8125rem; font-weight: 500; color: var(--text-primary);
         }
-        .trad-pair-state { font-size: 11.5px; color: var(--text-faint); }
+        .trad-pair-state { font-size: 0.7188rem; color: var(--text-faint); }
         .trad-pair-state.on { color: var(--success); }
         .trad-dl {
           flex-shrink: 0; padding: 7px 13px; border-radius: 8px;
           border: 1px solid var(--border-default); background: var(--bg-elevated);
           color: var(--text-secondary); font-family: 'DM Sans', sans-serif;
-          font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+          font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all .15s;
         }
         .trad-dl:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-border); }
         .trad-dl:disabled { opacity: .5; cursor: not-allowed; }
@@ -3025,7 +3025,7 @@ export default function SettingsPage() {
         .trad-progress-fill { height: 100%; border-radius: 99px; background: var(--accent); }
 
         .trad-consent-p {
-          font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;
+          font-size: 0.8125rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 12px;
         }
         .trad-consent-p-lead { color: var(--text-primary); font-weight: 500; }
         .trad-consent-actions {
@@ -3035,13 +3035,13 @@ export default function SettingsPage() {
         .trad-btn-online {
           border: 1px solid var(--danger-border); background: var(--danger-dim);
           color: var(--danger); border-radius: 9px; padding: 10px 14px;
-          font-size: 12px; font-weight: 600; cursor: pointer;
+          font-size: 0.75rem; font-weight: 600; cursor: pointer;
           font-family: 'DM Sans', sans-serif;
         }
         .trad-btn-stay {
           border: 1px solid transparent; background: var(--accent);
           color: var(--bg-base); border-radius: 9px; padding: 10px 14px;
-          font-size: 12px; font-weight: 700; cursor: pointer;
+          font-size: 0.75rem; font-weight: 700; cursor: pointer;
           font-family: 'DM Sans', sans-serif;
         }
         @media (max-width: 560px) {
@@ -3059,14 +3059,19 @@ export default function SettingsPage() {
         }
         .font-opt:hover { border-color: var(--border-default); }
         .font-opt.on { border-color: var(--accent-border); background: var(--accent-dim); }
-        .font-opt-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+        .font-opt-label { font-size: 0.6875rem; color: var(--text-muted); margin-top: 4px; }
         .font-opt.on .font-opt-label { color: var(--accent); }
 
-        @media (max-width: 860px) {
+        /* Grand écran : menu et contenu restent groupés au centre (20/11/2026). */
+        @media (min-width: 1280px) {
+          .settings-root { grid-template-columns: 230px minmax(0, 960px); justify-content: center; }
+        }
+
+        @media (max-width: 900px) {
           .settings-root { grid-template-columns: 1fr; width: 100%; overflow-x: hidden; }
           .s-sidebar { display: none; }
           .s-main { max-width: 100%; width: 100%; padding: 16px 12px 22px; }
-          .s-page-title { font-size: 22px; line-height: 1.15; }
+          .s-page-title { font-size: 1.375rem; line-height: 1.15; }
           .s-page-sub { margin-bottom: 18px; }
           .s-card { padding: 16px 14px; margin-bottom: 12px; border-radius: 12px; }
           .s-card-title { margin-bottom: 14px; flex-wrap: wrap; row-gap: 6px; }
@@ -3097,7 +3102,7 @@ export default function SettingsPage() {
             color: var(--text-secondary);
             border-radius: 999px;
             font-family: 'DM Sans', sans-serif;
-            font-size: 12px;
+            font-size: 0.75rem;
             white-space: nowrap;
             padding: 8px 12px;
           }
@@ -3427,7 +3432,7 @@ export default function SettingsPage() {
                         }}
                       />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.6875rem" }}>
                       <span style={{ color: pwdStrength.color, fontWeight: 500 }}>
                         {pwdStrength.labelKey ? t(pwdStrength.labelKey) : ""}
                       </span>
@@ -3463,7 +3468,7 @@ export default function SettingsPage() {
                     border: "none",
                     borderRadius: 9,
                     padding: "12px 24px",
-                    fontSize: 14,
+                    fontSize: "0.875rem",
                     fontWeight: 700,
                     color: "var(--bg-base)",
                     cursor: "pointer",
@@ -3514,7 +3519,7 @@ export default function SettingsPage() {
                         disabled={saving || emailCode.length !== 6}
                         style={{
                           background: "var(--accent)", border: "none", borderRadius: 9,
-                          padding: "12px 24px", fontSize: 14, fontWeight: 700,
+                          padding: "12px 24px", fontSize: "0.875rem", fontWeight: 700,
                           color: "var(--bg-base)", cursor: "pointer",
                           fontFamily: "'DM Sans', sans-serif",
                           opacity: saving || emailCode.length !== 6 ? 0.4 : 1,
@@ -3533,7 +3538,7 @@ export default function SettingsPage() {
                         }}
                         style={{
                           background: "none", border: "1px solid var(--border)",
-                          borderRadius: 9, padding: "12px 24px", fontSize: 14,
+                          borderRadius: 9, padding: "12px 24px", fontSize: "0.875rem",
                           cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
                         }}
                       >
@@ -3564,7 +3569,7 @@ export default function SettingsPage() {
                       disabled={saving || !emailMdp || !nouvelEmail.includes("@")}
                       style={{
                         background: "var(--accent)", border: "none", borderRadius: 9,
-                        padding: "12px 24px", fontSize: 14, fontWeight: 700,
+                        padding: "12px 24px", fontSize: "0.875rem", fontWeight: 700,
                         color: "var(--bg-base)", cursor: "pointer",
                         fontFamily: "'DM Sans', sans-serif",
                         opacity: saving || !emailMdp || !nouvelEmail.includes("@") ? 0.4 : 1,
@@ -3605,7 +3610,7 @@ export default function SettingsPage() {
                     <div
                       style={{
                         fontFamily: "monospace",
-                        fontSize: 22,
+                        fontSize: "1.375rem",
                         fontWeight: 700,
                         letterSpacing: 4,
                         textAlign: "center",
@@ -3656,7 +3661,7 @@ export default function SettingsPage() {
                       disabled={saving || !codeMdp}
                       style={{
                         background: "var(--accent)", border: "none", borderRadius: 9,
-                        padding: "12px 24px", fontSize: 14, fontWeight: 700,
+                        padding: "12px 24px", fontSize: "0.875rem", fontWeight: 700,
                         color: "var(--bg-base)", cursor: "pointer",
                         fontFamily: "'DM Sans', sans-serif",
                         opacity: saving || !codeMdp ? 0.4 : 1,
@@ -3693,7 +3698,7 @@ export default function SettingsPage() {
                       border: "1px solid var(--border-subtle)",
                       borderRadius: 10,
                       padding: "12px 14px",
-                      fontSize: 13,
+                      fontSize: "0.8125rem",
                       color: "var(--text-primary)",
                       fontFamily: "'DM Sans', sans-serif",
                       outline: "none",
@@ -3710,7 +3715,7 @@ export default function SettingsPage() {
                       background: "var(--accent)",
                       color: "var(--accent-text)",
                       fontFamily: "'DM Sans', sans-serif",
-                      fontSize: 13,
+                      fontSize: "0.8125rem",
                       fontWeight: 700,
                       cursor: pseudoAppareil.trim() ? "pointer" : "default",
                       opacity: pseudoAppareil.trim() && !pseudoEnregistre ? 1 : 0.5,
@@ -3724,12 +3729,12 @@ export default function SettingsPage() {
               <div className="s-card">
                 <div className="s-card-title">{t("set_active_sessions")}</div>
                 {sessions === null && (
-                  <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-faint)", padding: "12px 0" }}>
                     {t("loading")}
                   </div>
                 )}
                 {sessions !== null && sessions.length === 0 && (
-                  <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-faint)", padding: "12px 0" }}>
                     {t("no_device_yet")}
                   </div>
                 )}
@@ -3795,7 +3800,7 @@ export default function SettingsPage() {
                       <div>
                         <div
                           style={{
-                            fontSize: 13,
+                            fontSize: "0.8125rem",
                             fontWeight: 500,
                             color: "var(--text-primary)",
                             display: "flex",
@@ -3808,7 +3813,7 @@ export default function SettingsPage() {
                           {s.current && (
                             <span
                               style={{
-                                fontSize: 9,
+                                fontSize: "0.5625rem",
                                 background: "var(--success-dim)",
                                 color: "var(--success)",
                                 padding: "2px 7px",
@@ -3820,7 +3825,7 @@ export default function SettingsPage() {
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
+                        <div style={{ fontSize: "0.6875rem", color: "var(--text-faint)" }}>
                           {s.location ? `${s.location} - ` : ""}
                           {s.ts}
                         </div>
@@ -3856,7 +3861,7 @@ export default function SettingsPage() {
                           border: "1px solid var(--danger-border)",
                           borderRadius: 7,
                           padding: "6px 12px",
-                          fontSize: 11,
+                          fontSize: "0.6875rem",
                           color: "var(--danger)",
                           cursor: "pointer",
                           fontFamily: "'DM Sans', sans-serif",
@@ -3879,17 +3884,17 @@ export default function SettingsPage() {
 
               <div className="s-card">
                 <div className="s-card-title">{t("login_history")}</div>
-                <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 10 }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-faint)", marginBottom: 10 }}>
                   {t("login_history_sub")}
                 </div>
 
                 {historique === null && (
-                  <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-faint)", padding: "12px 0" }}>
                     {t("loading")}
                   </div>
                 )}
                 {historique !== null && historique.length === 0 && (
-                  <div style={{ fontSize: 12, color: "var(--text-faint)", padding: "12px 0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-faint)", padding: "12px 0" }}>
                     {t("no_login_yet")}
                   </div>
                 )}
@@ -3913,7 +3918,7 @@ export default function SettingsPage() {
                       <div style={{ minWidth: 0 }}>
                         <div
                           style={{
-                            fontSize: 13,
+                            fontSize: "0.8125rem",
                             fontWeight: 500,
                             color: "var(--text-primary)",
                             marginBottom: 2,
@@ -3921,7 +3926,7 @@ export default function SettingsPage() {
                         >
                           {quandTraduit(a.dateLogin)}
                         </div>
-                        <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
+                        <div style={{ fontSize: "0.6875rem", color: "var(--text-faint)" }}>
                           {details.length > 0 ? details.join(" - ") : t("set_unknown_origin")}
                         </div>
                       </div>
@@ -3929,7 +3934,7 @@ export default function SettingsPage() {
                         <span
                           style={{
                             flex: "none",
-                            fontSize: 9,
+                            fontSize: "0.5625rem",
                             background: "var(--accent-dim)",
                             color: "var(--accent-text)",
                             padding: "2px 7px",
@@ -4160,7 +4165,7 @@ export default function SettingsPage() {
                   {t("blocked_list_sub")}
                 </div>
                 {bloques.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "6px 0" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", padding: "6px 0" }}>
                     {t("blocked_none")}
                   </div>
                 ) : (
@@ -4177,11 +4182,11 @@ export default function SettingsPage() {
                       }}
                     >
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13, color: "var(--text-primary)" }}>
+                        <div style={{ fontSize: "0.8125rem", color: "var(--text-primary)" }}>
                           {nomBloque(personne)}
                         </div>
                         {personne.publicNumber && (
-                          <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                          <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>
                             {personne.publicNumber}
                           </div>
                         )}
@@ -4196,7 +4201,7 @@ export default function SettingsPage() {
                           background: "var(--bg-surface)",
                           color: "var(--text-primary)",
                           fontFamily: "'DM Sans', sans-serif",
-                          fontSize: 12,
+                          fontSize: "0.75rem",
                           cursor: "pointer",
                         }}
                       >
@@ -4278,7 +4283,7 @@ export default function SettingsPage() {
                     border: "1px solid var(--border-subtle)",
                     borderRadius: 10,
                     padding: "12px 14px",
-                    fontSize: 13,
+                    fontSize: "0.8125rem",
                     color: "var(--text-primary)",
                     fontFamily: "'DM Sans', sans-serif",
                     outline: "none",
@@ -4345,11 +4350,11 @@ export default function SettingsPage() {
                       gap: 12,
                     }}
                   >
-                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{label}</span>
+                    <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)" }}>{label}</span>
                     <span
                       className="about-value"
                       style={{
-                        fontSize: 13,
+                        fontSize: "0.8125rem",
                         color: "var(--text-primary)",
                         fontWeight: 500,
                         textAlign: "right",
@@ -4390,13 +4395,13 @@ export default function SettingsPage() {
                         gap: 16,
                       }}
                     >
-                      <span style={{ fontSize: 12, color: "var(--text-muted)", flexShrink: 0 }}>
+                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", flexShrink: 0 }}>
                         {label}
                       </span>
                       <span
                         className="stack-value"
                         style={{
-                          fontSize: 12,
+                          fontSize: "0.75rem",
                           color: "var(--text-secondary)",
                           fontWeight: 500,
                           textAlign: "right",

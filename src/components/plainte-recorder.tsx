@@ -389,7 +389,7 @@ function Bouton({
         borderRadius: "50%",
         border: "none",
         cursor: "pointer",
-        fontSize: 13,
+        fontSize: "0.8125rem",
         color: "#fff",
         background: accent
           ? "color-mix(in srgb, var(--danger) 85%, transparent)"
@@ -416,7 +416,7 @@ const styleTexte: React.CSSProperties = {
   flex: 1,
   minWidth: 0,
   color: "#fff",
-  fontSize: 12,
+  fontSize: "0.75rem",
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
@@ -424,7 +424,7 @@ const styleTexte: React.CSSProperties = {
 
 const styleChrono: React.CSSProperties = {
   color: "#fff",
-  fontSize: 13,
+  fontSize: "0.8125rem",
   fontWeight: 700,
   // Chiffres a chasse fixe : sans eux le minuteur tressaute chaque seconde et
   // tout ce qui le suit bouge avec.

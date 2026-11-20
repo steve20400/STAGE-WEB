@@ -32,10 +32,10 @@ export function EcranMaintenance() {
         color: "var(--text, #2b211b)",
       }}
     >
-      <div style={{ fontSize: 56 }} aria-hidden="true">
+      <div style={{ fontSize: "3.5rem" }} aria-hidden="true">
         <Icone nom="outil" taille={56} />
       </div>
-      <h1 style={{ fontSize: 24, margin: 0 }}>{t("maintenance_titre")}</h1>
+      <h1 style={{ fontSize: "1.5rem", margin: 0 }}>{t("maintenance_titre")}</h1>
       <p style={{ maxWidth: 420, margin: 0, opacity: 0.75, lineHeight: 1.5 }}>{t("maintenance_texte")}</p>
       <button
         type="button"

@@ -393,7 +393,7 @@ export function ThemeSelector() {
             </div>
             <div
               style={{
-                fontSize: 12,
+                fontSize: "0.75rem",
                 fontWeight: 500,
                 color: active ? "var(--accent)" : "var(--text-secondary)",
                 fontFamily: "'DM Sans', sans-serif",

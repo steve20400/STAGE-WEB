@@ -59,7 +59,7 @@ const champ: React.CSSProperties = {
   border: "1px solid var(--dev-border)",
   background: "var(--dev-bg-page)",
   color: "var(--dev-text-primary)",
-  fontSize: "14px",
+  fontSize: "0.875rem",
   boxSizing: "border-box",
 }
 
@@ -68,8 +68,8 @@ function CourbeLatence({ journal }: { journal: Journal | null }) {
   if (lignes.length < 2) {
     return (
       <div className="dev-panel-box" style={{ marginTop: "24px" }}>
-        <h4 style={{ margin: "0 0 6px 0", fontSize: "15px", fontWeight: 700 }}>Temps de réponse</h4>
-        <p style={{ margin: 0, color: "var(--dev-text-secondary)", fontSize: "14px" }}>
+        <h4 style={{ margin: "0 0 6px 0", fontSize: "0.9375rem", fontWeight: 700 }}>Temps de réponse</h4>
+        <p style={{ margin: 0, color: "var(--dev-text-secondary)", fontSize: "0.875rem" }}>
           La courbe apparaîtra après vos premiers appels à l'API.
         </p>
       </div>
@@ -88,7 +88,7 @@ function CourbeLatence({ journal }: { journal: Journal | null }) {
 
   return (
     <div className="dev-panel-box" style={{ marginTop: "24px" }}>
-      <h4 style={{ margin: "0 0 12px 0", fontSize: "15px", fontWeight: 700 }}>
+      <h4 style={{ margin: "0 0 12px 0", fontSize: "0.9375rem", fontWeight: 700 }}>
         Temps de réponse des derniers appels (ms)
       </h4>
       <div style={{ width: "100%", overflowX: "auto" }}>
@@ -289,7 +289,7 @@ export default function DeveloperPage() {
       <div className="dev-dashboard-main">
         <div className="dev-panel-box">
           <h3 className="dev-panel-title">Espace développeur indisponible pour ce compte</h3>
-          <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: "0.875rem", lineHeight: 1.6 }}>
             Les comptes agent, centre d'appels et centre vocal ne peuvent pas créer d'enseigne. Connectez-vous avec un
             compte Alanya personnel, ou créez un compte développeur.
           </p>
@@ -304,7 +304,7 @@ export default function DeveloperPage() {
       <div className="dev-dashboard-main">
         <div className="dev-panel-box">
           <h3 className="dev-panel-title">Créez votre enseigne</h3>
-          <p style={{ margin: "0 0 20px 0", fontSize: "14px", lineHeight: 1.6, color: "var(--dev-text-secondary)" }}>
+          <p style={{ margin: "0 0 20px 0", fontSize: "0.875rem", lineHeight: 1.6, color: "var(--dev-text-secondary)" }}>
             L'enseigne est l'expéditeur de vos messages : elle a son nom et son propre numéro Alanya. Vos clés d'API lui
             sont rattachées. Votre compte personnel, lui, ne change pas.
           </p>
@@ -371,7 +371,7 @@ export default function DeveloperPage() {
       {message && (
         <div
           role="status"
-          style={{ color: message.erreur ? "#ef4444" : "#10b981", fontSize: "14px", fontWeight: 600, marginBottom: "12px" }}
+          style={{ color: message.erreur ? "#ef4444" : "#10b981", fontSize: "0.875rem", fontWeight: 600, marginBottom: "12px" }}
         >
           {message.texte}
         </div>
@@ -379,9 +379,9 @@ export default function DeveloperPage() {
 
       {enseigneCreee && (
         <div className="dev-panel-box" style={{ borderColor: "#10b981", borderWidth: "2px", marginBottom: "16px" }}>
-          <h3 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>Enseigne « {enseigneCreee.nom} » créée</h3>
-          <p style={{ margin: "0 0 12px 0", fontSize: "14px", lineHeight: 1.6 }}>
-            Son numéro Alanya : <strong style={{ fontFamily: "monospace", fontSize: "16px" }}>{enseigneCreee.numero}</strong>.
+          <h3 style={{ margin: "0 0 8px 0", fontSize: "1rem" }}>Enseigne « {enseigneCreee.nom} » créée</h3>
+          <p style={{ margin: "0 0 12px 0", fontSize: "0.875rem", lineHeight: 1.6 }}>
+            Son numéro Alanya : <strong style={{ fontFamily: "monospace", fontSize: "1rem" }}>{enseigneCreee.numero}</strong>.
             C'est l'expéditeur de vos messages API.
           </p>
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -404,11 +404,11 @@ export default function DeveloperPage() {
 
       {cleComplete && (
         <div className="dev-panel-box" style={{ borderColor: "#6366f1", borderWidth: "2px", marginBottom: "16px" }}>
-          <h3 style={{ margin: "0 0 8px 0", color: "#6366f1", fontSize: "16px" }}>Votre nouvelle clé</h3>
-          <p style={{ fontSize: "14px", margin: "4px 0" }}>
+          <h3 style={{ margin: "0 0 8px 0", color: "#6366f1", fontSize: "1rem" }}>Votre nouvelle clé</h3>
+          <p style={{ fontSize: "0.875rem", margin: "4px 0" }}>
             Copiez-la maintenant et gardez-la sur votre serveur : elle ne sera plus jamais affichée.
           </p>
-          <div className="dev-code-block" style={{ color: "#10b981", fontSize: "15px", margin: "12px 0", wordBreak: "break-all" }}>
+          <div className="dev-code-block" style={{ color: "#10b981", fontSize: "0.9375rem", margin: "12px 0", wordBreak: "break-all" }}>
             {cleComplete}
           </div>
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -471,7 +471,7 @@ export default function DeveloperPage() {
           {clesActives.length === 0 && (
             <div className="dev-panel-box" style={{ marginTop: "24px" }}>
               <h3 className="dev-panel-title">Prochaine étape : une clé d'API</h3>
-              <p style={{ margin: "0 0 12px 0", fontSize: "14px", lineHeight: 1.6 }}>
+              <p style={{ margin: "0 0 12px 0", fontSize: "0.875rem", lineHeight: 1.6 }}>
                 Votre serveur s'identifie auprès d'Alanya avec une clé. Créez-en une, puis suivez la documentation pour
                 envoyer votre premier message.
               </p>
@@ -513,7 +513,7 @@ export default function DeveloperPage() {
                       <td style={{ fontWeight: 600 }}>{e.nom}</td>
                       <td style={{ fontFamily: "monospace" }}>{e.numero}</td>
                       <td>{e.clesActives}</td>
-                      <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>{dateCourte(e.creeLe)}</td>
+                      <td style={{ color: "var(--dev-text-secondary)", fontSize: "0.8125rem" }}>{dateCourte(e.creeLe)}</td>
                       <td>
                         <button
                           className="dev-metric-btn"
@@ -536,7 +536,7 @@ export default function DeveloperPage() {
             {peutEnCreer ? (
               <CreationEnseigne confirmationRequise={etat.confirmationRequise} onCree={(e) => void apresCreation(e)} />
             ) : (
-              <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.6 }}>
+              <p style={{ margin: 0, fontSize: "0.875rem", lineHeight: 1.6 }}>
                 Vous avez atteint le nombre maximal d'enseignes ({etat.limite}). Contactez l'équipe Alanya pour en
                 ouvrir davantage.
               </p>
@@ -592,8 +592,8 @@ export default function DeveloperPage() {
                       <tr key={c.id} style={{ opacity: c.isActive ? 1 : 0.5 }}>
                         <td style={{ fontWeight: 600 }}>{c.name}</td>
                         <td style={{ fontFamily: "monospace", color: "var(--dev-accent)" }}>{c.prefix}…</td>
-                        <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>{dateCourte(c.createdAt)}</td>
-                        <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>{dateHeure(c.lastUsedAt)}</td>
+                        <td style={{ color: "var(--dev-text-secondary)", fontSize: "0.8125rem" }}>{dateCourte(c.createdAt)}</td>
+                        <td style={{ color: "var(--dev-text-secondary)", fontSize: "0.8125rem" }}>{dateHeure(c.lastUsedAt)}</td>
                         <td>
                           <span style={{ color: c.isActive ? "#10b981" : "#ef4444", fontWeight: 600 }}>
                             {c.isActive ? "Active" : "Révoquée"}
@@ -632,7 +632,7 @@ export default function DeveloperPage() {
               </p>
             ) : (
               <>
-                <p style={{ color: "var(--dev-text-secondary)", fontSize: "13px", margin: "0 0 12px 0" }}>
+                <p style={{ color: "var(--dev-text-secondary)", fontSize: "0.8125rem", margin: "0 0 12px 0" }}>
                   {journal.total} appel{journal.total > 1 ? "s" : ""} au total · {journal.successRatePercent} % réussis ·{" "}
                   {journal.avgLatencyMs} ms en moyenne
                 </p>
@@ -650,8 +650,8 @@ export default function DeveloperPage() {
                     <tbody>
                       {journal.logs.map((l) => (
                         <tr key={l.id}>
-                          <td style={{ color: "var(--dev-text-secondary)", fontSize: "13px" }}>{dateHeure(l.createdAt)}</td>
-                          <td style={{ fontFamily: "monospace", fontSize: "13px" }}>
+                          <td style={{ color: "var(--dev-text-secondary)", fontSize: "0.8125rem" }}>{dateHeure(l.createdAt)}</td>
+                          <td style={{ fontFamily: "monospace", fontSize: "0.8125rem" }}>
                             {l.method} {l.endpoint}
                           </td>
                           <td>
@@ -659,7 +659,7 @@ export default function DeveloperPage() {
                               style={{
                                 padding: "2px 8px",
                                 borderRadius: "4px",
-                                fontSize: "12px",
+                                fontSize: "0.75rem",
                                 fontWeight: 700,
                                 background: l.statusCode < 300 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
                                 color: l.statusCode < 300 ? "#10b981" : "#ef4444",
@@ -668,8 +668,8 @@ export default function DeveloperPage() {
                               {l.statusCode}
                             </span>
                           </td>
-                          <td style={{ fontSize: "13px" }}>{l.latencyMs} ms</td>
-                          <td style={{ fontFamily: "monospace", color: "var(--dev-text-secondary)", fontSize: "12px" }}>
+                          <td style={{ fontSize: "0.8125rem" }}>{l.latencyMs} ms</td>
+                          <td style={{ fontFamily: "monospace", color: "var(--dev-text-secondary)", fontSize: "0.75rem" }}>
                             {l.keyPrefix ? `${l.keyPrefix}…` : "—"}
                           </td>
                         </tr>
@@ -689,7 +689,7 @@ export default function DeveloperPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <div className="dev-panel-box">
             <h3 className="dev-panel-title">Adresse de votre serveur</h3>
-            <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 16px 0", lineHeight: 1.6 }}>
+            <p style={{ color: "var(--dev-text-secondary)", fontSize: "0.875rem", margin: "0 0 16px 0", lineHeight: 1.6 }}>
               Alanya prévient votre serveur quand un message de l'enseigne part. L'adresse doit commencer par{" "}
               <code>https://</code> et être joignable sur Internet.
             </p>
@@ -716,7 +716,7 @@ export default function DeveloperPage() {
           {webhook && (
             <div className="dev-panel-box">
               <h3 className="dev-panel-title">Secret de signature</h3>
-              <p style={{ color: "var(--dev-text-secondary)", fontSize: "14px", margin: "0 0 12px 0", lineHeight: 1.6 }}>
+              <p style={{ color: "var(--dev-text-secondary)", fontSize: "0.875rem", margin: "0 0 12px 0", lineHeight: 1.6 }}>
                 Chaque envoi porte l'en-tête <code>X-Alanya-Signature</code>, calculé avec ce secret. Votre serveur s'en
                 sert pour vérifier que l'envoi vient bien d'Alanya (voir la documentation).
               </p>

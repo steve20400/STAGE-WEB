@@ -126,7 +126,7 @@
 
 .si-root .logo-txt {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 1.1875rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   line-height: 1;
@@ -134,7 +134,7 @@
 
 .si-root .auth-brand-subtitle {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   line-height: 1;
@@ -169,7 +169,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
   transition: all 0.3s;
@@ -209,7 +209,7 @@
 }
 
 .si-root .step-label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-muted);
   transition: color 0.3s;
@@ -222,7 +222,7 @@
 }
 
 .si-root .step-desc {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-faint);
   margin-top: 3px;
   line-height: 1.5;
@@ -234,7 +234,7 @@
 }
 
 .si-root .sec-title {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-faint);
   letter-spacing: 1.5px;
   text-transform: uppercase;
@@ -259,11 +259,11 @@
   justify-content: center;
   flex-shrink: 0;
   margin-top: 1px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .si-root .sec-txt {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-dim);
   line-height: 1.5;
 }
@@ -285,7 +285,7 @@
 }
 
 .si-root .step-pre {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--gold);
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -295,7 +295,7 @@
 
 .si-root .step-title {
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -1px;
   color: var(--text-white);
@@ -303,7 +303,7 @@
 }
 
 .si-root .step-sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-dim);
   line-height: 1.65;
 }
@@ -323,7 +323,7 @@
   border: 1px solid var(--bg-border);
   border-radius: var(--radius);
   padding: 22px 16px 9px;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-white);
   font-family: var(--font-body);
   outline: none;
@@ -344,7 +344,7 @@
 .si-root .field input:focus + label,
 .si-root .field input:not(:placeholder-shown) + label {
   top: 8px;
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--gold);
   letter-spacing: 0.3px;
 }
@@ -354,7 +354,7 @@
   top: 50%;
   left: 16px;
   transform: translateY(-50%);
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--text-faint);
   pointer-events: none;
   transition: all 0.18s ease;
@@ -378,17 +378,19 @@
   border: none;
   cursor: pointer;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-family: var(--font-body);
   padding: 4px;
   transition: color 0.2s;
 }
-.si-root .tog:hover {
-  color: var(--gold);
+@media (hover: hover) and (pointer: fine) {
+  .si-root .tog:hover {
+    color: var(--gold);
+  }
 }
 
 .si-root .match-icon {
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .si-root .input-with-toggle {
@@ -424,11 +426,11 @@
 }
 
 .si-root .strength-label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 500;
 }
 .si-root .strength-tips {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-dim);
   line-height: 1.6;
   text-align: right;
@@ -443,7 +445,7 @@
   border: none;
   border-radius: var(--radius);
   padding: 15px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   font-family: var(--font-body);
   cursor: pointer;
@@ -457,9 +459,11 @@
     transform 0.15s;
 }
 
-.si-root .btn-submit:hover:not(:disabled) {
-  opacity: 0.88;
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .si-root .btn-submit:hover:not(:disabled) {
+    opacity: 0.88;
+    transform: translateY(-1px);
+  }
 }
 .si-root .btn-submit:active:not(:disabled) {
   transform: translateY(0);
@@ -515,7 +519,7 @@
   border: 1px solid var(--danger-border);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: #fca5a5;
   margin-bottom: 16px;
   line-height: 1.5;
@@ -540,7 +544,7 @@
   height: 56px;
   border-radius: var(--radius);
   text-align: center;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 700;
   color: var(--gold);
   font-family: var(--font-display);
@@ -563,7 +567,7 @@
   }
   .si-root .otp-digit {
     height: 46px;
-    font-size: 18px;
+    font-size: 1.125rem;
   }
 }
 
@@ -571,7 +575,7 @@
 .si-root .resend-row {
   margin-top: 20px;
   text-align: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-dim);
 }
 
@@ -580,7 +584,7 @@
   border: none;
   cursor: pointer;
   color: var(--gold);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-family: var(--font-body);
   font-weight: 500;
   padding: 0;
@@ -603,7 +607,7 @@
 .si-root .attempts-warn {
   margin-top: 12px;
   text-align: center;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-secondary);
 }
 .si-root .attempts-warn span {
@@ -614,7 +618,7 @@
 .si-root .login-link {
   margin-top: 32px;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-dim);
 }
 .si-root .login-link a {
@@ -622,8 +626,10 @@
   text-decoration: none;
   font-weight: 500;
 }
-.si-root .login-link a:hover {
-  text-decoration: underline;
+@media (hover: hover) and (pointer: fine) {
+  .si-root .login-link a:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Selecteur de langue — habille comme un champ de l'application : meme rayon,
@@ -641,7 +647,7 @@
   position: absolute;
   top: 8px;
   left: 16px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   letter-spacing: 0.3px;
   color: var(--text-muted);
   pointer-events: none;
@@ -653,7 +659,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 24px 16px 10px;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-family: "DM Sans", sans-serif;
   color: var(--text-primary);
   outline: none;
@@ -673,9 +679,13 @@
     6px 6px;
   background-repeat: no-repeat;
 }
-.si-root .langue-select:hover,
 .si-root .langue-select:focus {
   border-color: var(--accent-border);
+}
+@media (hover: hover) and (pointer: fine) {
+  .si-root .langue-select:hover {
+    border-color: var(--accent-border);
+  }
 }
 .si-root .langue-select:focus-visible {
   outline: 2px solid var(--accent);

@@ -228,10 +228,10 @@ const STYLE = `
     width: 100%; max-width: 420px; display: flex; flex-direction: column;
     gap: 12px; text-align: center;
   }
-  .restauration .icone { font-size: 44px; line-height: 1; }
-  .restauration h1 { font-size: 22px; font-weight: 700; margin: 4px 0; }
-  .restauration .sous { font-size: 14px; line-height: 1.6; color: var(--text-muted); margin: 0 0 12px; }
-  .restauration .etape { font-size: 15px; margin: 8px 0 0; text-align: left; }
+  .restauration .icone { font-size: 2.75rem; line-height: 1; }
+  .restauration h1 { font-size: 1.375rem; font-weight: 700; margin: 4px 0; }
+  .restauration .sous { font-size: 0.875rem; line-height: 1.6; color: var(--text-muted); margin: 0 0 12px; }
+  .restauration .etape { font-size: 0.9375rem; margin: 8px 0 0; text-align: left; }
   .restauration .piste {
     position: relative; height: 8px; border-radius: 6px; overflow: hidden;
     background: var(--accent-dim);
@@ -247,13 +247,13 @@ const STYLE = `
   @media (prefers-reduced-motion: reduce) {
     .restauration .piste.animee .remplissage { animation: none; left: 0; width: 100%; opacity: .5; }
   }
-  .restauration .compteur { font-size: 12px; color: var(--text-muted); text-align: right; margin: 0 0 12px; }
+  .restauration .compteur { font-size: 0.75rem; color: var(--text-muted); text-align: right; margin: 0 0 12px; }
   .restauration button {
-    font: inherit; font-size: 15px; padding: 11px 16px; border-radius: 10px; cursor: pointer;
+    font: inherit; font-size: 0.9375rem; padding: 11px 16px; border-radius: 10px; cursor: pointer;
   }
   .restauration .principal { background: var(--accent); color: #fff; border: none; }
   .restauration .secondaire {
     background: transparent; color: var(--text-primary); border: 1px solid var(--accent);
   }
-  .restauration .note { font-size: 12px; color: var(--text-muted); margin: 0; }
+  .restauration .note { font-size: 0.75rem; color: var(--text-muted); margin: 0; }
 `

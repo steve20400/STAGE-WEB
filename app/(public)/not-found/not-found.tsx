@@ -33,7 +33,7 @@ export default function NotFound() {
         }
         .code {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: clamp(96px, 18vw, 160px);
+          font-size: clamp(6rem, 18vw, 10rem);
           font-weight: 800; letter-spacing: -8px;
           line-height: 1; color: var(--accent);
           opacity: .12; position: relative; z-index: 1;
@@ -46,11 +46,11 @@ export default function NotFound() {
         }
         .title {
           font-family: 'Bricolage Grotesque', sans-serif;
-          font-size: 28px; font-weight: 800; letter-spacing: -1px;
+          font-size: 1.75rem; font-weight: 800; letter-spacing: -1px;
           color: var(--text-primary); margin-bottom: 10px; position: relative; z-index: 2;
         }
         .sub {
-          font-size: 14px; color: var(--text-muted); line-height: 1.7;
+          font-size: 0.875rem; color: var(--text-muted); line-height: 1.7;
           max-width: 340px; margin-bottom: 36px;
           position: relative; z-index: 2;
         }
@@ -62,7 +62,7 @@ export default function NotFound() {
           display: inline-flex; align-items: center; gap: 8px;
           background: var(--accent); color: var(--bg-base);
           padding: 13px 28px; border-radius: 10px;
-          font-weight: 700; font-size: 14px; text-decoration: none;
+          font-weight: 700; font-size: 0.875rem; text-decoration: none;
           transition: opacity .15s, transform .1s;
         }
         .btn-primary:hover { opacity: .88; transform: translateY(-1px); }
@@ -70,7 +70,7 @@ export default function NotFound() {
           display: inline-flex; align-items: center; gap: 8px;
           background: var(--bg-surface); border: 1px solid var(--border-subtle);
           color: var(--text-secondary); padding: 13px 24px; border-radius: 10px;
-          font-size: 14px; font-weight: 500; text-decoration: none;
+          font-size: 0.875rem; font-weight: 500; text-decoration: none;
           transition: all .15s;
         }
         .btn-ghost:hover { border-color: var(--border-default); color: var(--text-primary); }

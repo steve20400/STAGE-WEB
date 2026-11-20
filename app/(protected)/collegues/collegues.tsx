@@ -15,6 +15,7 @@ import {
   type ServiceCollegues,
 } from "../../../src/services/collegues-service"
 import "./collegues-page.css"
+import { MEDIA_LARGE } from "../../../src/styles/points-de-rupture"
 
 /**
  * ANNUAIRE DES COLLÈGUES — pendant web de l'onglet mobile.
@@ -63,10 +64,10 @@ export default function ColleguesPage() {
    * meme condition ici, plutot que de la deviner.
    */
   const [deuxColonnes, setDeuxColonnes] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 901px)").matches
+    () => typeof window !== "undefined" && window.matchMedia(MEDIA_LARGE).matches
   )
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 901px)")
+    const mq = window.matchMedia(MEDIA_LARGE)
     const suivre = (e: MediaQueryListEvent) => setDeuxColonnes(e.matches)
     mq.addEventListener("change", suivre)
     return () => mq.removeEventListener("change", suivre)

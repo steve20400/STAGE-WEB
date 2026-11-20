@@ -21,12 +21,12 @@
   gap: 10px;
   padding: 11px 14px;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 .salle-fil-tete small {
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 500;
   color: var(--text-faint);
 }
@@ -42,7 +42,7 @@
 .salle-fil-vide {
   margin: auto;
   text-align: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--text-muted);
 }
@@ -57,7 +57,7 @@
   background: var(--bubble-them-bg);
   color: var(--bubble-them-text);
   border: 1px solid var(--bubble-them-border);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.4;
   word-break: break-word;
 }
@@ -69,13 +69,13 @@
   border-color: transparent;
 }
 .salle-msg-auteur {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   color: var(--agent-name);
 }
 .salle-msg-heure {
   align-self: flex-end;
-  font-size: 9px;
+  font-size: 0.5625rem;
   opacity: 0.7;
 }
 .salle-fil-saisie {
@@ -93,7 +93,7 @@
   border: 1px solid var(--border-subtle);
   background: var(--bg-input);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-family: inherit;
 }
 .salle-fil-saisie input:focus {

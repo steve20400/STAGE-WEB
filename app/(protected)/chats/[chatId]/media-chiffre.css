@@ -120,7 +120,7 @@
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 .mc-video {
   display: block;
@@ -207,7 +207,7 @@
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 800;
   letter-spacing: 0.4px;
 }
@@ -219,13 +219,13 @@
 }
 .mc-doc-nom {
   overflow: hidden;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .mc-doc-detail {
-  font-size: 11px;
+  font-size: 0.6875rem;
   opacity: 0.7;
 }
 .mc-doc-ouvrir {

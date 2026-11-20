@@ -24,7 +24,7 @@
 .ent-head h1 {
   margin: 0;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   /* Un nom d'entreprise long ne doit pas pousser le reste hors du cadre. */
@@ -63,9 +63,11 @@
     color 0.15s;
 }
 
-.ent-back:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .ent-back:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
 }
 
 .ent-back:focus-visible {
@@ -76,7 +78,7 @@
 /* Texte secondaire : la classe que la page appelait deja seize fois. */
 .s-hint {
   color: var(--text-muted);
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 
 /*
@@ -167,7 +169,7 @@
   background: var(--bg-surface);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .ent-champ input::placeholder {
@@ -191,9 +193,11 @@
   color: var(--text-muted);
   cursor: pointer;
 }
-.ent-champ-effacer:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .ent-champ-effacer:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
 }
 .ent-champ-effacer svg {
   width: 15px;
@@ -218,13 +222,15 @@
   border-radius: 12px;
   background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.ent-pays:hover {
-  border-color: var(--border-default);
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .ent-pays:hover {
+    border-color: var(--border-default);
+    background: var(--bg-elevated);
+  }
 }
 /* Un pays choisi a la main se voit : le filtre ne doit pas s'oublier. */
 .ent-pays.actif {
@@ -259,7 +265,7 @@
   height: 100%;
   opacity: 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 /* ═══ LES CARTES ═══ */
@@ -293,14 +299,16 @@
   background: var(--bg-surface);
   color: inherit;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: left;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
-.ent-carte:hover {
-  background: var(--bg-elevated);
-  border-color: var(--border-default);
+@media (hover: hover) and (pointer: fine) {
+  .ent-carte:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-default);
+  }
 }
 .ent-carte:focus-visible {
   outline: 2px solid var(--accent);
@@ -350,7 +358,7 @@
 }
 .ent-carte-sous {
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -374,7 +382,7 @@
   border-radius: 10px;
   background: var(--accent-dim);
   color: var(--accent);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   text-align: center;
 }
@@ -406,14 +414,14 @@
 .ent-fiche-identite h2 {
   margin: 2px 0 6px;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 .ent-fiche-description {
   margin: 0 0 10px;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.55;
 }
 .ent-fiche-ligne {
@@ -422,7 +430,7 @@
   gap: 7px;
   margin: 4px 0 0;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .ent-fiche-ligne svg {
   flex: none;
@@ -452,7 +460,7 @@
 }
 .ent-explication p {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   line-height: 1.5;
 }
 
@@ -478,7 +486,7 @@
   height: 24px;
 }
 .ent-centre .ent-carte-titre {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .ent-touches {
@@ -487,7 +495,7 @@
 .ent-touches-titre {
   margin-bottom: 6px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 .ent-touches ul {
@@ -502,7 +510,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .ent-touche {
   flex: none;
@@ -513,7 +521,7 @@
   border-radius: 6px;
   background: var(--accent-dim);
   color: var(--accent);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 .ent-touche-sans-nom {
@@ -535,13 +543,15 @@
   background: var(--accent);
   color: var(--accent-text);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   transition: filter 0.15s;
 }
-.ent-appeler:hover:not(:disabled) {
-  filter: brightness(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .ent-appeler:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
 }
 .ent-appeler:disabled {
   opacity: 0.55;
@@ -592,13 +602,13 @@
 }
 .ent-vide-titre {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 22px;
+  font-size: 1.375rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--text-primary);
 }
 .ent-vide-sous {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
   max-width: 320px;
   line-height: 1.6;

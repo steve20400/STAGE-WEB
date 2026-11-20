@@ -11,7 +11,7 @@
 }
 
 .greeting {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -20,7 +20,7 @@
 
 .dash-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 30px;
+  font-size: 1.875rem;
   font-weight: 800;
   letter-spacing: -1px;
   color: var(--text-primary);
@@ -52,7 +52,7 @@
 }
 
 .stat-card__label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -61,7 +61,7 @@
 
 .stat-card__value {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -1px;
   color: var(--text-primary);
@@ -73,7 +73,7 @@
 }
 
 .stat-card__sub {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-faint);
 }
 
@@ -108,21 +108,23 @@
 
 .card-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.3px;
 }
 
 .card-link {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--accent);
   text-decoration: none;
   font-weight: 500;
   transition: opacity 0.15s;
 }
-.card-link:hover {
-  opacity: 0.7;
+@media (hover: hover) and (pointer: fine) {
+  .card-link:hover {
+    opacity: 0.7;
+  }
 }
 
 .avatar {
@@ -132,7 +134,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--bg-base);
   flex-shrink: 0;
@@ -144,7 +146,7 @@
   width: 34px;
   height: 34px;
   min-width: 34px;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 /* Point vert "en ligne" sur l'avatar (taille normale) */
@@ -178,8 +180,10 @@
 .chat-item:last-child {
   border-bottom: none;
 }
-.chat-item:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .chat-item:hover {
+    background: var(--bg-hover);
+  }
 }
 
 .chat-meta {
@@ -188,7 +192,7 @@
 }
 
 .chat-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 2px;
@@ -198,7 +202,7 @@
 }
 
 .chat-preview {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -214,14 +218,14 @@
 }
 
 .chat-time {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-faint);
 }
 
 .unread-badge {
   background: var(--accent);
   color: var(--bg-base);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 20px;
@@ -230,7 +234,7 @@
 }
 
 .group-pill {
-  font-size: 9px;
+  font-size: 0.5625rem;
   background: var(--border-subtle);
   color: var(--text-muted);
   padding: 1px 6px;
@@ -255,7 +259,7 @@
 }
 
 .call-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 2px;
@@ -265,12 +269,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 
 .type-badge {
-  font-size: 9px;
+  font-size: 0.5625rem;
   background: var(--border-subtle);
   color: var(--text-muted);
   padding: 2px 7px;
@@ -290,7 +294,7 @@
 }
 
 .call-time {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-faint);
   text-align: right;
   flex-shrink: 0;
@@ -310,8 +314,10 @@
   flex-shrink: 0;
   transition: background 0.15s;
 }
-.call-btn:hover {
-  background: var(--accent-border);
+@media (hover: hover) and (pointer: fine) {
+  .call-btn:hover {
+    background: var(--accent-border);
+  }
 }
 
 .call-icon--in {
@@ -342,14 +348,14 @@
 }
 
 .contact-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 2px;
 }
 
 .contact-status {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 
@@ -358,19 +364,21 @@
   border: 1px solid var(--border-default);
   border-radius: 7px;
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-secondary);
   text-decoration: none;
   white-space: nowrap;
   transition: color 0.15s;
 }
-.contact-write:hover {
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .contact-write:hover {
+    color: var(--accent);
+  }
 }
 
 /* Indicateur de contacts en ligne dans le card-head */
 .contacts-online {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--success);
   font-weight: 500;
 }
@@ -397,7 +405,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--bg-base);
   flex-shrink: 0;
@@ -417,7 +425,7 @@
 
 .profile-name {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.3px;
@@ -425,7 +433,7 @@
 }
 
 .profile-email {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 
@@ -439,7 +447,7 @@
   display: flex;
   justify-content: space-between;
   padding: 6px 0;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .profile-row-label {
@@ -462,15 +470,17 @@
   border: 1px solid var(--accent-border);
   border-radius: 8px;
   padding: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--accent);
   font-weight: 600;
   cursor: pointer;
   font-family: "DM Sans", sans-serif;
   transition: background 0.15s;
 }
-.profile-edit:hover {
-  background: var(--accent-dim);
+@media (hover: hover) and (pointer: fine) {
+  .profile-edit:hover {
+    background: var(--accent-dim);
+  }
 }
 
 @media (max-width: 1100px) {

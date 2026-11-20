@@ -139,7 +139,7 @@ export function IvrPanel({ session }: { session: IvrSession }) {
             // fond teinté à 14% était illisible (rouge sur rouge). Le fond
             // reste inchangé — seul le texte change.
             color: "#fff",
-            fontSize: 13,
+            fontSize: "0.8125rem",
             textAlign: "center",
           }}
         >
@@ -168,8 +168,8 @@ export function IvrPanel({ session }: { session: IvrSession }) {
               background: "color-mix(in srgb, var(--text) 14%, transparent)",
             }}
           >
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{titre}</div>
-            {sous && <div style={{ fontSize: 11, opacity: 0.65 }}>{sous}</div>}
+            <div style={{ fontSize: "0.875rem", fontWeight: 600 }}>{titre}</div>
+            {sous && <div style={{ fontSize: "0.6875rem", opacity: 0.65 }}>{sous}</div>}
           </div>
         )}
       </div>
@@ -207,7 +207,7 @@ export function IvrPanel({ session }: { session: IvrSession }) {
         <span />
       </div>
 
-      <div style={{ marginTop: 12, fontSize: 12, opacity: 0.6, textAlign: "center" }}>
+      <div style={{ marginTop: 12, fontSize: "0.75rem", opacity: 0.6, textAlign: "center" }}>
         {session.envoiEnCours ? t("ivr_sending") : t("ivr_hold_hint")}
       </div>
     </div>
@@ -265,7 +265,7 @@ function IvrTouche({
         userSelect: "none",
         WebkitUserSelect: "none",
         touchAction: "manipulation",
-        fontSize: 24,
+        fontSize: "1.5rem",
         fontWeight: 600,
         color: verrouille ? "color-mix(in srgb, var(--text) 40%, transparent)" : "inherit",
         background: `color-mix(in srgb, var(--text) ${maintenue ? 26 : 12}%, transparent)`,
@@ -281,10 +281,10 @@ function IvrAttente({ session }: { session: IvrSession }) {
   const { t } = useTranslation()
   return (
     <div style={{ marginTop: 18, textAlign: "center" }}>
-      <div style={{ fontSize: 16, fontWeight: 600 }}>
+      <div style={{ fontSize: "1rem", fontWeight: 600 }}>
         {session.serviceChoisi ?? t("ivr_connecting")}
       </div>
-      <div style={{ marginTop: 6, fontSize: 13, opacity: 0.65 }}>{t("ivr_connecting_you")}</div>
+      <div style={{ marginTop: 6, fontSize: "0.8125rem", opacity: 0.65 }}>{t("ivr_connecting_you")}</div>
     </div>
   )
 }

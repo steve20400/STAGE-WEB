@@ -42,7 +42,7 @@
   background: var(--bg-surface);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .emoji-recherche input:focus {
   outline: none;
@@ -75,9 +75,11 @@
   width: 18px;
   height: 18px;
 }
-.emoji-onglet:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .emoji-onglet:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
 }
 .emoji-onglet.actif {
   border-bottom-color: var(--accent);
@@ -110,7 +112,7 @@
   padding: 8px 4px 4px;
   background: var(--bg-elevated);
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   font-weight: 600;
 }
 .emoji-cases {
@@ -124,14 +126,16 @@
   border: none;
   border-radius: 8px;
   background: none;
-  font-size: 24px;
+  font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
   transition: background 0.1s, transform 0.1s;
 }
-.emoji-case:hover {
-  background: var(--bg-hover);
-  transform: scale(1.12);
+@media (hover: hover) and (pointer: fine) {
+  .emoji-case:hover {
+    background: var(--bg-hover);
+    transform: scale(1.12);
+  }
 }
 .emoji-case:focus-visible {
   outline: 2px solid var(--accent);
@@ -140,6 +144,6 @@
 .emoji-vide {
   padding: 32px 12px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: center;
 }

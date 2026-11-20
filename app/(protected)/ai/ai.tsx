@@ -148,7 +148,7 @@ export default function AiAssistantPage() {
       {/* Fil de discussion */}
       <div className="room-body">
         {loading && (
-          <div style={{ padding: 20, color: "var(--text-muted)", fontSize: 13 }}>
+          <div style={{ padding: 20, color: "var(--text-muted)", fontSize: "0.8125rem" }}>
             {t("loading")}
           </div>
         )}
@@ -160,7 +160,7 @@ export default function AiAssistantPage() {
               style={{
                 fontFamily: "'Bricolage Grotesque', sans-serif",
                 fontWeight: 800,
-                fontSize: 18,
+                fontSize: "1.125rem",
                 color: "var(--text-primary)",
                 marginBottom: 6,
               }}
@@ -168,7 +168,7 @@ export default function AiAssistantPage() {
               {t("ai_ask_me")}
             </div>
             <div
-              style={{ fontSize: 13, color: "var(--text-muted)", maxWidth: 380, margin: "0 auto" }}
+              style={{ fontSize: "0.8125rem", color: "var(--text-muted)", maxWidth: 380, margin: "0 auto" }}
             >
               {t("ai_intro")}
             </div>
@@ -193,7 +193,7 @@ export default function AiAssistantPage() {
                   color: isMe ? "var(--bubble-me-text)" : "var(--bubble-them-text)",
                   padding: "10px 14px",
                   borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                  fontSize: 13,
+                  fontSize: "0.8125rem",
                   lineHeight: 1.6,
                   // Mes messages gardent leurs retours a la ligne ; la reponse
                   // de l'assistant est mise en forme (titres, listes, code…).
@@ -300,14 +300,14 @@ export default function AiAssistantPage() {
             <div
               style={{
                 fontWeight: 700,
-                fontSize: 15,
+                fontSize: "0.9375rem",
                 color: "var(--text-primary)",
                 marginBottom: 8,
               }}
             >
               {t("ai_clear_confirm")}
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 16 }}>
               {t("ai_clear_detail")}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
@@ -319,7 +319,7 @@ export default function AiAssistantPage() {
                   borderRadius: 8,
                   padding: "8px 14px",
                   color: "var(--text-secondary)",
-                  fontSize: 12,
+                  fontSize: "0.75rem",
                   cursor: "pointer",
                 }}
               >
@@ -333,7 +333,7 @@ export default function AiAssistantPage() {
                   borderRadius: 8,
                   padding: "8px 14px",
                   color: "#fff",
-                  fontSize: 12,
+                  fontSize: "0.75rem",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}

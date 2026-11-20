@@ -38,6 +38,24 @@ export function useTheme(): ThemeContextValue {
   return ctx
 }
 
+/**
+ * La barre d'état du téléphone (et la barre de titre de l'application
+ * installée) prend la couleur de l'en-tête de marque : marron en thème clair,
+ * chocolat en sombre. Lue dans `--entete-bg` après chaque changement de thème
+ * ou de palette, pour qu'aucune couleur ne soit écrite deux fois.
+ */
+function majCouleurBarre() {
+  const couleur = getComputedStyle(document.documentElement).getPropertyValue("--entete-bg").trim()
+  if (!couleur) return
+  let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (!meta) {
+    meta = document.createElement("meta")
+    meta.name = "theme-color"
+    document.head.appendChild(meta)
+  }
+  meta.content = couleur
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // Clair creme par defaut, comme l'app mobile (le sombre reste une option).
   const [theme, setThemeState] = useState<Theme>("light")
@@ -72,6 +90,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     else root.classList.remove("dark")
 
     setResolved(isDark ? "dark" : "light")
+    majCouleurBarre()
   }
 
   function setTheme(t: Theme) {
@@ -85,6 +104,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setPaletteState(paletteValue)
     safeSet("alanya-palette", paletteValue)
     document.documentElement.setAttribute("data-palette", paletteValue)
+    majCouleurBarre()
   }
 
   function toggle() {

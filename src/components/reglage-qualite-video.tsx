@@ -38,7 +38,7 @@ export function ReglageQualiteVideo() {
               }}
             >
               {t(QUALITES[q].cleLibelle)}
-              <small style={{ display: "block", opacity: 0.75, fontSize: 11 }}>{QUALITES[q].detail}</small>
+              <small style={{ display: "block", opacity: 0.75, fontSize: "0.6875rem" }}>{QUALITES[q].detail}</small>
             </button>
           ))}
         </div>

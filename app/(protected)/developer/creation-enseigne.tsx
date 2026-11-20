@@ -22,7 +22,7 @@ const champ: React.CSSProperties = {
   border: "1px solid var(--dev-border)",
   background: "var(--dev-bg-page)",
   color: "var(--dev-text-primary)",
-  fontSize: "15px",
+  fontSize: "0.9375rem",
   boxSizing: "border-box",
 }
 
@@ -91,7 +91,7 @@ export default function CreationEnseigne({
   if (defiId) {
     return (
       <form onSubmit={envoyerCode} style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "420px" }}>
-        <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: "0.875rem", lineHeight: 1.6 }}>
           Pour confirmer que c'est bien vous, un code à 6 chiffres vient d'être envoyé dans l'application Alanya de
           votre téléphone.
         </p>
@@ -102,10 +102,10 @@ export default function CreationEnseigne({
           placeholder="123456"
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-          style={{ ...champ, letterSpacing: "6px", fontSize: "20px", textAlign: "center" }}
+          style={{ ...champ, letterSpacing: "6px", fontSize: "1.25rem", textAlign: "center" }}
           autoFocus
         />
-        {erreur && <div style={{ color: "#ef4444", fontSize: "14px", fontWeight: 600 }}>{erreur}</div>}
+        {erreur && <div style={{ color: "#ef4444", fontSize: "0.875rem", fontWeight: 600 }}>{erreur}</div>}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
             type="submit"
@@ -133,7 +133,7 @@ export default function CreationEnseigne({
 
   return (
     <form onSubmit={envoyerNom} style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "420px" }}>
-      <label style={{ fontSize: "13px", fontWeight: 600 }} htmlFor="nom-enseigne">
+      <label style={{ fontSize: "0.8125rem", fontWeight: 600 }} htmlFor="nom-enseigne">
         Nom de l'enseigne
       </label>
       <input
@@ -146,10 +146,10 @@ export default function CreationEnseigne({
         autoFocus
         required
       />
-      <p style={{ margin: 0, fontSize: "13px", color: "var(--dev-text-secondary)", lineHeight: 1.5 }}>
+      <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--dev-text-secondary)", lineHeight: 1.5 }}>
         C'est le nom que verront les personnes à qui vous écrirez. L'enseigne reçoit son propre numéro Alanya.
       </p>
-      {erreur && <div style={{ color: "#ef4444", fontSize: "14px", fontWeight: 600 }}>{erreur}</div>}
+      {erreur && <div style={{ color: "#ef4444", fontSize: "0.875rem", fontWeight: 600 }}>{erreur}</div>}
       <button
         type="submit"
         disabled={enCours || nom.trim().length < 2}

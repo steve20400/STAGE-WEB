@@ -42,12 +42,12 @@ export default function RealtimeStatus() {
         gap: 12,
       }}
     >
-      <span style={{ fontSize: 13, color: "var(--text-muted)", flexShrink: 0 }}>
+      <span style={{ fontSize: "0.8125rem", color: "var(--text-muted)", flexShrink: 0 }}>
         Temps reel (messages)
       </span>
       <span
         style={{
-          fontSize: 12,
+          fontSize: "0.75rem",
           fontWeight: 500,
           textAlign: "right",
           color,

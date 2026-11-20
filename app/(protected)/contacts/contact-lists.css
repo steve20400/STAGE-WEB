@@ -84,7 +84,7 @@
    au-dessus, pour que la hierarchie entre les deux se voie. */
 .clist-root .clist-titre {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 800;
   letter-spacing: -0.4px;
   line-height: 1.3;
@@ -100,7 +100,7 @@
   border-radius: 999px;
   background: var(--border-subtle);
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   line-height: 1.5;
 }
@@ -120,16 +120,18 @@
   background: var(--accent);
   color: var(--accent-text);
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
   transition:
     opacity 0.15s,
     transform 0.1s;
 }
-.clist-root .clist-nouvelle:hover {
-  opacity: 0.88;
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .clist-root .clist-nouvelle:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+  }
 }
 .clist-root .clist-nouvelle:focus-visible {
   outline: 2px solid var(--accent);
@@ -168,10 +170,15 @@
     background 0.15s,
     border-color 0.15s;
 }
-.clist-root .clist-rangee:hover,
 .clist-root .clist-rangee:focus-within {
   background: var(--bg-surface);
   border-color: var(--border-subtle);
+}
+@media (hover: hover) and (pointer: fine) {
+  .clist-root .clist-rangee:hover {
+    background: var(--bg-surface);
+    border-color: var(--border-subtle);
+  }
 }
 
 /* Pastille de couleur de la liste. Le halo est un `color-mix` de la meme
@@ -217,7 +224,7 @@
 }
 
 .clist-root .clist-nom {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.4;
   color: var(--text-primary);
@@ -232,7 +239,7 @@
   flex-wrap: wrap;
   gap: 4px 10px;
   margin-top: 3px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -254,7 +261,7 @@
   border-radius: 999px;
   background: var(--accent-dim);
   color: var(--accent);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
 }
 .clist-root .clist-sonnerie-icone {
@@ -302,10 +309,12 @@
   width: 16px;
   height: 16px;
 }
-.clist-root .clist-bouton-icone:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .clist-root .clist-bouton-icone:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+    color: var(--accent);
+  }
 }
 .clist-root .clist-bouton-icone:focus-visible {
   outline: 2px solid var(--accent);
@@ -318,10 +327,12 @@
 
 /* Variante destructive : le rouge n'apparait qu'au survol, pour ne pas faire
    d'une rangee au repos un avertissement permanent. */
-.clist-root .clist-bouton-icone-danger:hover {
-  background: var(--danger-dim);
-  border-color: var(--danger-border);
-  color: var(--danger);
+@media (hover: hover) and (pointer: fine) {
+  .clist-root .clist-bouton-icone-danger:hover {
+    background: var(--danger-dim);
+    border-color: var(--danger-border);
+    color: var(--danger);
+  }
 }
 
 /* ═════════════════════════════════════════════════════════════ Etat vide */
@@ -358,7 +369,7 @@
 
 .clist-root .clist-vide-titre {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -368,7 +379,7 @@
 .clist-root .clist-vide-texte {
   max-width: 46ch;
   margin-top: 6px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.65;
   color: var(--text-muted);
 }
@@ -452,7 +463,7 @@
 .clist-modal-titre {
   min-width: 0;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 19px;
+  font-size: 1.1875rem;
   font-weight: 800;
   letter-spacing: -0.3px;
   line-height: 1.25;
@@ -481,9 +492,11 @@
   width: 16px;
   height: 16px;
 }
-.clist-fermer:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .clist-fermer:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
 }
 .clist-fermer:focus-visible {
   outline: 2px solid var(--accent);
@@ -516,7 +529,7 @@
 }
 
 .clist-label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.8px;
   text-transform: uppercase;
@@ -532,7 +545,7 @@
 }
 .clist-champ-valeur {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -545,7 +558,7 @@
   background: var(--bg-input);
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   outline: none;
   transition: border-color 0.2s;
 }
@@ -565,7 +578,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--danger);
 }
@@ -597,7 +610,7 @@
   background: var(--bg-input);
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
 }
 .clist-select:focus-visible {
   outline: 2px solid var(--accent);
@@ -617,7 +630,7 @@
   background: var(--bg-elevated);
   color: var(--accent);
   font-family: "DM Sans", sans-serif;
-  font-size: 12.5px;
+  font-size: 0.7812rem;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -629,9 +642,11 @@
   width: 14px;
   height: 14px;
 }
-.clist-ecouter:hover:not(:disabled) {
-  background: var(--accent-dim);
-  border-color: var(--accent-border);
+@media (hover: hover) and (pointer: fine) {
+  .clist-ecouter:hover:not(:disabled) {
+    background: var(--accent-dim);
+    border-color: var(--accent-border);
+  }
 }
 .clist-ecouter:focus-visible {
   outline: 2px solid var(--accent);
@@ -644,7 +659,7 @@
 
 .clist-aide {
   max-width: 62ch;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   color: var(--text-faint);
 }
@@ -689,8 +704,10 @@
   border-radius: 50%;
   background: var(--clist-teinte, var(--accent));
 }
-.clist-couleur:hover {
-  transform: scale(1.06);
+@media (hover: hover) and (pointer: fine) {
+  .clist-couleur:hover {
+    transform: scale(1.06);
+  }
 }
 .clist-couleur:focus-visible {
   outline: 2px solid var(--accent);
@@ -774,7 +791,7 @@
   background: transparent;
   color: var(--text-muted);
   font-family: "DM Sans", sans-serif;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
@@ -783,10 +800,12 @@
     border-color 0.15s,
     color 0.15s;
 }
-.clist-mode:hover,
-.clist-jeton:hover {
-  border-color: var(--border-default);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .clist-mode:hover,
+  .clist-jeton:hover {
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+  }
 }
 
 /* Mode retenu. Ecrit `.clist-mode.clist-mode-on`, et non `.clist-mode-on` seul
@@ -823,7 +842,7 @@
   background: var(--bg-input);
   color: var(--text-primary);
   font-family: "DM Sans", sans-serif;
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   outline: none;
   transition: border-color 0.2s;
 }
@@ -867,8 +886,10 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.clist-membre:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .clist-membre:hover {
+    background: var(--bg-hover);
+  }
 }
 /* Retrait NEGATIF : le cadre de focus est dessine a l'interieur de la ligne.
    Pose vers l'exterieur, il serait rogne par le bord de la zone defilante. */
@@ -895,7 +916,7 @@
      style inline sur l'element. */
   background: var(--bg-muted);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   overflow: hidden;
 }
@@ -911,7 +932,7 @@
   min-width: 0;
 }
 .clist-membre-nom {
-  font-size: 13.5px;
+  font-size: 0.8438rem;
   font-weight: 500;
   color: var(--text-primary);
   overflow: hidden;
@@ -919,7 +940,7 @@
   white-space: nowrap;
 }
 .clist-membre-num {
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -955,7 +976,7 @@
 .clist-membres-vide {
   padding: 24px 12px;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
   color: var(--text-muted);
 }
@@ -980,7 +1001,7 @@
 .clist-pied-info {
   margin-right: auto;
   min-width: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -991,7 +1012,7 @@
   padding: 0 18px;
   border-radius: 10px;
   font-family: "DM Sans", sans-serif;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
   transition:
     background 0.15s,
@@ -1006,9 +1027,11 @@
   color: var(--text-secondary);
   font-weight: 600;
 }
-.clist-annuler:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .clist-annuler:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
 }
 
 .clist-valider {
@@ -1017,8 +1040,10 @@
   color: var(--accent-text);
   font-weight: 700;
 }
-.clist-valider:hover:not(:disabled) {
-  opacity: 0.88;
+@media (hover: hover) and (pointer: fine) {
+  .clist-valider:hover:not(:disabled) {
+    opacity: 0.88;
+  }
 }
 
 /* Action destructive. `--brand-text` vaut #ffffff dans les quatre themes : sur
@@ -1030,8 +1055,10 @@
   color: var(--brand-text);
   font-weight: 700;
 }
-.clist-supprimer:hover:not(:disabled) {
-  opacity: 0.88;
+@media (hover: hover) and (pointer: fine) {
+  .clist-supprimer:hover:not(:disabled) {
+    opacity: 0.88;
+  }
 }
 
 .clist-annuler:focus-visible,
@@ -1056,7 +1083,7 @@
 }
 .clist-confirme-texte {
   max-width: 52ch;
-  font-size: 14px;
+  font-size: 0.875rem;
   line-height: 1.65;
   color: var(--text-secondary);
 }
@@ -1112,7 +1139,7 @@
     padding: 16px 16px 12px;
   }
   .clist-modal-titre {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .clist-modal-corps {
     padding: 16px 16px 20px;
@@ -1173,9 +1200,11 @@
   .clist-modal {
     animation: none;
   }
-  .clist-root .clist-nouvelle:hover,
-  .clist-couleur:hover {
-    transform: none;
+  @media (hover: hover) and (pointer: fine) {
+    .clist-root .clist-nouvelle:hover,
+    .clist-couleur:hover {
+      transform: none;
+    }
   }
   .clist-root .clist-nouvelle,
   .clist-couleur {

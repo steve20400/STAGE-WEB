@@ -47,7 +47,7 @@
 
 /* Grand cadre : le nom se lit de loin, comme sur l'ecran d'appel plein format. */
 .pgrid-room .pg-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .pgrid-room .pg-footer {
   padding: 7px 10px;
@@ -58,7 +58,7 @@
 .pgrid-room.pgrid-audio .pg-avatar {
   width: 88px;
   height: 88px;
-  font-size: 28px;
+  font-size: 1.75rem;
   border: 1px solid var(--accent-border);
 }
 
@@ -127,7 +127,7 @@
   flex: 0 1 auto;
   text-align: center;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   letter-spacing: -0.2px;
 }
@@ -149,7 +149,7 @@
 .pgrid-full.pgrid-audio .pg-avatar {
   width: 88px;
   height: 88px;
-  font-size: 28px;
+  font-size: 1.75rem;
   border: 1px solid var(--accent-border);
 }
 
@@ -164,19 +164,19 @@
   color: var(--accent);
   font-family: "Bricolage Grotesque", sans-serif;
   font-weight: 700;
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 
 .pgrid-medium .pg-avatar {
   width: 40px;
   height: 40px;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .pgrid-small .pg-avatar {
   width: 76px;
   height: 76px;
-  font-size: 24px;
+  font-size: 1.5rem;
 }
 
 /* Bandeau du bas : nom et etat du micro, lisibles sur une image comme sur un
@@ -197,7 +197,7 @@
 .pg-name {
   flex: 1;
   min-width: 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -217,7 +217,7 @@
 }
 
 .pgrid-small .pg-name {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* La photo remplit la pastille deja dimensionnee par `.pg-avatar` : c'est elle

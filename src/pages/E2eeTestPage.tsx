@@ -211,21 +211,21 @@ export default function E2eeTestPage() {
       <style>{`
         .e2ee-banc { max-width: 760px; margin: 0 auto; padding: 24px 16px 40px;
                      font-family: system-ui, sans-serif; color: #2b2b2b; }
-        .e2ee-banc h1 { font-size: 20px; margin: 0 0 8px; }
+        .e2ee-banc h1 { font-size: 1.25rem; margin: 0 0 8px; }
         .avert { background: #fff4e5; border: 1px solid #f0d5b8; border-radius: 10px;
-                 padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+                 padding: 10px 12px; font-size: 0.8125rem; line-height: 1.45; }
         section { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
                   margin: 16px 0; }
-        label { display: flex; flex-direction: column; gap: 4px; font-size: 12px;
+        label { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem;
                 flex-grow: 1; min-width: 220px; }
         input { padding: 9px 10px; border: 1px solid #d5c7b6; border-radius: 8px;
-                font-size: 14px; }
+                font-size: 0.875rem; }
         button { padding: 10px 16px; border: 0; border-radius: 20px; cursor: pointer;
-                 background: #b85c38; color: #fffcf8; font-size: 14px; font-weight: 600; }
+                 background: #b85c38; color: #fffcf8; font-size: 0.875rem; font-weight: 600; }
         button:disabled { opacity: .45; cursor: not-allowed; }
         .journal { margin-top: 20px; border: 1px solid #e0d0ba; border-radius: 10px;
                    background: #fffcf8; padding: 10px; height: 300px; overflow: auto;
-                   font-size: 12.5px; line-height: 1.5; }
+                   font-size: 0.7812rem; line-height: 1.5; }
         .ligne { padding: 2px 0; }
         .quand { color: #9a8577; margin-right: 6px; }
         .ok { color: #2d6a4f; }

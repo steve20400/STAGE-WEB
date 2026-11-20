@@ -40,7 +40,7 @@
 }
 .meetings-root .page-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 21px;
+  font-size: 1.3125rem;
   font-weight: 800;
   letter-spacing: -0.5px;
   line-height: 1.1;
@@ -49,7 +49,7 @@
 }
 .meetings-root .page-sub {
   margin: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--text-muted);
   max-width: 52ch;
@@ -79,7 +79,7 @@
   background: none;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
@@ -88,9 +88,11 @@
     color 0.15s,
     border-color 0.15s;
 }
-.meetings-root .filter-btn:hover {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .meetings-root .filter-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
 }
 .meetings-root .filter-btn.on {
   background: var(--accent-dim);
@@ -104,7 +106,7 @@
   border-radius: 20px;
   background: var(--accent);
   color: var(--bg-base);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
@@ -138,9 +140,11 @@
     border-color 0.15s,
     transform 0.15s;
 }
-.meetings-root .meeting-card:hover {
-  border-color: var(--border-default);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .meetings-root .meeting-card:hover {
+    border-color: var(--border-default);
+    transform: translateY(-1px);
+  }
 }
 .meetings-root .meeting-head {
   display: flex;
@@ -151,7 +155,7 @@
 }
 .meetings-root .meeting-title {
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   letter-spacing: -0.3px;
   color: var(--text-primary);
@@ -166,7 +170,7 @@
   border: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
   color: var(--text-faint);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
 }
 .meetings-root .meeting-info {
@@ -174,7 +178,7 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
 }
 /* Le type est un attribut, pas une action : une pastille sourde, qui ne se
@@ -206,7 +210,7 @@
   border-radius: 9px;
   border: 1px solid transparent;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -219,9 +223,11 @@
   background: var(--accent);
   color: var(--accent-text);
 }
-.meetings-root .btn-primary:hover:not(:disabled),
-.modal-content .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .meetings-root .btn-primary:hover:not(:disabled),
+  .modal-content .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
 }
 .meetings-root .btn-secondary,
 .modal-content .btn-secondary {
@@ -229,17 +235,21 @@
   border-color: var(--border-default);
   color: var(--text-secondary);
 }
-.meetings-root .btn-secondary:hover,
-.modal-content .btn-secondary:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .meetings-root .btn-secondary:hover,
+  .modal-content .btn-secondary:hover {
+    background: var(--bg-elevated);
+  }
 }
 .meetings-root .btn-danger {
   background: none;
   border-color: var(--danger-border);
   color: var(--danger);
 }
-.meetings-root .btn-danger:hover {
-  background: var(--danger-dim);
+@media (hover: hover) and (pointer: fine) {
+  .meetings-root .btn-danger:hover {
+    background: var(--danger-dim);
+  }
 }
 .meetings-root button:disabled,
 .modal-content button:disabled {
@@ -256,7 +266,7 @@
   color: var(--text-muted);
 }
 .meetings-root .empty-icon {
-  font-size: 30px;
+  font-size: 1.875rem;
   line-height: 1;
   margin-bottom: 12px;
   opacity: 0.65;
@@ -270,7 +280,7 @@
 }
 .meetings-root .empty-state p {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 .meetings-root .empty-retry {
@@ -282,12 +292,14 @@
   background: none;
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
 }
-.meetings-root .empty-retry:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .meetings-root .empty-retry:hover {
+    background: var(--bg-elevated);
+  }
 }
 
 /* ---------- Bouton de creation ---------- */
@@ -305,7 +317,7 @@
   border-radius: 50%;
   background: var(--accent);
   color: var(--accent-text);
-  font-size: 26px;
+  font-size: 1.625rem;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
@@ -313,9 +325,11 @@
     transform 0.15s,
     filter 0.15s;
 }
-.meetings-root .meetings-fab:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .meetings-root .meetings-fab:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.08);
+  }
 }
 
 /* ---------- Modale de creation ---------- */
@@ -352,7 +366,7 @@
 .modal-header h2 {
   margin: 0;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--text-primary);
@@ -367,12 +381,14 @@
   border-radius: 8px;
   background: none;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 0.875rem;
   cursor: pointer;
 }
-.modal-close:hover {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
+@media (hover: hover) and (pointer: fine) {
+  .modal-close:hover {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+  }
 }
 .modal-body {
   flex: 1;
@@ -398,7 +414,7 @@
   gap: 6px;
 }
 .form-group label {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text-secondary);
@@ -412,7 +428,7 @@
   background: var(--bg-input);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .form-group input:focus,
 .search-input:focus {
@@ -420,7 +436,7 @@
   border-color: var(--accent);
 }
 .form-group small {
-  font-size: 10px;
+  font-size: 0.625rem;
   color: var(--text-faint);
 }
 .radio-group {
@@ -439,7 +455,7 @@
   border-radius: 10px;
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -475,25 +491,27 @@
 .participant-item:last-child {
   border-bottom: none;
 }
-.participant-item:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .participant-item:hover {
+    background: var(--bg-elevated);
+  }
 }
 .participant-item input {
   accent-color: var(--accent);
 }
 .participant-info div {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-primary);
 }
 .participant-info small {
-  font-size: 11px;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 .empty-search {
   padding: 20px 12px;
   text-align: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -523,7 +541,7 @@
    meme phrase reste lisible en clair comme en nuit. */
 .meeting-capacite-note {
   margin: 8px 0 0;
-  font-size: 11px;
+  font-size: 0.6875rem;
   line-height: 1.45;
   color: var(--text-muted);
 }
@@ -533,7 +551,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--bg-elevated);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
@@ -550,7 +568,7 @@
   border: 1px solid var(--warning);
   border-radius: 8px;
   background: var(--warning-dim);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--text-primary);
 }
@@ -561,6 +579,8 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
-.participant-item.hors-plafond:hover {
-  background: transparent;
+@media (hover: hover) and (pointer: fine) {
+  .participant-item.hors-plafond:hover {
+    background: transparent;
+  }
 }

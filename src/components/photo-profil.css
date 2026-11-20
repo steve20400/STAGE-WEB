@@ -26,7 +26,7 @@
   justify-content: space-between;
   padding: 14px 18px;
   color: #fff;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 .pp-tete button {
@@ -53,7 +53,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 88px;
+  font-size: 5.5rem;
   font-weight: 700;
 }
 
@@ -70,7 +70,7 @@
 }
 .pp-choix-titre {
   padding: 12px 16px 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 .pp-choix button {
@@ -80,15 +80,17 @@
   color: var(--text-primary);
   padding: 14px 16px;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: left;
   cursor: pointer;
 }
 .pp-choix button:first-of-type {
   border-top: 0;
 }
-.pp-choix button:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .pp-choix button:hover {
+    background: var(--bg-elevated);
+  }
 }
 .pp-choix .pp-choix-annuler {
   color: var(--text-muted);
@@ -108,7 +110,7 @@
   max-width: 100%;
 }
 .pp-recadreur-titre {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -147,7 +149,7 @@
   max-width: 100%;
 }
 .pp-recadreur-aide {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
   text-align: center;
 }
@@ -164,7 +166,7 @@
   background: var(--bg-elevated);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   cursor: pointer;
 }
 .pp-recadreur-boutons button.principal {

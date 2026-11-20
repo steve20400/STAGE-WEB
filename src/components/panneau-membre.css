@@ -71,7 +71,7 @@
   min-width: 0;
   margin: 0;
   font-family: "Bricolage Grotesque", sans-serif;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   overflow: hidden;
@@ -86,13 +86,15 @@
   border-radius: 8px;
   background: none;
   color: var(--text-muted);
-  font-size: 22px;
+  font-size: 1.375rem;
   line-height: 1;
   cursor: pointer;
 }
-.pm-fermer:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .pm-fermer:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
 }
 
 /* Le corps DÉFILE seul : c'est lui qui rend une liste de cinquante membres
@@ -115,12 +117,12 @@
   padding: 10px 0 16px;
 }
 .pm-fiche-nom {
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 700;
   text-align: center;
 }
 .pm-fiche-numero {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-muted);
 }
 /*
@@ -148,17 +150,19 @@
   background: var(--bg-base);
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 0.7188rem;
   font-weight: 600;
   line-height: 1.25;
   text-align: center;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.pm-geste:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-  color: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .pm-geste:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
 }
 .pm-geste-icone {
   display: inline-flex;
@@ -177,7 +181,7 @@
 }
 
 .pm-fiche-role {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
   color: var(--accent);
   background: var(--accent-dim);
@@ -199,16 +203,20 @@
   padding: 8px;
   border-radius: 10px;
 }
-.pm-liste > li:hover {
-  background: var(--bg-elevated);
+@media (hover: hover) and (pointer: fine) {
+  .pm-liste > li:hover {
+    background: var(--bg-elevated);
+  }
 }
 /* Une seule personne : ses actions se centrent sous sa fiche. */
 .pm-liste > li.pm-liste-actions {
   justify-content: center;
   padding-top: 0;
 }
-.pm-liste > li.pm-liste-actions:hover {
-  background: none;
+@media (hover: hover) and (pointer: fine) {
+  .pm-liste > li.pm-liste-actions:hover {
+    background: none;
+  }
 }
 
 .pm-liste-textes {
@@ -222,19 +230,19 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .pm-liste-num {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 .pm-badge {
   flex: none;
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 700;
   color: var(--accent);
   background: var(--accent-dim);
@@ -255,21 +263,25 @@
   background: none;
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
-.pm-action:hover {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+@media (hover: hover) and (pointer: fine) {
+  .pm-action:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+  }
 }
 .pm-action.danger {
   color: var(--danger, #b3261e);
   border-color: color-mix(in srgb, var(--danger, #b3261e) 35%, transparent);
 }
-.pm-action.danger:hover {
-  background: color-mix(in srgb, var(--danger, #b3261e) 12%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .pm-action.danger:hover {
+    background: color-mix(in srgb, var(--danger, #b3261e) 12%, transparent);
+  }
 }
 
 /* ─────────────────────────────── Grand écran : le panneau de droite */

@@ -21,8 +21,10 @@
   text-align: left;
   cursor: pointer;
 }
-.groupes-communs button:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .groupes-communs button:hover {
+    background: var(--bg-hover);
+  }
 }
 .gc-photo {
   flex: none;
@@ -33,7 +35,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 700;
   color: #fff;
   background: var(--accent);
@@ -52,11 +54,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 .gc-membres {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }

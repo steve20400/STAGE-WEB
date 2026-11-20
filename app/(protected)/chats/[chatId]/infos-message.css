@@ -32,14 +32,14 @@
 }
 .infos-tete h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 .infos-fermer {
   border: none;
   background: none;
   color: var(--text-muted);
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
 }
@@ -62,7 +62,7 @@
 }
 .infos-resume {
   margin: 6px 4px 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 .infos-listes {
@@ -70,7 +70,7 @@
 }
 .infos-section-titre {
   margin: 10px 4px 4px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 .infos-section-titre.lu {
@@ -100,7 +100,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: #fff;
   background: var(--accent);
@@ -116,15 +116,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .infos-heure {
   flex: none;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 .infos-vide {
   margin: 12px 4px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 0.875rem;
 }

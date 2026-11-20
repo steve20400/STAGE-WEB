@@ -107,7 +107,7 @@ export default function TurnTester() {
     border: "1px solid var(--border-subtle)",
     background: "var(--bg-input)",
     color: "var(--text-primary)",
-    fontSize: 12,
+    fontSize: "0.75rem",
     fontFamily: "'DM Sans', sans-serif",
   }
 
@@ -117,7 +117,7 @@ export default function TurnTester() {
     border: "none",
     borderRadius: 9,
     padding: "9px 14px",
-    fontSize: 12,
+    fontSize: "0.75rem",
     fontWeight: 600,
     cursor: "pointer",
     fontFamily: "'DM Sans', sans-serif",
@@ -129,7 +129,7 @@ export default function TurnTester() {
     <div className="s-card">
       <div className="s-card-title">{t("turn_title")}</div>
       <p
-        style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6, margin: "6px 0 14px" }}
+        style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.6, margin: "6px 0 14px" }}
       >
         {t("turn_explain")}
       </p>
@@ -143,7 +143,7 @@ export default function TurnTester() {
       >
         <div
           style={{
-            fontSize: 12,
+            fontSize: "0.75rem",
             fontWeight: 600,
             color: "var(--text-secondary)",
             marginBottom: 10,
@@ -182,7 +182,7 @@ export default function TurnTester() {
         </div>
       </div>
 
-      {error && <div style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{error}</div>}
+      {error && <div style={{ fontSize: "0.75rem", color: "var(--danger)", marginTop: 8 }}>{error}</div>}
 
       {result && (
         <div
@@ -192,7 +192,7 @@ export default function TurnTester() {
             borderRadius: 10,
             border: `1px solid ${verdictOk ? "var(--success)" : "var(--danger)"}`,
             background: verdictOk ? "rgba(46, 125, 50, 0.08)" : "rgba(239, 68, 68, 0.08)",
-            fontSize: 12,
+            fontSize: "0.75rem",
             lineHeight: 1.7,
             color: "var(--text-primary)",
           }}
