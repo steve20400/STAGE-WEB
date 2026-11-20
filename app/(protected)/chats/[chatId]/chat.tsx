@@ -8854,6 +8854,7 @@ export default function ChatRoomPage() {
           </div>
           <div
             className="room-sub"
+            title={chat.isGroup && !libelleFrappe ? sousTitreGroupe : undefined}
             style={{
               color: isTyping
                 ? "var(--accent)"

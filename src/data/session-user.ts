@@ -54,11 +54,12 @@ export function normalizePhoneNumber(phone: string) {
 }
 
 export function toInitials(name: string) {
+  // Lettres et chiffres seulement (voir `toInitials` de `contacts.ts`).
   const initials = name
-    .split(" ")
+    .split(/\s+/)
+    .map((part) => part.match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? "")
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
     .join("")
   return initials || "UA"
 }

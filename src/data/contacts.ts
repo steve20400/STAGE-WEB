@@ -195,12 +195,15 @@ export function findDirectoryAccountByPhone(phone: string): DirectoryAccount | n
 }
 
 export function toInitials(name: string) {
+  // La première LETTRE ou le premier CHIFFRE de chaque mot : une parenthèse,
+  // un tiret ou un émoji n'est pas une initiale (« 3GI (banc) » → « 3B », et
+  // non « 3( », 20/11/2026).
   return (
     name
-      .split(" ")
+      .split(/\s+/)
+      .map((part) => part.match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? "")
       .filter(Boolean)
       .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
       .join("") || "NC"
   )
 }

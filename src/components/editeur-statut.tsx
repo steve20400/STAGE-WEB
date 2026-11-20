@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Icone } from "./icone"
 import { RognageImage } from "./rognage-image"
 import { useTranslation } from "../i18n"
@@ -37,6 +37,8 @@ interface TexteAppose {
 
 /** Un trait, suite de points en fraction. */
 interface Trace {
+  /** Identifiant propre au tracé : la mise à jour vise lui, et lui seul. */
+  id: number
   couleur: string
   epaisseur: number
   points: Array<{ x: number; y: number }>
@@ -73,6 +75,8 @@ export function EditeurStatut({
   const [aRogner, setARogner] = useState<File | null>(null)
 
   const cadre = useRef<HTMLDivElement>(null)
+  const zoneRef = useRef<HTMLDivElement>(null)
+  const image = useRef<HTMLImageElement>(null)
   const traceEnCours = useRef<Trace | null>(null)
   const deplace = useRef<number | null>(null)
 
@@ -82,9 +86,39 @@ export function EditeurStatut({
     return () => URL.revokeObjectURL(url)
   }, [source])
 
-  /** Convertit un point de l'écran en fraction du cadre. */
+  /*
+   * 🐛 LA ZONE DE DESSIN = LA PHOTO AFFICHÉE, au pixel près (20/11/2026).
+   *
+   * Les tracés et les textes étaient placés en fractions du CADRE entier, alors
+   * que la photo y est centrée avec des bandes noires : on pouvait dessiner sur
+   * les bandes, et à la publication — où les fractions sont multipliées par la
+   * taille de la PHOTO — le dessin glissait dès que la photo n'avait pas les
+   * proportions de l'écran. On calcule donc le rectangle exact de la photo
+   * (comme `object-fit: contain`), et tout vit dedans.
+   */
+  const [zone, setZone] = useState<{ l: number; t: number; w: number; h: number } | null>(null)
+  const mesurer = useCallback(() => {
+    const c = cadre.current
+    const im = image.current
+    if (!c || !im || !im.naturalWidth || !im.naturalHeight) return
+    const cw = c.clientWidth
+    const ch = c.clientHeight
+    const echelle = Math.min(cw / im.naturalWidth, ch / im.naturalHeight)
+    const w = im.naturalWidth * echelle
+    const h = im.naturalHeight * echelle
+    setZone({ l: (cw - w) / 2, t: (ch - h) / 2, w, h })
+  }, [])
+  useEffect(() => {
+    const c = cadre.current
+    if (!c || typeof ResizeObserver === "undefined") return
+    const observateur = new ResizeObserver(() => mesurer())
+    observateur.observe(c)
+    return () => observateur.disconnect()
+  }, [mesurer])
+
+  /** Convertit un point de l'écran en fraction de la photo affichée. */
   const enFraction = (e: { clientX: number; clientY: number }) => {
-    const boite = cadre.current?.getBoundingClientRect()
+    const boite = zoneRef.current?.getBoundingClientRect()
     if (!boite || boite.width === 0 || boite.height === 0) return null
     return {
       x: Math.min(1, Math.max(0, (e.clientX - boite.left) / boite.width)),
@@ -99,8 +133,9 @@ export function EditeurStatut({
     // La capture suit le doigt HORS du cadre : sans elle, un trait qui déborde
     // s'interrompt net au bord et reprend ailleurs au retour.
     ;(e.target as Element).setPointerCapture?.(e.pointerId)
-    traceEnCours.current = { couleur, epaisseur: EPAISSEUR_TRAIT, points: [p] }
-    setTraces((prev) => [...prev, traceEnCours.current!])
+    const nouveau: Trace = { id: Date.now() + Math.random(), couleur, epaisseur: EPAISSEUR_TRAIT, points: [p] }
+    traceEnCours.current = nouveau
+    setTraces((prev) => [...prev, nouveau])
   }
 
   const surPointerMove = (e: React.PointerEvent) => {
@@ -112,13 +147,22 @@ export function EditeurStatut({
       )
       return
     }
-    if (outil !== "dessin" || !traceEnCours.current) return
+    const courant = traceEnCours.current
+    if (outil !== "dessin" || !courant) return
     const p = enFraction(e)
     if (!p) return
-    traceEnCours.current.points.push(p)
-    // Recopie du tableau pour que React repeigne : le tracé courant est muté en
-    // place, ce qui évite de recréer tous les points à chaque mouvement.
-    setTraces((prev) => [...prev.slice(0, -1), { ...traceEnCours.current! }])
+    courant.points.push(p)
+    /*
+     * 🐛 L'APPLICATION PLANTAIT EN DESSINANT (signalé par le user, 20/11/2026).
+     * La copie lisait `traceEnCours.current` DANS la fonction de mise à jour,
+     * que React n'exécute que plus tard : si le doigt se levait entre-temps
+     * (`surPointerUp` remet la référence à nul), `{ ...null }` donnait un
+     * tracé sans points, et l'affichage tombait sur `trace.points.map`. On
+     * capture le tracé tout de suite, et la copie ne remplace que LUI.
+     */
+    const id = courant.id
+    const points = [...courant.points]
+    setTraces((prev) => prev.map((t) => (t.id === id ? { ...t, points } : t)))
   }
 
   const surPointerUp = () => {
@@ -293,31 +337,40 @@ export function EditeurStatut({
         </div>
       </div>
 
-      <div
-        ref={cadre}
-        className={`es-cadre${outil === "dessin" ? " dessin" : ""}`}
-        onPointerDown={surPointerDown}
-        onPointerMove={surPointerMove}
-        onPointerUp={surPointerUp}
-        onPointerCancel={surPointerUp}
-      >
-        {urlApercu && <img src={urlApercu} alt="" draggable={false} />}
+      <div ref={cadre} className="es-cadre">
+        <div
+          ref={zoneRef}
+          className={`es-zone${outil === "dessin" ? " dessin" : ""}`}
+          style={
+            zone
+              ? { left: zone.l, top: zone.t, width: zone.w, height: zone.h }
+              : { visibility: "hidden" }
+          }
+          onPointerDown={surPointerDown}
+          onPointerMove={surPointerMove}
+          onPointerUp={surPointerUp}
+          onPointerCancel={surPointerUp}
+        >
+        {urlApercu && <img ref={image} src={urlApercu} alt="" draggable={false} onLoad={mesurer} />}
 
         {/* Les tracés, en SVG plutôt qu'en canvas : le repère est le même que
             celui des textes — des fractions — et un SVG se redimensionne avec
-            le cadre sans se repeindre. */}
+            la photo sans se repeindre.
+            🐛 L'épaisseur était un pourcentage dans un repère de 1×1 combiné à
+            `non-scaling-stroke` : environ 0,006 pixel, un trait INVISIBLE. Elle
+            est maintenant en pixels d'écran, proportionnelle à la hauteur de la
+            photo affichée — la même règle qu'à l'export (`aplatir`). */}
         <svg className="es-traces" viewBox="0 0 1 1" preserveAspectRatio="none">
-          {traces.map((trace, i) => (
+          {traces.map((trace) => (
             <polyline
-              key={i}
+              key={trace.id}
               points={trace.points.map((p) => `${p.x},${p.y}`).join(" ")}
               fill="none"
               stroke={trace.couleur}
-              strokeWidth={trace.epaisseur}
+              strokeWidth={Math.max(2, trace.epaisseur * (zone?.h ?? 0))}
               strokeLinecap="round"
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
-              style={{ strokeWidth: `${trace.epaisseur * 100}%` }}
             />
           ))}
         </svg>
@@ -342,6 +395,7 @@ export function EditeurStatut({
             {tx.contenu}
           </span>
         ))}
+        </div>
       </div>
 
       <div className="es-couleurs">

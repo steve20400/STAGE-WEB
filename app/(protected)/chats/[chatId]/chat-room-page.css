@@ -67,6 +67,10 @@
   min-width: 0;
 }
 .room-name {
+  /* Une seule ligne : un nom long ne repousse pas l'en-tête (20/11/2026). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: "Bricolage Grotesque", sans-serif;
   font-size: 15px;
   font-weight: 700;
@@ -76,6 +80,15 @@
 }
 .room-sub {
   font-size: 11px;
+  /*
+   * 🐛 LA LISTE DES MEMBRES D'UN GROUPE COUVRAIT TOUT L'ÉCRAN (signalé par le
+   * user, 20/11/2026) : 80 noms sur une douzaine de lignes. Une seule ligne,
+   * coupée par « … », comme WhatsApp ; la liste complète reste dans les infos
+   * du groupe (et en infobulle).
+   */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .room-actions {
   display: flex;
