@@ -36,7 +36,23 @@
   isolation: isolate;
   width: fit-content;
   max-width: 100%;
-  padding: 92px 96px 64px 72px;
+  /* Le texte rentré dans le corps du nuage : il ne déborde plus sur les
+     lobes bas de gauche. */
+  padding: 104px 120px 72px 140px;
+}
+/* Le halo de l'astre, en haut à droite, derrière le nuage : soleil doré en
+   thème clair, lune argentée en sombre. */
+.fct-nuage::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  top: -40px;
+  right: -30px;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--astre) 0%, var(--astre-halo) 38%, transparent 70%);
+  pointer-events: none;
 }
 .fct-nuage-forme {
   position: absolute;
@@ -48,18 +64,33 @@
   /* Une ombre portée douce et chaude sous le nuage, pas de contour. */
   filter: drop-shadow(0 18px 26px rgb(43 27 18 / 0.13)) drop-shadow(0 2px 4px rgb(43 27 18 / 0.06));
 }
-/* Lumière en haut des lobes, corps crème, dessous à peine grisé. */
+/* SOLEIL (thème clair) : un nuage crème, doré en douceur en haut à droite
+   par la lumière, à peine ombré dessous. Le jaune reste pâle. */
 .fct-corps {
-  --nuage-lumiere: #fffdf9;
-  --nuage-corps: #fbf5ec;
-  --nuage-dessous: #eadfd0;
+  --nuage-corps: #fbf5eb;
+  --nuage-reflet: #ffffff;
+  --nuage-reflet-force: 0.55;
+  --nuage-astre: #ffd979;
+  --nuage-astre-force: 0.3;
+  --nuage-dessous: rgb(196 168 132 / 0.32);
+  --astre: rgb(255 220 130 / 0.38);
+  --astre-halo: rgb(255 228 160 / 0.16);
 }
-/* En sombre, un nuage de nuit : des écarts de teinte faibles, sinon chaque
-   lobe montre des anneaux et le nuage tourne au tas de pierres. */
+.fct-nuage-corps {
+  fill: var(--nuage-corps);
+}
+
+/* LUNE (thème sombre) : un nuage de nuit, argenté par la lumière en haut à
+   droite. Le reflet reste léger : le titre crème doit rester lisible. */
 :root[data-theme="dark"] .fct-corps {
-  --nuage-lumiere: #33251a;
-  --nuage-corps: #2c2017;
-  --nuage-dessous: #241911;
+  --nuage-corps: #2d241e;
+  --nuage-reflet: #e6ebf3;
+  --nuage-reflet-force: 0.1;
+  --nuage-astre: #e8edf5;
+  --nuage-astre-force: 0.22;
+  --nuage-dessous: rgb(0 0 0 / 0.35);
+  --astre: rgb(236 240 246 / 0.32);
+  --astre-halo: rgb(200 210 225 / 0.1);
 }
 
 /* Un seul des deux dessins à la fois : le large, ou celui du téléphone. */
@@ -78,7 +109,13 @@
   .fct-nuage {
     /* Le nuage s'étire en hauteur sur téléphone : le texte descend sous
        les bosses du haut et s'écarte du bord gauche. */
-    padding: 88px 30px 48px 36px;
+    padding: 96px 34px 52px 40px;
+  }
+  .fct-nuage::before {
+    width: 220px;
+    height: 220px;
+    top: -20px;
+    right: -20px;
   }
 }
 

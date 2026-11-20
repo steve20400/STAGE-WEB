@@ -55,8 +55,19 @@ const LOBES_ETROIT: Lobe[] = [
 function Nuage({ forme, lobes, largeur, hauteur }: { forme: string; lobes: Lobe[]; largeur: number; hauteur: number }) {
   // Identifiants propres à chaque dessin : un dégradé défini dans le dessin
   // masqué (display: none) ne s'appliquerait plus à l'autre.
-  const lumiere = `fct-nuage-lobe-${forme}`
-  const doux = `fct-nuage-doux-${forme}`
+  const id = (nom: string) => `fct-nuage-${nom}-${forme}`
+  /*
+   * L'ÉCLAIRAGE (20/11/2026) : la lumière tombe UNE fois sur tout le nuage,
+   * d'en haut à droite — et non lobe par lobe, ce qui en faisait autant de
+   * petits pains. Trois couches, toutes découpées à la silhouette :
+   *   1. le corps, d'une seule teinte (aucune couture entre les lobes) ;
+   *   2. un léger reflet en haut de chaque lobe, pour le volume ;
+   *   3. la lumière de l'astre, un dégradé doux sur l'ensemble, et l'ombre
+   *      du dessous.
+   */
+  const silhouette = lobes.map(([cx, cy, rx, ry]) => (
+    <ellipse key={`${cx}-${cy}`} cx={cx} cy={cy} rx={rx} ry={ry} />
+  ))
   return (
     <svg
       className={`fct-nuage-forme fct-nuage-${forme}`}
@@ -65,21 +76,35 @@ function Nuage({ forme, lobes, largeur, hauteur }: { forme: string; lobes: Lobe[
       aria-hidden="true"
     >
       <defs>
-        <radialGradient id={lumiere} cx="50%" cy="32%" r="68%">
-          <stop offset="0%" style={{ stopColor: "var(--nuage-lumiere)" }} />
-          <stop offset="62%" style={{ stopColor: "var(--nuage-corps)" }} />
-          <stop offset="100%" style={{ stopColor: "var(--nuage-dessous)" }} />
+        <clipPath id={id("silhouette")}>{silhouette}</clipPath>
+        {/* Le reflet de chaque lobe : clair en haut, transparent ailleurs. */}
+        <radialGradient id={id("reflet")} cx="55%" cy="22%" r="60%">
+          <stop offset="0%" style={{ stopColor: "var(--nuage-reflet)", stopOpacity: "var(--nuage-reflet-force)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--nuage-reflet)", stopOpacity: 0 }} />
         </radialGradient>
-        <filter id={doux} x="-6%" y="-12%" width="112%" height="124%">
+        {/* La lumière de l'astre, venue d'en haut à droite. */}
+        <radialGradient id={id("astre")} cx="82%" cy="0%" r="85%">
+          <stop offset="0%" style={{ stopColor: "var(--nuage-astre)", stopOpacity: "var(--nuage-astre-force)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--nuage-astre)", stopOpacity: 0 }} />
+        </radialGradient>
+        {/* L'ombre du dessous, qui monte doucement. */}
+        <linearGradient id={id("dessous")} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="55%" style={{ stopColor: "var(--nuage-dessous)", stopOpacity: 0 }} />
+          <stop offset="100%" style={{ stopColor: "var(--nuage-dessous)", stopOpacity: 1 }} />
+        </linearGradient>
+        <filter id={id("doux")} x="-6%" y="-12%" width="112%" height="124%">
           <feTurbulence type="fractalNoise" baseFrequency="0.02 0.045" numOctaves="2" seed="3" result="bruit" />
           <feDisplacementMap in="SourceGraphic" in2="bruit" scale="9" xChannelSelector="R" yChannelSelector="G" result="bord" />
-          <feGaussianBlur in="bord" stdDeviation="2.2" />
+          <feGaussianBlur in="bord" stdDeviation="2.4" />
         </filter>
       </defs>
-      <g filter={`url(#${doux})`}>
-        {lobes.map(([cx, cy, rx, ry]) => (
-          <ellipse key={`${cx}-${cy}`} cx={cx} cy={cy} rx={rx} ry={ry} fill={`url(#${lumiere})`} />
-        ))}
+      <g filter={`url(#${id("doux")})`}>
+        <g className="fct-nuage-corps">{silhouette}</g>
+        <g fill={`url(#${id("reflet")})`}>{silhouette}</g>
+        <g clipPath={`url(#${id("silhouette")})`}>
+          <rect x="0" y="0" width={largeur} height={hauteur} fill={`url(#${id("astre")})`} />
+          <rect x="0" y="0" width={largeur} height={hauteur} fill={`url(#${id("dessous")})`} />
+        </g>
       </g>
     </svg>
   )
@@ -133,6 +158,17 @@ const CARTES: Carte[] = [
       <>
         <rect x="3" y="11" width="18" height="11" rx="2" />
         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </>
+    ),
+  },
+  {
+    // Le document sensible (ajouté à la demande du user, 20/11/2026).
+    cle: "sensible",
+    icone: (
+      <>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6" />
+        <path d="M12 11.5l3 1.2v2.3c0 1.8-1.3 3-3 3.5-1.7-.5-3-1.7-3-3.5v-2.3z" />
       </>
     ),
   },
