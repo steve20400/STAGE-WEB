@@ -5,7 +5,10 @@ import {
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
 import { PaveNumerique } from "../../../src/components/pave-numerique"
+import { useToast } from "../../../src/components/toast"
 import { useTranslation } from "../../../src/i18n"
+import { addContactByPhone, memoriserContact } from "../../../src/services/contacts-service"
+import type { CompteTrouve } from "../../../src/services/contact-lists-service"
 import "./dialer.css"
 
 /**
@@ -28,14 +31,53 @@ import "./dialer.css"
 export function Dialer({
   onClose,
   onCall,
+  integre = false,
 }: {
-  onClose: () => void
+  /** Fermeture du composeur plein écran ; sans objet quand il est intégré. */
+  onClose?: () => void
   /** Recoit les chiffres seuls, sans les espaces d'affichage, et le type d'appel. */
   onCall: (number: string, type: "audio" | "video") => void
+  /**
+   * Posé dans le grand panneau de l'écran Appels (20/11/2026) au lieu d'occuper
+   * tout l'écran : pas de croix, un titre, et SURTOUT pas d'écoute du clavier
+   * sur tout le document — la recherche de la liste, à côté, doit garder ses
+   * frappes. Le pavé écoute alors seulement quand il a le focus.
+   */
+  integre?: boolean
 }) {
   const { t } = useTranslation()
+  const { success, error } = useToast()
   const [digits, setDigits] = useState("")
   const valide = isValidAlanyaNumber(digits)
+
+  /**
+   * Le titulaire du numéro, tel que le pavé l'a trouvé — pour proposer de
+   * l'ajouter aux contacts, comme le composeur du mobile. Il porte le numéro
+   * auquel il répond : une réponse arrivée pour un numéro déjà modifié ne doit
+   * pas allumer le bouton.
+   */
+  const [titulaire, setTitulaire] = useState<{ numero: string; compte: CompteTrouve | null }>({
+    numero: "",
+    compte: null,
+  })
+  const [ajoutEnCours, setAjoutEnCours] = useState(false)
+  const compte = titulaire.numero === digits ? titulaire.compte : null
+  const ajoutPossible = !!compte && !compte.estContact && !ajoutEnCours
+
+  const ajouterAuxContacts = useCallback(async () => {
+    if (!compte || compte.estContact) return
+    setAjoutEnCours(true)
+    try {
+      const contact = await addContactByPhone(digits)
+      memoriserContact(contact)
+      setTitulaire({ numero: digits, compte: { ...compte, estContact: true } })
+      success(t("contact_saved"))
+    } catch (err) {
+      error(t("add_contact"), err instanceof Error ? err.message : undefined)
+    } finally {
+      setAjoutEnCours(false)
+    }
+  }, [compte, digits, error, success, t])
 
   /**
    * Enveloppe du pave, tenue pour une seule raison : savoir si une frappe a
@@ -76,10 +118,13 @@ export function Dialer({
    * doublerait chaque chiffre.
    */
   useEffect(() => {
+    // Intégré à l'écran Appels : le pavé écoute lui-même quand il a le focus,
+    // et rien n'est volé à la recherche de la liste voisine.
+    if (integre) return
     const surFrappe = (evenement: KeyboardEvent) => {
       // Echap ferme, d'ou que vienne la frappe : le pave laisse expressement
       // passer cette touche a la fenetre qui le porte.
-      if (evenement.key === "Escape") return onClose()
+      if (evenement.key === "Escape") return onClose?.()
 
       const cible = evenement.target
       if (cible instanceof Node && zonePave.current?.contains(cible)) return
@@ -102,10 +147,17 @@ export function Dialer({
     }
     document.addEventListener("keydown", surFrappe)
     return () => document.removeEventListener("keydown", surFrappe)
-  }, [appeler, effacer, onClose, taper])
+  }, [appeler, effacer, integre, onClose, taper])
 
   return (
-    <div className="dialer-root" role="dialog" aria-label={t("a2_dial_dialog")}>
+    <div
+      className={integre ? "dialer-root dialer-integre" : "dialer-root"}
+      role={integre ? "region" : "dialog"}
+      aria-label={t("a2_dial_dialog")}
+    >
+      {integre ? (
+        <h2 className="dialer-titre">{t("a2_dial_dialog")}</h2>
+      ) : (
       <button className="dialer-close" onClick={onClose} aria-label={t("a2_close_keypad")}>
         <svg
           width="20"
@@ -120,6 +172,7 @@ export function Dialer({
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
+      )}
 
       <div className="dialer-pave" ref={zonePave}>
         {/* `afficherTitulaire` : le NOM COMPLET du titulaire se lit sous les
@@ -137,8 +190,9 @@ export function Dialer({
           valeur={digits}
           onChange={setDigits}
           onValider={() => appeler("audio")}
-          autoFocus
+          autoFocus={!integre}
           afficherTitulaire
+          onTitulaire={(trouve, numero) => setTitulaire({ numero, compte: trouve })}
         />
       </div>
 
@@ -156,6 +210,31 @@ export function Dialer({
         {/* Deux appels possibles depuis un numero compose, comme depuis une fiche
             de contact : la voix, ou la video. */}
         <div className="dialer-actions">
+          {/* Ajouter le titulaire aux contacts, comme le composeur du mobile :
+              allumé seulement quand un compte est trouvé et qu'il n'est pas
+              déjà au répertoire. */}
+          <button
+            className="dialer-call ajout"
+            onClick={() => void ajouterAuxContacts()}
+            disabled={!ajoutPossible}
+            aria-label={t("add_contact")}
+            title={compte?.estContact ? t("number_already_contact") : t("add_contact")}
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              aria-hidden
+            >
+              <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M19 8v6M22 11h-6" />
+            </svg>
+          </button>
           <button
             className="dialer-call audio"
             onClick={() => appeler("audio")}

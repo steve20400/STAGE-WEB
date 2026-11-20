@@ -20,20 +20,17 @@ import {
 } from "../../../src/lib/alanya-number"
 import { ApiError } from "../../../src/lib/api-client"
 import { Dialer } from "./dialer"
+import { useAppelsSortants } from "./appeler-numero"
 import { AvatarCircle } from "../../../src/components/avatar-circle"
 import { langueInitiale, traduire, useTranslation, type Cle } from "../../../src/i18n"
 
 type FilterType = "all" | "missed" | "audio" | "video"
 
-/** Ordres de tri de l'historique. */
-type SortType = "recent" | "oldest" | "name"
-
-/** Cles de tri : le libelle se resout au rendu, la langue peut changer. */
-const SORT_KEYS: Record<SortType, Cle> = {
-  recent: "sort_recent",
-  oldest: "sort_oldest",
-  name: "sort_name",
-}
+/*
+ * PLUS DE BARRE DE TRI (demande du user, 20/11/2026) : l'historique se lit du
+ * plus récent au plus ancien, regroupé par jour, comme sur le mobile. Les
+ * filtres et la recherche suffisent à retrouver un appel.
+ */
 
 /**
  * Heures, jours et mois suivent la langue choisie, comme les libelles.
@@ -104,11 +101,10 @@ export default function CallsPage() {
   const { t, language } = useTranslation()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<FilterType>("all")
-  const [sort, setSort] = useState<SortType>("recent")
   const [search, setSearch] = useState("")
   const [callsHistory, setCallsHistory] = useState<CallRecord[]>([])
   const [dialerOpen, setDialerOpen] = useState(false)
-  const { error } = useToast()
+  const { appelerNumero, signalerEchecAppel } = useAppelsSortants()
   /**
    * Mon propre numero, pour reconnaitre ma ligne dans l'historique : on peut
    * s'appeler soi-meme depuis un autre appareil, et le menu ne doit alors pas
@@ -142,23 +138,9 @@ export default function CallsPage() {
       .filter((call) => call.contactName.toLowerCase().includes(search.toLowerCase()))
   }, [callsHistory, filter, search])
 
-  // `language` figure dans les dependances : l'ordre alphabetique depend du
-  // collateur, et il differe franchement entre le pinyin chinois et les langues
-  // latines. Sans elle, la liste resterait triee selon la langue precedente tant
-  // que ni le filtre ni la recherche ne bougent.
-  const sorted = useMemo(() => {
-    const list = [...filtered]
-    if (sort === "name")
-      return list.sort((a, b) => a.contactName.localeCompare(b.contactName, language))
-    return list.sort((a, b) =>
-      sort === "oldest" ? a.ts.getTime() - b.ts.getTime() : b.ts.getTime() - a.ts.getTime()
-    )
-  }, [filtered, sort, language])
-
+  // Du plus récent au plus ancien, regroupé par jour.
   const grouped = useMemo(() => {
-    // Trie par nom, le regroupement par jour n'a plus de sens : on rend une
-    // liste plate, et l'en-tete vide n'est pas affiche.
-    if (sort === "name") return [{ header: "", calls: sorted }]
+    const sorted = [...filtered].sort((a, b) => b.ts.getTime() - a.ts.getTime())
     return sorted.reduce<Array<{ header: string; calls: CallRecord[] }>>((acc, call) => {
       const header = formatGroupHeader(call.ts)
       const last = acc[acc.length - 1]
@@ -169,7 +151,7 @@ export default function CallsPage() {
       }
       return acc
     }, [])
-  }, [sorted, sort])
+  }, [filtered])
 
   /**
    * Appel direct d'un Alanya ID compose au clavier.
@@ -180,18 +162,9 @@ export default function CallsPage() {
    * refuse la creation de la conversation et l'echec est annonce tel quel.
    */
   const callComposedNumber = async (publicNumber: string, type: "audio" | "video") => {
-    try {
-      // L'ecran s'ouvre AVANT la reponse du serveur (06/11/2026).
-      setDialerOpen(false)
-      await lancerAppel(navigate, {
-        conversation: async () => (await createPrivateChat(publicNumber)).id,
-        type,
-        titre: formatAlanyaNumber(publicNumber),
-        returnTo: "/calls",
-      })
-    } catch (err) {
-      signalerEchecAppel(err, formatAlanyaNumber(publicNumber))
-    }
+    // L'ecran s'ouvre AVANT la reponse du serveur (06/11/2026).
+    setDialerOpen(false)
+    await appelerNumero(publicNumber, type)
   }
 
   /**
@@ -222,20 +195,6 @@ export default function CallsPage() {
    * On distingue le correspondant inconnu du reseau injoignable : le premier est
    * une faute de frappe a corriger, le second n'a rien a voir avec le numero.
    */
-  function signalerEchecAppel(err: unknown, cible: string) {
-    const inconnu = err instanceof ApiError && [400, 404, 422].includes(err.status)
-    const reseau = err instanceof ApiError && err.status === 0
-    error(
-      t("call_failed"),
-      inconnu
-        ? t("no_account_matches").replace("{cible}", cible)
-        : reseau
-          ? t("server_unreachable")
-          : err instanceof Error
-            ? err.message
-            : t("call_failed_now")
-    )
-  }
 
   return (
     <>
@@ -263,20 +222,6 @@ export default function CallsPage() {
                 <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
               </svg>
               {t("call_contact")}
-            </button>
-            <button className="dial-btn" onClick={() => setDialerOpen(true)}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="6" cy="6" r="1.9" />
-                <circle cx="12" cy="6" r="1.9" />
-                <circle cx="18" cy="6" r="1.9" />
-                <circle cx="6" cy="12" r="1.9" />
-                <circle cx="12" cy="12" r="1.9" />
-                <circle cx="18" cy="12" r="1.9" />
-                <circle cx="6" cy="18" r="1.9" />
-                <circle cx="12" cy="18" r="1.9" />
-                <circle cx="18" cy="18" r="1.9" />
-              </svg>
-              {t("dial_id")}
             </button>
           </div>
 
@@ -338,20 +283,6 @@ export default function CallsPage() {
               ))}
             </div>
 
-            {/* Tri de l'historique, distinct des filtres de type au-dessus. */}
-            <div className="sort-group" role="group" aria-label={t("sort_history")}>
-              <span className="sort-label">{t("sort")}</span>
-              {(Object.keys(SORT_KEYS) as SortType[]).map((current) => (
-                <button
-                  key={current}
-                  className={`filter-btn ${sort === current ? "on" : ""}`}
-                  onClick={() => setSort(current)}
-                  aria-pressed={sort === current}
-                >
-                  {t(SORT_KEYS[current])}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="stats-strip">
@@ -613,6 +544,28 @@ export default function CallsPage() {
           )}
         </div>
       </div>
+      {/* Le pavé vit dans le grand panneau ; sur téléphone, où ce panneau
+          n'existe pas, ce bouton rond ouvre le composeur plein écran
+          (20/11/2026 : le bouton « Composer ID » de l'en-tête est retiré). */}
+      <button
+        className="calls-fab-composer"
+        onClick={() => setDialerOpen(true)}
+        aria-label={t("a2_dial_dialog")}
+        title={t("a2_dial_dialog")}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <circle cx="6" cy="5" r="1.9" />
+          <circle cx="12" cy="5" r="1.9" />
+          <circle cx="18" cy="5" r="1.9" />
+          <circle cx="6" cy="11" r="1.9" />
+          <circle cx="12" cy="11" r="1.9" />
+          <circle cx="18" cy="11" r="1.9" />
+          <circle cx="6" cy="17" r="1.9" />
+          <circle cx="12" cy="17" r="1.9" />
+          <circle cx="18" cy="17" r="1.9" />
+          <circle cx="12" cy="22" r="1.6" />
+        </svg>
+      </button>
       {dialerOpen && (
         <Dialer
           onClose={() => setDialerOpen(false)}

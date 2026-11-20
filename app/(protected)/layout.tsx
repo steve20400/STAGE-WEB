@@ -537,8 +537,9 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
 
       {/* Profil + deconnexion */}
       <div className="sb-footer">
+        {/* Le bouton seul, sans le mot « Thème » : la lune et le soleil se
+            comprennent d'eux-mêmes, et l'infobulle les nomme (20/11/2026). */}
         <div className="sb-theme-row">
-          <span className="sb-theme-label">{t("theme")}</span>
           <ThemeToggle />
         </div>
         <div className="sb-profile" onClick={() => navigate("/settings")}>

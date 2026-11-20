@@ -81,7 +81,7 @@
   gap: 9px;
   padding: 20px;
   flex-shrink: 0;
-  background: var(--entete-bg);
+  background: var(--entete-fond, var(--entete-bg));
   border-bottom: 1px solid var(--entete-bord);
 }
 
@@ -473,7 +473,7 @@
   gap: 12px;
   padding: 14px 20px;
   border-bottom: 1px solid var(--entete-bord);
-  background: var(--entete-bg);
+  background: var(--entete-fond, var(--entete-bg));
   position: sticky;
   top: 0;
   z-index: 30;
@@ -782,4 +782,47 @@
 .sb-logo .marque.sb-logo-txt {
   font-size: 0.9375rem;
   letter-spacing: 0.01em;
+}
+
+/* ============================================================
+   LE PIED DE LA BARRE LATÉRALE, AUX COULEURS DE L'EN-TÊTE (20/11/2026)
+   Le même chocolat en dégradé que le haut : la barre est encadrée par la
+   marque. Texte crème, statut en ligne en vert clair, boutons discrets.
+   ============================================================ */
+.sb-footer {
+  background: var(--entete-fond, var(--entete-bg));
+  border-top: 1px solid var(--entete-bord);
+}
+.sb-theme-row {
+  justify-content: flex-end;
+}
+.sb-footer .bascule-theme {
+  color: var(--entete-texte);
+  border-color: color-mix(in srgb, var(--entete-texte) 35%, transparent);
+}
+.sb-footer .sb-user-name {
+  color: var(--entete-texte);
+}
+.sb-footer .sb-user-status {
+  color: #7fd18a;
+}
+.sb-footer .sb-logout {
+  color: var(--entete-texte-doux);
+}
+.sb-footer .sb-avatar-dot {
+  border-color: var(--entete-bg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sb-footer .bascule-theme:hover {
+    color: #f0b860;
+    border-color: #f0b860;
+    background: rgb(240 184 96 / 0.14);
+  }
+  .sb-footer .sb-profile:hover {
+    background: rgb(245 239 230 / 0.08);
+  }
+  .sb-footer .sb-logout:hover {
+    color: #f0b860;
+    background: rgb(240 184 96 / 0.14);
+  }
 }

@@ -145,19 +145,24 @@ button {
    * thèmes CLAIRS, eux, gardent le marron de la marque (voir leur bloc).
    * `--brand` reste la couleur des autres éléments (avatars, boutons).
    */
-  --entete-bg: var(--bg-surface);
-  --entete-bord: var(--border-subtle);
-  --entete-texte: var(--text-primary);
-  --entete-texte-doux: var(--text-muted);
-  /* Le logotype du mobile tel quel sur les en-tetes clairs ou sombres. */
-  --entete-marque-vert: var(--marque-vert);
-  --entete-marque-premier: var(--marque-terre);
-  --entete-marque-second: var(--marque-terre);
+  /* L'en-tête de l'application a la couleur de la barre des pages publiques
+     (20/11/2026) : un chocolat en dégradé, plus profond en thème sombre.
+     `--entete-bg` reste une couleur PLEINE : c'est elle que ThemeProvider
+     donne à la barre d'état du téléphone, qui n'accepte pas de dégradé. */
+  --entete-bg: #0d0805;
+  --entete-fond: linear-gradient(90deg, #0d0805 0%, #170e08 55%, #2e1a0e 100%);
+  --entete-bord: #3a2618;
+  --entete-texte: #f5efe6;
+  --entete-texte-doux: rgb(245 239 230 / 0.72);
+  /* Le logotype du mobile : ALANY vert, A WORK terre cuite claire. */
+  --entete-marque-vert: #098084;
+  --entete-marque-premier: #e29a74;
+  --entete-marque-second: #e29a74;
   --entete-logo-halo: none;
-  --entete-bouton: var(--bg-hover);
-  --entete-bouton-survol: var(--accent-dim);
-  --entete-bouton-texte: var(--text-secondary);
-  --entete-bouton-survol-texte: var(--accent);
+  --entete-bouton: rgb(245 239 230 / 0.1);
+  --entete-bouton-survol: rgb(240 184 96 / 0.16);
+  --entete-bouton-texte: #f5efe6;
+  --entete-bouton-survol-texte: #f0b860;
   /* Le bouton rond des discussions : l'orange du FAB mobile. */
   --fab-bg: #c04d29;
   --fab-texte: #ffffff;
@@ -168,7 +173,9 @@ button {
 :root,
 :root[data-theme="light"] {
   --bg-base: #f5efe6; /* creme (fond mobile) */
-  --bg-surface: #ffffff; /* cartes, panels */
+  /* Cartes et panneaux : un blanc cassé chaud, plus le blanc pur jugé
+     agressif sur le motif (demande du user, 20/11/2026). */
+  --bg-surface: #fbf6ee; /* cartes, panels */
   --bg-elevated: #fdfaf4; /* dropdowns */
   --bg-hover: #efe4d3; /* hover liste */
   --bg-input: #ffffff; /* champs */
@@ -237,27 +244,25 @@ button {
   --motif-image: url("/motif-bg.png");
   --motif-overlay: rgba(245, 239, 230, 0.9);
   /*
-   * LES DEUX THÈMES CLAIRS GARDENT L'EN-TÊTE MARRON DE LA MARQUE (demande du
-   * user, 03/10/2026) : texte blanc, « Work » orange, logo sur sa pastille
-   * blanche — le vert du logo se perdrait sur le marron. Le thème clair doux
-   * hérite de ce bloc : il ne redéfinit aucune de ces valeurs.
+   * L'EN-TÊTE DE L'APPLICATION A LA COULEUR DE LA BARRE DES PAGES PUBLIQUES
+   * (demande du user, 20/11/2026) : chocolat en dégradé, réchauffé vers la
+   * droite. Le logotype s'y écrit dans les couleurs du mobile (ALANY vert,
+   * A WORK terre cuite claire). `--entete-bg`, couleur pleine, sert à la barre
+   * d'état du téléphone ; `--entete-fond` porte le dégradé.
    */
-  --entete-bg: var(--brand);
-  --entete-bord: var(--brand-strong);
-  --entete-texte: var(--brand-text);
-  --entete-texte-doux: rgba(255, 255, 255, 0.75);
-  /* Sur le marron, le vert et la terre cuite du logotype disparaitraient :
-     ALANYA en blanc, WORK en orange clair. */
-  --entete-marque-vert: var(--brand-text);
-  --entete-marque-premier: var(--brand-text);
-  --entete-marque-second: #ff8a4c;
-  /* Le logo est pose tel quel, sans pastille qui le rognait (20/11/2026). Sur
-     le marron, un fin halo clair qui suit son contour garde le vert lisible. */
-  --entete-logo-halo: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1.5px rgb(255 255 255 / 0.85));
-  --entete-bouton: rgba(255, 255, 255, 0.14);
-  --entete-bouton-survol: rgba(255, 255, 255, 0.26);
-  --entete-bouton-texte: var(--brand-text);
-  --entete-bouton-survol-texte: var(--brand-text);
+  --entete-bg: #2b1b12;
+  --entete-fond: linear-gradient(90deg, #2b1b12 0%, #3b2416 55%, #6e3c22 100%);
+  --entete-bord: transparent;
+  --entete-texte: #f5efe6;
+  --entete-texte-doux: rgb(245 239 230 / 0.72);
+  --entete-marque-vert: #098084;
+  --entete-marque-premier: #e29a74;
+  --entete-marque-second: #e29a74;
+  --entete-logo-halo: none;
+  --entete-bouton: rgb(245 239 230 / 0.1);
+  --entete-bouton-survol: rgb(240 184 96 / 0.16);
+  --entete-bouton-texte: #f5efe6;
+  --entete-bouton-survol-texte: #f0b860;
   --fab-bg: #c04d29;
   --fab-texte: #ffffff;
   --fab-ombre: #c04d2960;

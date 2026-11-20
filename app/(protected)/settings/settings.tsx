@@ -2704,7 +2704,8 @@ export default function SettingsPage() {
 
         .settings-root {
           font-family: 'DM Sans', sans-serif;
-          background: linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png") repeat; background-size: auto, 280px auto; color: var(--text-primary);
+          /* Voile crème sous le menu et le titre, qui s'efface vers la droite (20/11/2026). */
+          background: linear-gradient(90deg, color-mix(in srgb, var(--bg-base) 92%, transparent) 0%, color-mix(in srgb, var(--bg-base) 78%, transparent) 45%, transparent 80%), linear-gradient(var(--motif-overlay), var(--motif-overlay)), url("/motif-bg.png") repeat; background-size: auto, auto, 280px auto; color: var(--text-primary);
           display: grid; grid-template-columns: 230px 1fr;
           width: 100%;
           overflow-x: hidden;

@@ -342,6 +342,26 @@ export function PaveNumerique({
     if (chiffres) onChange("")
   }, [chiffres, onChange])
 
+  /*
+   * L'APPUI LONG SUR L'EFFACEMENT VIDE TOUT (20/11/2026), comme sur le clavier
+   * d'un téléphone et sur le composeur du mobile. Le clic qui suit le
+   * relâchement ne doit pas effacer en plus un chiffre… qui n'existe plus.
+   */
+  const minuterieLong = useRef<number | null>(null)
+  const appuiLongFait = useRef(false)
+  const debutAppui = useCallback(() => {
+    appuiLongFait.current = false
+    minuterieLong.current = window.setTimeout(() => {
+      appuiLongFait.current = true
+      vider()
+    }, 550)
+  }, [vider])
+  const finAppui = useCallback(() => {
+    if (minuterieLong.current !== null) window.clearTimeout(minuterieLong.current)
+    minuterieLong.current = null
+  }, [])
+  useEffect(() => finAppui, [finAppui])
+
   const surFrappe = useCallback(
     (evenement: React.KeyboardEvent<HTMLDivElement>) => {
       if (/^[0-9]$/.test(evenement.key)) {
@@ -451,7 +471,17 @@ export function PaveNumerique({
         <button
           type="button"
           className="pave-effacer"
-          onClick={effacer}
+          onPointerDown={debutAppui}
+          onPointerUp={finAppui}
+          onPointerLeave={finAppui}
+          onPointerCancel={finAppui}
+          onClick={() => {
+            if (appuiLongFait.current) {
+              appuiLongFait.current = false
+              return
+            }
+            effacer()
+          }}
           disabled={chiffres.length === 0}
           aria-label={t("erase_last_digit")}
           title={t("erase_last_digit")}

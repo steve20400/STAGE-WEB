@@ -7422,6 +7422,60 @@ export default function ChatRoomPage() {
     return () => document.removeEventListener("keydown", surTouche)
   }, [edition, annulerModification])
 
+  /*
+   * ÉCHAP FERME LA CONVERSATION, comme sur WhatsApp et Telegram (demande du
+   * user, 20/11/2026) — mais en DERNIER : tant qu'un menu, une fenêtre, une
+   * réponse, une modification ou un aperçu est ouvert, c'est lui qui prend
+   * Échap. L'écoute est en phase de CAPTURE, donc AVANT celles des menus :
+   * elle voit encore l'état « ouvert » et s'efface. Écoutée après eux, elle
+   * voyait le menu déjà refermé par la même frappe et fermait aussi la
+   * conversation. Le panneau d'informations, s'il est ouvert, se ferme
+   * d'abord ; un second Échap ferme la conversation.
+   */
+  const ouvertParDessus =
+    !!replyTo ||
+    !!edition ||
+    showAttach ||
+    emojisOuverts ||
+    barreFormatOuverte ||
+    mentionOuverte ||
+    listeEpinglesOuverte ||
+    listeMembresOuverte ||
+    partageContact ||
+    verifOuverte ||
+    !!demandeProtection ||
+    !!lightbox ||
+    !!gallery ||
+    photoAModifier !== null ||
+    pendingMedia.length > 0 ||
+    !!forwardMsg ||
+    !!partageMsg ||
+    !!infosMsg ||
+    !!aSignaler ||
+    recording
+  const etatEchap = useRef({ ouvertParDessus, infoPanelOpen })
+  etatEchap.current = { ouvertParDessus, infoPanelOpen }
+  useEffect(() => {
+    const surEchap = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return
+      if (etatEchap.current.ouvertParDessus) return
+      // Une fenêtre ou un menu d'un autre composant (fiche, menu d'actions…).
+      if (
+        document.querySelector(
+          '[role="dialog"], [aria-modal="true"], [role="menu"], [role="listbox"], .attach-menu'
+        )
+      )
+        return
+      if (etatEchap.current.infoPanelOpen) {
+        setInfoPanelOpen(false)
+        return
+      }
+      navigate("/chats")
+    }
+    window.addEventListener("keydown", surEchap, true)
+    return () => window.removeEventListener("keydown", surEchap, true)
+  }, [navigate])
+
   const sendMessage = useCallback(() => {
     if (edition) {
       validerModification()

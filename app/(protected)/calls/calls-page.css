@@ -776,3 +776,52 @@
   max-width: 1200px;
   margin-inline: auto;
 }
+
+/* Le bouton rond qui ouvre le composeur plein écran — seulement quand le grand
+   panneau (et donc le pavé) n'est pas affiché : téléphone, fenêtre étroite. */
+.calls-fab-composer {
+  position: fixed;
+  right: calc(20px + env(safe-area-inset-right, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 18px;
+  background: var(--fab-bg, var(--accent));
+  color: var(--fab-texte, #fff);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.22);
+  cursor: pointer;
+}
+.calls-fab-composer:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@container sections (min-width: 720px) {
+  .calls-fab-composer {
+    display: none;
+  }
+}
+
+/* « Appeler contact » dans le vert d'ALANY du logotype (#098084, demande du
+   user, 20/11/2026), et à la même taille que la recherche juste dessous :
+   même hauteur, même largeur, même arrondi. Texte blanc lisible (4,7:1). */
+.calls-launchers .new-call-btn {
+  background: #098084;
+  color: #ffffff;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.calls-root .search-wrap {
+  max-width: none;
+}
+.calls-root .search-wrap input {
+  min-height: 44px;
+  border-radius: 10px;
+  box-sizing: border-box;
+}

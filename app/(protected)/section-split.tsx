@@ -16,17 +16,26 @@ interface SectionSplitProps {
      chargement, et ne suivrait pas un changement de langue. */
   title: Cle
   subtitle: Cle
+  /**
+   * Contenu du grand panneau à la place de l'accueil (20/11/2026) : l'écran
+   * Appels y pose son pavé de numérotation.
+   */
+  panel?: ReactNode
 }
 
-export default function SectionSplit({ children, icon, title, subtitle }: SectionSplitProps) {
+export default function SectionSplit({ children, icon, title, subtitle, panel }: SectionSplitProps) {
   const { t } = useTranslation()
   return (
     <div className="section-split">
       <div className="section-split-list">{children}</div>
       <div className="section-split-panel">
-        <div className="section-split-badge">{icon}</div>
-        <div className="section-split-title">{t(title)}</div>
-        <div className="section-split-sub">{t(subtitle)}</div>
+        {panel ?? (
+          <>
+            <div className="section-split-badge">{icon}</div>
+            <div className="section-split-title">{t(title)}</div>
+            <div className="section-split-sub">{t(subtitle)}</div>
+          </>
+        )}
       </div>
     </div>
   )

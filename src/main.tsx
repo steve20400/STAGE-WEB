@@ -33,6 +33,7 @@ import ConvInfoPage from "../app/(protected)/chats/[chatId]/chat-info"
 import { RejoindreGroupePage } from "../app/(protected)/g/rejoindre-groupe"
 import ChatsSplit, { ChatEmptyState } from "../app/(protected)/chats/chats-split"
 import SectionSplit from "../app/(protected)/section-split"
+import PanneauComposeur from "../app/(protected)/calls/panneau-composeur"
 import ContactsPage from "../app/(protected)/contacts/contacts"
 import ColleguesPage from "../app/(protected)/collegues/collegues"
 import EntreprisesPage from "../app/(protected)/entreprises/entreprises"
@@ -264,6 +265,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                           <SectionSplit
                             title="calls"
                             subtitle="core_calls_sub"
+                            panel={<PanneauComposeur />}
                             icon={
                               <svg
                                 width="34"

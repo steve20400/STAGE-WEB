@@ -117,6 +117,15 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* Le voile crème des pages publiques sous le titre et le texte : opaque à
+     gauche, il s'efface vers la droite où le motif reste visible
+     (20/11/2026). */
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--bg-base) 92%, transparent) 0%,
+    color-mix(in srgb, var(--bg-base) 78%, transparent) 45%,
+    transparent 80%
+  );
 }
 
 /* Chaque volet defile POUR LUI : jamais la page entiere. */

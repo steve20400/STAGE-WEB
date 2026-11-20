@@ -137,3 +137,51 @@
     gap: 6px;
   }
 }
+
+/* Ajouter le titulaire aux contacts : un bouton plus discret que les appels,
+   neutre, à leur gauche — comme sur le mobile. */
+.dialer-call.ajout {
+  width: 52px;
+  height: 52px;
+  align-self: center;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+@media (hover: hover) and (pointer: fine) {
+  .dialer-call.ajout:hover:not(:disabled) {
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+}
+
+/* ============================================================
+   INTÉGRÉ AU GRAND PANNEAU DE L'ÉCRAN APPELS (20/11/2026)
+   Plus de plein écran : une carte posée sur le motif, avec son titre. Le
+   texte n'est jamais posé à nu sur le motif.
+   ============================================================ */
+.dialer-root.dialer-integre {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  overflow: visible;
+  grid-template-rows: auto auto auto;
+  gap: 14px;
+  width: min(380px, 100%);
+  padding: 26px 28px 28px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  background: var(--bg-surface);
+  box-shadow: 0 14px 36px rgb(43 27 18 / 0.12);
+}
+.dialer-integre .dialer-pave {
+  align-self: auto;
+}
+.dialer-titre {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
