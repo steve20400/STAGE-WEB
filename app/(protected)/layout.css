@@ -885,13 +885,15 @@
   .avec-barre-nav .ch-list,
   .avec-barre-nav .layout-main > .calls-root,
   .avec-barre-nav .section-split-list .calls-root,
-  .avec-barre-nav .calls-body {
-    padding-bottom: var(--barre-nav-espace);
+  .avec-barre-nav .calls-body,
+  .avec-barre-nav .meetings-list {
+    padding-bottom: calc(var(--barre-nav-espace) + 64px);
   }
   /* `!important` : le bouton des discussions pose sa position dans son style
      propre (bottom: 20px), qui l'emporterait sinon. */
   .avec-barre-nav .chats-fab,
-  .avec-barre-nav .calls-fab-composer {
+  .avec-barre-nav .calls-fab-composer,
+  .avec-barre-nav .meetings-fab {
     bottom: calc(var(--barre-nav-espace) + 4px) !important;
   }
 }

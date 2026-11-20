@@ -564,7 +564,7 @@ export function DocumentViewer({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "14px 18px",
+            padding: "calc(14px + env(safe-area-inset-top, 0px)) 18px 14px",
             borderBottom: `1px solid ${isMe ? "#ffffff15" : "#1a1f24"}`,
             fontFamily: "'Bricolage Grotesque', sans-serif",
             fontWeight: 700,
@@ -2769,7 +2769,7 @@ function MediaGallery({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "14px 18px",
+          padding: "calc(14px + env(safe-area-inset-top, 0px)) 18px 14px",
           color: "#fff",
           flexShrink: 0,
         }}
@@ -2907,7 +2907,7 @@ function MediaGallery({
           display: "flex",
           gap: 7,
           justifyContent: "center",
-          padding: "12px 18px 20px",
+          padding: "12px 18px calc(20px + env(safe-area-inset-bottom, 0px))",
           flexShrink: 0,
         }}
       >
@@ -3129,7 +3129,7 @@ function MediaComposer({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "14px 18px",
+          padding: "calc(14px + env(safe-area-inset-top, 0px)) 18px 14px",
           color: "#fff",
           flexShrink: 0,
         }}
@@ -3303,7 +3303,10 @@ function MediaComposer({
           flexWrap: "wrap",
           alignItems: "flex-end",
           gap: 10,
-          padding: "12px 18px 18px",
+          /* La rangée « légende + Envoyer » reste au-dessus de la barre de gestes
+             et de la barre du navigateur du téléphone : sans cette marge, elle
+             passait dessous et le bouton Envoyer était caché (20/11/2026). */
+          padding: "12px 18px calc(18px + env(safe-area-inset-bottom, 0px))",
           flexShrink: 0,
         }}
       >
