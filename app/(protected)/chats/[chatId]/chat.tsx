@@ -8,6 +8,7 @@ import {
   useCallback,
   useMemo,
   type ErrorInfo,
+  type CSSProperties,
   type ReactNode,
   type RefObject,
 } from "react"
@@ -3453,6 +3454,57 @@ function isVoiceNote(msg: Message): boolean {
   return !msg.fileName || /^vocal-\d+\./i.test(msg.fileName)
 }
 
+/**
+ * AU-DELÀ, UN MESSAGE SE REPLIE — et c'est un nombre de caractères, pas de
+ * lignes, parce qu'il se décide avant le rendu et ne dépend ni de la largeur de
+ * la fenêtre ni de la taille du texte choisie par le lecteur.
+ */
+const SEUIL_TEXTE_LONG = 420
+
+/**
+ * UN LONG MESSAGE SE REPLIE, AVEC « LIRE LA SUITE ».
+ *
+ * 🐛 SIGNALÉ PAR LES TESTEURS (20/11/2026) : « cette barre qui affiche les noms
+ * de tous les membres du groupe m'empêche de lire les messages de façon
+ * confortable ». Ce n'était pas une barre : c'était un MESSAGE contenant la
+ * liste des membres, plus de cent noms, qui occupait la moitié de l'écran et
+ * repoussait toute la conversation. Un message long reste long — on ne peut pas
+ * l'interdire — mais il n'a pas à confisquer la vue.
+ *
+ * ⚠️ SON PROPRE ÉTAT, ET NON CELUI DE LA LISTE. Chaque message décide seul
+ * s'il est déplié : garder l'ensemble dans l'écran de discussion obligerait à
+ * redessiner toute la liste au moindre « lire la suite », et à retenir des
+ * identifiants de messages qui ne sont plus à l'écran.
+ */
+function TexteRepliable({
+  long,
+  style,
+  children,
+}: {
+  long: boolean
+  style?: CSSProperties
+  children: ReactNode
+}) {
+  const { t } = useTranslation()
+  const [deplie, setDeplie] = useState(false)
+  return (
+    <>
+      <span className={long && !deplie ? "texte-replie" : undefined} style={style}>
+        {children}
+      </span>
+      {long && (
+        <button
+          type="button"
+          className="texte-voir-plus"
+          onClick={() => setDeplie((v) => !v)}
+        >
+          {t(deplie ? "msg_reduire" : "msg_lire_suite")}
+        </button>
+      )}
+    </>
+  )
+}
+
 /** Un message cite merite une vignette des lors qu'il porte un fichier. */
 function hasQuotedMedia(msg: Message): boolean {
   return (
@@ -5619,7 +5671,8 @@ function MessageBubble({
                     audios, sinon le texte saisi au moment de l'envoi serait perdu
                     a l'affichage. */}
                   {msg.content && msg.type !== "contact" && msg.type !== "location" && msg.type !== "sticker" && !msg.boutons?.length && (
-                    <span
+                    <TexteRepliable
+                      long={(msg.content?.length ?? 0) > SEUIL_TEXTE_LONG}
                       style={
                         msg.type === "image"
                           ? { display: "block", padding: "6px 8px 4px" }
@@ -5691,7 +5744,7 @@ function MessageBubble({
                         }
                         return null
                       })()}
-                    </span>
+                    </TexteRepliable>
                   )}
                 </>
               )}
@@ -7703,6 +7756,30 @@ export default function ChatRoomPage() {
     }
     return sortie
   }
+
+  /*
+   * LA ZONE DE SAISIE GRANDIT AVEC LE TEXTE — jusqu'à cinq lignes, puis défile.
+   *
+   * 🐛 « LA ZONE D'ÉCRITURE N'EST PAS ASSEZ GRANDE » (testeurs, 20/11/2026) :
+   * elle avait une hauteur FIXE d'une ligne, pour une saisie qui accepte 500
+   * caractères. On écrivait à l'aveugle, et se relire était impossible.
+   *
+   * ⚠️ UN EFFET SUR `input`, ET NON UN GESTE DANS `handleInput` : le texte
+   * change aussi par d'autres chemins que la frappe — l'envoi qui vide le
+   * champ, un brouillon rechargé, une mention insérée, un texte collé. Un
+   * ajustement posé sur la seule frappe aurait laissé la zone haute après
+   * l'envoi, ou basse après un brouillon.
+   *
+   * ⚠️ REMISE À « auto » AVANT DE MESURER : sans cela `scrollHeight` ne
+   * redescend jamais — il rend la hauteur actuelle, et la zone ne saurait que
+   * grandir.
+   */
+  useEffect(() => {
+    const zone = inputRef.current
+    if (!zone) return
+    zone.style.height = "auto"
+    zone.style.height = `${Math.min(110, Math.max(22, zone.scrollHeight))}px`
+  }, [input])
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     // Coupe defensive : `maxLength` sur le textarea couvre la frappe et le

@@ -631,7 +631,20 @@ textarea.room-textarea {
   font-size: 13px;
   font-family: "DM Sans", sans-serif;
   resize: none;
-  height: 22px;
+  /*
+   * 🐛 « LA ZONE D'ÉCRITURE DU MESSAGE N'EST PAS ASSEZ GRANDE » (testeurs,
+   * 20/11/2026). Elle avait une hauteur FIXE de 22 px, soit UNE ligne : on
+   * pouvait écrire 500 caractères sans jamais en voir plus d'une à la fois, et
+   * se relire était impossible. Elle grandit maintenant avec le texte,
+   * jusqu'à cinq lignes, puis défile.
+   *
+   * ⚠️ `min-height` ET `max-height`, jamais `height` : c'est le script qui
+   * pose la hauteur exacte d'après le contenu (`ajusterHauteurSaisie`), et une
+   * hauteur figée ici l'écraserait.
+   */
+  min-height: 22px;
+  max-height: 110px;
+  overflow-y: auto;
   line-height: 1.6;
   padding: 2px 0;
 }
@@ -1664,4 +1677,34 @@ textarea.room-textarea::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+/* ═══════════ UN LONG MESSAGE SE REPLIE (testeurs, 20/11/2026) ═══════════
+ *
+ * Huit lignes : assez pour qu'un message ordinaire ne soit jamais coupé, trop
+ * peu pour qu'une liste de cent noms confisque l'écran.
+ */
+.texte-replie {
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  line-clamp: 8;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.texte-voir-plus {
+  display: block;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.82em;
+  font-weight: 600;
+  /* `currentColor` : la bulle de l'expediteur est sombre, celle du destinataire
+     claire — un accent fixe serait illisible dans l'une des deux. */
+  color: currentColor;
+  opacity: 0.75;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.texte-voir-plus:hover {
+  opacity: 1;
 }
