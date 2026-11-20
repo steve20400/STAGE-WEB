@@ -849,8 +849,8 @@
 /* ============================================================
    LA BARRE DE NAVIGATION DU BAS, SUR TÉLÉPHONE (20/11/2026)
    Copie de celle du mobile : flottante (marges 16 / 12), hauteur 64, rayon
-   20, ombre portée. Elle PLANE : fond translucide et flou, le contenu défile
-   dessous et se voit à travers et à côté.
+   20, ombre portée, fond PLEIN — blanc en thème clair, surface du thème en
+   sombre avec un filet (pas de transparence, demande du user).
    ============================================================ */
 .barre-nav {
   display: none;
@@ -866,19 +866,18 @@
     height: 64px;
     padding: 0 4px;
     border-radius: 20px;
-    background: color-mix(in srgb, var(--bg-surface) 62%, transparent);
-    -webkit-backdrop-filter: blur(18px) saturate(1.6);
-    backdrop-filter: blur(18px) saturate(1.6);
-    border: 1px solid color-mix(in srgb, var(--bg-surface) 70%, transparent);
-    box-shadow: 0 4px 20px rgb(0 0 0 / 0.12);
+    background: #ffffff;
+    border: none;
+    box-shadow: 0 4px 20px rgb(0 0 0 / 0.08);
   }
   :root[data-theme="dark"] .barre-nav {
-    border-color: rgb(255 255 255 / 0.08);
+    background: var(--bg-surface);
+    border: 0.5px solid var(--border-subtle);
     box-shadow: 0 4px 20px rgb(0 0 0 / 0.45);
   }
 
   /* L'espace que la barre occupe : la fin des listes et les boutons ronds
-     passent au-dessus d'elle, le reste défile dessous. */
+     restent au-dessus d'elle. */
   .layout-root.avec-barre-nav {
     --barre-nav-espace: calc(64px + 12px + 12px + env(safe-area-inset-bottom, 0px));
   }
