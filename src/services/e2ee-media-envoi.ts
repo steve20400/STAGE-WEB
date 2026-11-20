@@ -32,6 +32,67 @@ import { empreinteHex, televerser } from "./envoi-morceaux"
  * ⚠️ UN MÉDIA PAR MESSAGE (décision du user, 03/10/2026) : la charge ne porte
  * qu'un descripteur, et dix aperçus ne tiendraient pas dans une enveloppe.
  */
+/**
+ * CE QUI PEUT ÊTRE FAIT AVANT QUE LA LÉGENDE SOIT ÉCRITE — aperçu, chiffrement,
+ * téléversement, descripteur.
+ *
+ * 🔴 POURQUOI CETTE COUPURE (20/11/2026) : des cinq étapes d'un envoi chiffré,
+ * les trois premières ne dépendent QUE du fichier. Elles peuvent donc tourner
+ * pendant que l'utilisateur regarde son aperçu et tape sa légende — comme la
+ * compression le fait déjà depuis le 06/10. Le téléversement est de loin la
+ * plus longue : sur une connexion à 1 Mbit/s en montée, une vidéo compressée à
+ * 4 Mo demande une demi-minute, et aujourd'hui cette demi-minute commence
+ * seulement quand on appuie sur « Envoyer ».
+ *
+ * ⚠️ ELLE NE CHANGE RIEN TOUTE SEULE. `envoyerMediaChiffre` l'appelle comme
+ * avant quand personne ne lui donne de descripteur tout prêt : le comportement
+ * par défaut est identique, octet pour octet.
+ */
+export async function preparerMediaChiffre(
+  fichier: Blob,
+  o: {
+    nom: string
+    mime: string
+    dureeMs?: number
+    onProgression?: (fraction: number) => void
+    sensible?: boolean
+    protection?: ProtectionPdf
+  },
+): Promise<DescripteurMedia> {
+  // 1-2. Aperçu puis chiffrement.
+  const clair = new Uint8Array(await fichier.arrayBuffer())
+  const apercu = await fabriquerApercu(fichier, o.mime, o.dureeMs)
+  const f = await chiffrerFichier(clair)
+
+  // 3. Le fichier chiffré — en morceaux au-delà d'un mébioctet (chapitre 46).
+  // L'empreinte du chiffré, déjà dans le descripteur, sert aussi au serveur à
+  // vérifier l'assemblage.
+  const media = await televerser(
+    new Blob([f.chiffre as Uint8Array<ArrayBuffer>], { type: "application/octet-stream" }),
+    {
+      nom: "chiffre.bin",
+      mime: "application/octet-stream",
+      chiffre: true,
+      empreinteHex: await empreinteHex(f.chiffre),
+      onProgression: o.onProgression,
+    },
+  )
+
+  return {
+    id: media.id,
+    cle: f.cle,
+    empreinte: f.empreinte,
+    taille: clair.length,
+    mime: o.mime,
+    nom: o.nom,
+    ...apercu,
+    // Écrit seulement s'il est vrai : le format d'un document ordinaire ne
+    // change pas (même règle que le mobile).
+    ...(o.sensible ? { sensible: true } : {}),
+    ...(o.sensible && o.protection ? { protection: o.protection } : {}),
+  }
+}
+
 export async function envoyerMediaChiffre(
   convId: string,
   fichier: Blob,
@@ -52,6 +113,12 @@ export async function envoyerMediaChiffre(
     sensible?: boolean
     /** La protection d'un PDF sensible (26/10/2026) : mots de passe, impression. */
     protection?: ProtectionPdf
+    /**
+     * Le descripteur DÉJÀ PRÊT, quand aperçu, chiffrement et téléversement ont
+     * été lancés d'avance (voir `preparerMediaChiffre`). Absent, tout se fait
+     * ici comme avant.
+     */
+    pret?: DescripteurMedia
   },
 ): Promise<{ id: string; createdAt: string; descripteur: DescripteurMedia }> {
   /*
@@ -66,38 +133,9 @@ export async function envoyerMediaChiffre(
     throw new Error("Ce correspondant n'a aucun appareil capable de déchiffrer.")
   }
 
-  // 1-2. Aperçu puis chiffrement.
-  const clair = new Uint8Array(await fichier.arrayBuffer())
-  const apercu = await fabriquerApercu(fichier, o.mime, o.dureeMs)
-  const f = await chiffrerFichier(clair)
-
-  // 3. Le fichier chiffré — en morceaux au-delà d'un mébioctet (chapitre 46).
-  // L'empreinte du chiffré, déjà dans le descripteur, sert aussi au serveur à
-  // vérifier l'assemblage.
-  const media = await televerser(
-    new Blob([f.chiffre as Uint8Array<ArrayBuffer>], { type: "application/octet-stream" }),
-    {
-      nom: "chiffre.bin",
-      mime: "application/octet-stream",
-      chiffre: true,
-      empreinteHex: await empreinteHex(f.chiffre),
-      onProgression: o.onProgression,
-    },
-  )
-
-  const descripteur: DescripteurMedia = {
-    id: media.id,
-    cle: f.cle,
-    empreinte: f.empreinte,
-    taille: clair.length,
-    mime: o.mime,
-    nom: o.nom,
-    ...apercu,
-    // Écrit seulement s'il est vrai : le format d'un document ordinaire ne
-    // change pas (même règle que le mobile).
-    ...(o.sensible ? { sensible: true } : {}),
-    ...(o.sensible && o.protection ? { protection: o.protection } : {}),
-  }
+  // 1-3. Aperçu, chiffrement, téléversement — ou rien, s'ils ont déjà été
+  // faits pendant que la légende s'écrivait.
+  const descripteur: DescripteurMedia = o.pret ?? (await preparerMediaChiffre(fichier, o))
 
   const legende = o.legende ?? ""
   const moi = getMyUserId()
@@ -119,7 +157,7 @@ export async function envoyerMediaChiffre(
       ...(o.replyToId ? { reponseA: o.replyToId } : {}),
     }
     await cacheMessage(entreeCacheDechiffree(entree)).catch(() => undefined)
-    await garderClair(descripteur.id, new Blob([clair as Uint8Array<ArrayBuffer>], { type: o.mime }))
+    await garderClair(descripteur.id, new Blob([fichier], { type: o.mime }))
     return { id: cree.id, createdAt: cree.createdAt, descripteur }
   }
 
@@ -131,7 +169,7 @@ export async function envoyerMediaChiffre(
       body: {
         type: typeDuMessage(descripteur),
         chiffre: true,
-        mediaIds: [media.id],
+        mediaIds: [descripteur.id],
         ...(o.replyToId ? { replyToId: o.replyToId } : {}),
         ...(o.statutCite ? { statutCite: o.statutCite } : {}),
       },
@@ -163,7 +201,7 @@ export async function envoyerMediaChiffre(
     ...(o.replyToId ? { reponseA: o.replyToId } : {}),
   }
   await cacheMessage(entreeCacheDechiffree(entree)).catch(() => undefined)
-  await garderClair(descripteur.id, new Blob([clair as Uint8Array<ArrayBuffer>], { type: o.mime }))
+  await garderClair(descripteur.id, new Blob([fichier], { type: o.mime }))
   archiver(entree)
 
   return { id: message.id, createdAt: message.createdAt, descripteur }
