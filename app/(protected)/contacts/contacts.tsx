@@ -380,7 +380,18 @@ export default function ContactsPage() {
         {filtered.map((contact) => {
           const color = CONTACT_COLORS[contact.color]
           return (
-            <div key={contact.id} className="call-item">
+            <div
+              key={contact.id}
+              className="call-item"
+              /* Un clic sur la ligne ouvre le même menu que les trois points
+                 (demande du user, 20/11/2026). Les clics venus du bouton ou du
+                 menu lui-même sont laissés à ces derniers. */
+              onClick={(e) => {
+                const cible = e.target as HTMLElement
+                if (cible.closest('[aria-haspopup="menu"], [role="menu"]')) return
+                e.currentTarget.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')?.click()
+              }}
+            >
               <div
                 className="call-av"
                 style={{ background: color.bg, color: color.fg, overflow: "hidden" }}
