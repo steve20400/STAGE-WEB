@@ -14,9 +14,76 @@ import "./fonctionnalites.css"
  */
 type Carte = { cle: string; icone: ReactNode }
 
-/** La silhouette du nuage, dans un repère de 1000 × 420 étiré au texte. */
-const TRACE_NUAGE =
-  "M 90 385 L 910 385 A 75 75 0 0 0 965 255 A 95 95 0 0 0 860 125 A 115 115 0 0 0 665 70 A 135 135 0 0 0 430 55 A 115 115 0 0 0 225 95 A 95 95 0 0 0 60 200 A 90 90 0 0 0 90 385 Z"
+/*
+ * Le nuage, en lobes ronds qui se chevauchent, comme un cumulus : une base
+ * allongée, un corps plein sous le texte, puis des bosses de tailles variées,
+ * plus hautes au milieu. [cx, cy, rx, ry]
+ *
+ * DEUX DESSINS : étirer le dessin large dans la colonne d'un téléphone
+ * déformait chaque lobe en œuf. Le second est pensé pour un bloc presque carré.
+ */
+type Lobe = [number, number, number, number]
+
+/** Écran large : repère 1000 × 420. */
+const LOBES_LARGE: Lobe[] = [
+  [500, 318, 450, 92],
+  [120, 300, 92, 82],
+  [235, 225, 118, 112],
+  [385, 160, 132, 128],
+  [545, 128, 150, 138],
+  [705, 168, 128, 122],
+  [830, 238, 104, 100],
+  [925, 305, 72, 70],
+  [300, 300, 140, 96],
+  [640, 290, 170, 104],
+]
+
+/** Téléphone : repère 600 × 560. */
+const LOBES_ETROIT: Lobe[] = [
+  [300, 330, 272, 190],
+  [300, 470, 285, 78],
+  [80, 430, 76, 72],
+  [520, 440, 74, 70],
+  [130, 250, 104, 100],
+  [265, 165, 120, 112],
+  [415, 195, 112, 106],
+  [500, 300, 92, 90],
+  [200, 455, 130, 86],
+  [410, 455, 140, 88],
+]
+
+function Nuage({ forme, lobes, largeur, hauteur }: { forme: string; lobes: Lobe[]; largeur: number; hauteur: number }) {
+  // Identifiants propres à chaque dessin : un dégradé défini dans le dessin
+  // masqué (display: none) ne s'appliquerait plus à l'autre.
+  const lumiere = `fct-nuage-lobe-${forme}`
+  const doux = `fct-nuage-doux-${forme}`
+  return (
+    <svg
+      className={`fct-nuage-forme fct-nuage-${forme}`}
+      viewBox={`0 0 ${largeur} ${hauteur}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <radialGradient id={lumiere} cx="50%" cy="32%" r="68%">
+          <stop offset="0%" style={{ stopColor: "var(--nuage-lumiere)" }} />
+          <stop offset="62%" style={{ stopColor: "var(--nuage-corps)" }} />
+          <stop offset="100%" style={{ stopColor: "var(--nuage-dessous)" }} />
+        </radialGradient>
+        <filter id={doux} x="-6%" y="-12%" width="112%" height="124%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.02 0.045" numOctaves="2" seed="3" result="bruit" />
+          <feDisplacementMap in="SourceGraphic" in2="bruit" scale="9" xChannelSelector="R" yChannelSelector="G" result="bord" />
+          <feGaussianBlur in="bord" stdDeviation="2.2" />
+        </filter>
+      </defs>
+      <g filter={`url(#${doux})`}>
+        {lobes.map(([cx, cy, rx, ry]) => (
+          <ellipse key={`${cx}-${cy}`} cx={cx} cy={cy} rx={rx} ry={ry} fill={`url(#${lumiere})`} />
+        ))}
+      </g>
+    </svg>
+  )
+}
 
 const CARTES: Carte[] = [
   {
@@ -122,24 +189,12 @@ export default function FonctionnalitesPage() {
       <EnTetePublic action="connexion" />
       <main className="fct-corps cp-corps">
         <section className="fct-intro">
-          {/* Le titre dans un nuage (demande du user, 20/11/2026) : une
-              silhouette de nuage dont le bord est effiloché par un bruit
-              (feTurbulence) puis estompé, avec une ombre douce sur le pourtour,
-              pour un rendu proche d'un vrai nuage. Le texte, lui, reste net. */}
+          {/* Le titre dans un nuage (demande du user, 20/11/2026) : des lobes
+              éclairés par le haut, légèrement ombrés en dessous, aux bords
+              adoucis — sans contour. Le texte, posé dessus, reste net. */}
           <div className="fct-nuage">
-            <svg className="fct-nuage-forme" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-hidden="true">
-              <defs>
-                <filter id="fct-nuage-effiloche" x="-8%" y="-15%" width="116%" height="130%">
-                  <feTurbulence type="fractalNoise" baseFrequency="0.011 0.028" numOctaves="3" seed="7" result="bruit" />
-                  <feDisplacementMap in="SourceGraphic" in2="bruit" scale="26" xChannelSelector="R" yChannelSelector="G" />
-                </filter>
-              </defs>
-              <g filter="url(#fct-nuage-effiloche)">
-                {/* Le pourtour ombré, un peu plus large que le corps. */}
-                <path className="fct-nuage-ombre" d={TRACE_NUAGE} vectorEffect="non-scaling-stroke" />
-                <path className="fct-nuage-corps" d={TRACE_NUAGE} />
-              </g>
-            </svg>
+            <Nuage forme="large" lobes={LOBES_LARGE} largeur={1000} hauteur={420} />
+            <Nuage forme="etroit" lobes={LOBES_ETROIT} largeur={600} hauteur={560} />
             <h1 className="fct-titre">{tr("fct_titre")}</h1>
             <p className="fct-sous-titre">{tr("fct_sous_titre")}</p>
           </div>

@@ -45,23 +45,34 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  /* Le bord estompé : tout le dessin est flouté, en pixels d'écran (le même
-     flou quelle que soit la taille du nuage), puis posé sur une ombre douce. */
-  filter: blur(5px) drop-shadow(0 14px 22px rgb(43 27 18 / 0.14));
+  /* Une ombre portée douce et chaude sous le nuage, pas de contour. */
+  filter: drop-shadow(0 18px 26px rgb(43 27 18 / 0.13)) drop-shadow(0 2px 4px rgb(43 27 18 / 0.06));
 }
-/* Le pourtour : un trait large et clair-obscur, que le flou fond en ombre. */
-.fct-nuage-ombre {
-  fill: none;
-  stroke: var(--nuage-bord);
-  stroke-width: 16;
-  stroke-linejoin: round;
-}
-.fct-nuage-corps {
-  fill: var(--nuage-fond);
-}
+/* Lumière en haut des lobes, corps crème, dessous à peine grisé. */
 .fct-corps {
-  --nuage-fond: color-mix(in srgb, var(--bg-base) 97%, transparent);
-  --nuage-bord: color-mix(in srgb, var(--accent) 22%, transparent);
+  --nuage-lumiere: #fffdf9;
+  --nuage-corps: #fbf5ec;
+  --nuage-dessous: #eadfd0;
+}
+/* En sombre, un nuage de nuit : des écarts de teinte faibles, sinon chaque
+   lobe montre des anneaux et le nuage tourne au tas de pierres. */
+:root[data-theme="dark"] .fct-corps {
+  --nuage-lumiere: #33251a;
+  --nuage-corps: #2c2017;
+  --nuage-dessous: #241911;
+}
+
+/* Un seul des deux dessins à la fois : le large, ou celui du téléphone. */
+.fct-nuage-etroit {
+  display: none;
+}
+@media (max-width: 600px) {
+  .fct-nuage-large {
+    display: none;
+  }
+  .fct-nuage-etroit {
+    display: block;
+  }
 }
 @media (max-width: 600px) {
   .fct-nuage {
