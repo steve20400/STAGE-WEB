@@ -615,25 +615,29 @@ export default function ChatsPage() {
   return (
     <div className="chats-root">
       <div className="ch-header">
-        {/* Carte profil : nom + Alanya ID, comme en tete de liste sur mobile */}
+        {/* Carte profil compacte (nom + ID) et, sur la même ligne, le bouton
+            « Nouvelle discussion » réduit à son « + » (20/11/2026). */}
+        <div className="ch-moi-ligne">
         <div
+          className="ch-moi-carte"
           onClick={() => navigate("/settings")}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            gap: 10,
+            flex: 1,
+            minWidth: 0,
             background: "var(--bg-surface)",
             border: "1px solid var(--border-subtle)",
-            borderRadius: 14,
-            padding: "12px 14px",
-            marginBottom: 14,
+            borderRadius: 12,
+            padding: "7px 10px",
             cursor: "pointer",
           }}
         >
           <div
             style={{
-              width: 42,
-              height: 42,
+              width: 34,
+              height: 34,
               borderRadius: "50%",
               background: "var(--brand)",
               color: "var(--brand-text)",
@@ -679,7 +683,7 @@ export default function ChatsPage() {
               {sessionUser?.name ?? t("my_profile")}
             </div>
             <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-              Alanya ID :{" "}
+              ID :{" "}
               <strong style={{ color: "var(--accent)" }}>
                 {sessionUser?.phone ? formatAlanyaNumber(sessionUser.phone) : "—"}
               </strong>
@@ -697,24 +701,30 @@ export default function ChatsPage() {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </div>
-
-        <div className="ch-title-row page-title-row">
-          <h1 className="ch-title">{t("chats")}</h1>
-          <button className="new-chat-btn" onClick={() => navigate("/chats/new")}>
+          <button
+            className="new-chat-btn ch-nouvelle"
+            onClick={() => navigate("/chats/new")}
+            aria-label={t("new_chat")}
+            title={t("new_chat")}
+          >
             <svg
-              width="14"
-              height="14"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2.5"
               strokeLinecap="round"
+              aria-hidden
             >
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            {t("new_chat")}
           </button>
+        </div>
+
+        <div className="ch-title-row page-title-row">
+          <h1 className="ch-title">{t("chats")}</h1>
         </div>
 
         {/* Recherche */}

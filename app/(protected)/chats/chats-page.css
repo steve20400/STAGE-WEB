@@ -432,3 +432,25 @@
     opacity: 1;
   }
 }
+
+/* La carte du profil et le bouton « + », sur une ligne (20/11/2026). */
+.ch-moi-ligne {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ch-moi-ligne .new-chat-btn.ch-nouvelle {
+  flex: none;
+  width: 50px;
+  min-height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+}
+
+/* La recherche suit la largeur de la colonne, qui se redimensionne. */
+.chats-root .search-wrap {
+  max-width: none;
+}

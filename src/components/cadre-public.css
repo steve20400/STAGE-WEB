@@ -11,7 +11,7 @@
   /* Les cartes des pages publiques (fonctionnalités, connexion, inscription) :
      un crème chaud plutôt que le blanc pur, jugé agressif sur le motif
      (demande du user, 20/11/2026). */
-  --carte-publique: #faf4ea;
+  --carte-publique: #fdf9f3;
   --carte-publique-bord: rgb(138 75 43 / 0.14);
   --carte-publique-ombre: 0 12px 32px rgb(43 27 18 / 0.1);
   /* Un dégradé : chocolat profond sous le logo, qui se réchauffe vers le brun

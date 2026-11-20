@@ -1819,6 +1819,7 @@ export const WEB_TRANSLATION_KEYS = [
   "rogner_illisible",
   "rogner_valider",
   // La page « Fonctionnalités » (20/11/2026).
+  "redimensionner_liste",
   "fct_titre",
   "fct_sous_titre",
   "fct_messages_titre",
@@ -1855,6 +1856,7 @@ export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    redimensionner_liste: "Redimensionner la liste (double-clic : taille par défaut)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Tout ce qu'Alanya Work fait pour vous",
     fct_sous_titre: "Une seule application pour écrire, appeler, se réunir et travailler en équipe, sur téléphone comme sur ordinateur.",
@@ -3711,6 +3713,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Afficher l'aperçu",
   },
   en: {
+    redimensionner_liste: "Resize the list (double-click: default size)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Everything Alanya Work does for you",
     fct_sous_titre: "One app to message, call, meet and work as a team, on your phone and on your computer.",
@@ -5553,6 +5556,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Show preview",
   },
   es: {
+    redimensionner_liste: "Cambiar el tamaño de la lista (doble clic: tamaño predeterminado)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Todo lo que Alanya Work hace por ti",
     fct_sous_titre: "Una sola aplicación para escribir, llamar, reunirse y trabajar en equipo, en el teléfono y en el ordenador.",
@@ -7395,6 +7399,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Mostrar vista previa",
   },
   de: {
+    redimensionner_liste: "Liste in der Größe ändern (Doppelklick: Standardgröße)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Alles, was Alanya Work für Sie tut",
     fct_sous_titre: "Eine App zum Schreiben, Telefonieren, für Besprechungen und Teamarbeit, auf dem Telefon wie am Computer.",
@@ -9250,6 +9255,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Vorschau anzeigen",
   },
   pt: {
+    redimensionner_liste: "Redimensionar a lista (duplo clique: tamanho padrão)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Tudo o que o Alanya Work faz por você",
     fct_sous_titre: "Um só aplicativo para escrever, ligar, se reunir e trabalhar em equipe, no celular e no computador.",
@@ -11092,6 +11098,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Mostrar pré-visualização",
   },
   ru: {
+    redimensionner_liste: "Изменить ширину списка (двойной щелчок — по умолчанию)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Всё, что Alanya Work делает для вас",
     fct_sous_titre: "Одно приложение для переписки, звонков, встреч и командной работы — на телефоне и на компьютере.",
@@ -12927,6 +12934,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Показать предпросмотр",
   },
   zh: {
+    redimensionner_liste: "调整列表宽度（双击恢复默认）",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Alanya Work 能为您做的一切",
     fct_sous_titre: "一个应用即可聊天、通话、开会和团队协作，手机和电脑都能用。",
@@ -14724,6 +14732,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "显示预览",
   },
   sv: {
+    redimensionner_liste: "Ändra listans bredd (dubbelklick: standardstorlek)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Allt som Alanya Work gör för dig",
     fct_sous_titre: "En app för att skriva, ringa, mötas och arbeta i team, på telefonen och på datorn.",
@@ -16561,6 +16570,7 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Visa förhandsvisning",
   },
   no: {
+    redimensionner_liste: "Endre listens bredde (dobbeltklikk: standardstørrelse)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Alt Alanya Work gjør for deg",
     fct_sous_titre: "Én app for å skrive, ringe, møtes og jobbe i team, på telefonen og på datamaskinen.",

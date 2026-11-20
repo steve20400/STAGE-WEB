@@ -14,8 +14,13 @@
 
 /* Colonne de gauche : liste des discussions (largeur fixe) */
 .chats-split-list {
-  /* La colonne suit la largeur de l'écran, entre 320 et 440 px. */
-  width: clamp(320px, 26vw, 440px);
+  /* Largeur par défaut, qui est aussi le MINIMUM : elle suit l'écran, entre
+     320 et 440 px. L'utilisateur l'élargit en tirant la poignée
+     (`--largeur-liste`), jusqu'à 720 px et jamais plus de 55 % de la place. */
+  position: relative;
+  width: var(--largeur-liste, clamp(320px, 26vw, 440px));
+  min-width: clamp(320px, 26vw, 440px);
+  max-width: min(720px, 55cqw);
   flex-shrink: 0;
   min-height: 0;
   display: flex;
@@ -123,5 +128,51 @@
   }
   .chats-split.room-open .chats-split-room {
     display: flex;
+  }
+}
+
+/* La poignée de redimensionnement, sur le bord droit de la liste : invisible
+   au repos, un trait d'accent au survol, au focus et pendant le glissement. */
+.chats-split-poignee {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  width: 8px;
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+}
+.chats-split-poignee::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+.chats-split-poignee:hover::after,
+.chats-split-poignee:focus-visible::after,
+.redimension-en-cours .chats-split-poignee::after {
+  background: var(--accent);
+}
+.chats-split-poignee:focus-visible {
+  outline: none;
+}
+/* Pendant le glissement : pas de sélection de texte, curseur partout. */
+.redimension-en-cours {
+  cursor: col-resize;
+  user-select: none;
+}
+/* Une seule colonne (téléphone, fenêtre étroite) : rien à redimensionner. */
+@container discussions (max-width: 719.98px) {
+  .chats-split-poignee {
+    display: none;
+  }
+  .chats-split-list {
+    min-width: 0;
+    max-width: none;
   }
 }

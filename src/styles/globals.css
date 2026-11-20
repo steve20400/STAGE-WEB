@@ -178,7 +178,7 @@ button {
   --bg-base: #f5efe6; /* creme (fond mobile) */
   /* Cartes et panneaux : un blanc cassé chaud, plus le blanc pur jugé
      agressif sur le motif (demande du user, 20/11/2026). */
-  --bg-surface: #fbf6ee; /* cartes, panels */
+  --bg-surface: #fdfaf5; /* cartes, panels */
   --bg-elevated: #fdfaf4; /* dropdowns */
   --bg-hover: #efe4d3; /* hover liste */
   --bg-input: #ffffff; /* champs */
