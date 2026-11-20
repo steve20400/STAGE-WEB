@@ -1,0 +1,150 @@
+/*
+ * L'ASSISTANT ET SES CONVERSATIONS (20/11/2026), comme sur le mobile : la
+ * liste à gauche, la conversation ouverte à droite. En dessous de 720 px de
+ * place, une seule colonne : la conversation, et la liste par-dessus quand on
+ * l'appelle depuis l'en-tête.
+ */
+.ia-page {
+  container: assistant / inline-size;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.ia-page .room-root.ia-fil {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+.ia-liste {
+  width: clamp(280px, 24vw, 360px);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-base);
+}
+.ia-liste-tete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 12px;
+}
+.ia-liste-titre {
+  flex: 1;
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+.ia-nouvelle {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.ia-liste-vide {
+  padding: 24px 16px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+.ia-conversations {
+  list-style: none;
+  overflow-y: auto;
+  padding: 0 8px 16px;
+}
+.ia-conversation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ia-conversation.active {
+  background: var(--accent-dim);
+}
+.ia-conversation:focus-visible,
+.ia-nouvelle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ia-conversation-icone {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.ia-conversation-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ia-conversation-titre,
+.ia-conversation-apercu {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ia-conversation-titre {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+.ia-conversation-apercu {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ia-conversation:hover {
+    background: var(--bg-hover);
+  }
+  .ia-conversation.active:hover {
+    background: var(--accent-dim);
+  }
+  .ia-nouvelle:hover {
+    opacity: 0.88;
+  }
+}
+
+/* Deux colonnes : le bouton « liste » et le « + » de l'en-tête sont inutiles. */
+.ia-voir-liste,
+.ia-nouvelle-tete {
+  display: none;
+}
+
+/* Une seule colonne. */
+@container assistant (max-width: 719.98px) {
+  .ia-liste {
+    display: none;
+  }
+  .ia-voir-liste,
+  .ia-nouvelle-tete {
+    display: flex;
+  }
+  .ia-page.liste-visible .ia-liste {
+    display: flex;
+    width: 100%;
+    border-right: none;
+  }
+  .ia-page.liste-visible .ia-fil {
+    display: none;
+  }
+}

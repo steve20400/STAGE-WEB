@@ -39,3 +39,56 @@ export async function sendAiMessage(message: string): Promise<AiMessage> {
 export async function clearAiHistory(): Promise<void> {
   await apiRequest("/api/ai/messages", { method: "DELETE" })
 }
+
+/*
+ * LES CONVERSATIONS AVEC L'ASSISTANT (20/11/2026), comme sur le mobile
+ * (`ai_repository.dart`). Le serveur les tient depuis longtemps ; le web, lui,
+ * ne connaissait que l'ancien fil unique (`/api/ai/messages`).
+ */
+
+/** Résumé d'une conversation, pour la liste (de la plus récente à la plus ancienne). */
+export interface AiConversation {
+  id: string
+  title: string
+  updatedAt: string | null
+  lastMessage: string | null
+}
+
+export async function listerConversationsIa(): Promise<AiConversation[]> {
+  const reponse = await apiRequest<{
+    threads?: Array<{ id: string; title?: string | null; updatedAt?: string | null; lastMessage?: string | null }>
+  }>("/api/ai/threads")
+  return (reponse?.threads ?? []).map((t) => ({
+    id: t.id,
+    title: t.title || "Conversation",
+    updatedAt: t.updatedAt ?? null,
+    lastMessage: t.lastMessage ?? null,
+  }))
+}
+
+export async function messagesConversationIa(threadId: string): Promise<AiMessage[]> {
+  const reponse = await apiRequest<{ messages?: AiMessage[] }>(
+    `/api/ai/threads/${encodeURIComponent(threadId)}/messages`
+  )
+  return reponse?.messages ?? []
+}
+
+/**
+ * Envoie un message dans une conversation ; `threadId` nul en ouvre une
+ * nouvelle. Rend l'identifiant de la conversation, pour la poursuivre.
+ * 75 secondes : l'assistant peut chercher sur Internet avant de répondre.
+ */
+export async function envoyerMessageIa(
+  message: string,
+  threadId: string | null
+): Promise<{ threadId: string; reply: AiMessage }> {
+  return apiRequest<{ threadId: string; reply: AiMessage }>("/api/ai/chat", {
+    method: "POST",
+    body: threadId ? { message, threadId } : { message },
+    signal: AbortSignal.timeout(75_000),
+  })
+}
+
+export async function supprimerConversationIa(threadId: string): Promise<void> {
+  await apiRequest(`/api/ai/threads/${encodeURIComponent(threadId)}`, { method: "DELETE" })
+}

@@ -1820,6 +1820,11 @@ export const WEB_TRANSLATION_KEYS = [
   "rogner_valider",
   // La page « Fonctionnalités » (20/11/2026).
   "redimensionner_liste",
+  // Les conversations avec l'assistant (20/11/2026), textes repris du mobile.
+  "ai_my_conversations",
+  "ai_new_conversation",
+  "ai_empty",
+  "ai_delete_conversation_body",
   "fct_titre",
   "fct_sous_titre",
   "fct_messages_titre",
@@ -1856,6 +1861,10 @@ export type WebTranslationKey = (typeof WEB_TRANSLATION_KEYS)[number]
 
 export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKey, string>>> = {
   fr: {
+    ai_my_conversations: "Mes conversations",
+    ai_new_conversation: "Nouvelle conversation",
+    ai_empty: "Aucune conversation. Pose une question !",
+    ai_delete_conversation_body: "Les échanges de cette conversation seront supprimés.",
     redimensionner_liste: "Redimensionner la liste (double-clic : taille par défaut)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Tout ce qu'Alanya Work fait pour vous",
@@ -3713,6 +3722,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Afficher l'aperçu",
   },
   en: {
+    ai_my_conversations: "My conversations",
+    ai_new_conversation: "New conversation",
+    ai_empty: "No conversations. Ask a question!",
+    ai_delete_conversation_body: "All messages in this conversation will be deleted.",
     redimensionner_liste: "Resize the list (double-click: default size)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Everything Alanya Work does for you",
@@ -5556,6 +5569,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Show preview",
   },
   es: {
+    ai_my_conversations: "Mis conversaciones",
+    ai_new_conversation: "Nueva conversación",
+    ai_empty: "Sin conversaciones. ¡Haz una pregunta!",
+    ai_delete_conversation_body: "Se eliminarán los mensajes de esta conversación.",
     redimensionner_liste: "Cambiar el tamaño de la lista (doble clic: tamaño predeterminado)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Todo lo que Alanya Work hace por ti",
@@ -7399,6 +7416,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Mostrar vista previa",
   },
   de: {
+    ai_my_conversations: "Meine Unterhaltungen",
+    ai_new_conversation: "Neue Unterhaltung",
+    ai_empty: "Keine Unterhaltungen. Stell eine Frage!",
+    ai_delete_conversation_body: "Alle Nachrichten dieser Unterhaltung werden gelöscht.",
     redimensionner_liste: "Liste in der Größe ändern (Doppelklick: Standardgröße)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Alles, was Alanya Work für Sie tut",
@@ -9255,6 +9276,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Vorschau anzeigen",
   },
   pt: {
+    ai_my_conversations: "As minhas conversas",
+    ai_new_conversation: "Nova conversa",
+    ai_empty: "Sem conversas. Faz uma pergunta!",
+    ai_delete_conversation_body: "As mensagens desta conversa serão eliminadas.",
     redimensionner_liste: "Redimensionar a lista (duplo clique: tamanho padrão)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Tudo o que o Alanya Work faz por você",
@@ -11098,6 +11123,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Mostrar pré-visualização",
   },
   ru: {
+    ai_my_conversations: "Мои беседы",
+    ai_new_conversation: "Новая беседа",
+    ai_empty: "Бесед нет. Задай вопрос!",
+    ai_delete_conversation_body: "Все сообщения этой беседы будут удалены.",
     redimensionner_liste: "Изменить ширину списка (двойной щелчок — по умолчанию)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Всё, что Alanya Work делает для вас",
@@ -12934,6 +12963,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Показать предпросмотр",
   },
   zh: {
+    ai_my_conversations: "我的会话",
+    ai_new_conversation: "新会话",
+    ai_empty: "暂无会话，问点什么吧！",
+    ai_delete_conversation_body: "此会话中的所有消息将被删除。",
     redimensionner_liste: "调整列表宽度（双击恢复默认）",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Alanya Work 能为您做的一切",
@@ -14732,6 +14765,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "显示预览",
   },
   sv: {
+    ai_my_conversations: "Mina konversationer",
+    ai_new_conversation: "Ny konversation",
+    ai_empty: "Inga konversationer. Ställ en fråga!",
+    ai_delete_conversation_body: "Alla meddelanden i konversationen raderas.",
     redimensionner_liste: "Ändra listans bredd (dubbelklick: standardstorlek)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Allt som Alanya Work gör för dig",
@@ -16570,6 +16607,10 @@ export const WEB_CATALOGUE: Record<LanguageCode, Partial<Record<WebTranslationKe
     dl_show_preview: "Visa förhandsvisning",
   },
   no: {
+    ai_my_conversations: "Mine samtaler",
+    ai_new_conversation: "Ny samtale",
+    ai_empty: "Ingen samtaler. Still et spørsmål!",
+    ai_delete_conversation_body: "Alle meldinger i samtalen slettes.",
     redimensionner_liste: "Endre listens bredde (dobbeltklikk: standardstørrelse)",
     // La page « Fonctionnalités » (20/11/2026).
     fct_titre: "Alt Alanya Work gjør for deg",

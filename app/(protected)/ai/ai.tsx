@@ -1,15 +1,19 @@
 import { useTranslation } from "../../../src/i18n"
 import { FenetreSignalement } from "../../../src/components/signalement"
 import { Icone } from "../../../src/components/icone"
-import { lazy, Suspense, useEffect, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useToast } from "../../../src/components/toast"
+import { RowActionsMenu } from "../../../src/components/row-actions-menu"
 import {
-  clearAiHistory,
-  fetchAiMessages,
-  sendAiMessage,
+  envoyerMessageIa,
+  listerConversationsIa,
+  messagesConversationIa,
+  supprimerConversationIa,
+  type AiConversation,
   type AiMessage,
 } from "../../../src/services/ai-service"
 import "../chats/[chatId]/chat-room-page.css"
+import "./ai-page.css"
 
 // La mise en forme des reponses, chargee a la demande (01/11/2026) : voir
 // `texte-markdown.tsx`.
@@ -33,23 +37,74 @@ export default function AiAssistantPage() {
   const [loading, setLoading] = useState(true)
   const [thinking, setThinking] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+
+  /*
+   * LES CONVERSATIONS (20/11/2026), comme sur le mobile : la liste à gauche,
+   * la conversation ouverte à droite. À l'ouverture de l'écran, la plus
+   * récente s'affiche ; « + » en commence une nouvelle, dont l'identifiant
+   * arrive avec la première réponse. Sur téléphone, une seule colonne à la
+   * fois : la conversation, et la liste derrière le bouton de l'en-tête.
+   */
+  const [conversations, setConversations] = useState<AiConversation[]>([])
+  const [threadId, setThreadId] = useState<string | null>(null)
+  const [listeVisible, setListeVisible] = useState(false)
+  /** Conversation à supprimer depuis la liste (sinon : la conversation ouverte). */
+  const [aSupprimer, setASupprimer] = useState<string | null>(null)
+  /** Ignore une réponse qui arrive pour une conversation qu'on a quittée. */
+  const conversationAffichee = useRef<string | null>(null)
+
+  const rafraichirListe = useCallback(async () => {
+    try {
+      const liste = await listerConversationsIa()
+      setConversations(liste)
+      return liste
+    } catch {
+      return null
+    }
+  }, [])
+
+  const ouvrirConversation = useCallback(
+    async (id: string) => {
+      conversationAffichee.current = id
+      setThreadId(id)
+      setListeVisible(false)
+      setLoading(true)
+      try {
+        const liste = await messagesConversationIa(id)
+        if (conversationAffichee.current === id) setMessages(liste)
+      } catch (err) {
+        error(t("assistant"), err instanceof Error ? err.message : t("ai_unavailable"))
+      } finally {
+        if (conversationAffichee.current === id) setLoading(false)
+      }
+    },
+    [error, t]
+  )
+
+  const nouvelleConversation = useCallback(() => {
+    conversationAffichee.current = null
+    setThreadId(null)
+    setMessages([])
+    setListeVisible(false)
+    setLoading(false)
+    inputRef.current?.focus()
+  }, [])
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // À l'ouverture : la liste, puis la conversation la plus récente.
   useEffect(() => {
-    let cancelled = false
-    void fetchAiMessages()
-      .then((list) => {
-        if (!cancelled) setMessages(list)
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+    let annule = false
+    void (async () => {
+      const liste = await rafraichirListe()
+      if (annule) return
+      if (liste && liste.length > 0) await ouvrirConversation(liste[0].id)
+      else setLoading(false)
+    })()
     return () => {
-      cancelled = true
+      annule = true
     }
-  }, [])
+  }, [ouvrirConversation, rafraichirListe])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -69,9 +124,17 @@ export default function AiAssistantPage() {
     setInput("")
     setThinking(true)
 
+    const depuis = threadId
     try {
-      const reply = await sendAiMessage(text)
-      setMessages((prev) => [...prev, reply])
+      const { threadId: recu, reply } = await envoyerMessageIa(text, depuis)
+      // On a pu changer de conversation pendant que l'assistant réfléchissait.
+      if (conversationAffichee.current === depuis) {
+        conversationAffichee.current = recu
+        setThreadId(recu)
+        setMessages((prev) => [...prev, reply])
+      }
+      // Une nouvelle conversation apparaît en tête ; une ancienne y remonte.
+      void rafraichirListe()
     } catch (err) {
       const message = err instanceof Error ? err.message : t("ai_unavailable")
       error(t("assistant"), message)
@@ -89,21 +152,106 @@ export default function AiAssistantPage() {
   }
 
   const handleClear = async () => {
+    const cible = aSupprimer ?? threadId
     try {
-      await clearAiHistory()
-      setMessages([])
+      if (cible) await supprimerConversationIa(cible)
+      if (cible === threadId) nouvelleConversation()
+      setConversations((liste) => liste.filter((c) => c.id !== cible))
     } catch (err) {
       const message = err instanceof Error ? err.message : t("set_delete_failed_detail")
       error(t("error"), message)
     } finally {
       setConfirmClear(false)
+      setASupprimer(null)
     }
   }
 
+  const titreOuvert = conversations.find((c) => c.id === threadId)?.title
+
   return (
-    <div className="room-root">
+    <div className={`ia-page${listeVisible ? " liste-visible" : ""}`}>
+      <aside className="ia-liste" aria-label={t("ai_my_conversations")}>
+        <div className="ia-liste-tete">
+          <h2 className="ia-liste-titre">{t("ai_my_conversations")}</h2>
+          <button
+            type="button"
+            className="ia-nouvelle"
+            onClick={nouvelleConversation}
+            aria-label={t("ai_new_conversation")}
+            title={t("ai_new_conversation")}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        </div>
+        {conversations.length === 0 ? (
+          <p className="ia-liste-vide">{t("ai_empty")}</p>
+        ) : (
+          <ul className="ia-conversations">
+            {conversations.map((c) => (
+              <li key={c.id}>
+                <div
+                  className={`ia-conversation${c.id === threadId ? " active" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-current={c.id === threadId ? "true" : undefined}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('[aria-haspopup="menu"], [role="menu"]')) return
+                    void ouvrirConversation(c.id)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && e.target === e.currentTarget) void ouvrirConversation(c.id)
+                  }}
+                >
+                  <span className="ia-conversation-icone" aria-hidden>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                    </svg>
+                  </span>
+                  <span className="ia-conversation-texte">
+                    <span className="ia-conversation-titre">{c.title}</span>
+                    {c.lastMessage && <span className="ia-conversation-apercu">{c.lastMessage}</span>}
+                  </span>
+                  <RowActionsMenu
+                    ariaLabel={t("l2_actions_for", { nom: c.title })}
+                    actions={[
+                      {
+                        label: t("delete"),
+                        danger: true,
+                        onSelect: () => {
+                          setASupprimer(c.id)
+                          setConfirmClear(true)
+                        },
+                      },
+                    ]}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </aside>
+
+    <div className="room-root ia-fil">
       {/* En-tete facon conversation */}
       <div className="room-top">
+        {/* Sur téléphone : la liste des conversations, derrière ce bouton. */}
+        <button
+          type="button"
+          className="action-btn ia-voir-liste"
+          onClick={() => setListeVisible(true)}
+          aria-label={t("ai_my_conversations")}
+          title={t("ai_my_conversations")}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="M8 6h13M8 12h13M8 18h13" />
+            <circle cx="3.5" cy="6" r="1.2" />
+            <circle cx="3.5" cy="12" r="1.2" />
+            <circle cx="3.5" cy="18" r="1.2" />
+          </svg>
+        </button>
         <div className="room-av" style={{ background: "var(--brand)", color: "var(--brand-text)" }}>
           <svg
             width="20"
@@ -121,10 +269,23 @@ export default function AiAssistantPage() {
         </div>
         <div className="room-info">
           <div className="room-name">{t("s2_ai_name")}</div>
+          <div className="room-sub">{titreOuvert ?? t("ai_new_conversation")}</div>
         </div>
         <div className="room-actions">
           <button
+            className="action-btn ia-nouvelle-tete"
+            onClick={nouvelleConversation}
+            title={t("ai_new_conversation")}
+            aria-label={t("ai_new_conversation")}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+          <button
             className="action-btn"
+            disabled={!threadId}
             onClick={() => setConfirmClear(true)}
             title={t("ai_clear")}
             aria-label={t("ai_clear")}
@@ -275,7 +436,10 @@ export default function AiAssistantPage() {
 
       {confirmClear && (
         <div
-          onClick={() => setConfirmClear(false)}
+          onClick={() => {
+            setConfirmClear(false)
+            setASupprimer(null)
+          }}
           style={{
             position: "fixed",
             inset: 0,
@@ -308,11 +472,14 @@ export default function AiAssistantPage() {
               {t("ai_clear_confirm")}
             </div>
             <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 16 }}>
-              {t("ai_clear_detail")}
+              {t("ai_delete_conversation_body")}
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
-                onClick={() => setConfirmClear(false)}
+                onClick={() => {
+                  setConfirmClear(false)
+                  setASupprimer(null)
+                }}
                 style={{
                   background: "none",
                   border: "1px solid var(--border-default)",
@@ -344,6 +511,7 @@ export default function AiAssistantPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }
