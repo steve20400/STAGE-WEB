@@ -791,19 +791,23 @@
    Le même chocolat en dégradé que le haut : la barre est encadrée par la
    marque. Texte crème, statut en ligne en vert clair, boutons discrets.
    ============================================================ */
+/* La couleur de la marque ne couvre que le profil, pas le bouton de thème :
+   la bande est la plus courte possible (demande du user, 20/11/2026). */
 .sb-footer {
+  padding: 0;
+}
+.sb-footer .sb-theme-row {
+  padding: 10px 12px;
+}
+.sb-pied-marque {
+  padding: 12px;
   background: var(--entete-fond, var(--entete-bg));
-  border-top: 1px solid var(--entete-bord);
 }
 /* Le bouton de thème à gauche, plein (20/11/2026). */
 .sb-theme-row {
   justify-content: flex-start;
 }
-.sb-footer .bascule-theme {
-  color: var(--entete-texte);
-  background: rgb(245 239 230 / 0.16);
-  border-color: rgb(245 239 230 / 0.4);
-}
+
 .sb-footer .sb-user-name {
   color: var(--entete-texte);
 }
@@ -824,11 +828,6 @@
   border-color: var(--entete-bg);
 }
 @media (hover: hover) and (pointer: fine) {
-  .sb-footer .bascule-theme:hover {
-    color: #f0b860;
-    border-color: #f0b860;
-    background: rgb(240 184 96 / 0.14);
-  }
   .sb-footer .sb-profile:hover {
     background: rgb(245 239 230 / 0.2);
     border-color: rgb(245 239 230 / 0.4);

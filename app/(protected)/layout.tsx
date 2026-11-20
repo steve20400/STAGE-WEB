@@ -542,36 +542,40 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
         <div className="sb-theme-row">
           <ThemeToggle />
         </div>
-        <div className="sb-profile" onClick={() => navigate("/settings")}>
-          {/* Sans overflow: hidden, qui rognait le point de presence ; la photo
-              s'arrondit elle-meme (20/11/2026). */}
-          <div className="sb-avatar">
-            {avatarDisplaySrc(sessionUser?.avatar) ? (
-              <img
-                src={avatarDisplaySrc(sessionUser?.avatar)!}
-                alt=""
-                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-              />
-            ) : (
-              user.initials
-            )}
-            <div className="sb-avatar-dot" />
+        {/* La bande de couleur de la marque ne porte que le profil : le bouton
+            de thème reste sur le fond clair de la barre (20/11/2026). */}
+        <div className="sb-pied-marque">
+          <div className="sb-profile" onClick={() => navigate("/settings")}>
+            {/* Sans overflow: hidden, qui rognait le point de presence ; la photo
+                s'arrondit elle-meme (20/11/2026). */}
+            <div className="sb-avatar">
+              {avatarDisplaySrc(sessionUser?.avatar) ? (
+                <img
+                  src={avatarDisplaySrc(sessionUser?.avatar)!}
+                  alt=""
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                />
+              ) : (
+                user.initials
+              )}
+              <div className="sb-avatar-dot" />
+            </div>
+            <div className="sb-user-info">
+              <div className="sb-user-name">{user.name}</div>
+              <div className="sb-user-status">{user.status}</div>
+            </div>
+            <button
+              className="sb-logout"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleLogout()
+              }}
+              aria-label={t("logout")}
+              title={t("logout")}
+            >
+              <Icons.Logout />
+            </button>
           </div>
-          <div className="sb-user-info">
-            <div className="sb-user-name">{user.name}</div>
-            <div className="sb-user-status">{user.status}</div>
-          </div>
-          <button
-            className="sb-logout"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleLogout()
-            }}
-            aria-label={t("logout")}
-            title={t("logout")}
-          >
-            <Icons.Logout />
-          </button>
         </div>
       </div>
     </aside>
