@@ -63,6 +63,14 @@
 
 .si-root .si-left {
   padding: 48px 40px;
+  /* Un voile crème sous les étapes, qui s'efface vers la droite : le motif
+     reste visible, le texte n'est plus posé dessus (20/11/2026). */
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--bg-base) 92%, transparent) 0%,
+    color-mix(in srgb, var(--bg-base) 72%, transparent) 60%,
+    transparent 100%
+  );
   border-right: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
   display: flex;
   flex-direction: column;
@@ -112,9 +120,6 @@
   width: 38px;
   height: 38px;
   object-fit: contain;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--bg-card) 82%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 30%, transparent);
   flex-shrink: 0;
 }
 
@@ -275,9 +280,80 @@
   padding: 48px 80px;
 }
 
+/* Le formulaire sur une carte pleine, comme la connexion (20/11/2026). */
 .si-root .form-wrap {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
+  padding: 34px 30px 28px;
+  border: 1px solid var(--carte-publique-bord);
+  border-radius: 18px;
+  background: var(--carte-publique);
+  box-shadow: var(--carte-publique-ombre);
+}
+@media (max-width: 860px) {
+  .si-root .form-wrap {
+    padding: 28px 20px 24px;
+  }
+}
+
+/* Le pays, habillé comme les autres champs : même fond, même filet, même
+   rayon, et une flèche dessinée au lieu de celle du système. */
+.si-root .si-pays {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 16px 44px 16px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background-color: var(--bg-elevated);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a4b2b' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+:root[data-theme="dark"] .si-root .si-pays {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23e29a74' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+.si-root .si-pays:focus {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.si-root .si-pays option {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+/* Pays et téléphone empruntent .fp-field (mot de passe oublié), dont la marge
+   était annulée par la remise à zéro « .si-root * » : les deux champs se
+   touchaient. */
+.si-root .fp-field {
+  margin-bottom: 16px;
+}
+
+/* Les conditions : texte discret, liens aux couleurs de l'application. */
+.si-root .si-legal {
+  margin: 4px 0 14px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+.si-root .si-legal a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .si-root .si-legal a:hover {
+    text-decoration-thickness: 2px;
+  }
 }
 
 .si-root .step-head {
@@ -694,4 +770,33 @@
 .si-root .langue-select option {
   background: var(--bg-elevated);
   color: var(--text-primary);
+}
+
+/* La colonne des étapes, écrite plus grand (demande du user, 20/11/2026) :
+   les libellés passaient pour des notes de bas de page. */
+.si-root .step-circle {
+  width: 40px;
+  height: 40px;
+  font-size: 0.9375rem;
+}
+.si-root .step-label {
+  font-size: 1.0625rem;
+}
+.si-root .step-desc {
+  font-size: 0.875rem;
+}
+.si-root .sec-title {
+  font-size: 0.75rem;
+}
+.si-root .sec-item {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.si-root .sec-icon {
+  width: 26px;
+  height: 26px;
+  font-size: 0.8125rem;
+}
+.si-root .sec-txt {
+  font-size: 0.9375rem;
 }

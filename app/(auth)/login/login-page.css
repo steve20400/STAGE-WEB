@@ -18,9 +18,15 @@
     280px auto;
   min-height: 100vh;
   min-height: 100dvh;
+  /* En-tête, corps, pied (20/11/2026) ; le corps garde ses deux colonnes. */
+  display: flex;
+  flex-direction: column;
+  color: var(--text-primary);
+}
+.login-corps {
+  flex: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  color: var(--text-primary);
 }
 
 /* -------- PANNEAU GAUCHE -------- */
@@ -29,7 +35,16 @@
   padding: 60px 56px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 56px;
+  /* Un voile crème sous le texte, qui s'efface vers la droite : le motif reste,
+     les lettres ne sont plus posées dessus (20/11/2026). */
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--bg-base) 92%, transparent) 0%,
+    color-mix(in srgb, var(--bg-base) 72%, transparent) 55%,
+    transparent 100%
+  );
   border-right: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
   overflow: hidden;
 }
@@ -73,9 +88,6 @@
   width: 38px;
   height: 38px;
   object-fit: contain;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--bg-elevated) 82%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
   flex-shrink: 0;
 }
 .auth-brand-copy {
@@ -149,9 +161,16 @@
   justify-content: center;
   padding: 60px 72px;
 }
+/* Le formulaire sur une carte pleine, comme la conversation de la maquette :
+   il ressort du motif au lieu de flotter dessus (20/11/2026). */
 .form-card {
   width: 100%;
-  max-width: 380px;
+  max-width: 420px;
+  padding: 34px 30px 28px;
+  border: 1px solid var(--carte-publique-bord);
+  border-radius: 18px;
+  background: var(--carte-publique);
+  box-shadow: var(--carte-publique-ombre);
 }
 
 .form-pretitle {
@@ -369,78 +388,17 @@
 }
 
 @media (max-width: 768px) {
-  .login-root {
+  .login-corps {
     grid-template-columns: 1fr;
   }
   .left-panel {
     display: none;
   }
   .right-panel {
-    padding: 40px 24px;
+    padding: 28px 16px 40px;
+  }
+  .form-card {
+    padding: 28px 20px 24px;
   }
 }
 
-/* Selecteur de langue — habille comme un champ de l'application : meme rayon,
-   meme fond, meme hauteur. Il etait trop petit et detonnait a cote des champs. */
-.login-root .langue-field {
-  position: relative;
-  /* Plus etroit que les champs et cale a droite : c'est un reglage, pas une
-     information a saisir — il ne doit pas se lire comme un champ du
-     formulaire. De l'air des deux cotes, sinon il se colle au bouton de
-     validation et passe pour une partie de celui-ci. */
-  max-width: 260px;
-  margin: 20px 0 28px auto;
-}
-
-.login-root .langue-label {
-  position: absolute;
-  top: 8px;
-  left: 16px;
-  font-size: 0.6875rem;
-  letter-spacing: 0.3px;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.login-root .langue-select {
-  width: 100%;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  padding: 24px 16px 10px;
-  font-size: 0.9375rem;
-  font-family: "DM Sans", sans-serif;
-  color: var(--text-primary);
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.2s;
-  /* La fleche native varie d'un navigateur a l'autre : on pose la notre pour
-     que le champ ait la meme allure partout. */
-  appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
-    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
-  background-position:
-    right 20px center,
-    right 14px center;
-  background-size:
-    6px 6px,
-    6px 6px;
-  background-repeat: no-repeat;
-}
-.login-root .langue-select:focus {
-  border-color: var(--accent-border);
-}
-@media (hover: hover) and (pointer: fine) {
-  .login-root .langue-select:hover {
-    border-color: var(--accent-border);
-  }
-}
-.login-root .langue-select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-.login-root .langue-select option {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-}

@@ -95,13 +95,21 @@
   height: 34px;
   object-fit: contain;
   flex-shrink: 0;
-  /* Pastille blanche sur le marron des themes clairs, rien en sombre. */
-  border-radius: 50%;
-  background: var(--entete-logo-fond);
-  box-shadow: var(--entete-logo-anneau);
+  /* Le logo du mobile tel quel, sans pastille ronde : elle rognait la queue
+     de la bulle et le combine. Halo clair sur le marron, rien en sombre. */
+  filter: var(--entete-logo-halo);
 }
 
-/* « Work » dans la couleur que l'en-tete lui donne (orange sur le marron). */
+/* Le logotype dans les couleurs que l'en-tete lui donne : celles du mobile sur
+   les en-tetes clairs ou sombres, blanc et orange sur le marron. */
+.sb-logo .marque-vert,
+.topbar .marque-vert {
+  color: var(--entete-marque-vert);
+}
+.sb-logo .marque-terre,
+.topbar .marque-terre {
+  color: var(--entete-marque-premier);
+}
 .sb-logo .marque-second,
 .topbar .marque-second {
   color: var(--entete-marque-second);
@@ -494,9 +502,7 @@
   height: 30px;
   object-fit: contain;
   flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--entete-logo-fond);
-  box-shadow: var(--entete-logo-anneau);
+  filter: var(--entete-logo-halo);
 }
 
 .topbar-brand-copy {
@@ -754,4 +760,26 @@
     align-items: center;
     justify-content: center;
   }
+}
+
+/* Le bouton de thème dans la barre du haut du téléphone : aux couleurs de la
+   barre (blanc sur le marron, texte du thème en sombre), sans fond plein. */
+.topbar .bascule-theme {
+  color: var(--entete-texte);
+  border-color: color-mix(in srgb, var(--entete-texte) 35%, transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .topbar .bascule-theme:hover {
+    color: var(--entete-texte);
+    background: color-mix(in srgb, var(--entete-texte) 14%, transparent);
+    border-color: color-mix(in srgb, var(--entete-texte) 60%, transparent);
+  }
+}
+
+/* « ALANYA WORK » en capitales, comme le mobile, tient dans la barre latérale
+   de 240 px à côté du logo et du bouton de repli : un corps et une approche
+   un peu resserrés, ici seulement (20/11/2026). */
+.sb-logo .marque.sb-logo-txt {
+  font-size: 0.9375rem;
+  letter-spacing: 0.01em;
 }

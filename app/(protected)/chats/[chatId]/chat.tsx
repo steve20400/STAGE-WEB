@@ -8936,7 +8936,9 @@ export default function ChatRoomPage() {
 
         <div
           className="room-av"
-          style={{ background: color.bg, color: color.text, overflow: "hidden" }}
+          // Sans overflow: hidden, qui rognait le point de presence pose sur le
+          // bord du cercle ; la photo est arrondie par elle-meme (20/11/2026).
+          style={{ background: color.bg, color: color.text }}
         >
           {avatarDisplaySrc((chat as { avatar?: string | null }).avatar) ? (
             <img

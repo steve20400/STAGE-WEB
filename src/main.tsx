@@ -20,6 +20,7 @@ import AiAssistantPage from "../app/(protected)/ai/ai"
 import ForgotPasswordPage from "../app/(auth)/forgot-password/forgot-password"
 import SignUpPage from "../app/(auth)/signup/signup"
 import WelcomePage from "../app/(public)/welcome/welcome"
+import FonctionnalitesPage from "../app/(public)/fonctionnalites/fonctionnalites"
 import PageLegale from "../app/(public)/legal/page-legale"
 import SuppressionComptePage from "../app/(public)/legal/suppression-compte"
 import E2eeTestPage from "./pages/E2eeTestPage"
@@ -63,6 +64,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   <Route path="/e2ee-test" element={<E2eeTestPage />} />
                   <Route path="/" element={<WelcomePage />} />
                   <Route path="/welcome" element={<WelcomePage />} />
+                  <Route path="/fonctionnalites" element={<FonctionnalitesPage />} />
                   {/* Pages légales publiques (18/11/2026, exigence du Play Store). */}
                   <Route path="/confidentialite" element={<PageLegale slug="confidentialite" />} />
                   <Route path="/conditions" element={<PageLegale slug="conditions" />} />

@@ -4,10 +4,9 @@ import { useAuth } from "../../../src/components/auth-provider"
 import { requestRegistrationOtp } from "../../../src/services/auth-api"
 import { drapeau, listerPays, type Pays } from "../../../src/services/pays-service"
 import { formaterTelephone } from "../../../src/services/telephone"
-import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from "../../../src/i18n"
-const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
+import { useTranslation } from "../../../src/i18n"
 import "./signup-page.css"
-import { BrandName } from "../../../src/components/brand-name"
+import { EnTetePublic, PiedPublic } from "../../../src/components/cadre-public"
 import { nomPersonneValide } from "../../../src/lib/nom-personne"
 
 // Etape 4 : le CODE DE RECUPERATION, pour une inscription sans adresse. Elle
@@ -123,7 +122,7 @@ export default function SignUpPage() {
    */
   const destination =
     (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/chats"
-  const { language, setLanguage, t } = useTranslation()
+  const { t } = useTranslation()
   const { register, registerWithoutEmail } = useAuth()
 
   const [step, setStep] = useState<Step>(1)
@@ -322,14 +321,11 @@ export default function SignUpPage() {
   }, [otpDigits, step])
 
   return (
-    <div className="si-root">
+    <div className="cp-page">
+    {/* Marque, langue et thème dans la barre du haut (20/11/2026). */}
+    <EnTetePublic action="connexion" />
+    <div className="si-root cp-corps">
       <aside className="si-left">
-        <div className="logo">
-          <img src={alanyaLogo} alt={t("x2_logo_alt")} className="auth-school-logo" />
-          <div className="auth-brand-copy">
-            <BrandName className="logo-txt" />
-          </div>
-        </div>
 
         <div className="stepper">
           {(
@@ -374,27 +370,6 @@ export default function SignUpPage() {
 
       <main className="si-right">
         <div className="form-wrap">
-          {/* Le choix de la langue vient AVANT le formulaire : quelqu'un qui ne
-              lit pas le francais doit pouvoir basculer avant d'essayer de
-              comprendre les champs, pas apres son inscription. */}
-          <div className="langue-field">
-            <label className="langue-label" htmlFor="signup-langue">
-              {t("language_settings")}
-            </label>
-            <select
-              id="signup-langue"
-              className="langue-select"
-              value={language}
-              onChange={(event) => setLanguage(event.target.value as LanguageCode)}
-            >
-              {LANGUAGE_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {libelleLangue(code, language)}
-                </option>
-              ))}
-            </select>
-          </div>
-
           {error && (
             <div className="error-banner">
               <span>{error}</span>
@@ -444,6 +419,8 @@ export default function SignUpPage() {
               <div className="fp-field" style={{ marginTop: 12 }}>
                 <select
                   id="pays"
+                  className="si-pays"
+                  aria-label={t("set_country")}
                   value={form.idPays ?? ""}
                   onChange={(e) => {
                     const id = e.target.value ? Number(e.target.value) : null
@@ -461,7 +438,6 @@ export default function SignUpPage() {
                       }
                     }
                   }}
-                  style={{ width: "100%", padding: "12px 14px", borderRadius: 9 }}
                 >
                   <option value="">
                     {pays.length === 0 ? t("loading") : t("set_country")}
@@ -503,7 +479,7 @@ export default function SignUpPage() {
 
               {/* Les conditions et la confidentialité, avant de créer le compte
                   (18/11/2026, exigence du Play Store). */}
-              <p style={{ fontSize: "0.7812rem", lineHeight: 1.5, opacity: 0.8, margin: "4px 0 10px" }}>
+              <p className="si-legal">
                 {t("legal_acceptation")}{" "}
                 <a href={`${import.meta.env.BASE_URL}conditions`} target="_blank" rel="noreferrer">{t("legal_conditions")}</a>{" "}
                 {t("legal_et")}{" "}
@@ -783,6 +759,8 @@ export default function SignUpPage() {
           )}
         </div>
       </main>
+    </div>
+    <PiedPublic />
     </div>
   )
 }

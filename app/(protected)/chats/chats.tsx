@@ -1107,7 +1107,7 @@ function ConvItem({
     >
       <div
         className={`av${statuts ? ` av-statut${statuts.hasUnviewed ? "" : " vu"}` : pairId ? " av-cliquable" : ""}`}
-        style={{ background: color.bg, color: color.text, overflow: "hidden" }}
+        style={{ background: color.bg, color: color.text }}
         title={statuts ? t("status_open_statuses") : pairId ? t("avatar_view_photo") : undefined}
         onClick={
           // Tete-a-tete seulement : la photo d'un groupe ouvre la discussion.

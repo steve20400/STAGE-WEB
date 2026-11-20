@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useTranslation } from "../../../src/i18n"
-const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./forgot-password-page.css"
-import { BrandName } from "../../../src/components/brand-name"
+import { EnTetePublic, PiedPublic } from "../../../src/components/cadre-public"
 import {
   demanderCodeReinitialisation,
   reinitialiserParCodeRecuperation,
@@ -149,14 +148,11 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="fp-root">
+    <div className="cp-page">
+    {/* Marque, langue et thème dans la barre du haut (20/11/2026). */}
+    <EnTetePublic action="connexion" />
+    <div className="fp-root cp-corps">
       <main className="fp-card">
-        <Link to="/" className="fp-brand" aria-label={t("auth_back_home")}>
-          <img src={alanyaLogo} alt={t("x2_logo_alt")} className="fp-logo" />
-          <span>
-            <BrandName className="fp-brand-name" />
-          </span>
-        </Link>
 
         <div className="fp-copy">
           <div className="fp-pretitle">{t("auth_recovery")}</div>
@@ -342,6 +338,8 @@ export default function ForgotPasswordPage() {
           <Link to="/signup">{t("create_account")}</Link>
         </div>
       </main>
+    </div>
+    <PiedPublic />
     </div>
   )
 }

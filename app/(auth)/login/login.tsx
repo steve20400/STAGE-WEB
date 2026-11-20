@@ -2,7 +2,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { DeuxEtapesRequises } from "../../../src/services/auth-api"
-import { LANGUAGE_CODES, libelleLangue, useTranslation, type LanguageCode } from "../../../src/i18n"
+import { useTranslation } from "../../../src/i18n"
 import {
   ALANYA_NUMBER_FORMATTED_MAX_LENGTH,
   formatAlanyaNumber,
@@ -10,9 +10,8 @@ import {
   normalizeAlanyaNumber,
 } from "../../../src/lib/alanya-number"
 import { consommeMessageDeconnexion } from "../../../src/data/session-message"
-const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./login-page.css"
-import { BrandName } from "../../../src/components/brand-name"
+import { EnTetePublic, PiedPublic } from "../../../src/components/cadre-public"
 
 function isNumberLikeIdentifier(value: string) {
   const compact = value.trim().replace(/\s+/g, "")
@@ -37,7 +36,7 @@ function isValidIdentifier(value: string) {
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { language, setLanguage, t } = useTranslation()
+  const { t } = useTranslation()
   const location = useLocation()
   const { login, loginAvecCode } = useAuth()
   const [showPwd, setShowPwd] = useState(false)
@@ -110,14 +109,10 @@ export default function LoginPage() {
 
   return (
     <div className="login-root">
+      {/* La barre du haut porte la marque, la langue et le thème (20/11/2026). */}
+      <EnTetePublic action="inscription" />
+      <div className="login-corps">
       <div className="left-panel">
-        <div className="logo">
-          <img src={alanyaLogo} alt={t("x2_logo_alt")} className="auth-school-logo" />
-          <div className="auth-brand-copy">
-            <BrandName className="logo-name" />
-          </div>
-        </div>
-
         <div className="left-body">
           <h1 className="left-heading">{t("login_heading")}</h1>
           <p className="left-sub">{t("login_left_sub")}</p>
@@ -266,27 +261,6 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          {/* Juste au-dessus du bouton de connexion : c'est le dernier reglage
-              qu'on ajuste avant de valider. Meme choix que dans les parametres —
-              la langue est une preference d'appareil, deja retenue en arrivant. */}
-          <div className="langue-field">
-            <label className="langue-label" htmlFor="login-langue">
-              {t("language_settings")}
-            </label>
-            <select
-              id="login-langue"
-              className="langue-select"
-              value={language}
-              onChange={(event) => setLanguage(event.target.value as LanguageCode)}
-            >
-              {LANGUAGE_CODES.map((code) => (
-                <option key={code} value={code}>
-                  {libelleLangue(code, language)}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <button type="submit" className="btn-submit" disabled={loading || !canSubmit}>
             {loading ? (
               <>
@@ -307,6 +281,8 @@ export default function LoginPage() {
           )}
         </form>
       </div>
+      </div>
+      <PiedPublic />
     </div>
   )
 }

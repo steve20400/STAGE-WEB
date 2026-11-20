@@ -1,50 +1,64 @@
 /*
- * Logotype « Alanya Work ».
+ * Logotype « ALANYA WORK » — le meme que sur le mobile (20/11/2026,
+ * lib/widgets/alanya_wordmark.dart) : capitales, « ALANY » dans le vert releve
+ * sur le « W » de l'icone, le dernier « A » et « WORK » en terre cuite.
  *
- * Un seul mot composé de deux : « Alanya » porte le nom, « Work » porte la
- * couleur. Le second mot reprend toujours celle des deux teintes du logo qui
- * tranche sur le fond — le vert sur les surfaces claires ou sombres, l'orange
- * sur la barre terracotta. Le logotype fait ainsi echo au symbole pose juste a
- * cote, au lieu d'etre un simple texte a cote d'une image.
+ * Le vert ne suit pas le theme : il appartient a la marque. La terre cuite
+ * s'eclaircit en sombre, comme sur le mobile, ou #B85C38 manquerait de
+ * contraste.
  *
- * La taille et la graisse ne sont pas fixees ici : elles restent au contexte
- * (18 px dans la barre laterale, 20 px sur l'accueil). Ce fichier ne decide que
- * de la couleur, de l'approche et de la soudure entre les deux mots.
+ * La taille et la graisse restent au contexte (barre laterale, accueil…) ; ce
+ * fichier ne decide que des couleurs, des capitales et de l'approche.
  */
 .marque {
   display: inline-flex;
   align-items: baseline;
   white-space: nowrap;
-  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-primary);
 }
-
-/* Une demi-chasse plutot qu'une espace pleine : les deux mots forment un bloc. */
+.marque-vert {
+  color: var(--marque-vert);
+}
+.marque-terre,
 .marque-second {
-  margin-left: 0.24em;
-  letter-spacing: -0.01em;
-  color: var(--marque-second);
+  color: var(--marque-terre);
+}
+/* Une espace entre ALANYA et WORK, sans casser le bloc. */
+.marque-second {
+  margin-left: 0.32em;
 }
 
-/* Vert du logo, assombri sur fond creme pour rester lisible en petit corps. */
 :root,
 :root[data-theme="light"] {
-  --marque-second: #0e7a78;
+  --marque-vert: #098084;
+  --marque-terre: #b85c38;
 }
-
-/* Sur le chocolat, le meme vert s'enfonce : on l'eclaircit. */
 :root[data-theme="dark"] {
-  --marque-second: #3bb6b0;
+  --marque-vert: #098084;
+  --marque-terre: #e29a74;
 }
 
 /*
- * Sur la barre de marque, le vert disparaitrait dans la terracotta. Le second
- * mot prend alors l'orange du combine, eclairci pour tenir le contraste des
- * gros caracteres, et le premier passe en blanc comme le reste de la barre.
+ * Sur la barre marron de l'application (themes clairs), le vert et la terre
+ * cuite disparaitraient dans le marron (1,3:1). Le decoupage reste le meme,
+ * les couleurs passent au blanc et a l'orange clair du combine.
  */
-.marque.sur-marque {
+.marque.sur-marque .marque-vert,
+.marque.sur-marque .marque-terre {
   color: var(--brand-text);
 }
 .marque.sur-marque .marque-second {
   color: #ff8a4c;
+}
+
+/* Sur la barre chocolat des pages publiques : les couleurs du mobile, la terre
+   cuite claire (#E29A74) pour tenir sur le fond sombre. */
+.marque.sur-nuit .marque-terre,
+.marque.sur-nuit .marque-second {
+  color: #e29a74;
+}
+.marque.sur-nuit .marque-vert {
+  color: #098084;
 }

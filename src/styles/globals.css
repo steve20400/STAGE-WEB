@@ -149,9 +149,11 @@ button {
   --entete-bord: var(--border-subtle);
   --entete-texte: var(--text-primary);
   --entete-texte-doux: var(--text-muted);
-  --entete-marque-second: var(--marque-second);
-  --entete-logo-fond: transparent;
-  --entete-logo-anneau: none;
+  /* Le logotype du mobile tel quel sur les en-tetes clairs ou sombres. */
+  --entete-marque-vert: var(--marque-vert);
+  --entete-marque-premier: var(--marque-terre);
+  --entete-marque-second: var(--marque-terre);
+  --entete-logo-halo: none;
   --entete-bouton: var(--bg-hover);
   --entete-bouton-survol: var(--accent-dim);
   --entete-bouton-texte: var(--text-secondary);
@@ -244,9 +246,14 @@ button {
   --entete-bord: var(--brand-strong);
   --entete-texte: var(--brand-text);
   --entete-texte-doux: rgba(255, 255, 255, 0.75);
+  /* Sur le marron, le vert et la terre cuite du logotype disparaitraient :
+     ALANYA en blanc, WORK en orange clair. */
+  --entete-marque-vert: var(--brand-text);
+  --entete-marque-premier: var(--brand-text);
   --entete-marque-second: #ff8a4c;
-  --entete-logo-fond: #ffffff;
-  --entete-logo-anneau: 0 0 0 1px var(--brand-strong);
+  /* Le logo est pose tel quel, sans pastille qui le rognait (20/11/2026). Sur
+     le marron, un fin halo clair qui suit son contour garde le vert lisible. */
+  --entete-logo-halo: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1.5px rgb(255 255 255 / 0.85));
   --entete-bouton: rgba(255, 255, 255, 0.14);
   --entete-bouton-survol: rgba(255, 255, 255, 0.26);
   --entete-bouton-texte: var(--brand-text);

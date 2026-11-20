@@ -1,0 +1,280 @@
+/*
+ * EN-TÊTE ET PIED DES PAGES PUBLIQUES (20/11/2026).
+ *
+ * Une barre chocolat franche, qui se détache du motif au lieu de se fondre
+ * dedans : c'était le reproche (« l'en-tête n'est pas visible »). Les mêmes
+ * couleurs en clair et en sombre — la barre est déjà sombre ; en thème sombre
+ * elle s'enfonce juste un peu plus que la page, avec un filet pour la border.
+ */
+:root,
+:root[data-theme="light"] {
+  /* Les cartes des pages publiques (fonctionnalités, connexion, inscription) :
+     un crème chaud plutôt que le blanc pur, jugé agressif sur le motif
+     (demande du user, 20/11/2026). */
+  --carte-publique: #faf4ea;
+  --carte-publique-bord: rgb(138 75 43 / 0.14);
+  --carte-publique-ombre: 0 12px 32px rgb(43 27 18 / 0.1);
+  /* Un dégradé : chocolat profond sous le logo, qui se réchauffe vers le brun
+     de la marque à droite (demande du user, 20/11/2026). Le texte crème garde
+     plus de 7:1 partout. */
+  --cp-fond: linear-gradient(90deg, #2b1b12 0%, #3b2416 45%, #6e3c22 100%);
+  --cp-filet: transparent;
+}
+:root[data-theme="dark"] {
+  --carte-publique: var(--bg-surface);
+  --carte-publique-bord: var(--border-subtle);
+  --carte-publique-ombre: 0 12px 32px rgb(0 0 0 / 0.3);
+  --cp-fond: linear-gradient(90deg, #0d0805 0%, #170e08 45%, #2e1a0e 100%);
+  --cp-filet: #3a2618;
+}
+
+.cp-entete,
+.cp-pied {
+  --cp-texte: #f5efe6;
+  --cp-texte-doux: rgb(245 239 230 / 0.78);
+  background: var(--cp-fond);
+  color: var(--cp-texte);
+  font-family: "DM Sans", sans-serif;
+  position: relative;
+  z-index: 5;
+}
+
+/* ---------------- En-tête ---------------- */
+.cp-entete {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 68px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) clamp(16px, 4vw, 48px) 10px;
+  padding-left: max(clamp(16px, 4vw, 48px), env(safe-area-inset-left, 0px));
+  padding-right: max(clamp(16px, 4vw, 48px), env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--cp-filet);
+  box-shadow: 0 2px 14px rgb(0 0 0 / 0.18);
+}
+
+.cp-marque {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+/* Le logo du mobile, sans fond ni pastille : rien ne le rogne. */
+.cp-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.cp-nom {
+  font-family: "Bricolage Grotesque", sans-serif;
+  font-size: 1.375rem;
+  font-weight: 800;
+}
+
+.cp-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.6vw, 18px);
+}
+
+.cp-lien {
+  color: var(--cp-texte);
+  transition: color 0.15s;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 8px 4px;
+}
+/* La page où l'on est : soulignée en ambre. */
+.cp-lien.active {
+  color: #f0b860;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.cp-lien:focus-visible,
+.cp-bouton:focus-visible,
+.cp-pied a:focus-visible {
+  outline: 2px solid #e0a040;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* L'action principale : ambre, texte chocolat (8,5:1). */
+.cp-bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: #e0a040;
+  color: #2b1b12;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  transition: background 0.15s;
+}
+
+/* La langue : globe, code, flèche ; la vraie liste est posée par-dessus. */
+.cp-langue {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid rgb(245 239 230 / 0.4);
+  border-radius: 8px;
+  color: var(--cp-texte);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.cp-langue select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 16px;
+  /* Les options gardent un fond lisible dans la liste du système. */
+  color: #2b1b12;
+  background: #fff;
+}
+.cp-langue:focus-within {
+  outline: 2px solid #e0a040;
+  outline-offset: 2px;
+}
+
+/* Le bouton de thème, aux couleurs de la barre : crème, ambre au survol. */
+.bascule-theme.cp-theme {
+  width: 40px;
+  height: 40px;
+  color: var(--cp-texte);
+  border-color: rgb(245 239 230 / 0.4);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Au survol, l'ambre de l'action principale (demande du user, 20/11/2026). */
+  .cp-lien:hover {
+    color: #f0b860;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  .cp-bouton:hover {
+    background: #f0b860;
+  }
+  .cp-langue:hover {
+    color: #f0b860;
+    border-color: #f0b860;
+  }
+  .bascule-theme.cp-theme:hover {
+    color: #f0b860;
+    border-color: #f0b860;
+    background: rgb(240 184 96 / 0.12);
+  }
+  .cp-pied a:hover {
+    color: var(--cp-texte);
+    text-decoration: underline;
+  }
+}
+
+/* ---------------- Pied ---------------- */
+.cp-pied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px clamp(16px, 4vw, 48px) calc(18px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--cp-filet);
+  text-align: center;
+}
+.cp-pied-marque {
+  font-size: 0.9375rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+}
+.cp-nom-pied {
+  font-weight: 700;
+}
+.cp-pied-liens {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 22px;
+}
+.cp-pied a {
+  color: var(--cp-texte-doux);
+  font-size: 0.875rem;
+  text-decoration: none;
+  padding: 4px 0;
+}
+
+/* ---------------- Petits écrans ---------------- */
+@media (max-width: 760px) {
+  /* La place manque : le lien « Fonctionnalités » cède, l'essentiel reste. */
+  .cp-lien {
+    display: none;
+  }
+}
+@media (max-width: 520px) {
+  .cp-entete {
+    gap: 8px;
+    min-height: 60px;
+  }
+  .cp-logo {
+    width: 34px;
+    height: 34px;
+  }
+  .cp-nom {
+    font-size: 1.125rem;
+  }
+  .cp-bouton {
+    padding: 0 12px;
+    font-size: 0.875rem;
+  }
+  .cp-langue {
+    padding: 0 8px;
+  }
+}
+@media (max-width: 400px) {
+  /* Le logo seul suffit à reconnaître la marque. */
+  .cp-nom {
+    display: none;
+  }
+}
+@media (pointer: coarse) {
+  .cp-bouton,
+  .cp-langue,
+  .cp-theme {
+    min-height: 44px;
+  }
+  .bascule-theme.cp-theme {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* La page entière : barre, corps qui prend la place restante, pied. Le corps
+   gardait sa hauteur d'écran complète : on la lui retire, la barre et le pied
+   la partagent désormais. */
+.cp-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.cp-page > .cp-corps {
+  flex: 1;
+  min-height: 0;
+}

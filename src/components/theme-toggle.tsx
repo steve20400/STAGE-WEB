@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef } from "react"
 import { useTheme } from "./theme-provider"
 import { useTranslation } from "../i18n"
+import "./theme-toggle.css"
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { t } = useTranslation()
@@ -29,66 +30,35 @@ export function ThemeToggle({ className }: { className?: string }) {
     }, 240)
   }
 
+  /*
+   * LE BOUTON DE THÈME (20/11/2026, demande du user) : plus de fond blanc, une
+   * lune et un soleil plus modernes, et un survol propre — tout est dans
+   * theme-toggle.css, plus rien en style écrit ici ni en script de survol.
+   * Les deux icônes sont toujours là, superposées : l'une s'efface en tournant
+   * quand l'autre apparaît.
+   */
   return (
     <button
+      type="button"
       onClick={handlePress}
       aria-label={isDark ? t("s2_switch_light") : t("s2_switch_dark")}
       title={t("s2_theme_toggle_hint", {
         mode: isDark ? t("s2_light_mode") : t("s2_dark_mode"),
         palette: isSoftPalette ? t("s2_palette_standard") : t("s2_palette_cream"),
       })}
-      className={className}
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: 9,
-        background: "var(--bg-elevated)",
-        border: "1px solid var(--border-subtle)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        color: "var(--text-muted)",
-        transition: "all .2s",
-        flexShrink: 0,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "var(--accent-border)"
-        e.currentTarget.style.color = "var(--accent)"
-        e.currentTarget.style.background = "var(--accent-dim)"
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "var(--border-subtle)"
-        e.currentTarget.style.color = "var(--text-muted)"
-        e.currentTarget.style.background = "var(--bg-elevated)"
-      }}
+      className={`bascule-theme${className ? ` ${className}` : ""}`}
+      data-sombre={isDark ? "oui" : "non"}
     >
-      {isDark ? (
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        >
-          <circle cx="12" cy="12" r="5" />
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-        </svg>
-      ) : (
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        >
-          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
-        </svg>
-      )}
+      {/* Lune : en thème clair, elle propose de passer au sombre. */}
+      <svg className="bt-lune" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path className="bt-plein" d="M20.5 14.2A8.5 8.5 0 1 1 9.8 3.5a6.6 6.6 0 0 0 10.7 10.7Z" />
+        <path d="M17.5 3.5v3M16 5h3" />
+      </svg>
+      {/* Soleil : en thème sombre, il propose de revenir au clair. */}
+      <svg className="bt-soleil" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle className="bt-plein" cx="12" cy="12" r="4" />
+        <path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" />
+      </svg>
     </button>
   )
 }

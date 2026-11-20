@@ -542,12 +542,14 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
           <ThemeToggle />
         </div>
         <div className="sb-profile" onClick={() => navigate("/settings")}>
-          <div className="sb-avatar" style={{ overflow: "hidden" }}>
+          {/* Sans overflow: hidden, qui rognait le point de presence ; la photo
+              s'arrondit elle-meme (20/11/2026). */}
+          <div className="sb-avatar">
             {avatarDisplaySrc(sessionUser?.avatar) ? (
               <img
                 src={avatarDisplaySrc(sessionUser?.avatar)!}
                 alt=""
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
               />
             ) : (
               user.initials

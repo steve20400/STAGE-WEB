@@ -1,12 +1,11 @@
 import { useTranslation } from "../../../src/i18n"
 import { Link } from "react-router-dom"
-import { ThemeToggle } from "../../../src/components/theme-toggle"
-const alanyaLogo = `${import.meta.env.BASE_URL}logo-alanya.png`
 import "./welcome-page.css"
-import { BrandName } from "../../../src/components/brand-name"
+import { EnTetePublic, PiedPublic } from "../../../src/components/cadre-public"
 
 export default function WelcomePage() {
   const { t } = useTranslation()
+
   /**
    * Initiales du contact de demonstration, deduites de son nom traduit.
    *
@@ -26,34 +25,10 @@ export default function WelcomePage() {
   return (
     <>
       <div className="alanya-root">
-        {/* Navbar */}
-        <nav className="nav">
-          <div className="nav-logo">
-            <img src={alanyaLogo} alt={t("x2_logo_alt")} className="school-logo" />
-            <div className="brand-copy">
-              <BrandName className="display-font brand-name" />
-            </div>
-          </div>
-          <div className="nav-links">
-            <div className="welcome-theme-row">
-              <span className="welcome-theme-label">{t("theme")}</span>
-              <ThemeToggle className="welcome-theme-toggle" />
-            </div>
-            <a href="#features">{t("welcome_nav_features")}</a>
-            <Link to="/login" className="btn-nav">
-              {t("login")}
-            </Link>
-            {/* PAS DE LIEN VERS L'ESPACE DEVELOPPEUR ICI.
-                Cette page est la premiere que voit quelqu'un qui arrive sur
-                l'application : elle s'adresse aux UTILISATEURS, et une console
-                d'API a cote du bouton de connexion n'y a rien a dire. Le lien
-                etait par ailleurs le seul libelle EN DUR de la barre — les huit
-                autres langues montraient du francais — et le seul a se peindre
-                d'un bleu etranger a la palette.
-                L'espace reste accessible par sa route ; c'est au site vitrine
-                de le presenter. */}
-          </div>
-        </nav>
+        {/* La barre commune des pages publiques (20/11/2026). PAS DE LIEN VERS
+            L'ESPACE DEVELOPPEUR : cette page s'adresse aux utilisateurs ; la
+            console reste accessible par sa route. */}
+        <EnTetePublic action="connexion" />
 
         {/* Hero */}
         <div className="hero">
@@ -77,29 +52,14 @@ export default function WelcomePage() {
               <Link to="/signup" className="btn-primary">
                 {t("welcome_start")}
               </Link>
-              <a href="#features" className="btn-ghost">
+              <Link to="/fonctionnalites" className="btn-ghost">
                 {t("welcome_features")}
                 <span style={{ fontSize: "0.875rem" }}>-&gt;</span>
-              </a>
+              </Link>
             </div>
 
-            <div id="features" className="features">
-              <div className="feat">
-                <div className="feat-label">{t("welcome_latency")}</div>
-                <div className="feat-val">
-                  <strong>&lt; 500ms</strong>
-                  {t("welcome_delivery")}
-                </div>
-              </div>
-              <div className="feat">
-                <div className="feat-label">{t("welcome_files")}</div>
-                <div className="feat-val">{t("welcome_files_sub")}</div>
-              </div>
-              <div className="feat">
-                <div className="feat-label">{t("welcome_calls")}</div>
-                <div className="feat-val">{t("welcome_calls_sub")}</div>
-              </div>
-            </div>
+            {/* La bande « Latence / Fichiers / Appels » est retirée (demande du
+                user, 20/11/2026) ; les fonctionnalités ont leur page. */}
           </div>
 
           {/* Chat preview */}
@@ -154,6 +114,7 @@ export default function WelcomePage() {
             </div>
           </div>
         </div>
+        <PiedPublic />
       </div>
     </>
   )
