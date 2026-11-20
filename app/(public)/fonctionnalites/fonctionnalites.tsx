@@ -14,6 +14,10 @@ import "./fonctionnalites.css"
  */
 type Carte = { cle: string; icone: ReactNode }
 
+/** La silhouette du nuage, dans un repère de 1000 × 420 étiré au texte. */
+const TRACE_NUAGE =
+  "M 90 385 L 910 385 A 75 75 0 0 0 965 255 A 95 95 0 0 0 860 125 A 115 115 0 0 0 665 70 A 135 135 0 0 0 430 55 A 115 115 0 0 0 225 95 A 95 95 0 0 0 60 200 A 90 90 0 0 0 90 385 Z"
+
 const CARTES: Carte[] = [
   {
     cle: "messages",
@@ -118,8 +122,27 @@ export default function FonctionnalitesPage() {
       <EnTetePublic action="connexion" />
       <main className="fct-corps cp-corps">
         <section className="fct-intro">
-          <h1 className="fct-titre">{tr("fct_titre")}</h1>
-          <p className="fct-sous-titre">{tr("fct_sous_titre")}</p>
+          {/* Le titre dans un nuage (demande du user, 20/11/2026) : une
+              silhouette de nuage dont le bord est effiloché par un bruit
+              (feTurbulence) puis estompé, avec une ombre douce sur le pourtour,
+              pour un rendu proche d'un vrai nuage. Le texte, lui, reste net. */}
+          <div className="fct-nuage">
+            <svg className="fct-nuage-forme" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <filter id="fct-nuage-effiloche" x="-8%" y="-15%" width="116%" height="130%">
+                  <feTurbulence type="fractalNoise" baseFrequency="0.011 0.028" numOctaves="3" seed="7" result="bruit" />
+                  <feDisplacementMap in="SourceGraphic" in2="bruit" scale="26" xChannelSelector="R" yChannelSelector="G" />
+                </filter>
+              </defs>
+              <g filter="url(#fct-nuage-effiloche)">
+                {/* Le pourtour ombré, un peu plus large que le corps. */}
+                <path className="fct-nuage-ombre" d={TRACE_NUAGE} vectorEffect="non-scaling-stroke" />
+                <path className="fct-nuage-corps" d={TRACE_NUAGE} />
+              </g>
+            </svg>
+            <h1 className="fct-titre">{tr("fct_titre")}</h1>
+            <p className="fct-sous-titre">{tr("fct_sous_titre")}</p>
+          </div>
         </section>
 
         <ul className="fct-grille">

@@ -52,10 +52,8 @@ export default function WelcomePage() {
               <Link to="/signup" className="btn-primary">
                 {t("welcome_start")}
               </Link>
-              <Link to="/fonctionnalites" className="btn-ghost">
-                {t("welcome_features")}
-                <span style={{ fontSize: "0.875rem" }}>-&gt;</span>
-              </Link>
+              {/* « Voir les fonctionnalités » retiré (demande du user, 20/11/2026) :
+                  le lien de la barre du haut y mène déjà. */}
             </div>
 
             {/* La bande « Latence / Fichiers / Appels » est retirée (demande du

@@ -20,37 +20,55 @@
 }
 
 .fct-intro {
-  position: relative;
-  isolation: isolate;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 56px 0 40px;
+  padding: 36px 0 32px;
 }
+
 /*
- * UN NUAGE sous le titre et le texte (demande du user, 20/11/2026), au lieu
- * d'une bande rectangulaire aux bords visibles : plusieurs ellipses crème qui
- * se chevauchent et s'effacent dans le motif, sans arête nulle part.
+ * LE NUAGE DESSINÉ (demande du user, 20/11/2026) : une silhouette de nuage au
+ * contour visible, pleine de crème, autour du titre et du texte. Le bloc prend
+ * la largeur de son texte ; les marges intérieures gardent les lettres dans le
+ * corps du nuage, sous les bosses du haut.
  */
-.fct-intro::before {
-  content: "";
+.fct-nuage {
+  position: relative;
+  isolation: isolate;
+  width: fit-content;
+  max-width: 100%;
+  padding: 92px 96px 64px 72px;
+}
+.fct-nuage-forme {
   position: absolute;
+  inset: 0;
   z-index: -1;
-  inset: -10px -8% -30px -12%;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 42% 58% at 22% 42%, var(--nuage) 0%, var(--nuage) 45%, transparent 72%),
-    radial-gradient(ellipse 34% 50% at 46% 58%, var(--nuage) 0%, var(--nuage) 38%, transparent 70%),
-    radial-gradient(ellipse 30% 46% at 62% 40%, var(--nuage-leger) 0%, transparent 70%),
-    radial-gradient(ellipse 26% 40% at 10% 70%, var(--nuage-leger) 0%, transparent 70%);
-  filter: blur(6px);
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  /* Le bord estompé : tout le dessin est flouté, en pixels d'écran (le même
+     flou quelle que soit la taille du nuage), puis posé sur une ombre douce. */
+  filter: blur(5px) drop-shadow(0 14px 22px rgb(43 27 18 / 0.14));
+}
+/* Le pourtour : un trait large et clair-obscur, que le flou fond en ombre. */
+.fct-nuage-ombre {
+  fill: none;
+  stroke: var(--nuage-bord);
+  stroke-width: 16;
+  stroke-linejoin: round;
+}
+.fct-nuage-corps {
+  fill: var(--nuage-fond);
 }
 .fct-corps {
-  /* Le nuage déborde de l'introduction : il est coupé au bord de la page au
-     lieu de la faire défiler à l'horizontale (clip, pas hidden : aucun
-     conteneur de défilement n'est créé). */
-  overflow-x: clip;
-  --nuage: color-mix(in srgb, var(--bg-base) 96%, transparent);
-  --nuage-leger: color-mix(in srgb, var(--bg-base) 80%, transparent);
+  --nuage-fond: color-mix(in srgb, var(--bg-base) 97%, transparent);
+  --nuage-bord: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+@media (max-width: 600px) {
+  .fct-nuage {
+    /* Le nuage s'étire en hauteur sur téléphone : le texte descend sous
+       les bosses du haut et s'écarte du bord gauche. */
+    padding: 88px 30px 48px 36px;
+  }
 }
 
 .fct-titre {
