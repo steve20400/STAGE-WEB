@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
+import { CarteStockage } from "../../../src/components/carte-stockage"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { RepondeurReglages } from "../../../src/components/repondeur-reglages"
 import { ExportMedias } from "../../../src/components/export-medias"
@@ -4055,6 +4056,9 @@ export default function SettingsPage() {
               <div className="s-page-title">{t("settings_donnees")}</div>
               <p className="s-page-sub">{t("dl_sub")}</p>
               <ReglagesTelechargementAuto />
+              {/* Ce que l'application occupe dans ce navigateur, et de quoi le
+                  libérer — l'écran que le mobile a depuis le 11/11/2026. */}
+              <CarteStockage />
             </>
           )}
 
