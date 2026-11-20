@@ -845,3 +845,106 @@
 .sb-nav-section {
   font-size: 0.6875rem;
 }
+
+/* ============================================================
+   LA BARRE DE NAVIGATION DU BAS, SUR TÉLÉPHONE (20/11/2026)
+   Copie de celle du mobile : flottante (marges 16 / 12), hauteur 64, rayon
+   20, ombre portée. Elle PLANE : fond translucide et flou, le contenu défile
+   dessous et se voit à travers et à côté.
+   ============================================================ */
+.barre-nav {
+  display: none;
+}
+@media (max-width: 900px) {
+  .barre-nav {
+    position: fixed;
+    left: calc(16px + env(safe-area-inset-left, 0px));
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    z-index: 45;
+    display: flex;
+    height: 64px;
+    padding: 0 4px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--bg-surface) 62%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.6);
+    backdrop-filter: blur(18px) saturate(1.6);
+    border: 1px solid color-mix(in srgb, var(--bg-surface) 70%, transparent);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 0.12);
+  }
+  :root[data-theme="dark"] .barre-nav {
+    border-color: rgb(255 255 255 / 0.08);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 0.45);
+  }
+
+  /* L'espace que la barre occupe : la fin des listes et les boutons ronds
+     passent au-dessus d'elle, le reste défile dessous. */
+  .layout-root.avec-barre-nav {
+    --barre-nav-espace: calc(64px + 12px + 12px + env(safe-area-inset-bottom, 0px));
+  }
+  .avec-barre-nav .ch-list,
+  .avec-barre-nav .layout-main > .calls-root,
+  .avec-barre-nav .section-split-list .calls-root,
+  .avec-barre-nav .calls-body {
+    padding-bottom: var(--barre-nav-espace);
+  }
+  /* `!important` : le bouton des discussions pose sa position dans son style
+     propre (bottom: 20px), qui l'emporterait sinon. */
+  .avec-barre-nav .chats-fab,
+  .avec-barre-nav .calls-fab-composer {
+    bottom: calc(var(--barre-nav-espace) + 4px) !important;
+  }
+}
+
+.barre-nav-onglet {
+  flex: 1;
+  min-width: 0;
+  margin: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: "DM Sans", sans-serif;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.barre-nav-onglet.actif {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.barre-nav-icone {
+  display: grid;
+  place-items: center;
+}
+.barre-nav-icone svg {
+  width: 22px;
+  height: 22px;
+}
+.barre-nav-libelle {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+.barre-nav-onglet.actif .barre-nav-libelle {
+  font-weight: 600;
+}
+.barre-nav-onglet:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .barre-nav-onglet:not(.actif):hover {
+    background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  }
+}

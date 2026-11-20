@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 
 export interface RowAction {
   label: string
@@ -43,7 +44,14 @@ export function RowActionsMenu({
   triggerClassName?: string
 }) {
   const [open, setOpen] = useState(false)
-  const [above, setAbove] = useState(false)
+  /*
+   * LE MENU EST POSÉ AU-DESSUS DE LA PAGE (20/11/2026) : position fixe, rendu
+   * dans `body`. Dessiné dans la ligne, il était coupé par toute liste qui
+   * défile (la liste des conversations de l'assistant coupait « Supprimer »).
+   * Sa place est calculée sur le bouton, sous lui, ou au-dessus s'il y a plus
+   * de place en haut. Invisible tant qu'elle n'est pas calculée.
+   */
+  const [place, setPlace] = useState<{ top?: number; bottom?: number; right: number } | null>(null)
   const host = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDivElement>(null)
 
@@ -54,7 +62,9 @@ export function RowActionsMenu({
 
     // Meme comportement que le menu d'un message : tout clic ailleurs ferme.
     const onPointerDown = (event: PointerEvent) => {
-      if (host.current && !host.current.contains(event.target as Node)) close()
+      const cible = event.target as Node
+      if (host.current?.contains(cible) || menu.current?.contains(cible)) return
+      close()
     }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") close()
@@ -93,18 +103,25 @@ export function RowActionsMenu({
    * libelle passe sur deux lignes : le menu debordait alors en bas de l'ecran
    * sans que le calcul s'en apercoive.
    */
-  useEffect(() => {
-    if (!open) return
+  useLayoutEffect(() => {
+    if (!open) {
+      setPlace(null)
+      return
+    }
     const panneau = menu.current
     const bouton = host.current
     if (!panneau || !bouton) return
-    const place = bouton.getBoundingClientRect()
+    const rect = bouton.getBoundingClientRect()
     const hauteur = panneau.getBoundingClientRect().height
-    const enDessous = window.innerHeight - place.bottom
-    const enDessus = place.top
+    const enDessous = window.innerHeight - rect.bottom
+    const enDessus = rect.top
     // On ne bascule vers le haut que s'il y a vraiment plus de place la-haut :
     // sinon on garde le sens naturel et le menu defile.
-    setAbove(hauteur + 12 > enDessous && enDessus > enDessous)
+    const auDessus = hauteur + 12 > enDessous && enDessus > enDessous
+    const right = Math.max(12, window.innerWidth - rect.right)
+    setPlace(
+      auDessus ? { bottom: window.innerHeight - rect.top + 6, right } : { top: rect.bottom + 6, right }
+    )
   }, [open, actions.length])
 
   const toggle = (event: React.MouseEvent) => {
@@ -148,16 +165,19 @@ export function RowActionsMenu({
         )}
       </button>
 
-      {open && (
+      {open &&
+        createPortal(
         <div
           role="menu"
           ref={menu}
           onClick={(event) => event.stopPropagation()}
           style={{
-            position: "absolute",
-            right: 0,
-            [above ? "bottom" : "top"]: "calc(100% + 6px)",
-            zIndex: 60,
+            position: "fixed",
+            right: place?.right ?? 0,
+            top: place?.top,
+            bottom: place?.bottom,
+            visibility: place ? "visible" : "hidden",
+            zIndex: 9000,
             minWidth: 188,
             // Ni plus haut que l'ecran, ni plus large : un menu qui deborde
             // n'est pas atteignable, quel que soit le sens d'ouverture.
@@ -196,8 +216,9 @@ export function RowActionsMenu({
               {action.label}
             </button>
           ))}
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </div>
   )
 }

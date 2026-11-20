@@ -423,9 +423,17 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="18" x2="21" y2="18" />
+              {/* Barre ouverte : « < » la replie ; barre repliée : les trois
+                  traits la déplient (20/11/2026). */}
+              {collapsed ? (
+                <>
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </>
+              ) : (
+                <polyline points="15 18 9 12 15 6" />
+              )}
             </svg>
           </button>
         )}
@@ -584,6 +592,92 @@ function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps)
 
 // LAYOUT PROTEGE
 
+/*
+ * LA BARRE DE NAVIGATION DU BAS, SUR TÉLÉPHONE (20/11/2026) — copie de celle
+ * du mobile (`alanya_nav_bar.dart`) : flottante, arrondie, quatre onglets
+ * plus un cinquième selon le compte (Collègues pour un agent, Entreprises
+ * sinon). Elle « plane » : fond translucide et flou, la liste défile dessous
+ * et se voit à travers.
+ *
+ * Seulement sous 900 px (là où la barre latérale devient un tiroir) et
+ * seulement sur les écrans d'onglet, comme sur le mobile : pas dans une
+ * conversation, où elle couvrirait la zone de saisie.
+ *
+ * RETOUR : comme le bouton retour du téléphone sur le mobile, le retour du
+ * navigateur depuis un onglet ramène aux Discussions. Quitter Discussions
+ * pour un onglet AJOUTE une entrée à l'historique ; passer d'onglet en onglet
+ * la REMPLACE ; revenir aux Discussions RECULE dans l'historique.
+ */
+const ONGLETS_BARRE = ["/chats", "/status", "/calls", "/meetings", "/collegues", "/entreprises"]
+const CLE_ONGLET_DEPUIS_DISCUSSIONS = "alanya-onglet-depuis-discussions"
+
+function BarreNavigation({ isAgent }: { isAgent: boolean }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  if (!ONGLETS_BARRE.includes(pathname)) return null
+
+  const onglets: Array<{ href: string; label: string; icon: React.ReactNode }> = [
+    { href: "/chats", label: t("chats"), icon: <Icons.Chat /> },
+    { href: "/status", label: t("status"), icon: <Icons.Status /> },
+    { href: "/calls", label: t("calls"), icon: <Icons.Call /> },
+    { href: "/meetings", label: t("meetings"), icon: <Icons.Meeting /> },
+    isAgent
+      ? { href: "/collegues", label: t("colleagues"), icon: <Icons.Collegues /> }
+      : { href: "/entreprises", label: t("companies"), icon: <Icons.Entreprises /> },
+  ]
+
+  const aller = (href: string) => {
+    if (href === pathname) return
+    let depuisDiscussions = false
+    try {
+      depuisDiscussions = sessionStorage.getItem(CLE_ONGLET_DEPUIS_DISCUSSIONS) === "1"
+    } catch {
+      /* stockage indisponible */
+    }
+    const ecrire = (v: string | null) => {
+      try {
+        if (v === null) sessionStorage.removeItem(CLE_ONGLET_DEPUIS_DISCUSSIONS)
+        else sessionStorage.setItem(CLE_ONGLET_DEPUIS_DISCUSSIONS, v)
+      } catch {
+        /* stockage indisponible */
+      }
+    }
+    if (href === "/chats") {
+      ecrire(null)
+      if (depuisDiscussions) navigate(-1)
+      else navigate("/chats", { replace: true })
+    } else if (pathname === "/chats") {
+      ecrire("1")
+      navigate(href)
+    } else {
+      navigate(href, { replace: true })
+    }
+  }
+
+  return (
+    <nav className="barre-nav" aria-label={t("nav_section_navigation")}>
+      {onglets.map(({ href, label, icon }) => {
+        const actif = pathname === href
+        return (
+          <button
+            key={href}
+            type="button"
+            className={`barre-nav-onglet${actif ? " actif" : ""}`}
+            aria-current={actif ? "page" : undefined}
+            onClick={() => aller(href)}
+          >
+            <span className="barre-nav-icone" aria-hidden>
+              {icon}
+            </span>
+            <span className="barre-nav-libelle">{label}</span>
+          </button>
+        )
+      })}
+    </nav>
+  )
+}
+
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -614,6 +708,19 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const chatSegment = /^\/chats\/([^/]+)/.exec(location.pathname)?.[1]
   const inConversation = Boolean(chatSegment) && chatSegment !== "new"
 
+  // Le cinquième onglet de la barre du bas dépend du compte (voir BarreNavigation).
+  const [agent, setAgent] = useState(false)
+  useEffect(() => {
+    let annule = false
+    void checkIsAgent().then((v) => {
+      if (!annule) setAgent(v)
+    })
+    return () => {
+      annule = true
+    }
+  }, [])
+  const avecBarreNav = ONGLETS_BARRE.includes(location.pathname)
+
   const openDrawer = useCallback(() => setMobileOpen(true), [])
   const closeDrawer = useCallback(() => setMobileOpen(false), [])
   useDrawerSwipe({
@@ -624,7 +731,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   })
 
   return (
-    <div className={`layout-root ${collapsed ? "nav-collapsed" : ""}`}>
+    <div className={`layout-root ${collapsed ? "nav-collapsed" : ""}${avecBarreNav ? " avec-barre-nav" : ""}`}>
       <div className="layout-sidebar-static">
         <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       </div>
@@ -660,6 +767,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
         {children}
       </div>
+
+      <BarreNavigation isAgent={agent} />
 
       {/* Overlay global d'appel entrant (WebSocket incoming_call) */}
       {/* Pseudo d'appareil : demande une fois par compte, ici plutot que dans
