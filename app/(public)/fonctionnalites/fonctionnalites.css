@@ -184,7 +184,7 @@
   margin: 28px auto 0;
   padding: 28px clamp(20px, 3vw, 36px);
   border-radius: 18px;
-  background: linear-gradient(90deg, #2b1b12 0%, #3b2416 45%, #6e3c22 100%);
+  background: linear-gradient(90deg, #2b1b12 0%, #5a321c 28%, #8a4b2b 100%);
   color: #f5efe6;
   display: flex;
   flex-wrap: wrap;

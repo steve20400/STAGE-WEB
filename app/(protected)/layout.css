@@ -780,7 +780,9 @@
    de 240 px à côté du logo et du bouton de repli : un corps et une approche
    un peu resserrés, ici seulement (20/11/2026). */
 .sb-logo .marque.sb-logo-txt {
-  font-size: 0.9375rem;
+  /* En px : le logotype ne suit pas la taille de base, qui grandit avec
+     l'écran — sinon il heurte le bouton de repli. */
+  font-size: 15px;
   letter-spacing: 0.01em;
 }
 
@@ -793,12 +795,14 @@
   background: var(--entete-fond, var(--entete-bg));
   border-top: 1px solid var(--entete-bord);
 }
+/* Le bouton de thème à gauche, plein (20/11/2026). */
 .sb-theme-row {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 .sb-footer .bascule-theme {
   color: var(--entete-texte);
-  border-color: color-mix(in srgb, var(--entete-texte) 35%, transparent);
+  background: rgb(245 239 230 / 0.16);
+  border-color: rgb(245 239 230 / 0.4);
 }
 .sb-footer .sb-user-name {
   color: var(--entete-texte);
@@ -806,8 +810,15 @@
 .sb-footer .sb-user-status {
   color: #7fd18a;
 }
+/* La carte du profil se détache : elle est cliquable (elle mène aux
+   paramètres). La déconnexion est en rouge. */
+.sb-footer .sb-profile {
+  background: rgb(245 239 230 / 0.12);
+  border: 1px solid rgb(245 239 230 / 0.22);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+}
 .sb-footer .sb-logout {
-  color: var(--entete-texte-doux);
+  color: #ff8a80;
 }
 .sb-footer .sb-avatar-dot {
   border-color: var(--entete-bg);
@@ -819,10 +830,19 @@
     background: rgb(240 184 96 / 0.14);
   }
   .sb-footer .sb-profile:hover {
-    background: rgb(245 239 230 / 0.08);
+    background: rgb(245 239 230 / 0.2);
+    border-color: rgb(245 239 230 / 0.4);
   }
   .sb-footer .sb-logout:hover {
-    color: #f0b860;
-    background: rgb(240 184 96 / 0.14);
+    color: #ffffff;
+    background: #d84a3c;
   }
+}
+
+/* Les libellés de la navigation à la taille de la maquette (20/11/2026). */
+.sb-link {
+  font-size: 0.9375rem;
+}
+.sb-nav-section {
+  font-size: 0.6875rem;
 }

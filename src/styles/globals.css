@@ -14,7 +14,10 @@
  * jusqu'à 18 px à 2560 px — au lieu de rester minuscules au milieu de l'écran.
  */
 html {
-  font-size: clamp(100%, 0.7917rem + 0.2083vw, 112.5%);
+  /* Écriture plus grande, comme la maquette retenue (demande du user,
+     20/11/2026) : 16 px sur téléphone, ~17,6 px à 1440 px de large, 18 px
+     au-delà de 1600 px. */
+  font-size: clamp(100%, 0.875rem + 0.25vw, 112.5%);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   -webkit-text-size-adjust: 100%;
@@ -150,7 +153,7 @@ button {
      `--entete-bg` reste une couleur PLEINE : c'est elle que ThemeProvider
      donne à la barre d'état du téléphone, qui n'accepte pas de dégradé. */
   --entete-bg: #0d0805;
-  --entete-fond: linear-gradient(90deg, #0d0805 0%, #170e08 55%, #2e1a0e 100%);
+  --entete-fond: linear-gradient(90deg, #120a06 0%, #2e1a0e 28%, #4a2a17 100%);
   --entete-bord: #3a2618;
   --entete-texte: #f5efe6;
   --entete-texte-doux: rgb(245 239 230 / 0.72);
@@ -251,7 +254,9 @@ button {
    * d'état du téléphone ; `--entete-fond` porte le dégradé.
    */
   --entete-bg: #2b1b12;
-  --entete-fond: linear-gradient(90deg, #2b1b12 0%, #3b2416 55%, #6e3c22 100%);
+  /* La teinte claire domine (20/11/2026) : le sombre ne tient que le bord
+     gauche, sous le logo. */
+  --entete-fond: linear-gradient(90deg, #2b1b12 0%, #5a321c 28%, #8a4b2b 100%);
   --entete-bord: transparent;
   --entete-texte: #f5efe6;
   --entete-texte-doux: rgb(245 239 230 / 0.72);

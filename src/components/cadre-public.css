@@ -17,14 +17,14 @@
   /* Un dégradé : chocolat profond sous le logo, qui se réchauffe vers le brun
      de la marque à droite (demande du user, 20/11/2026). Le texte crème garde
      plus de 7:1 partout. */
-  --cp-fond: linear-gradient(90deg, #2b1b12 0%, #3b2416 45%, #6e3c22 100%);
+  --cp-fond: linear-gradient(90deg, #2b1b12 0%, #5a321c 28%, #8a4b2b 100%);
   --cp-filet: transparent;
 }
 :root[data-theme="dark"] {
   --carte-publique: var(--bg-surface);
   --carte-publique-bord: var(--border-subtle);
   --carte-publique-ombre: 0 12px 32px rgb(0 0 0 / 0.3);
-  --cp-fond: linear-gradient(90deg, #0d0805 0%, #170e08 45%, #2e1a0e 100%);
+  --cp-fond: linear-gradient(90deg, #120a06 0%, #2e1a0e 28%, #4a2a17 100%);
   --cp-filet: #3a2618;
 }
 
