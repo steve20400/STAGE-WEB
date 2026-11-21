@@ -10,6 +10,7 @@ import { sendChatMessage } from "../../../src/services/messages-service"
 import { useToast } from "../../../src/components/toast"
 import { toInitials } from "../../../src/data/session-user"
 import { resolveMediaUrl,
+  TAILLE_MEDIA_MAX_MO,
   TAILLE_MEDIA_MAX_OCTETS,
   uploadMedia,
 } from "../../../src/services/media-service"
@@ -692,7 +693,7 @@ export default function StatusPage() {
     // La MEME borne que la messagerie et que le serveur. Elle etait ecrite en
     // dur ici : le jour ou l'une des trois change, les deux autres mentent.
     if (file.size > TAILLE_MEDIA_MAX_OCTETS) {
-      throw new Error(t("l2_max_50_mb"))
+      throw new Error(t("l2_max_50_mb", { max: TAILLE_MEDIA_MAX_MO }))
     }
     /*
      * COMPRESSEE COMME DANS UNE DISCUSSION. Un statut est vu par tout le
