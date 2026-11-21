@@ -4089,6 +4089,7 @@ function MessageBubble({
   albumMsgs,
   onOpenAlbum,
   autoTraduction,
+  sansTraduction,
   langueSourceDeclaree,
   conversationId,
 }: {
@@ -4141,6 +4142,12 @@ function MessageBubble({
   onOpenGalerie?: (msgs: Message[], index: number) => void
   /** Traduction automatique active pour cette discussion (reglage par appareil). */
   autoTraduction: boolean
+  /**
+   * Pas de traduction du tout (21/11/2026, demande du user, comme sur le
+   * mobile) : dans un GROUPE et dans la conversation du compte OFFICIEL, ni
+   * bouton, ni proposition, ni traduction automatique.
+   */
+  sansTraduction?: boolean
   /**
    * Langue DECLAREE du correspondant pour cette conversation, ou `null`.
    *
@@ -4214,6 +4221,8 @@ function MessageBubble({
   const stickerRecu = !msg.isDeleted && msg.type === "sticker" ? lireChargeSticker(msg.content) : null
 
   const texteATraduire = useMemo(() => {
+    // Rien à traduire : ni bouton, ni proposition, ni traduction automatique.
+    if (sansTraduction) return ""
     if (msg.isDeleted || msg.type === "system") return ""
     /*
      * LE CONTENU D'UNE FICHE N'EST PAS DE LA PROSE, C'EST DU JSON.
@@ -4234,7 +4243,7 @@ function MessageBubble({
     if (!brut) return ""
     const prose = extractGpsCoords(brut) ? removeGpsCoordinates(brut) : brut
     return prose.trim()
-  }, [msg.isDeleted, msg.type, msg.content])
+  }, [msg.isDeleted, msg.type, msg.content, sansTraduction])
   const [traductionOuverte, setTraductionOuverte] = useState(false)
   const [traductionProposee, setTraductionProposee] = useState(false)
   /**
@@ -9595,6 +9604,7 @@ export default function ChatRoomPage() {
                           .catch(() => error(t("e2ee_media_echec")))
                       }}
                       autoTraduction={autoTraduction}
+                      sansTraduction={!!chat?.isGroup || compteOfficiel}
                       langueSourceDeclaree={langueDeclaree}
                     />
                   </MessageErrorBoundary>
@@ -9672,6 +9682,7 @@ export default function ChatRoomPage() {
                     quoteAuthor={quoteAuthor}
                     onJumpToMessage={jumpToMessage}
                     autoTraduction={autoTraduction}
+                    sansTraduction={!!chat?.isGroup || compteOfficiel}
                       langueSourceDeclaree={langueDeclaree}
                   />
                 </MessageErrorBoundary>
