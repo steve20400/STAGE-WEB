@@ -656,23 +656,57 @@
 
 /* « X est passe en video » (06/11/2026) : au-dessus des commandes, comme
    l'invitation de WhatsApp. */
+/* Deux lignes (24/11/2026) : la phrase et l'icone, puis les boutons. */
 .call-room-root .passage-video {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 8px;
   max-width: 520px;
   margin: 0 auto 16px;
-  padding: 10px 12px 10px 16px;
+  padding: 12px 12px 10px 16px;
   border-radius: 14px;
   background: color-mix(in srgb, #000 55%, transparent);
   color: #fff;
   font-size: 0.875rem;
 }
 
-.call-room-root .passage-video span {
-  flex: 1;
-  min-width: 140px;
+.call-room-root .passage-video-texte {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.call-room-root .passage-video-texte svg {
+  flex-shrink: 0;
+}
+
+.call-room-root .passage-video-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Camera avant / arriere, en haut a droite, en face du nom (24/11/2026). */
+.call-room-root .basculer-camera {
+  position: absolute;
+  top: 74px;
+  right: 24px;
+  z-index: 6;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, #000 45%, transparent);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.call-room-root .basculer-camera.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .call-room-root .passage-video button {

@@ -708,6 +708,24 @@ export default function CallRoomPage() {
               Raccrocher transparaissaient au travers, juste derriere les boutons
               du repondeur. Un appel termine n'a de toute facon plus aucune
               commande a offrir — il n'y a rien a couper ni a raccrocher. */}
+          {/* Camera avant / arriere, en haut a droite (24/11/2026, demande
+              du user) : elle n'encombre plus la rangee des commandes. Elle
+              se cache avec elles. */}
+          {isVideo && !call.repondeur && (
+            <button
+              type="button"
+              className={`basculer-camera ${!controlsVisible && callState === "active" ? "hidden" : ""}`}
+              onClick={() => void switchCamera()}
+              aria-label={t("switch_camera")}
+              title={t("a2_flip_camera_short")}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 16v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2l2-3h4l2 3h2a2 2 0 0 1 2 2v1" />
+                <path d="M15 12h6l-3-3" />
+                <path d="M9 14a3 3 0 0 0 5.2 2" />
+              </svg>
+            </button>
+          )}
           {!call.repondeur && (
           <div
             className={`controls-bar ${!controlsVisible && isVideo && callState === "active" ? "hidden" : ""}`}
@@ -715,14 +733,21 @@ export default function CallRoomPage() {
             {/* Le correspondant est passe en video : on le voit, il ne nous
                 voit pas encore. Comme WhatsApp, on propose la camera. */}
             {call.passageVideoPar && (
+              // Deux lignes (24/11/2026, demande du user) : la phrase et
+              // l'icone, puis les deux boutons — comme sur le mobile.
               <div className="passage-video">
-                <span>{t("call_peer_switched_video", { name: call.passageVideoPar })}</span>
-                <button type="button" className="passage-video-plus-tard" onClick={() => ignorerPassageVideo()}>
-                  {t("call_not_now")}
-                </button>
-                <button type="button" className="passage-video-oui" onClick={() => void passerEnVideo()}>
-                  {t("call_turn_on_camera")}
-                </button>
+                <div className="passage-video-texte">
+                  <span>{t("call_peer_switched_video", { name: call.passageVideoPar })}</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" /></svg>
+                </div>
+                <div className="passage-video-actions">
+                  <button type="button" className="passage-video-plus-tard" onClick={() => ignorerPassageVideo()}>
+                    {t("call_not_now")}
+                  </button>
+                  <button type="button" className="passage-video-oui" onClick={() => void passerEnVideo()}>
+                    {t("call_turn_on_camera")}
+                  </button>
+                </div>
               </div>
             )}
             <div className="controls-inner">
@@ -804,20 +829,6 @@ export default function CallRoomPage() {
                   <span className="ctrl-btn-label">
                     {call.camOn ? t("a2_cam_short") : t("a2_cam_off_short")}
                   </span>
-                </button>
-              )}
-
-              {isVideo && (
-                <button
-                  className="ctrl-btn"
-                  onClick={() => void switchCamera()}
-                  aria-label={t("switch_camera")}
-                >
-                  <div className="ctrl-btn-icon ctrl-on">↻</div>
-                  {/* Cette commande RETOURNE la camera : la cle generique
-                      « back » y affichait « Retour », donc « Back » en anglais,
-                      juste sous une icone de bascule. */}
-                  <span className="ctrl-btn-label">{t("a2_flip_camera_short")}</span>
                 </button>
               )}
 
