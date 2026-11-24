@@ -656,7 +656,7 @@
 
 /* « X est passe en video » (06/11/2026) : au-dessus des commandes, comme
    l'invitation de WhatsApp. */
-/* Deux lignes (24/11/2026) : la phrase et l'icone, puis les boutons. */
+/* Deux lignes centrees (24/11/2026) : la phrase et l'icone, puis les boutons. */
 .call-room-root .passage-video {
   display: flex;
   flex-direction: column;
@@ -673,7 +673,9 @@
 .call-room-root .passage-video-texte {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  text-align: center;
 }
 
 .call-room-root .passage-video-texte svg {
@@ -682,7 +684,7 @@
 
 .call-room-root .passage-video-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
 }
 
