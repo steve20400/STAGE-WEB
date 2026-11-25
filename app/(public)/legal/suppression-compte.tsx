@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { Link } from "react-router-dom"
+import { EnTetePublic, PiedPublic } from "../../../src/components/cadre-public"
 import { apiRequest } from "../../../src/lib/api-client"
 import "./legal.css"
 
@@ -39,13 +39,10 @@ export default function SuppressionComptePage() {
   }
 
   return (
-    <main className="legal-page">
-      <nav className="legal-nav">
-        <Link to="/">Alanya Work</Link>
-        <span>
-          <Link to="/confidentialite">Confidentialité</Link> · <Link to="/conditions">Conditions</Link>
-        </span>
-      </nav>
+    <div className="alanya-root">
+      {/* Même cadre que l'accueil — voir `page-legale.tsx` (25/11/2026). */}
+      <EnTetePublic action="connexion" />
+      <main className="legal-page">
       <article>
         <h1>Supprimer mon compte Alanya Work</h1>
         {fait ? (
@@ -101,6 +98,8 @@ export default function SuppressionComptePage() {
           </>
         )}
       </article>
-    </main>
+      </main>
+      <PiedPublic />
+    </div>
   )
 }
