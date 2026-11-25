@@ -137,6 +137,15 @@ export interface ChatMessageMock {
    */
   progressionEnvoi?: number
   /**
+   * Cet envoi peut-il être mis en pause ? (25/11/2026)
+   *
+   * ⚠️ PAS TOUS : seul un fichier envoyé EN MORCEAUX s'interrompt. Sous le
+   * seuil, le fichier part d'un seul bloc et un bouton « pause » mentirait.
+   */
+  envoiPausable?: boolean
+  /** Cet envoi est-il en pause ? Suit le contrôle, qui seul fait foi. */
+  envoiEnPause?: boolean
+  /**
    * Ce message est-il chiffre de bout en bout ?
    *
    * ⚠️ IL VIENT DU SERVEUR, qui le deduit de l existence d une enveloppe — pas

@@ -1808,3 +1808,31 @@ textarea.room-textarea::placeholder {
     animation: none;
   }
 }
+
+/* ════════ METTRE UN ENVOI EN PAUSE (25/11/2026) ════════
+   Le bouton vit dans la ligne de l'heure, à côté du pourcentage. Il hérite la
+   couleur de son parent — blanc translucide sur mes bulles terracotta, gris
+   pâle ailleurs — pour ne pas avoir deux règles qui se contredisent selon le
+   thème.
+
+   ⚠️ LA ZONE TOUCHABLE DÉBORDE L'ICÔNE. Onze pixels de côté ne s'atteignent
+   pas au doigt : le `padding` et la marge négative l'élargissent sans décaler
+   le pourcentage d'un pixel. */
+.msg-pause-bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: -6px -4px -6px 1px;
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .msg-pause-bouton:hover {
+    opacity: 1;
+  }
+}

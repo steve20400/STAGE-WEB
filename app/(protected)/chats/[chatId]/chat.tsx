@@ -149,7 +149,8 @@ import {
   resterDansGroupe,
   type ReglagesGroupe,
 } from "../../../../src/services/groupe-service"
-import { televerser, type Reprise } from "../../../../src/services/envoi-morceaux"
+import { televerser, SEUIL_MORCEAUX, type Reprise } from "../../../../src/services/envoi-morceaux"
+import { ControleTransfert } from "../../../../src/services/controle-envoi"
 import { urlApercu, type ProtectionPdf } from "../../../../src/services/e2ee-media"
 import { DialogueProtectionPdf, type ChoixProtectionPdf } from "../../../../src/components/protection-pdf"
 import { SelecteurEmojis } from "../../../../src/components/selecteur-emojis"
@@ -4075,6 +4076,7 @@ function MessageBubble({
   onEdit,
   onShare,
   onReessayer,
+  onBasculerPause,
   onCopy,
   isGroup,
   nbLectures,
@@ -4120,6 +4122,13 @@ function MessageBubble({
   onShare?: (m: Message) => void
   /** « Réessayer » : seulement sur une bulle à moi en échec. */
   onReessayer?: (m: Message) => void
+  /**
+   * Met l'envoi en pause, ou le reprend (25/11/2026).
+   *
+   * Absent quand l'envoi ne s'interrompt pas — un fichier parti d'un seul
+   * bloc. C'est `msg.envoiPausable` qui le dit, et le parent qui décide.
+   */
+  onBasculerPause?: (m: Message) => void
   onCopy: (m: Message) => void
   isGroup?: boolean
   senderName?: string
@@ -5830,7 +5839,35 @@ function MessageBubble({
                   )}
                   {isMe && msg.status === "sending" && typeof msg.progressionEnvoi === "number" && (
                     // « 18 % », arrondi VERS LE BAS : jamais 100 % avant la fin.
-                    <span style={{ opacity: 0.9 }}>{Math.floor(msg.progressionEnvoi * 100)} %</span>
+                    // ⚠️ EN PAUSE, LE POURCENTAGE RESTE AFFICHÉ, en pâle : le
+                    // remplacer par « en pause » ferait perdre de vue ce qui
+                    // est déjà parti, qui est précisément ce que la pause
+                    // préserve.
+                    <span
+                      style={{
+                        opacity: msg.envoiEnPause ? 0.55 : 0.9,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 3,
+                      }}
+                    >
+                      {Math.floor(msg.progressionEnvoi * 100)} %
+                      {msg.envoiPausable && onBasculerPause && (
+                        <button
+                          type="button"
+                          className="msg-pause-bouton"
+                          title={msg.envoiEnPause ? t("envoi_reprendre") : t("envoi_pause")}
+                          aria-label={msg.envoiEnPause ? t("envoi_reprendre") : t("envoi_pause")}
+                          onClick={(event) => {
+                            // Sans cela, le clic ouvrirait aussi le média.
+                            event.stopPropagation()
+                            onBasculerPause(msg)
+                          }}
+                        >
+                          <Icone nom={msg.envoiEnPause ? "lecture" : "pause"} taille={11} />
+                        </button>
+                      )}
+                    </span>
                   )}
                   {isMe && <StatusIcon status={msg.status} />}
                 </span>
@@ -5998,6 +6035,26 @@ export default function ChatRoomPage() {
   // Compteur des identifiants temporaires. Date.now() seul ne suffit pas :
   // plusieurs fichiers d'un meme envoi partiraient dans la meme milliseconde.
   const tempSeqRef = useRef(0)
+  /*
+   * LES ENVOIS QU'ON PEUT METTRE EN PAUSE, par identifiant temporaire
+   * (25/11/2026). La bulle n'a besoin que de son `tempId` pour trouver le
+   * contrôle de SON envoi.
+   */
+  const controlesEnvoi = useRef(new Map<string, ControleTransfert>())
+  /*
+   * ⚠️ QUITTER LA CONVERSATION RELÂCHE LES PAUSES. Le bouton disparaît avec la
+   * bulle : un envoi laissé en pause n'aurait plus aucun moyen de repartir et
+   * le fichier resterait en mémoire jusqu'à la fermeture de l'onglet. On le
+   * laisse donc finir — c'est ce que l'utilisateur veut d'un fichier qu'il a
+   * demandé à envoyer.
+   */
+  useEffect(
+    () => () => {
+      for (const c of controlesEnvoi.current.values()) c.reprendre()
+      controlesEnvoi.current.clear()
+    },
+    []
+  )
   // Appels passes dans cette conversation, affiches dans le fil (facon WhatsApp)
   const [callEvents, setCallEvents] = useState<CallRecord[]>([])
   const [input, setInput] = useState("")
@@ -7976,6 +8033,28 @@ export default function ChatRoomPage() {
       if (!etatConnu(chatId)) await lireEtatE2ee(chatId).catch(() => undefined)
 
       /*
+       * LE CONTRÔLE DE CET ENVOI (25/11/2026) : il porte la pause.
+       *
+       * ⚠️ SEULEMENT AU-DELÀ DU SEUIL DES MORCEAUX. Sous un mébioctet le
+       * fichier part d'un seul bloc, que rien ne sait interrompre : proposer
+       * la pause y serait un bouton sans effet. La taille est connue ICI, et
+       * pas plus tôt — c'est celle du fichier COMPRESSÉ.
+       */
+      const controle = new ControleTransfert()
+      const pausable = file.size > SEUIL_MORCEAUX
+      if (pausable) {
+        controlesEnvoi.current.set(tempId, controle)
+        // L'affichage suit le contrôle : lui seul sait s'il est en pause.
+        controle.surChangement((enPause) => {
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, envoiEnPause: enPause } : m)))
+        })
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, envoiPausable: true } : m)))
+      }
+      const oublierControle = () => {
+        controlesEnvoi.current.delete(tempId)
+      }
+
+      /*
        * LE POURCENTAGE DE L'ENVOI (demande du user, 10/10/2026) : « 18 % » à
        * côté de l'horloge de la bulle. Rafraîchi au changement de pour cent
        * seulement — un rendu par paquet réseau redessinerait tout le fil.
@@ -7997,6 +8076,7 @@ export default function ChatRoomPage() {
             legende: caption,
             replyToId: replyTo?.id,
             onProgression: progression,
+            controle,
             sensible,
             protection,
           })
@@ -8035,6 +8115,8 @@ export default function ChatRoomPage() {
           setMessages((prev) => prev.filter((m) => m.id !== tempId))
           URL.revokeObjectURL(localUrl)
           error(t("f2_file_not_sent"), err instanceof Error ? err.message : t("send_file_failed"))
+        } finally {
+          oublierControle()
         }
         return
       }
@@ -8056,6 +8138,7 @@ export default function ChatRoomPage() {
           mime,
           dureeMs: durationMs,
           onProgression: progression,
+          controle,
           onReservation: (r) => {
             reservation = r
           },
@@ -8153,10 +8236,22 @@ export default function ChatRoomPage() {
         })
         const message = err instanceof Error ? err.message : t("send_file_failed")
         error(t("f2_file_not_sent"), message)
+      } finally {
+        oublierControle()
       }
     },
     [chatId, replyTo, error, t]
   )
+
+  /**
+   * Le bouton « pause »/« reprendre » de la bulle (25/11/2026).
+   *
+   * ⚠️ RIEN À FAIRE SI L'ENVOI N'EST PLUS LÀ : il a pu finir entre le rendu de
+   * la bulle et le clic.
+   */
+  const basculerPauseEnvoi = useCallback((m: Message) => {
+    controlesEnvoi.current.get(m.id)?.basculer()
+  }, [])
 
   const mediaKindFromFile = (file: File): "image" | "audio" | "video" | "file" => {
     const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
@@ -9570,6 +9665,7 @@ export default function ChatRoomPage() {
                       onSignaler={demanderSignalement}
                       onShare={demanderPartage}
                       onReessayer={reessayerEnvoi}
+                      onBasculerPause={basculerPauseEnvoi}
                       onCopy={handleCopy}
                       isGroup={chat?.isGroup}
                       senderName={
@@ -9670,6 +9766,7 @@ export default function ChatRoomPage() {
                     onShare={demanderPartage}
                     onEdit={peutModifier(msg) ? demarrerModification : undefined}
                     onReessayer={reessayerEnvoi}
+                    onBasculerPause={basculerPauseEnvoi}
                     onCopy={handleCopy}
                     isGroup={chat?.isGroup}
                     nbLectures={compterLectures(msg)}

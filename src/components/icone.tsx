@@ -39,8 +39,17 @@ export type NomIcone =
   | "globe"
   | "qr"
   | "fermer"
+  | "pause"
+  | "lecture"
 
 const TRACES: Record<NomIcone, ReactNode> = {
+  pause: (
+    <>
+      <path d="M9 5v14" />
+      <path d="M15 5v14" />
+    </>
+  ),
+  lecture: <path d="M7 4l12 8-12 8z" />,
   etincelles: (
     <>
       <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />

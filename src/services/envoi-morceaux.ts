@@ -1,6 +1,7 @@
 import { apiRequest, ApiError } from "../lib/api-client"
 import { API_BASE_URL } from "../config/runtime"
 import { uploadMedia } from "./media-service"
+import type { ControleTransfert } from "./controle-envoi"
 
 /**
  * ENVOYER UN FICHIER EN MORCEAUX, depuis le navigateur — lot 5 (cours,
@@ -21,7 +22,14 @@ import { uploadMedia } from "./media-service"
  * ferait deux requêtes là où une suffit ; on garde `POST /api/media`.
  */
 
-const SEUIL_MORCEAUX = 1024 * 1024
+/**
+ * Au-delà, l'envoi se fait en morceaux — et devient donc interruptible.
+ *
+ * ⚠️ EXPORTÉ POUR L'INTERFACE : seul un envoi en morceaux se met en pause, et
+ * c'est cette valeur qui dit lesquels. Un bouton « pause » sur un fichier d'un
+ * demi-mébioctet ne ferait rien.
+ */
+export const SEUIL_MORCEAUX = 1024 * 1024
 const EN_PARALLELE = 3
 const REESSAIS = 5
 
@@ -61,6 +69,15 @@ export interface OptionsEnvoi {
    * jamais.
    */
   onReservation?: (r: Reprise) => void
+  /**
+   * LA PAUSE (25/11/2026) : l'envoyeur consulte ce contrôle avant chaque
+   * morceau et lui confie de quoi couper celui qui est en vol.
+   *
+   * ⚠️ SANS EFFET SOUS LE SEUIL : un fichier envoyé d'un seul bloc ne passe pas
+   * par ici. L'interface ne propose donc la pause qu'au-delà de
+   * [SEUIL_MORCEAUX].
+   */
+  controle?: ControleTransfert
 }
 
 /** De quoi reprendre un envoi commencé : son identifiant et son jeton. */
@@ -207,10 +224,16 @@ async function envoyerMorceaux(
     for (let n = file.shift(); n !== undefined; n = file.shift()) {
       const debut = n * r.tailleMorceau
       const morceau = fichier.slice(debut, debut + (tailles.get(n) ?? 0))
-      const reponse = await envoyerMorceau(r, n, morceau, (f) => {
-        if (f > (avance.get(n) ?? 0)) avance.set(n, f)
-        signaler()
-      })
+      const reponse = await envoyerMorceau(
+        r,
+        n,
+        morceau,
+        (f) => {
+          if (f > (avance.get(n) ?? 0)) avance.set(n, f)
+          signaler()
+        },
+        o.controle,
+      )
       avance.set(n, 1)
       signaler()
       if (reponse?.termine === true) termine = true
@@ -224,6 +247,9 @@ async function envoyerMorceaux(
    * serveur — `terminer` relance l'assemblage si tout est là.
    */
   if (!termine) {
+    // Une pause au dernier morceau ne doit pas se terminer quand même : rien
+    // ne se passe tant que l'utilisateur n'a pas repris.
+    await o.controle?.point()
     const etat = await avecJeton<{ statut?: string }>(r, "POST", `/api/media/envois/${r.id}/terminer`)
     if (etat.statut !== "termine") throw new Error("Le serveur n'a pas pu assembler le fichier.")
   }
@@ -252,24 +278,40 @@ async function unBloc(fichier: Blob, o: OptionsEnvoi): Promise<{ id: string }> {
  * ⚠️ UN REFUS DU SERVEUR (4xx) N'EST PAS RÉESSAYÉ : jeton faux, envoi expiré,
  * morceau inconnu ne s'arrangeront pas en insistant. Une coupure ou un 5xx,
  * si : 1, 2, 4, 8 puis 16 secondes d'attente.
+ *
+ * 🔴 UNE PAUSE N'EST PAS UNE PANNE (25/11/2026). Elle interrompt la requête en
+ * vol — c'est à ça qu'on voit que la pause a pris effet — mais elle n'use
+ * AUCUN réessai : le morceau repart entier à la reprise. Compter une pause
+ * comme un échec aurait fait mourir l'envoi au sixième clic, et l'utilisateur
+ * aurait vu « Fichier non envoyé » pour avoir mis en pause une fois de trop.
  */
 async function envoyerMorceau(
   r: Reservation,
   n: number,
   morceau: Blob,
   onAvance: (fraction: number) => void,
+  controle?: ControleTransfert,
 ): Promise<{ termine?: boolean } | null> {
-  for (let essai = 0; ; essai++) {
+  let essai = 0
+  for (;;) {
+    // Avant de (re)partir : on attend ici tant que c'est en pause.
+    await controle?.point()
+    let coupeParPause = false
     try {
       return await new Promise((ok, ko) => {
         const xhr = new XMLHttpRequest()
         xhr.open("PUT", `${API_BASE_URL}/api/media/envois/${r.id}/morceaux/${n}`)
         xhr.setRequestHeader("X-Envoi-Jeton", r.jeton)
         xhr.setRequestHeader("Content-Type", "application/octet-stream")
+        const retirer = controle?.inscrire(() => {
+          coupeParPause = true
+          xhr.abort()
+        })
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable && e.total > 0) onAvance(e.loaded / e.total)
         }
         xhr.onload = () => {
+          retirer?.()
           let corps: unknown = null
           try {
             corps = JSON.parse(xhr.responseText)
@@ -279,15 +321,27 @@ async function envoyerMorceau(
           if (xhr.status >= 200 && xhr.status < 300) ok(corps as { termine?: boolean } | null)
           else ko(new ApiError(`Morceau ${n} refusé (${xhr.status})`, xhr.status, corps))
         }
-        xhr.onerror = () => ko(new ApiError(`Morceau ${n} : réseau`, 0))
+        xhr.onerror = () => {
+          retirer?.()
+          ko(new ApiError(`Morceau ${n} : réseau`, 0))
+        }
+        xhr.onabort = () => {
+          retirer?.()
+          ko(new ApiError(`Morceau ${n} : interrompu`, 0))
+        }
         xhr.send(morceau)
       })
     } catch (err) {
+      if (coupeParPause) {
+        onAvance(0)
+        continue
+      }
       const statut = err instanceof ApiError ? err.status : 0
       const definitif = statut >= 400 && statut < 500
       if (definitif || essai >= REESSAIS) throw err
       onAvance(0)
       await new Promise((attendre) => setTimeout(attendre, 1000 * 2 ** essai))
+      essai++
     }
   }
 }

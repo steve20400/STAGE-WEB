@@ -10,6 +10,7 @@ import { archiver } from "./e2ee-sauvegarde"
 import { garderClair } from "./e2ee-media-ouverture"
 import { envoyerDansGroupe, estGroupe } from "./e2ee-groupe-fil"
 import { empreinteHex, televerser } from "./envoi-morceaux"
+import type { ControleTransfert } from "./controle-envoi"
 
 /**
  * ENVOYER UN MÉDIA CHIFFRÉ DE BOUT EN BOUT — cours, chapitre 24 (lot B).
@@ -57,6 +58,8 @@ export async function preparerMediaChiffre(
     onProgression?: (fraction: number) => void
     sensible?: boolean
     protection?: ProtectionPdf
+    /** La pause de l'envoi (25/11/2026) — voir `controle-envoi.ts`. */
+    controle?: ControleTransfert
   },
 ): Promise<DescripteurMedia> {
   // 1-2. Aperçu puis chiffrement.
@@ -75,6 +78,7 @@ export async function preparerMediaChiffre(
       chiffre: true,
       empreinteHex: await empreinteHex(f.chiffre),
       onProgression: o.onProgression,
+      controle: o.controle,
     },
   )
 
@@ -119,6 +123,12 @@ export async function envoyerMediaChiffre(
      * ici comme avant.
      */
     pret?: DescripteurMedia
+    /**
+     * La pause de l'envoi (25/11/2026). Elle ne porte que sur le
+     * TÉLÉVERSEMENT : aperçu, chiffrement et enveloppes sont l'affaire d'un
+     * instant, les interrompre n'économiserait rien.
+     */
+    controle?: ControleTransfert
   },
 ): Promise<{ id: string; createdAt: string; descripteur: DescripteurMedia }> {
   /*
