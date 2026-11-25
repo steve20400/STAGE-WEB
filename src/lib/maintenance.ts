@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import { noterLimiteServeur } from "../services/media-service"
 import { API_BASE_URL } from "../config/runtime"
 
 /**
@@ -29,7 +30,10 @@ export function signalerMaintenance() {
 export async function verifierMaintenance() {
   try {
     const r = await fetch(`${API_BASE_URL}/api/maintenance`, { cache: "no-store" })
-    const d = (await r.json()) as { maintenance?: boolean }
+    const d = (await r.json()) as { maintenance?: boolean; mediaMaxMo?: unknown }
+    // La limite des médias voyage dans la même réponse (25/11/2026) : la lire
+    // ici évite un aller-retour de plus, et la tient à jour pendant la session.
+    noterLimiteServeur(d?.mediaMaxMo)
     if (r.ok && d.maintenance === false) {
       if (sondage) clearInterval(sondage)
       sondage = null

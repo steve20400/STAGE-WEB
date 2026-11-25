@@ -127,5 +127,55 @@ export function formatAudioDuration(durationMs?: number): string {
  * sinon l'une des deux ment. Refuser un peu tot vaut mieux que refuser trop
  * tard — un fichier refuse a l'ecran ne coute rien.
  */
-export const TAILLE_MEDIA_MAX_MO = 500
-export const TAILLE_MEDIA_MAX_OCTETS = TAILLE_MEDIA_MAX_MO * 1024 * 1024
+/*
+ * 🔴 LA LIMITE VIENT DU SERVEUR, ET CELLE-CI N'EST QUE LE SECOURS (25/11/2026,
+ * décision du user). Elle était écrite en dur à QUATRE endroits — serveur,
+ * nginx, web, mobile — et avait déjà divergé : 500 Mo ici, 300 sur le
+ * téléphone. `GET /api/maintenance` l'annonce désormais, et `noterLimiteServeur`
+ * la pose ici dès qu'on la connaît.
+ *
+ * ⚠️ `let` ET NON `const`, ET C'EST VOLONTAIRE : les modules ES donnent des
+ * liaisons VIVES, donc tout ce qui importe ces deux valeurs voit la mise à jour
+ * sans qu'on touche à un seul appelant. Les repasser en `const` casserait la
+ * remontée en silence — tout compilerait, et la limite ne bougerait plus.
+ *
+ * ⚠️ ON GARDE LA VALEUR LOCALE TANT QUE LE SERVEUR N'A RIEN DIT : hors ligne,
+ * ou face à un serveur plus ancien qui n'annonce rien, l'application doit
+ * continuer de refuser tôt plutôt que de téléverser pour rien.
+ */
+export let TAILLE_MEDIA_MAX_MO = 500
+export let TAILLE_MEDIA_MAX_OCTETS = TAILLE_MEDIA_MAX_MO * 1024 * 1024
+
+/**
+ * Le serveur vient d'annoncer sa limite. Une valeur absurde est ignorée.
+ *
+ * ⚠️ LES GARDE-FOUS NE SONT PAS DE LA DÉFIANCE : un champ absent, une chaîne,
+ * un zéro — et l'application refuserait TOUS les envois sans que personne
+ * comprenne pourquoi. Mieux vaut garder l'ancienne valeur.
+ */
+export function noterLimiteServeur(mo: unknown): void {
+  if (typeof mo !== "number" || !Number.isFinite(mo)) return
+  const entier = Math.floor(mo)
+  if (entier < 1 || entier > 5000) return
+  if (entier === TAILLE_MEDIA_MAX_MO) return
+  TAILLE_MEDIA_MAX_MO = entier
+  TAILLE_MEDIA_MAX_OCTETS = entier * 1024 * 1024
+}
+
+/**
+ * Demande sa limite au serveur, une fois, au démarrage.
+ *
+ * ⚠️ SANS JETON ET SANS BRUIT : `/api/maintenance` est la seule route qui
+ * réponde même pendant une maintenance, et un échec ici ne doit jamais empêcher
+ * l'application de démarrer — on garde simplement la valeur de secours.
+ */
+export async function relireLimiteServeur(): Promise<void> {
+  try {
+    const r = await fetch(`${API_BASE_URL}/api/maintenance`, { cache: "no-store" })
+    if (!r.ok) return
+    const d = (await r.json()) as { mediaMaxMo?: unknown }
+    noterLimiteServeur(d?.mediaMaxMo)
+  } catch {
+    /* hors ligne, ou serveur plus ancien : la valeur de secours fait l'affaire */
+  }
+}

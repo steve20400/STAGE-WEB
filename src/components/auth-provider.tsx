@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import { relireLimiteServeur } from "../services/media-service"
 import {
   clearSessionUser,
   loadSessionUser,
@@ -171,6 +172,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     drain()
     window.addEventListener("online", drain)
+
+    /*
+     * La limite des médias, demandée au serveur une fois (25/11/2026). Sans
+     * elle on garde la valeur de secours du code : l'application refuse alors
+     * peut-être un peu trop tôt, ou un peu trop tard, mais elle fonctionne.
+     */
+    void relireLimiteServeur()
 
     /*
      * ══════ ET UN RÉESSAI RÉGULIER TANT QU'IL RESTE QUELQUE CHOSE ══════
