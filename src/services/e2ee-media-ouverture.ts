@@ -2,6 +2,8 @@ import { initIndexedDB } from "../indexedDB/schema"
 import { loadSessionToken } from "../data/session-auth"
 import { resolveMediaUrl } from "./media-service"
 import { dechiffrerFichier, type DescripteurMedia } from "./e2ee-media"
+import { ControleTransfert } from "./controle-envoi"
+import { telechargerAvecReprise, RefusTelechargement } from "./telechargement-reprise"
 
 /**
  * OUVRIR UN MÉDIA CHIFFRÉ — le télécharger, le vérifier, le déchiffrer.
@@ -20,15 +22,78 @@ const cleCache = (id: string) => `e2ee:${id}`
 /** Ouvertures en cours : dix bulles qui demandent le même média = un seul téléchargement. */
 const enCours = new Map<string, Promise<Blob>>()
 
-export function ouvrirMediaChiffre(d: DescripteurMedia): Promise<Blob> {
+/** Ce que l'interface observe d'un téléchargement : où il en est, et sa pause. */
+type Spectateur = (fraction: number, enPause: boolean) => void
+
+interface Suivi {
+  controle: ControleTransfert
+  spectateurs: Set<Spectateur>
+  fraction: number
+}
+
+/**
+ * LES TÉLÉCHARGEMENTS QU'ON PEUT SUIVRE ET METTRE EN PAUSE (25/11/2026).
+ *
+ * ⚠️ UN SUIVI PAR MÉDIA, PAS PAR BULLE. Le même fichier peut être demandé par
+ * plusieurs endroits à la fois — la bulle, la galerie, l'écran des fichiers
+ * partagés ; `enCours` fait déjà qu'un seul téléchargement part. La pause doit
+ * suivre la même règle : mettre en pause depuis la galerie met en pause LE
+ * téléchargement, pas une copie imaginaire.
+ */
+const suivis = new Map<string, Suivi>()
+
+export function ouvrirMediaChiffre(
+  d: DescripteurMedia,
+  o?: {
+    /** Avancement du téléchargement, de 0 à 1, et son état de pause. */
+    onProgression?: Spectateur
+  },
+): Promise<Blob> {
   const deja = enCours.get(d.id)
-  if (deja) return deja
-  const p = ouvrir(d).finally(() => enCours.delete(d.id))
+  if (deja) {
+    const suivi = suivis.get(d.id)
+    if (o?.onProgression && suivi) {
+      suivi.spectateurs.add(o.onProgression)
+      // Dire TOUT DE SUITE où on en est : un second spectateur ne doit pas
+      // attendre le prochain paquet pour que sa barre se remplisse.
+      o.onProgression(suivi.fraction, suivi.controle.enPause)
+    }
+    return deja
+  }
+
+  const suivi: Suivi = {
+    controle: new ControleTransfert(),
+    spectateurs: new Set(o?.onProgression ? [o.onProgression] : []),
+    fraction: 0,
+  }
+  suivis.set(d.id, suivi)
+  suivi.controle.surChangement((enPause) => prevenir(suivi, suivi.fraction, enPause))
+
+  const p = ouvrir(d, suivi).finally(() => {
+    enCours.delete(d.id)
+    suivis.delete(d.id)
+  })
   enCours.set(d.id, p)
   return p
 }
 
-async function ouvrir(d: DescripteurMedia): Promise<Blob> {
+/** Met en pause le téléchargement de ce média, ou le reprend. */
+export function basculerPauseTelechargement(id: string): void {
+  suivis.get(id)?.controle.basculer()
+}
+
+function prevenir(suivi: Suivi, fraction: number, enPause: boolean): void {
+  suivi.fraction = fraction
+  for (const f of [...suivi.spectateurs]) {
+    try {
+      f(fraction, enPause)
+    } catch {
+      /* un spectateur qui jette ne doit pas couper le téléchargement */
+    }
+  }
+}
+
+async function ouvrir(d: DescripteurMedia, suivi: Suivi): Promise<Blob> {
   try {
     const db = await initIndexedDB()
     const garde = (await db.get(MAGASIN, cleCache(d.id))) as { blob?: Blob } | undefined
@@ -37,7 +102,7 @@ async function ouvrir(d: DescripteurMedia): Promise<Blob> {
     /* cache indisponible : on télécharge */
   }
 
-  const chiffre = await telechargerChiffre(d.id)
+  const chiffre = await telechargerChiffre(d.id, suivi)
   const clair = await dechiffrerFichier(chiffre, d)
   const blob = new Blob([clair as Uint8Array<ArrayBuffer>], { type: d.mime })
 
@@ -76,25 +141,47 @@ export async function garderClair(id: string, blob: Blob): Promise<void> {
  * posé, réseau d'entreprise qui bloque Backblaze. Le fichier étant chiffré, le
  * faire passer par nous ne révèle rien : c'est un coût de bande passante, pas
  * une fuite.
+ *
+ * 🔴 EN FLUX, AVEC REPRISE ET PAUSE DEPUIS LE 25/11/2026. C'était un
+ * `fetch().arrayBuffer()` : aucun avancement affiché, aucune reprise, et une
+ * coupure à 95 % renvoyait au premier octet. Avec un plafond à 500 Mo, c'était
+ * la moitié d'un forfait perdue pour rien.
+ *
+ * ⚠️ LA REPRISE PAR PLAGE DEMANDE L'ACCORD DU STOCKAGE. L'en-tête `Range` sur
+ * une autre origine exige une requête préalable ; si le seau ne l'autorise pas,
+ * `telechargerAvecReprise` repart de zéro — jamais moins bien qu'avant, mais
+ * pas mieux non plus. C'est un réglage à poser sur le seau, pas dans ce code.
  */
-async function telechargerChiffre(id: string): Promise<Uint8Array> {
+async function telechargerChiffre(id: string, suivi: Suivi): Promise<Uint8Array> {
   const adresse = resolveMediaUrl(`/api/media/${id}`)
+  const avance = (recu: number, total: number) => {
+    /*
+     * ⚠️ PAS DE TAILLE ANNONCÉE, PAS DE POURCENTAGE. Afficher « 0 % » pendant
+     * tout un téléchargement serait pire que de ne rien afficher : on croirait
+     * que rien n'avance. Sans total, l'interface garde son sablier.
+     */
+    if (total <= 0) return
+    prevenir(suivi, Math.min(1, recu / total), suivi.controle.enPause)
+  }
   try {
-    const r = await fetch(adresse)
-    if (r.ok) return new Uint8Array(await r.arrayBuffer())
-    if (r.status === 403 || r.status === 404 || r.status === 410) {
-      throw new MediaIndisponible(r.status)
-    }
+    return await telechargerAvecReprise(adresse, {
+      onProgression: avance,
+      controle: suivi.controle,
+    })
   } catch (e) {
-    if (e instanceof MediaIndisponible) throw e
+    if (e instanceof RefusTelechargement) throw new MediaIndisponible(e.statut)
     /* direct refusé (CORS, réseau) : repli par le serveur */
   }
   const token = loadSessionToken()
-  const r = await fetch(`${adresse}&flux=1`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  })
-  if (!r.ok) throw new MediaIndisponible(r.status)
-  return new Uint8Array(await r.arrayBuffer())
+  try {
+    return await telechargerAvecReprise(`${adresse}&flux=1`, {
+      entetes: token ? { Authorization: `Bearer ${token}` } : undefined,
+      onProgression: avance,
+      controle: suivi.controle,
+    })
+  } catch (e) {
+    throw e instanceof RefusTelechargement ? new MediaIndisponible(e.statut) : e
+  }
 }
 
 /** Le serveur n'a plus ce fichier, ou nous le refuse. */

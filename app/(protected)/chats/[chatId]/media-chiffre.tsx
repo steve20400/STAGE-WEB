@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { useTranslation } from "../../../../src/i18n"
+import { Icone } from "../../../../src/components/icone"
 import type { DescripteurMedia } from "../../../../src/services/e2ee-media"
 import { FichierInvalide, urlApercu } from "../../../../src/services/e2ee-media"
-import { ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
+import { basculerPauseTelechargement, ouvrirMediaChiffre } from "../../../../src/services/e2ee-media-ouverture"
 import { formatBytes } from "../../../../src/services/messages-service"
 import { VisionneuseSensible } from "./visionneuse-sensible"
 import { InfosProtectionPdf } from "../../../../src/components/protection-pdf"
@@ -36,6 +37,48 @@ import "./media-chiffre.css"
  * la MÊME galerie que les albums et la MÊME visionneuse que les documents en
  * clair.
  */
+/**
+ * OÙ EN EST LE TÉLÉCHARGEMENT, ET LE BOUTON POUR L'ARRÊTER (25/11/2026).
+ *
+ * ⚠️ UNE `span`, PAS UN `button` : la tuile entière EST déjà un bouton, et un
+ * bouton dans un bouton est invalide — les navigateurs le réparent chacun à
+ * leur façon. Le rôle et le clavier sont donc posés à la main.
+ */
+function PastilleTelechargement({
+  pourcent,
+  enPause,
+  onBasculer,
+}: {
+  pourcent: number
+  enPause: boolean
+  onBasculer: () => void
+}) {
+  const { t } = useTranslation()
+  const libelle = enPause ? t("dl_reprendre") : t("dl_pause")
+  const agir = (e: { stopPropagation: () => void; preventDefault: () => void }) => {
+    // Sans cela, le clic ouvrirait aussi le média derrière.
+    e.stopPropagation()
+    e.preventDefault()
+    onBasculer()
+  }
+  return (
+    <span
+      className={`mc-dl${enPause ? " pause" : ""}`}
+      role="button"
+      tabIndex={0}
+      title={libelle}
+      aria-label={libelle}
+      onClick={agir}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") agir(e)
+      }}
+    >
+      <span className="mc-dl-pct">{pourcent}&nbsp;%</span>
+      <Icone nom={enPause ? "lecture" : "pause"} taille={12} />
+    </span>
+  )
+}
+
 /** Au-delà, une vidéo ou un document attend toujours un clic. */
 const TAILLE_MAX_AUTO = 100 * 1024 * 1024
 
@@ -76,14 +119,39 @@ export function MediaChiffre({
   /** Document sensible déchiffré, ouvert dans sa visionneuse. */
   const [clairSensible, setClairSensible] = useState<Blob | null>(null)
 
+  /*
+   * L'AVANCEMENT DU TÉLÉCHARGEMENT (25/11/2026). Absent quand le serveur
+   * n'annonce pas de taille : on n'invente pas de pourcentage.
+   */
+  const [dl, setDl] = useState<{ pourcent: number; enPause: boolean } | null>(null)
+  /*
+   * ⚠️ UN RENDU PAR PAQUET REÇU SERAIT INTENABLE : un fichier de 500 Mo arrive
+   * en milliers de morceaux, et chacun redessinerait la bulle. On ne note que
+   * les changements VISIBLES — un point de pourcentage, ou la pause.
+   */
+  const dernierDl = useRef<{ p: number; enPause: boolean } | null>(null)
+  const suivreAvance = (fraction: number, enPause: boolean) => {
+    const p = Math.floor(fraction * 100)
+    const avant = dernierDl.current
+    if (avant && avant.p === p && avant.enPause === enPause) return
+    dernierDl.current = { p, enPause }
+    setDl({ pourcent: p, enPause })
+  }
+  const finirAvance = () => {
+    dernierDl.current = null
+    setDl(null)
+  }
+  const basculerDl = () => basculerPauseTelechargement(d.id)
+
   const lancer = () => {
     setEtat("chargement")
-    ouvrirMediaChiffre(d)
+    ouvrirMediaChiffre(d, { onProgression: suivreAvance })
       .then((blob) => {
         setUrl(URL.createObjectURL(blob))
         setEtat("pret")
       })
       .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
+      .finally(finirAvance)
   }
   const charger = () => {
     if (etat === "chargement" || etat === "pret") return
@@ -152,12 +220,13 @@ export function MediaChiffre({
     const ouvrirSensible = () => {
       if (etat === "chargement") return
       setEtat("chargement")
-      ouvrirMediaChiffre(d)
+      ouvrirMediaChiffre(d, { onProgression: suivreAvance })
         .then((blob) => {
           setEtat("attente")
           setClairSensible(blob)
         })
         .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
+        .finally(finirAvance)
     }
     return (
       <>
@@ -177,7 +246,12 @@ export function MediaChiffre({
                 {t("sens_titre")} — {t("sens_web_ouvrir")}
               </span>
             </span>
-            {etat === "chargement" && <span className="mc-doc-attente" aria-label={t("loading")} />}
+            {etat === "chargement" &&
+              (dl ? (
+                <PastilleTelechargement pourcent={dl.pourcent} enPause={dl.enPause} onBasculer={basculerDl} />
+              ) : (
+                <span className="mc-doc-attente" aria-label={t("loading")} />
+              ))}
           </span>
         </button>
         {/* PDF protégé (26/10/2026) : mots de passe en clair chez l'expéditeur,
@@ -213,7 +287,12 @@ export function MediaChiffre({
       >
         {apercu && <img src={apercu} alt="" className="mc-apercu flou" />}
         {url && <img src={url} alt="" className="mc-net" />}
-        {etat === "chargement" && <span className="mc-sablier" aria-hidden="true" />}
+        {etat === "chargement" &&
+          (dl ? (
+            <PastilleTelechargement pourcent={dl.pourcent} enPause={dl.enPause} onBasculer={basculerDl} />
+          ) : (
+            <span className="mc-sablier" aria-hidden="true" />
+          ))}
       </button>
     )
   }
@@ -225,6 +304,9 @@ export function MediaChiffre({
       <button type="button" className="mc-visuel" style={{ aspectRatio: ratio }} onClick={chargerSurClic}>
         {apercu && <img src={apercu} alt="" className="mc-apercu" />}
         <span className={`mc-lecture${etat === "chargement" ? " charge" : ""}`} aria-hidden="true" />
+        {etat === "chargement" && dl && (
+          <PastilleTelechargement pourcent={dl.pourcent} enPause={dl.enPause} onBasculer={basculerDl} />
+        )}
         {d.dureeMs ? <span className="mc-duree">{duree(d.dureeMs)}</span> : null}
       </button>
     )
@@ -237,6 +319,9 @@ export function MediaChiffre({
       <button type="button" className={`mc-vocal${isMe ? " moi" : ""}`} onClick={charger}>
         <span className={`mc-lecture petit${etat === "chargement" ? " charge" : ""}`} aria-hidden="true" />
         <span>{t("voice_message")}</span>
+        {etat === "chargement" && dl && (
+          <PastilleTelechargement pourcent={dl.pourcent} enPause={dl.enPause} onBasculer={basculerDl} />
+        )}
         {d.dureeMs ? <span className="mc-duree-texte">{duree(d.dureeMs)}</span> : null}
       </button>
     )
@@ -265,7 +350,7 @@ export function MediaChiffre({
     }
     if (etat === "chargement") return
     setEtat("chargement")
-    ouvrirMediaChiffre(d)
+    ouvrirMediaChiffre(d, { onProgression: suivreAvance })
       .then((blob) => {
         const u = URL.createObjectURL(blob)
         setUrl(u)
@@ -273,6 +358,7 @@ export function MediaChiffre({
         onOuvrirDocument(u)
       })
       .catch((e) => setEtat(e instanceof FichierInvalide ? "altere" : "echec"))
+      .finally(finirAvance)
   }
   const type = typeFichier ?? { color: "#6b7280", label: (d.nom?.split(".").pop() ?? "").slice(0, 4).toUpperCase() || "DOC" }
 
@@ -303,7 +389,11 @@ export function MediaChiffre({
           </span>
         </span>
         {etat === "chargement" ? (
-          <span className="mc-doc-attente" aria-label={t("loading")} />
+          dl ? (
+            <PastilleTelechargement pourcent={dl.pourcent} enPause={dl.enPause} onBasculer={basculerDl} />
+          ) : (
+            <span className="mc-doc-attente" aria-label={t("loading")} />
+          )
         ) : (
           <svg className="mc-doc-ouvrir" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />

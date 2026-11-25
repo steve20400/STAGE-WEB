@@ -297,3 +297,47 @@
   line-height: 1.35;
   text-align: center;
 }
+
+/* ════════ OÙ EN EST LE TÉLÉCHARGEMENT, ET SA PAUSE (25/11/2026) ════════
+   La pastille remplace le sablier : elle dit un pourcentage et porte le bouton
+   qui arrête. Fond sombre translucide pour rester lisible sur n'importe quelle
+   photo — un gris du thème disparaîtrait sur une image claire. */
+.mc-dl {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  backdrop-filter: blur(4px);
+}
+.mc-dl:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+/* En pause, le chiffre se fige : on le pâlit pour que l'arrêt se voie sans
+   avoir à lire le libellé du bouton. */
+.mc-dl.pause .mc-dl-pct {
+  opacity: 0.6;
+}
+/* Dans une LIGNE de document ou de vocal, la pastille n'est pas posée sur une
+   image : elle prend sa place dans le texte, sans fond. */
+.mc-doc-ligne .mc-dl,
+.mc-vocal .mc-dl {
+  position: static;
+  background: none;
+  color: inherit;
+  padding: 0;
+  backdrop-filter: none;
+}
