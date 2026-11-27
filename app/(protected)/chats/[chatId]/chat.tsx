@@ -51,7 +51,10 @@ import {
   mettreMediaEnFile,
   apercusMediasEnAttente,
   type SendOptions,
+  INITIAL_PAGE_SIZE,
 } from "../../../../src/services/messages-service"
+import { removeMessageFromCache } from "../../../../src/services/indexeddb-cache"
+import { confirmer } from "../../../../src/components/confirmation"
 import {
   activerE2ee,
   chargePour,
@@ -6504,6 +6507,9 @@ export default function ChatRoomPage() {
 
   const refreshMessages = useCallback(async () => {
     const pour = chatId
+    // Ce qui arrive en temps reel PENDANT la lecture n'est pas encore dans sa
+    // reponse : on ne le retire pas (voir plus bas).
+    const debut = Date.now() - 5_000
     await fetchMessagesCacheFirst(
       chatId,
       // onCached : affichage instantané depuis IndexedDB (~2ms)
@@ -6512,7 +6518,44 @@ export default function ChatRoomPage() {
       },
       // onFresh : mise à jour silencieuse avec les données réseau
       (fresh) => {
-        if (chatIdCourant.current === pour) setMessages((prev) => fusionnerMessages(prev, fresh))
+        if (chatIdCourant.current !== pour) return
+        /*
+         * 🐛 « UN MESSAGE SUPPRIME POUR MOI REVIENT APRES RECONNEXION » (user,
+         * 27/11/2026). A la reconnexion, l'archive chiffree remet TOUS les
+         * messages archives dans le cache local, ceux qu'on avait supprimes
+         * pour soi compris — l'archive ne connait pas ce masquage. Le serveur,
+         * lui, ne les sert plus ; mais la fusion gardait la copie du cache.
+         *
+         * 🔴 LE SERVEUR FAIT FOI SUR CE QUI EXISTE POUR MOI. Dans la fenetre
+         * qu'il vient de servir — depuis son plus ancien message, ou depuis
+         * toujours s'il a tout servi —, ce qu'il ne renvoie pas est retire de
+         * l'ecran et du cache : message supprime pour moi, conversation
+         * supprimee pour moi. Restent les envois en cours (« tmp- »,
+         * « sending », « failed ») et ce qui est arrive pendant la lecture.
+         */
+        const servis = new Set(fresh.map((m) => m.id))
+        const depuis =
+          fresh.length < INITIAL_PAGE_SIZE
+            ? -Infinity
+            : Math.min(...fresh.map((m) => m.timestamp.getTime()))
+        const disparus = new Set<string>()
+        setMessages((prev) =>
+          fusionnerMessages(prev, fresh).filter((m) => {
+            const t = m.timestamp.getTime()
+            const garde =
+              servis.has(m.id) ||
+              m.id.startsWith("tmp") ||
+              m.status === "sending" ||
+              m.status === "failed" ||
+              t < depuis ||
+              t >= debut
+            if (!garde) disparus.add(m.id)
+            return garde
+          })
+        )
+        queueMicrotask(() => {
+          for (const id of disparus) void removeMessageFromCache(id)
+        })
       }
     )
   }, [chatId, fusionnerMessages])
@@ -8619,7 +8662,15 @@ export default function ChatRoomPage() {
       .catch(() => error(t("f2_copy_failed"), t("clipboard_unavailable")))
   }
 
-  const handleDelete = (msg: Message, scope: "me" | "everyone") => {
+  const handleDelete = async (msg: Message, scope: "me" | "everyone") => {
+    // Toujours confirmer une suppression (demande du user, 27/11/2026).
+    const oui = await confirmer({
+      titre: t(scope === "me" ? "suppr_msg_moi_q" : "suppr_msg_tous_q"),
+      texte: t(scope === "me" ? "suppr_msg_moi_d" : "suppr_msg_tous_d"),
+      confirmer: t("delete"),
+      annuler: t("cancel"),
+    })
+    if (!oui) return
     // Vingt-quatre heures pour supprimer pour tous (décision du user,
     // 07/10/2026). Le menu ne le propose plus au-delà ; le délai a pu passer
     // pendant qu'il était ouvert.
