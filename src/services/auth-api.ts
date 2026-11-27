@@ -416,10 +416,33 @@ export async function deleteCurrentAccount(password: string) {
  * POST /api/account/password — change le mot de passe (verifie l'ancien cote
  * backend). Le nouveau doit faire au moins 8 caracteres et differer de l'actuel.
  */
-export async function changePasswordApi(currentPassword: string, newPassword: string) {
+export async function changePasswordApi(
+  currentPassword: string,
+  newPassword: string,
+  /**
+   * « Déconnecter mes autres appareils » (27/11/2026) : le serveur révoque
+   * toutes les sessions du compte sauf celles de ce navigateur.
+   */
+  deconnecterAutres = false,
+) {
   await apiRequest<{ message?: string }>("/api/account/password", {
     method: "POST",
-    body: { currentPassword, newPassword },
+    body: deconnecterAutres
+      ? {
+          currentPassword,
+          newPassword,
+          deconnecterAutres: true,
+          appareilCourant: getOrCreateWebDeviceId(),
+        }
+      : { currentPassword, newPassword },
+  })
+}
+
+/** POST /api/account/verify-password — lève si le mot de passe est faux. */
+export async function verifierMotDePasseApi(password: string) {
+  await apiRequest<{ ok?: boolean }>("/api/account/verify-password", {
+    method: "POST",
+    body: { password },
   })
 }
 

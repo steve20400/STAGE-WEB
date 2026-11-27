@@ -161,6 +161,43 @@ export default function ForgotPasswordPage() {
         </div>
 
         {/*
+          🔴 PRÉVENIR AVANT (27/11/2026) : réinitialiser le mot de passe sans
+          connaître l'ancien laisse la sauvegarde sous l'ancien — seule la clé
+          de récupération l'ouvre ensuite sur un nouvel appareil.
+        */}
+        <div
+          role="note"
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "flex-start",
+            padding: 12,
+            marginBottom: 16,
+            borderRadius: 12,
+            background: "var(--accent-dim)",
+            fontSize: "0.8125rem",
+            lineHeight: 1.45,
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+            style={{ flexShrink: 0, marginTop: 1, color: "var(--accent)" }}
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12.01" y2="8" />
+          </svg>
+          <span>{t("arch_oubli_avertissement")}</span>
+        </div>
+
+        {/*
           Choix du chemin. Masqué une fois le code parti par courriel : changer
           de mode à ce moment-là abandonnerait un code déjà envoyé, sans le dire.
         */}

@@ -20,9 +20,13 @@ import { useEffect, useState } from "react"
 import { Icone } from "../../../src/components/icone"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
+  aUneCleDeRecuperation,
+  ouvrir,
+  relierAuMotDePasse,
   restaurerALaConnexionSuivie,
   type IssueConnexion,
 } from "../../../src/services/e2ee-sauvegarde"
+import { useTranslation } from "../../../src/i18n"
 import { reprendreMotDePasse } from "../../../src/services/restauration-en-attente"
 import { cacheMessage } from "../../../src/services/indexeddb-cache"
 import { entreeCacheDechiffree } from "../../../src/services/e2ee-entree-cache"
@@ -86,6 +90,39 @@ export default function RestaurationPage() {
   const [progression, setProgression] = useState<ProgressionRestauration>(derniere)
   const [issue, setIssue] = useState<IssueConnexion | null>(null)
   const [essai, setEssai] = useState(0)
+  const { t } = useTranslation()
+
+  /*
+   * 🔴 L'ARCHIVE EST FERMÉE MAIS A UNE CLÉ DE RÉCUPÉRATION (27/11/2026) : on
+   * la propose, sans bloquer — « Plus tard » entre aussitôt.
+   */
+  const [proposerCle, setProposerCle] = useState(false)
+  const [mots, setMots] = useState("")
+  const [ouverture, setOuverture] = useState(false)
+  const [erreurCle, setErreurCle] = useState<string | null>(null)
+
+  /**
+   * Les 12 mots : on ouvre, on RELIE l'archive au mot de passe qu'on vient de
+   * taper (les appareils suivants s'ouvriront avec lui), puis la restauration
+   * reprend — la clé est désormais dans ce navigateur.
+   */
+  const ouvrirParCle = async () => {
+    const saisie = mots.trim()
+    if (!saisie || ouverture) return
+    setOuverture(true)
+    setErreurCle(null)
+    if (!(await ouvrir("recuperation", saisie))) {
+      setOuverture(false)
+      setErreurCle(t("arch_cle_refusee"))
+      return
+    }
+    if (motDePasse) await relierAuMotDePasse(motDePasse)
+    setMots("")
+    setOuverture(false)
+    setProposerCle(false)
+    setIssue(null)
+    setEssai((n) => n + 1)
+  }
 
   const entrer = () => {
     oublier()
@@ -111,6 +148,12 @@ export default function RestaurationPage() {
       if (r.issue === "restauree" || r.issue === "rienARestaurer") {
         oublier()
         navigate(suite, { replace: true })
+      } else if (r.issue === "fermee") {
+        void aUneCleDeRecuperation().then((avecCle) => {
+          if (!actif) return
+          setProposerCle(avecCle)
+          setIssue("fermee")
+        })
       } else {
         setIssue(r.issue)
       }
@@ -135,9 +178,11 @@ export default function RestaurationPage() {
         <h1>
           {issue === null
             ? "Récupération de vos messages"
-            : issue === "fermee"
-              ? "Votre sauvegarde reste fermée"
-              : "La récupération n’a pas abouti"}
+            : issue === "fermee" && proposerCle
+              ? t("arch_cle_proposee_titre")
+              : issue === "fermee"
+                ? "Votre sauvegarde reste fermée"
+                : "La récupération n’a pas abouti"}
         </h1>
 
         {issue === null && (
@@ -169,7 +214,42 @@ export default function RestaurationPage() {
           </>
         )}
 
-        {issue === "fermee" && (
+        {issue === "fermee" && proposerCle && (
+          <>
+            <p className="sous">{t("arch_cle_proposee_texte")}</p>
+            <textarea
+              className="mots"
+              rows={3}
+              value={mots}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder={t("arch_cle_saisie")}
+              aria-label={t("arch_cle_saisie")}
+              aria-invalid={erreurCle ? true : undefined}
+              onChange={(e) => setMots(e.target.value)}
+            />
+            {erreurCle && (
+              <p className="erreur" role="alert">
+                {erreurCle}
+              </p>
+            )}
+            <button
+              type="button"
+              className="principal"
+              disabled={ouverture || !mots.trim()}
+              onClick={() => void ouvrirParCle()}
+            >
+              {ouverture ? "…" : t("arch_cle_restaurer")}
+            </button>
+            <button type="button" className="secondaire" disabled={ouverture} onClick={entrer}>
+              {t("arch_plus_tard")}
+            </button>
+          </>
+        )}
+
+        {issue === "fermee" && !proposerCle && (
           <>
             <p className="sous">
               Votre mot de passe n’ouvre pas votre sauvegarde. Il a peut-être changé depuis
@@ -256,4 +336,11 @@ const STYLE = `
     background: transparent; color: var(--text-primary); border: 1px solid var(--accent);
   }
   .restauration .note { font-size: 0.75rem; color: var(--text-muted); margin: 0; }
+  .restauration .mots {
+    font: inherit; font-size: 0.9375rem; padding: 10px 12px; border-radius: 10px; resize: none;
+    background: var(--bg-base); color: var(--text-primary); border: 1px solid var(--accent-dim);
+  }
+  .restauration .mots:focus { outline: none; border-color: var(--accent); }
+  .restauration .erreur { font-size: 0.8125rem; color: #d64545; margin: 0; text-align: left; }
+  .restauration button:disabled { opacity: .5; cursor: default; }
 `

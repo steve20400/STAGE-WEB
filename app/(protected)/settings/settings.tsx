@@ -135,7 +135,7 @@ import {
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { E2eeSauvegardePanneau } from "./e2ee-sauvegarde-panneau"
 import { EmpreintePanneau } from "./empreinte-panneau"
-import { suivreChangementMotDePasse } from "../../../src/services/e2ee-sauvegarde"
+import { aUneArchive, suivreChangementMotDePasse } from "../../../src/services/e2ee-sauvegarde"
 import { useTelechargementAuto } from "../../../src/hooks/use-telechargement-auto"
 import {
   changerTelechargement,
@@ -1997,7 +1997,7 @@ export default function SettingsPage() {
   const { language, setLanguage, t } = useTranslation()
   const navigate = useNavigate()
   const { deleteAccount: removeAccount, logoutEverywhere, updateUser, user } = useAuth()
-  const { success, error: toastError, info, warning } = useToast()
+  const { success, error: toastError, info, warning, toast } = useToast()
 
   /**
    * La section ouverte, qui peut etre DESIGNEE PAR L'URL.
@@ -2425,6 +2425,9 @@ export default function SettingsPage() {
     }
   }
 
+  // « Déconnecter mes autres appareils » au changement de mot de passe (27/11/2026).
+  const [deconnecterAutres, setDeconnecterAutres] = useState(false)
+
   const changePassword = async () => {
     if (!security.currentPwd) return toastError(t("set_current_password_required"))
     if (security.newPwd.length < 8)
@@ -2434,7 +2437,7 @@ export default function SettingsPage() {
       return toastError(t("set_password_same"), t("set_choose_different_password"))
     setSaving(true)
     try {
-      await changePasswordApi(security.currentPwd, security.newPwd)
+      await changePasswordApi(security.currentPwd, security.newPwd, deconnecterAutres)
 
       /*
        * 🐛 LA SAUVEGARDE DOIT SUIVRE, SINON ELLE CASSE EN SILENCE.
@@ -2452,10 +2455,26 @@ export default function SettingsPage() {
        * à ré-envelopper — et on aurait posé une serrure pour un mot de passe
        * que le compte n'a pas.
        */
-      await suivreChangementMotDePasse(security.currentPwd, security.newPwd)
+      const suivi = await suivreChangementMotDePasse(security.currentPwd, security.newPwd)
 
       setSecurity({ currentPwd: "", newPwd: "", confirmPwd: "" })
-      success(t("set_password_changed"), t("set_password_changed_detail"))
+      setDeconnecterAutres(false)
+      /*
+       * 🔴 UN ÉCHEC SE DIT (27/11/2026). Il passait sous silence, et l'on
+       * découvrait l'archive fermée au changement d'appareil. Seulement s'il
+       * y a une archive : sans elle, il n'y avait rien à faire suivre. La
+       * prochaine connexion sur ce navigateur la répare.
+       */
+      if (!suivi && (await aUneArchive())) {
+        toast({
+          type: "warning",
+          title: t("set_password_changed"),
+          message: t("arch_suivi_echoue"),
+          duration: 12000,
+        })
+      } else {
+        success(t("set_password_changed"), t("set_password_changed_detail"))
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : t("set_current_password_wrong")
       toastError(t("error"), message)
@@ -3455,6 +3474,38 @@ export default function SettingsPage() {
                       : undefined
                   }
                 />
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    margin: "4px 0 14px",
+                    cursor: "pointer",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={deconnecterAutres}
+                    disabled={saving}
+                    onChange={(e) => setDeconnecterAutres(e.target.checked)}
+                    style={{ marginTop: 3, accentColor: "var(--accent)" }}
+                  />
+                  <span>
+                    {t("arch_deconnecter_autres")}
+                    <span
+                      style={{
+                        display: "block",
+                        fontSize: "0.75rem",
+                        color: "var(--text-muted)",
+                        marginTop: 2,
+                      }}
+                    >
+                      {t("arch_deconnecter_autres_d")}
+                    </span>
+                  </span>
+                </label>
 
                 <button
                   onClick={changePassword}

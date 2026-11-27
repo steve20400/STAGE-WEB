@@ -10,6 +10,7 @@ import {
   creerArchive,
   normaliserCleRecuperation,
   ouvrirArchiveBrute,
+  serrureDepuisMatiere,
   tirerCleRecuperation,
   type Serrure,
   type TypeSerrure,
@@ -109,6 +110,86 @@ async function relire(): Promise<CryptoKey | null> {
     )
   } catch {
     return null
+  }
+}
+
+/**
+ * La matière brute de la clé maîtresse, telle que le coffre la garde — pour
+ * REFAIRE une serrure (27/11/2026). `null` si le coffre ne l'a pas.
+ *
+ * ⚠️ RIEN D'AUTRE NE DOIT S'EN SERVIR. L'usage courant passe par `laCle()`,
+ * qui rend une clé non extractible.
+ */
+async function lireMatiere(): Promise<ArrayBuffer | null> {
+  try {
+    await ouvrirCoffre()
+    const b64 = lireSecret<string>(CLE_COFFRE)
+    return b64 ? depuisB64Local(b64) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * La serrure « mot de passe » refuse-t-elle [motDePasse] ? Alors elle est
+ * périmée : on la refait avec la clé de cet appareil. Ne lève jamais ; rend
+ * vrai si elle a été refaite.
+ */
+async function reparerSerrureSiPerimee(motDePasse: string, serrure: Serrure): Promise<boolean> {
+  try {
+    await ouvrirArchiveBrute(motDePasse, serrure)
+    return false // Elle s'ouvre : rien à faire.
+  } catch {
+    // Elle refuse ce mot de passe : périmée.
+  }
+  try {
+    const matiere = await lireMatiere()
+    if (!matiere) return false
+    await poserSerrure(await serrureDepuisMatiere("motdepasse", motDePasse, matiere))
+    console.info("[e2ee] serrure « mot de passe » périmée, refaite.")
+    return true
+  } catch (e) {
+    console.warn("[e2ee] serrure périmée, réparation impossible :", e)
+    return false
+  }
+}
+
+/**
+ * Relie l'archive ouverte au mot de passe [motDePasse] — déjà vérifié par
+ * l'appelant — en refaisant sa serrure, même si une autre existe.
+ *
+ * 🔴 APRÈS UNE OUVERTURE PAR LES 12 MOTS (27/11/2026) : la serrure « mot de
+ * passe » qui existe est justement celle qui n'a pas ouvert. La garder ferait
+ * redemander les 12 mots sur chaque nouvel appareil.
+ */
+export async function relierAuMotDePasse(motDePasse: string): Promise<boolean> {
+  if (!motDePasse) return false
+  try {
+    const matiere = await lireMatiere()
+    if (!matiere) return false
+    await poserSerrure(await serrureDepuisMatiere("motdepasse", motDePasse, matiere))
+    return true
+  } catch (e) {
+    console.warn("[e2ee] sauvegarde non reliée au mot de passe :", e)
+    return false
+  }
+}
+
+/** Une archive existe-t-elle pour ce compte ? Faux en cas de doute. */
+export async function aUneArchive(): Promise<boolean> {
+  try {
+    return (await lireSerrures()).length > 0
+  } catch {
+    return false
+  }
+}
+
+/** L'archive a-t-elle une clé de récupération ? Faux en cas de doute. */
+export async function aUneCleDeRecuperation(): Promise<boolean> {
+  try {
+    return (await lireSerrures()).some((s) => s.type === "recuperation")
+  } catch {
+    return false
   }
 }
 
@@ -692,7 +773,18 @@ export async function suivreChangementMotDePasse(
     const ancienne = serrures.find((s) => s.type === "motdepasse")
     if (!ancienne) return false
 
-    const posee = await ajouterSerrure(ancien, ancienne, "motdepasse", nouveau)
+    /*
+     * ⚠️ SI L'ANCIEN N'OUVRE PLUS (27/11/2026) — la serrure était déjà
+     * périmée —, la clé que cet appareil garde suffit à la refaire.
+     */
+    let posee: Serrure
+    try {
+      posee = await ajouterSerrure(ancien, ancienne, "motdepasse", nouveau)
+    } catch {
+      const matiere = await lireMatiere()
+      if (!matiere) throw new Error("ni l'ancien mot de passe ni la clé de l'appareil")
+      posee = await serrureDepuisMatiere("motdepasse", nouveau, matiere)
+    }
     await poserSerrure(posee)
     console.info("[e2ee] la sauvegarde suit le nouveau mot de passe.")
     return true
@@ -829,6 +921,7 @@ export async function restaurerALaConnexionSuivie(
 
   // Ce navigateur a peut-être déjà la clé : pas besoin du mot de passe.
   let cle = await laCle()
+  const dejaSurAppareil = cle !== null
   if (!cle) {
     if (!serrures.some((s) => s.type === "motdepasse")) return fermee
     if (!(await ouvrir("motdepasse", motDePasse))) return fermee
@@ -846,6 +939,22 @@ export async function restaurerALaConnexionSuivie(
     }
     suivi?.({ etape: "rangement", fait: messages.length, total: messages.length })
     console.info(`[e2ee] ${messages.length} message(s) restauré(s) depuis la sauvegarde.`)
+    /*
+     * 🔴 UNE SERRURE PÉRIMÉE SE RÉPARE ICI (27/11/2026). Après un mot de passe
+     * oublié, ou un changement dont la serrure n'a pas suivi, elle garde
+     * l'ANCIEN mot de passe : tout nouvel appareil trouvait l'archive fermée.
+     * Ce navigateur l'ouvre avec sa clé, sans passer par elle — personne ne
+     * la réparait.
+     *
+     * ⚠️ SEULEMENT SI LA CLÉ A LU QUELQUE CHOSE. Une clé restée d'une archive
+     * supprimée puis recréée ailleurs n'est plus la bonne : refaire la serrure
+     * avec elle fermerait l'archive pour de bon. Un message déchiffré prouve
+     * que c'est la bonne. EN FOND : Argon2id prend une à deux secondes.
+     */
+    const serrureMdp = serrures.find((s) => s.type === "motdepasse")
+    if (dejaSurAppareil && serrureMdp && messages.length > 0) {
+      void reparerSerrureSiPerimee(motDePasse, serrureMdp)
+    }
     return { issue: "restauree", restaures: messages.length, illisibles: blocsIllisibles }
   } catch (e) {
     console.error("[e2ee] restauration à la connexion impossible :", e)

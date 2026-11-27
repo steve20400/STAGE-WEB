@@ -6,10 +6,13 @@ import {
   lireCoffre,
   ouvrir,
   ouvrirParTrousseau,
+  relierAuMotDePasse,
   restaurerTout,
   toutEffacer,
 } from "../../../src/services/e2ee-sauvegarde"
 import { cacheMessage } from "../../../src/services/indexeddb-cache"
+import { entreeCacheDechiffree } from "../../../src/services/e2ee-entree-cache"
+import { verifierMotDePasseApi } from "../../../src/services/auth-api"
 import { useTranslation } from "../../../src/i18n"
 import "./e2ee-sauvegarde-panneau.css"
 
@@ -50,6 +53,10 @@ export function E2eeSauvegardePanneau() {
   const [secretSaisi, setSecretSaisi] = useState("")
   const [restaure, setRestaure] = useState<{ n: number; illisibles: number } | null>(null)
   const [confirmeEffacement, setConfirmeEffacement] = useState(false)
+  // Après une ouverture par les 12 mots : relier au mot de passe (27/11/2026).
+  const [relier, setRelier] = useState(false)
+  const [mdpRelier, setMdpRelier] = useState("")
+  const [relie, setRelie] = useState(false)
 
   /*
    * ⚠️ ON NE PROPOSE PAS CE QU'ON NE PEUT PAS TENIR. Un bouton qui échouera
@@ -118,19 +125,44 @@ export function E2eeSauvegardePanneau() {
        * messages ; c'est l'écran qui décide d'en faire quelque chose — et c'est
        * ce qui permet d'annoncer un décompte avant d'écrire quoi que ce soit.
        */
+      /*
+       * 🐛 LES MÉDIAS SE PERDAIENT ICI (27/11/2026) : l'entrée était écrite à
+       * la main, `type: "TEXT"` en dur — une photo restaurée depuis les
+       * réglages revenait en texte vide. La même fabrique que la page de
+       * restauration : un média se range COMPLET, avec sa clé.
+       */
       for (const m of messages) {
-        await cacheMessage({
-          id: m.id,
-          conversationId: m.convId,
-          senderId: m.expediteurId,
-          content: m.texte,
-          type: "TEXT",
-          status: "SENT",
-          createdAt: m.quand,
-        })
+        await cacheMessage(entreeCacheDechiffree(m))
       }
       setSecretSaisi("")
       setRestaure({ n: messages.length, illisibles: blocsIllisibles })
+      // Ouverte par les 12 mots : la relier au mot de passe actuel (27/11/2026).
+      if (type === "recuperation") setRelier(true)
+    })
+
+  /* ── RELIER AU MOT DE PASSE, APRÈS LES 12 MOTS ───────────────────── */
+
+  /*
+   * 🔴 SANS CELA, CHAQUE NOUVEL APPAREIL REDEMANDERAIT LES 12 MOTS (27/11/2026).
+   * Si l'on a eu besoin de la clé, c'est que la serrure « mot de passe » est
+   * périmée. On demande le mot de passe actuel, le serveur le vérifie, et la
+   * serrure est refaite avec lui. Facultatif : « Plus tard » laisse l'archive
+   * telle quelle, la prochaine connexion sur ce navigateur la réparera.
+   */
+  const relierMotDePasse = () =>
+    avec(async () => {
+      const mdp = mdpRelier
+      if (!mdp) return
+      try {
+        await verifierMotDePasseApi(mdp)
+      } catch {
+        throw new Error(t("arch_mdp_incorrect"))
+      }
+      if (!(await relierAuMotDePasse(mdp))) throw new Error(t("error"))
+      setMdpRelier("")
+      setRelier(false)
+      setRelie(true)
+      await relire()
     })
 
   /* ── AJOUTER UNE CLÉ DE RÉCUPÉRATION ─────────────────────────────── */
@@ -162,16 +194,14 @@ export function E2eeSauvegardePanneau() {
     avec(async () => {
       if (!(await ouvrirParTrousseau())) throw new Error(t("e2ee_sauv_trousseau_refus"))
       const { messages, blocsIllisibles } = await restaurerTout()
+      /*
+       * 🐛 LES MÉDIAS SE PERDAIENT ICI (27/11/2026) : l'entrée était écrite à
+       * la main, `type: "TEXT"` en dur — une photo restaurée depuis les
+       * réglages revenait en texte vide. La même fabrique que la page de
+       * restauration : un média se range COMPLET, avec sa clé.
+       */
       for (const m of messages) {
-        await cacheMessage({
-          id: m.id,
-          conversationId: m.convId,
-          senderId: m.expediteurId,
-          content: m.texte,
-          type: "TEXT",
-          status: "SENT",
-          createdAt: m.quand,
-        })
+        await cacheMessage(entreeCacheDechiffree(m))
       }
       setRestaure({ n: messages.length, illisibles: blocsIllisibles })
     })
@@ -382,6 +412,47 @@ export function E2eeSauvegardePanneau() {
               )}
             </p>
           )}
+
+          {relier && (
+            <div className="sauv-cle">
+              <div className="sauv-cle-titre">{t("arch_relier_titre")}</div>
+              <p className="sauv-cle-avert">{t("arch_relier_texte")}</p>
+              <label className="sauv-champ">
+                <span>{t("current_password")}</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={mdpRelier}
+                  onChange={(e) => setMdpRelier(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && mdpRelier) void relierMotDePasse()
+                  }}
+                />
+              </label>
+              <div className="sauv-actions">
+                <button
+                  type="button"
+                  className="sauv-btn primaire"
+                  disabled={occupe || !mdpRelier}
+                  onClick={() => void relierMotDePasse()}
+                >
+                  {t("save")}
+                </button>
+                <button
+                  type="button"
+                  className="sauv-btn"
+                  disabled={occupe}
+                  onClick={() => {
+                    setMdpRelier("")
+                    setRelier(false)
+                  }}
+                >
+                  {t("arch_plus_tard")}
+                </button>
+              </div>
+            </div>
+          )}
+          {relie && <p className="sauv-resultat">{t("arch_relier_ok")}</p>}
 
           <div className="sauv-danger">
             {!confirmeEffacement ? (

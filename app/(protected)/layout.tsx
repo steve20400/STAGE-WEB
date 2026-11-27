@@ -7,6 +7,7 @@ import { ThemeToggle } from "../../src/components/theme-toggle"
 import { ActiveCallFloating } from "../../src/components/active-call-floating"
 import { RepondeurRetour } from "../../src/components/repondeur-retour"
 import { PseudoAppareilGate } from "../../src/components/pseudo-appareil-gate"
+import { InvitationCleRecuperation } from "../../src/components/invitation-cle-recuperation"
 import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
 import {
@@ -775,6 +776,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           l'ecran de connexion — l'inscription enchaine directement sur la
           session, et la demande y serait sautee. */}
       <PseudoAppareilGate />
+      <InvitationCleRecuperation />
       <ActiveCallFloating />
       {/* Le repondeur s'affiche DANS l'ecran d'appel. Ce composant-ci ne
           dessine rien : il y ramene quand on l'avait quitte — fenetre reduite

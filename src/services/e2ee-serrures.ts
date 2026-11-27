@@ -387,6 +387,33 @@ export async function cleDepuisMatiere(brut: ArrayBuffer): Promise<CryptoKey> {
   ])
 }
 
+/**
+ * Refait une serrure à partir de la MATIÈRE de la clé maîtresse — celle que
+ * cet appareil a rangée dans son coffre (27/11/2026).
+ *
+ * 🔴 POUR LES CAS OÙ AUCUN SECRET CONNU N'OUVRE PLUS : une serrure « mot de
+ * passe » restée sur l'ANCIEN mot de passe (oubli, changement qui n'a pas
+ * suivi). `ajouterSerrure` exige un secret qui marche ; ici, c'est l'appareil
+ * qui a la clé.
+ *
+ * ⚠️ LA CLÉ EST EXTRACTIBLE LE TEMPS DE CET APPEL, comme dans
+ * `ajouterSerrure`, et ne quitte pas la fonction.
+ */
+export async function serrureDepuisMatiere(
+  type: TypeSerrure,
+  secret: string,
+  matiere: ArrayBuffer,
+): Promise<Serrure> {
+  const maitresse = await crypto.subtle.importKey(
+    "raw",
+    matiere,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"],
+  )
+  return envelopper(type, secret, maitresse)
+}
+
 /* ══════════════════ AJOUTER UNE SERRURE PLUS TARD ══════════════════ */
 
 /**
