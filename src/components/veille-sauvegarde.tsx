@@ -39,6 +39,12 @@ import "./confirmation.css"
  * ⚠️ RIEN NE BLOQUE : « Plus tard » ferme tout jusqu'au prochain démarrage.
  */
 const PAUSE_MS = 60_000
+/**
+ * Les demandes des autres appareils se relisent aussi d'elles-mêmes, page
+ * visible : le signal temps réel peut se perdre (socket qui se rouvre au même
+ * instant). Une seule requête légère.
+ */
+const RELECTURE_DEMANDES_MS = 30_000
 
 export function VeilleSauvegarde() {
   const { user } = useAuth()
@@ -56,13 +62,19 @@ export function VeilleSauvegarde() {
   const ecartees = useRef(new Set<string>())
   const bandeauEcarte = useRef(false)
   const enCours = useRef(false)
+  // Un signal arrivé pendant une vérification n'est pas perdu : on refait un tour.
+  const relancer = useRef(false)
   const dernier = useRef(0)
   // La page de restauration fait elle-même ce travail : on ne s'y croise pas.
   const surRestauration = pathname.startsWith("/restauration")
 
   const verifier = useCallback(
     async (force = false) => {
-      if (!moi || enCours.current) return
+      if (!moi) return
+      if (enCours.current) {
+        if (force) relancer.current = true
+        return
+      }
       if (!force && Date.now() - dernier.current < PAUSE_MS) return
       enCours.current = true
       dernier.current = Date.now()
@@ -95,10 +107,34 @@ export function VeilleSauvegarde() {
         if (!bandeauEcarte.current) setBandeau(await serrureMotDePassePerimee())
       } finally {
         enCours.current = false
+        if (relancer.current) {
+          relancer.current = false
+          void verifier(true)
+        }
       }
     },
     [moi, success, t],
   )
+
+  /** Seulement les demandes des autres appareils : le tour léger. */
+  const relireDemandes = useCallback(async () => {
+    if (!moi || enCours.current || document.visibilityState !== "visible") return
+    enCours.current = true
+    try {
+      for (const d of await demandesCleOuvertes()) {
+        if (d.auto) {
+          await servirDemandeCle(d)
+          continue
+        }
+        if (!ecartees.current.has(d.id)) {
+          setDemande((deja) => deja ?? d)
+          break
+        }
+      }
+    } finally {
+      enCours.current = false
+    }
+  }, [moi])
 
   useEffect(() => {
     if (!moi || surRestauration) return
@@ -108,12 +144,14 @@ export function VeilleSauvegarde() {
     }
     document.addEventListener("visibilitychange", auRetour)
     const desabonner = subscribeToSignalSauvegarde(() => void verifier(true))
+    const releve = window.setInterval(() => void relireDemandes(), RELECTURE_DEMANDES_MS)
     return () => {
+      window.clearInterval(releve)
       window.clearTimeout(premier)
       document.removeEventListener("visibilitychange", auRetour)
       desabonner()
     }
-  }, [moi, surRestauration, verifier])
+  }, [moi, surRestauration, verifier, relireDemandes])
 
   const autoriser = async () => {
     if (!demande) return

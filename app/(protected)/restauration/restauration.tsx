@@ -28,7 +28,10 @@ import {
   restaurerALaConnexionSuivie,
   type IssueConnexion,
 } from "../../../src/services/e2ee-sauvegarde"
-import { subscribeToSignalSauvegarde } from "../../../src/services/websocket-service"
+import {
+  sendSignalSauvegarde,
+  subscribeToSignalSauvegarde,
+} from "../../../src/services/websocket-service"
 import { useTranslation } from "../../../src/i18n"
 import { reprendreMotDePasse } from "../../../src/services/restauration-en-attente"
 import { cacheMessage } from "../../../src/services/indexeddb-cache"
@@ -136,6 +139,7 @@ export default function RestaurationPage() {
    * toute seule s'il est ouvert, ou plus tard (la veille la reprendra).
    */
   const [attente, setAttente] = useState(false)
+  const [idDemande, setIdDemande] = useState<string | null>(null)
   const [refusParAppareil, setRefusParAppareil] = useState(false)
   const [motsVisibles, setMotsVisibles] = useState(false)
 
@@ -198,10 +202,14 @@ export default function RestaurationPage() {
             navigate(suite, { replace: true })
             return
           }
+          // La demande d'abord, l'écran ensuite : sinon « reste fermée » clignote
+          // une seconde avant l'attente.
+          const id = await demanderCleAuxAppareils(motDePasse ?? undefined)
+          if (!actif) return
+          setIdDemande(id)
+          setAttente(id !== null)
           setProposerCle(avecCle)
           setIssue("fermee")
-          const id = await demanderCleAuxAppareils(motDePasse ?? undefined)
-          if (actif) setAttente(id !== null)
         })
       } else {
         setIssue(r.issue)
@@ -237,7 +245,13 @@ export default function RestaurationPage() {
         setAttente(false)
       }
     }
-    const minuterie = window.setInterval(() => void relire(), 4000)
+    let tours = 0
+    const minuterie = window.setInterval(() => {
+      // Le signal se renvoie toutes les vingt secondes : le premier a pu partir
+      // pendant que la socket se rouvrait, juste après la connexion.
+      if (++tours % 5 === 0 && idDemande) sendSignalSauvegarde("demande_cle", idDemande)
+      void relire()
+    }, 4000)
     const desabonner = subscribeToSignalSauvegarde((quoi) => {
       if (quoi === "demande_cle_traitee") void relire()
     })
@@ -246,7 +260,7 @@ export default function RestaurationPage() {
       window.clearInterval(minuterie)
       desabonner()
     }
-  }, [issue, attente])
+  }, [issue, attente, idDemande])
 
   const fraction = fractionGlobale(progression)
   const texteCompteur = compteur(progression, {
