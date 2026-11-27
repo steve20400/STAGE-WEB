@@ -53,9 +53,13 @@ export function libelleEtape(e: EtapeRestauration): string {
 }
 
 /** Le compteur sous la barre : « 1 250 / 2 100 blocs », ou rien. */
-export function compteur(p: ProgressionRestauration): string | null {
+export function compteur(
+  p: ProgressionRestauration,
+  // Les unités, traduites par l'écran (27/11/2026). Le français par défaut.
+  unites: { blocs: string; messages: string } = { blocs: "blocs", messages: "messages" },
+): string | null {
   if (p.etape === "ouverture" || p.total === undefined) return null
-  const unite = p.etape === "rangement" ? "messages" : "blocs"
+  const unite = p.etape === "rangement" ? unites.messages : unites.blocs
   return `${milliers(p.fait)} / ${milliers(p.total)} ${unite}`
 }
 

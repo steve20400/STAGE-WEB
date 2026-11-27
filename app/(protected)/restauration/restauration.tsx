@@ -35,9 +35,34 @@ import type { MessageArchive } from "../../../src/services/e2ee-archive"
 import {
   compteur,
   fractionGlobale,
-  libelleEtape,
   type ProgressionRestauration,
 } from "../../../src/lib/restauration-progression"
+import { useAuth } from "../../../src/components/auth-provider"
+
+/*
+ * « Plus tard » sur la proposition des 12 mots : on ne la refait pas avant
+ * sept jours sur ce navigateur (27/11/2026). Hors du préfixe `alanya.e2ee.`,
+ * vidé à la déconnexion.
+ */
+const REPORT_MS = 7 * 24 * 3600 * 1000
+const cleReport = (moi: string) => `alanya-proposition-cle-reportee-${moi}`
+function propositionReportee(moi: string | null): boolean {
+  if (!moi) return false
+  try {
+    const quand = Number(localStorage.getItem(cleReport(moi)) ?? "")
+    return Number.isFinite(quand) && quand > 0 && Date.now() - quand < REPORT_MS
+  } catch {
+    return false
+  }
+}
+function reporterProposition(moi: string | null) {
+  if (!moi) return
+  try {
+    localStorage.setItem(cleReport(moi), String(Date.now()))
+  } catch {
+    // stockage indisponible : la proposition reviendra, sans gravité.
+  }
+}
 
 type Resultat = Awaited<ReturnType<typeof restaurerALaConnexionSuivie>>
 
@@ -91,6 +116,7 @@ export default function RestaurationPage() {
   const [issue, setIssue] = useState<IssueConnexion | null>(null)
   const [essai, setEssai] = useState(0)
   const { t } = useTranslation()
+  const moi = useAuth().user?.id ?? null
 
   /*
    * 🔴 L'ARCHIVE EST FERMÉE MAIS A UNE CLÉ DE RÉCUPÉRATION (27/11/2026) : on
@@ -151,6 +177,12 @@ export default function RestaurationPage() {
       } else if (r.issue === "fermee") {
         void aUneCleDeRecuperation().then((avecCle) => {
           if (!actif) return
+          if (avecCle && propositionReportee(moi)) {
+            // Déjà proposée et remise à plus tard : on entre, sans rien dire.
+            oublier()
+            navigate(suite, { replace: true })
+            return
+          }
           setProposerCle(avecCle)
           setIssue("fermee")
         })
@@ -163,10 +195,13 @@ export default function RestaurationPage() {
       abonnes.delete(setProgression)
     }
     // `essai` relance : « Réessayer ».
-  }, [essai, navigate, suite])
+  }, [essai, navigate, suite, moi])
 
   const fraction = fractionGlobale(progression)
-  const texteCompteur = compteur(progression)
+  const texteCompteur = compteur(progression, {
+    blocs: t("rest_blocs"),
+    messages: t("rest_messages"),
+  })
 
   return (
     <div className="restauration">
@@ -177,21 +212,18 @@ export default function RestaurationPage() {
         </div>
         <h1>
           {issue === null
-            ? "Récupération de vos messages"
+            ? t("rest_titre")
             : issue === "fermee" && proposerCle
               ? t("arch_cle_proposee_titre")
               : issue === "fermee"
-                ? "Votre sauvegarde reste fermée"
-                : "La récupération n’a pas abouti"}
+                ? t("rest_ferme_titre")
+                : t("rest_echec_titre")}
         </h1>
 
         {issue === null && (
           <>
-            <p className="sous">
-              Vos conversations chiffrées sont déchiffrées dans ce navigateur. Personne
-              d’autre, pas même Alanya, ne peut les lire.
-            </p>
-            <p className="etape">{libelleEtape(progression.etape)}</p>
+            <p className="sous">{t("rest_sous")}</p>
+            <p className="etape">{t(`rest_etape_${progression.etape}` as const)}</p>
             <div
               className={`piste${fraction === null ? " animee" : ""}`}
               role="progressbar"
@@ -206,11 +238,9 @@ export default function RestaurationPage() {
             </div>
             <p className="compteur">{texteCompteur ?? " "}</p>
             <button type="button" className="secondaire" onClick={entrer}>
-              Continuer en arrière-plan
+              {t("rest_arriere_plan")}
             </button>
-            <p className="note">
-              La récupération se poursuit pendant que vous utilisez Alanya.
-            </p>
+            <p className="note">{t("rest_note")}</p>
           </>
         )}
 
@@ -243,7 +273,15 @@ export default function RestaurationPage() {
             >
               {ouverture ? "…" : t("arch_cle_restaurer")}
             </button>
-            <button type="button" className="secondaire" disabled={ouverture} onClick={entrer}>
+            <button
+              type="button"
+              className="secondaire"
+              disabled={ouverture}
+              onClick={() => {
+                reporterProposition(moi)
+                entrer()
+              }}
+            >
               {t("arch_plus_tard")}
             </button>
           </>
@@ -251,11 +289,7 @@ export default function RestaurationPage() {
 
         {issue === "fermee" && !proposerCle && (
           <>
-            <p className="sous">
-              Votre mot de passe n’ouvre pas votre sauvegarde. Il a peut-être changé depuis
-              sa création, ou elle n’est protégée que par votre clé de récupération (les 12
-              mots).
-            </p>
+            <p className="sous">{t("rest_ferme_texte")}</p>
             <button
               type="button"
               className="principal"
@@ -264,21 +298,17 @@ export default function RestaurationPage() {
                 navigate("/settings?section=security", { replace: true })
               }}
             >
-              Utiliser ma clé de récupération
+              {t("rest_utiliser_cle")}
             </button>
             <button type="button" className="secondaire" onClick={entrer}>
-              Continuer sans l’historique
+              {t("rest_continuer_sans")}
             </button>
           </>
         )}
 
         {issue === "echec" && (
           <>
-            <p className="sous">
-              Le serveur n’a pas pu être joint, ou n’a pas répondu comme prévu. Votre
-              historique est intact : réessayez maintenant, ou plus tard depuis Réglages ›
-              Sécurité.
-            </p>
+            <p className="sous">{t("rest_echec_texte")}</p>
             <button
               type="button"
               className="principal"
@@ -287,10 +317,10 @@ export default function RestaurationPage() {
                 setEssai((n) => n + 1)
               }}
             >
-              Réessayer
+              {t("rest_reessayer")}
             </button>
             <button type="button" className="secondaire" onClick={entrer}>
-              Continuer sans l’historique
+              {t("rest_continuer_sans")}
             </button>
           </>
         )}

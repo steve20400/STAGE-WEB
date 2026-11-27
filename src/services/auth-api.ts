@@ -424,18 +424,29 @@ export async function changePasswordApi(
    * toutes les sessions du compte sauf celles de ce navigateur.
    */
   deconnecterAutres = false,
-) {
-  await apiRequest<{ message?: string }>("/api/account/password", {
-    method: "POST",
-    body: deconnecterAutres
-      ? {
-          currentPassword,
-          newPassword,
-          deconnecterAutres: true,
-          appareilCourant: getOrCreateWebDeviceId(),
-        }
-      : { currentPassword, newPassword },
-  })
+): Promise<{ appareilsRevoques: string[] }> {
+  const r = await apiRequest<{ message?: string; appareilsRevoques?: string[] }>(
+    "/api/account/password",
+    {
+      method: "POST",
+      body: deconnecterAutres
+        ? {
+            currentPassword,
+            newPassword,
+            deconnecterAutres: true,
+            appareilCourant: getOrCreateWebDeviceId(),
+            /*
+             * 🐛 LE JETON DE CETTE SESSION, POUR QU'ELLE RESTE (27/11/2026) :
+             * une session ouverte avant qu'on enregistre l'appareil n'a pas
+             * d'identifiant, et ce navigateur a pu régénérer le sien. Le
+             * serveur garde la session de ce jeton quoi qu'il arrive.
+             */
+            jetonCourant: loadRefreshToken() ?? undefined,
+          }
+        : { currentPassword, newPassword },
+    },
+  )
+  return { appareilsRevoques: Array.isArray(r?.appareilsRevoques) ? r.appareilsRevoques : [] }
 }
 
 /** POST /api/account/verify-password — lève si le mot de passe est faux. */

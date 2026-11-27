@@ -4,6 +4,7 @@ import { useAuth } from "./auth-provider"
 import { confirmer } from "./confirmation"
 import { useTranslation } from "../i18n"
 import { aUneCleDeRecuperation, estOuverte } from "../services/e2ee-sauvegarde"
+import { getCallState } from "../services/call-manager"
 
 /**
  * INVITER À NOTER LA CLÉ DE RÉCUPÉRATION, UNE FOIS (27/11/2026).
@@ -25,6 +26,13 @@ import { aUneCleDeRecuperation, estOuverte } from "../services/e2ee-sauvegarde"
  * Ne dessine rien : la boîte se monte d'elle-même (`confirmer`).
  */
 const ATTENTE_MS = 5_000
+/** Un appel en cours : on repasse plus tard, sans jamais l'interrompre. */
+const ATTENTE_APPEL_MS = 60_000
+
+function appelEnCours(): boolean {
+  const etat = getCallState()
+  return Boolean(etat.activeCallId || etat.incoming)
+}
 
 export function InvitationCleRecuperation() {
   const { user } = useAuth()
@@ -32,10 +40,10 @@ export function InvitationCleRecuperation() {
   const { pathname } = useLocation()
   const { t } = useTranslation()
   const moi = user?.id ?? null
-  const surRestauration = pathname.startsWith("/restauration")
+  const horsPropos = pathname.startsWith("/restauration") || pathname.startsWith("/calls")
 
   useEffect(() => {
-    if (!moi || surRestauration) return
+    if (!moi || horsPropos) return
     const cle = `alanya-invitation-cle-recuperation-vue-${moi}`
     try {
       if (localStorage.getItem(cle) === "1") return
@@ -50,9 +58,14 @@ export function InvitationCleRecuperation() {
       }
     }
     let annule = false
-    // Après l'arrivée : ne pas se superposer à la demande du pseudo d'appareil.
-    const minuterie = window.setTimeout(async () => {
-      if (annule || !(await estOuverte())) return
+    let minuterie = 0
+    const essayer = async () => {
+      if (annule) return
+      if (appelEnCours()) {
+        minuterie = window.setTimeout(() => void essayer(), ATTENTE_APPEL_MS)
+        return
+      }
+      if (!(await estOuverte())) return
       if (await aUneCleDeRecuperation()) {
         marquer()
         return
@@ -68,12 +81,14 @@ export function InvitationCleRecuperation() {
         danger: false,
       })
       if (creer) navigate("/settings?section=security")
-    }, ATTENTE_MS)
+    }
+    // Après l'arrivée : ne pas se superposer à la demande du pseudo d'appareil.
+    minuterie = window.setTimeout(() => void essayer(), ATTENTE_MS)
     return () => {
       annule = true
       window.clearTimeout(minuterie)
     }
-  }, [moi, surRestauration, navigate, t])
+  }, [moi, horsPropos, navigate, t])
 
   return null
 }

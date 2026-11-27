@@ -135,10 +135,20 @@ async function lireMatiere(): Promise<ArrayBuffer | null> {
  * périmée : on la refait avec la clé de cet appareil. Ne lève jamais ; rend
  * vrai si elle a été refaite.
  */
-async function reparerSerrureSiPerimee(motDePasse: string, serrure: Serrure): Promise<boolean> {
+async function reparerSerrureSiPerimee(
+  motDePasse: string,
+  serrure: Serrure,
+  /**
+   * Le serveur la dit antérieure au dernier changement : même si elle s'ouvre,
+   * on la repose (sel neuf, date neuve), sans quoi la question reviendrait à
+   * chaque connexion.
+   */
+  refaireSiOuvre = false,
+): Promise<boolean> {
   try {
     await ouvrirArchiveBrute(motDePasse, serrure)
-    return false // Elle s'ouvre : rien à faire.
+    if (refaireSiOuvre) await relierAuMotDePasse(motDePasse)
+    return false // Elle s'ouvre : rien à réparer.
   } catch {
     // Elle refuse ce mot de passe : périmée.
   }
@@ -172,6 +182,42 @@ export async function relierAuMotDePasse(motDePasse: string): Promise<boolean> {
   } catch (e) {
     console.warn("[e2ee] sauvegarde non reliée au mot de passe :", e)
     return false
+  }
+}
+
+/**
+ * Faut-il éprouver la serrure « mot de passe » ? (27/11/2026)
+ *
+ * 🔴 SEULEMENT SI ELLE EST PLUS ANCIENNE QUE LE DERNIER CHANGEMENT. L'éprouver
+ * coûte un Argon2id — une à deux secondes, et de la mémoire, sur le fil
+ * principal du navigateur. Le faire à chaque connexion figeait un téléphone
+ * modeste pour rien.
+ *
+ * `changeLe` : `undefined` — serveur d'avant cette date, on éprouve comme
+ * avant ; `null` — mot de passe jamais changé depuis, rien à éprouver.
+ */
+function aEprouver(serrure: Serrure, changeLe: string | null | undefined): boolean {
+  if (changeLe === undefined) return true
+  if (changeLe === null) return false
+  const posee = serrure.updatedAt ? Date.parse(serrure.updatedAt) : NaN
+  const change = Date.parse(changeLe)
+  if (Number.isNaN(change)) return false
+  return Number.isNaN(posee) || posee < change
+}
+
+/**
+ * Réessaie [travail] sur une erreur passagère : la plupart des échecs à faire
+ * suivre la serrure sont des coupures réseau, et le nouveau mot de passe n'est
+ * connu que maintenant.
+ */
+async function avecReessais<T>(travail: () => Promise<T>, attentes = [1500, 4000]): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await travail()
+    } catch (e) {
+      if (i >= attentes.length) throw e
+      await new Promise((r) => setTimeout(r, attentes[i]))
+    }
   }
 }
 
@@ -769,9 +815,21 @@ export async function suivreChangementMotDePasse(
   nouveau: string,
 ): Promise<boolean> {
   try {
-    const serrures = await lireSerrures()
+    const serrures = await avecReessais(lireSerrures)
     const ancienne = serrures.find((s) => s.type === "motdepasse")
-    if (!ancienne) return false
+    if (!ancienne) {
+      /*
+       * ⚠️ PAS DE SERRURE « MOT DE PASSE » (27/11/2026) : si cette archive
+       * est ouverte ici, on la pose avec le nouveau — comme le fait déjà la
+       * connexion sur le téléphone. Sinon il n'y a rien à faire suivre.
+       */
+      const matiere = await lireMatiere()
+      if (!matiere || serrures.length === 0) return false
+      await avecReessais(async () =>
+        poserSerrure(await serrureDepuisMatiere("motdepasse", nouveau, matiere)),
+      )
+      return true
+    }
 
     /*
      * ⚠️ SI L'ANCIEN N'OUVRE PLUS (27/11/2026) — la serrure était déjà
@@ -785,7 +843,7 @@ export async function suivreChangementMotDePasse(
       if (!matiere) throw new Error("ni l'ancien mot de passe ni la clé de l'appareil")
       posee = await serrureDepuisMatiere("motdepasse", nouveau, matiere)
     }
-    await poserSerrure(posee)
+    await avecReessais(() => poserSerrure(posee))
     console.info("[e2ee] la sauvegarde suit le nouveau mot de passe.")
     return true
   } catch (e) {
@@ -899,10 +957,16 @@ export async function restaurerALaConnexionSuivie(
 
   let serrures: Serrure[]
   let refusee: boolean
+  let motDePasseChangeLe: string | null | undefined
   try {
-    const r = await apiRequest<{ serrures?: Serrure[]; refusee?: boolean }>("/api/e2ee/coffre")
+    const r = await apiRequest<{
+      serrures?: Serrure[]
+      refusee?: boolean
+      motDePasseChangeLe?: string | null
+    }>("/api/e2ee/coffre")
     serrures = r.serrures ?? []
     refusee = r.refusee === true
+    motDePasseChangeLe = r.motDePasseChangeLe
   } catch {
     return echec
   }
@@ -927,6 +991,13 @@ export async function restaurerALaConnexionSuivie(
     if (!(await ouvrir("motdepasse", motDePasse))) return fermee
     cle = await laCle()
     if (!cle) return echec
+    // Elle vient de s'ouvrir avec ce mot de passe : la clé est la bonne. Si le
+    // serveur la dit antérieure au dernier changement, on la repose pour que
+    // la question ne revienne pas (27/11/2026).
+    const ouverte = serrures.find((s) => s.type === "motdepasse")
+    if (ouverte && motDePasseChangeLe !== undefined && aEprouver(ouverte, motDePasseChangeLe)) {
+      void relierAuMotDePasse(motDePasse)
+    }
   }
 
   try {
@@ -952,8 +1023,13 @@ export async function restaurerALaConnexionSuivie(
      * que c'est la bonne. EN FOND : Argon2id prend une à deux secondes.
      */
     const serrureMdp = serrures.find((s) => s.type === "motdepasse")
-    if (dejaSurAppareil && serrureMdp && messages.length > 0) {
-      void reparerSerrureSiPerimee(motDePasse, serrureMdp)
+    if (dejaSurAppareil && messages.length > 0) {
+      if (!serrureMdp) {
+        // Pas de serrure « mot de passe » : on la pose, comme le téléphone.
+        void relierAuMotDePasse(motDePasse)
+      } else if (aEprouver(serrureMdp, motDePasseChangeLe)) {
+        void reparerSerrureSiPerimee(motDePasse, serrureMdp, motDePasseChangeLe !== undefined)
+      }
     }
     return { issue: "restauree", restaures: messages.length, illisibles: blocsIllisibles }
   } catch (e) {

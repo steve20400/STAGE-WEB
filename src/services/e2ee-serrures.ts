@@ -48,6 +48,12 @@ export interface Serrure {
    * ne saurait plus avec quoi elles ont été fabriquées.
    */
   parametres: string
+  /**
+   * Dernière pose, telle que le serveur la date (27/11/2026). Plus ancienne
+   * que le dernier changement de mot de passe : la serrure « mot de passe »
+   * est périmée. Absente des serrures qu'on vient de fabriquer.
+   */
+  updatedAt?: string
 }
 
 export type Algo = "argon2id" | "pbkdf2-sha256"

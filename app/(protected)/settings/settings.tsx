@@ -135,7 +135,11 @@ import {
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { E2eeSauvegardePanneau } from "./e2ee-sauvegarde-panneau"
 import { EmpreintePanneau } from "./empreinte-panneau"
-import { aUneArchive, suivreChangementMotDePasse } from "../../../src/services/e2ee-sauvegarde"
+import {
+  aUneArchive,
+  estOuverte as sauvegardeOuverte,
+  suivreChangementMotDePasse,
+} from "../../../src/services/e2ee-sauvegarde"
 import { useTelechargementAuto } from "../../../src/hooks/use-telechargement-auto"
 import {
   changerTelechargement,
@@ -2427,6 +2431,25 @@ export default function SettingsPage() {
 
   // « Déconnecter mes autres appareils » au changement de mot de passe (27/11/2026).
   const [deconnecterAutres, setDeconnecterAutres] = useState(false)
+  /*
+   * 🔴 LA CASE SE BLOQUE QUAND L'ARCHIVE EST FERMÉE ICI (27/11/2026). Les
+   * autres appareils gardent peut-être la seule copie de la clé : les
+   * déconnecter pourrait vider leur coffre, et l'historique serait perdu.
+   */
+  const [deconnecterBloque, setDeconnecterBloque] = useState(false)
+  useEffect(() => {
+    let actif = true
+    void (async () => {
+      const bloque = (await aUneArchive()) && !(await sauvegardeOuverte())
+      if (actif) {
+        setDeconnecterBloque(bloque)
+        if (bloque) setDeconnecterAutres(false)
+      }
+    })()
+    return () => {
+      actif = false
+    }
+  }, [])
 
   const changePassword = async () => {
     if (!security.currentPwd) return toastError(t("set_current_password_required"))
@@ -2437,7 +2460,14 @@ export default function SettingsPage() {
       return toastError(t("set_password_same"), t("set_choose_different_password"))
     setSaving(true)
     try {
-      await changePasswordApi(security.currentPwd, security.newPwd, deconnecterAutres)
+      const { appareilsRevoques } = await changePasswordApi(
+        security.currentPwd,
+        security.newPwd,
+        deconnecterAutres && !deconnecterBloque,
+      )
+      // Les sockets des appareils révoqués se ferment tout de suite : sans
+      // cette annonce, ils garderaient le temps réel jusqu'à 15 minutes.
+      for (const id of appareilsRevoques) sendSessionRevoked(id)
 
       /*
        * 🐛 LA SAUVEGARDE DOIT SUIVRE, SINON ELLE CASSE EN SILENCE.
@@ -3488,7 +3518,7 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     checked={deconnecterAutres}
-                    disabled={saving}
+                    disabled={saving || deconnecterBloque}
                     onChange={(e) => setDeconnecterAutres(e.target.checked)}
                     style={{ marginTop: 3, accentColor: "var(--accent)" }}
                   />
@@ -3502,7 +3532,7 @@ export default function SettingsPage() {
                         marginTop: 2,
                       }}
                     >
-                      {t("arch_deconnecter_autres_d")}
+                      {deconnecterBloque ? t("arch_deconnecter_bloque") : t("arch_deconnecter_autres_d")}
                     </span>
                   </span>
                 </label>
