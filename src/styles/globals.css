@@ -255,10 +255,10 @@ button {
    * A WORK terre cuite claire). `--entete-bg`, couleur pleine, sert à la barre
    * d'état du téléphone ; `--entete-fond` porte le dégradé.
    */
-  /* 27/11/2026 : le dégradé de la fiche « info contact » du mobile, brun vers
-     vert (demande du user). */
-  --entete-bg: #91603f;
-  --entete-fond: linear-gradient(90deg, #91603f 0%, #7d6242 25%, #666043 50%, #576648 75%, #44684c 100%);
+  --entete-bg: #2b1b12;
+  /* La teinte claire domine (20/11/2026) : le sombre ne tient que le bord
+     gauche, sous le logo. Rétabli le 27/11/2026 (demande du user). */
+  --entete-fond: linear-gradient(90deg, #2b1b12 0%, #5a321c 28%, #8a4b2b 100%);
   --entete-bord: transparent;
   --entete-texte: #f5efe6;
   --entete-texte-doux: rgb(245 239 230 / 0.72);

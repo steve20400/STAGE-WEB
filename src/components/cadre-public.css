@@ -17,8 +17,7 @@
   /* Un dégradé : chocolat profond sous le logo, qui se réchauffe vers le brun
      de la marque à droite (demande du user, 20/11/2026). Le texte crème garde
      plus de 7:1 partout. */
-  /* 27/11/2026 : le dégradé de la fiche « info contact » du mobile. */
-  --cp-fond: linear-gradient(90deg, #91603f 0%, #7d6242 25%, #666043 50%, #576648 75%, #44684c 100%);
+  --cp-fond: linear-gradient(90deg, #2b1b12 0%, #5a321c 28%, #8a4b2b 100%);
   --cp-filet: transparent;
 }
 :root[data-theme="dark"] {

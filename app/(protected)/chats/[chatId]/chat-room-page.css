@@ -1845,7 +1845,9 @@ textarea.room-textarea::placeholder {
    même règle les suit tous deux.
    ============================================================ */
 .room-top {
-  background: var(--entete-fond, #91603f);
+  /* Le dégradé brun → vert de la fiche « info contact » du mobile (thème
+     clair) ; en sombre, le chocolat des en-têtes (règle suivante). */
+  background: linear-gradient(90deg, #91603f 0%, #7d6242 25%, #666043 50%, #576648 75%, #44684c 100%);
   border-bottom-color: transparent;
   color: #fff;
 }
@@ -1884,4 +1886,8 @@ textarea.room-textarea::placeholder {
 /* Toucher le nom ou la photo ouvre la fiche, comme sur le mobile. */
 .room-top .room-ouvre-fiche {
   cursor: pointer;
+}
+
+:root[data-theme="dark"] .room-top {
+  background: var(--entete-fond);
 }
