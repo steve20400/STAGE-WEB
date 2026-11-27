@@ -33,6 +33,7 @@ import { E2eeVerification } from "./e2ee-verification"
 import { FichiersPartages } from "./fichiers-partages"
 import { GroupesCommuns } from "./groupes-communs"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
+import { CartesContact } from "./cartes-contact"
 import {
   LANGUAGE_CODES,
   langueInitiale,
@@ -742,7 +743,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
         .cip-standalone .cip-root { height: auto; min-height: 0; }
       `}</style>
 
-      <div className="cip-root">
+      {/* La fiche d'un CONTACT a l'allure du mobile (27/11/2026) : en-tete en
+          degrade, boutons ronds, cartes. Un groupe garde la sienne. */}
+      <div className={`cip-root${!conv.isGroup && conv.pairUserId && !conv.officiel ? " cip-contact" : ""}`}>
         <div className="cip-head">
           {onClose && (
             <button className="cip-back" onClick={onClose} aria-label={t("close")}>
@@ -765,6 +768,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
         <div className="cip-body">
           <div className="cip-hero">
+            <div className="cip-hero-fond">
             <AvatarCircle
               className="cip-av"
               style={{ background: color.bg, color: color.fg }}
@@ -827,10 +831,11 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </div>
             )}
             {!conv.isGroup && statutPair && <div className="cip-statut">{statutPair}</div>}
+            </div>
 
             <div className="cip-actions">
               <button
-                className="ca-btn"
+                className="ca-btn ca-message"
                 onClick={() => navigate(`/chats/${conv.id}`)}
                 aria-label={t("cinfo_message")}
               >
@@ -851,7 +856,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </button>
               {estContact === false && (
                 <button
-                  className="ca-btn"
+                  className="ca-btn ca-ajouter"
                   onClick={() => setEnregistrementOuvert((v) => !v)}
                   aria-label={t("inc_save")}
                   aria-expanded={enregistrementOuvert}
@@ -867,7 +872,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               {!conv.isGroup && (
               <>
               <button
-                className="ca-btn"
+                className="ca-btn ca-appel"
                 onClick={() => {
                   void lancerAppel(navigate, {
                     conversation: async () => conv.id,
@@ -897,10 +902,10 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
                     <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                   </svg>
                 </div>
-                <span className="ca-label">{t("cinfo_audio")}</span>
+                <span className="ca-label">{t("call_action")}</span>
               </button>
               <button
-                className="ca-btn"
+                className="ca-btn ca-video"
                 onClick={() => {
                   void lancerAppel(navigate, {
                     conversation: async () => conv.id,
@@ -935,7 +940,7 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </button>
               </>
               )}
-              <button className="ca-btn" aria-label={t("cinfo_search")}>
+              <button className="ca-btn ca-recherche" aria-label={t("cinfo_search")}>
                 <div className="ca-icon">
                   <svg
                     width="16"
@@ -963,6 +968,18 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
               </div>
             )}
           </div>
+
+          {/* « Votre nom pour ce contact », le numero, « A propos » — comme le
+              mobile (27/11/2026). */}
+          {!conv.isGroup && conv.pairUserId && !conv.officiel && (
+            <CartesContact
+              pairUserId={conv.pairUserId}
+              alanyaId={conv.alanyaId ?? null}
+              nomProfil={conv.pseudoPair ?? conv.name}
+              aPropos={conv.statusMsg ?? null}
+              estContact={estContact}
+            />
+          )}
 
           <div className="cip-section">
             {/* Traduction automatique de cette conversation. Elle vivait dans
