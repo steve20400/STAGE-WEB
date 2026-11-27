@@ -543,16 +543,18 @@
 }
 
 /*
- * PETIT ÉCRAN, DANS UNE CONVERSATION : PAS DE BANDE « ALANYA WORK » AU-DESSUS
- * DE L'EN-TÊTE DE LA CONVERSATION (27/11/2026), comme sur le mobile. Partout
- * ailleurs — la liste des discussions comprise — la bande reste, avec son
- * bouton de menu qui ouvre le tiroir (précision du user).
+ * PETIT ÉCRAN : LA BANDE « ALANYA WORK » NE VIT QUE SUR LES ONGLETS
+ * (27/11/2026, précision du user). Discussions, Statuts, Appels, Réunions,
+ * Entreprises — les pages de la barre du bas — la gardent, avec son bouton de
+ * menu qui ouvre le tiroir. Une page OUVERTE depuis un onglet (une
+ * conversation, les paramètres…) la retire, comme sur le mobile : elle a son
+ * propre en-tête.
  */
 @media (max-width: 640px) {
-  .en-conversation .topbar {
+  .hors-onglet .topbar {
     display: none;
   }
-  .en-conversation .layout-main {
+  .hors-onglet .layout-main {
     padding-top: env(safe-area-inset-top, 0px);
   }
 }
