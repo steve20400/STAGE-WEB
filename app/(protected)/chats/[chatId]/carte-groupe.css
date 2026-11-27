@@ -1,0 +1,59 @@
+/*
+ * LA FICHE D'UN GROUPE, EN CARTES COMME LE MOBILE (27/11/2026).
+ *
+ * Jumelle de `group_info_screen.dart` : une carte d'en-tête (grande photo,
+ * nom, « N membres »), puis les médias et les membres, chacun dans sa carte
+ * arrondie, sur le fond gris clair du mobile. Plus d'onglets.
+ */
+.cip-groupe .cip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 16px 32px;
+  background: var(--bg-base);
+}
+
+.cip-groupe .cip-hero,
+.cip-groupe .cip-section {
+  margin: 0;
+  border-radius: 22px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.05);
+}
+
+.cip-groupe .cip-hero {
+  padding: 26px 16px 22px;
+  text-align: center;
+}
+
+.cip-groupe .cip-hero .cip-av {
+  width: 112px;
+  height: 112px;
+  font-size: 2.75rem;
+}
+
+.cip-groupe .cip-hero .cip-name {
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+.cip-groupe .cip-section {
+  padding: 14px 16px;
+}
+
+.cip-groupe .cip-section-title {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+/* L'ordre du mobile : en-tête, médias, membres, puis le reste. */
+.cip-groupe .cip-hero { order: 0; }
+.cip-groupe [data-section-fichiers] { order: 1; }
+.cip-groupe [data-section-membres] { order: 2; }
+.cip-groupe .cip-body > *:not(.cip-hero):not([data-section-fichiers]):not([data-section-membres]) { order: 3; }
+
+/* Les onglets disparaissent : tout est visible, carte par carte. */
+.cip-groupe .cip-tabs {
+  display: none;
+}

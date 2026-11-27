@@ -733,7 +733,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   })
 
   return (
-    <div className={`layout-root ${collapsed ? "nav-collapsed" : ""}${avecBarreNav ? " avec-barre-nav" : ""}`}>
+    <div
+      className={`layout-root ${collapsed ? "nav-collapsed" : ""}${avecBarreNav ? " avec-barre-nav" : ""}${avecBarreNav ? "" : " hors-onglet"}`}
+    >
       <div className="layout-sidebar-static">
         <Sidebar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
       </div>

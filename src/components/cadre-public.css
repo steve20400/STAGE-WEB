@@ -24,6 +24,7 @@
   --carte-publique: var(--bg-surface);
   --carte-publique-bord: var(--border-subtle);
   --carte-publique-ombre: 0 12px 32px rgb(0 0 0 / 0.3);
+  /* Thème sombre : le chocolat d'avant le vert (demande du user, 27/11/2026). */
   --cp-fond: linear-gradient(90deg, #120a06 0%, #2e1a0e 28%, #4a2a17 100%);
   --cp-filet: #3a2618;
 }

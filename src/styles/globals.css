@@ -152,6 +152,8 @@ button {
      (20/11/2026) : un chocolat en dégradé, plus profond en thème sombre.
      `--entete-bg` reste une couleur PLEINE : c'est elle que ThemeProvider
      donne à la barre d'état du téléphone, qui n'accepte pas de dégradé. */
+  /* Thème sombre : le chocolat d'avant le vert (demande du user, 27/11/2026 —
+     le dégradé brun → vert ne vaut que pour le thème clair). */
   --entete-bg: #0d0805;
   --entete-fond: linear-gradient(90deg, #120a06 0%, #2e1a0e 28%, #4a2a17 100%);
   --entete-bord: #3a2618;
@@ -255,7 +257,7 @@ button {
    */
   --entete-bg: #2b1b12;
   /* La teinte claire domine (20/11/2026) : le sombre ne tient que le bord
-     gauche, sous le logo. */
+     gauche, sous le logo. Rétabli le 27/11/2026 (demande du user). */
   --entete-fond: linear-gradient(90deg, #2b1b12 0%, #5a321c 28%, #8a4b2b 100%);
   --entete-bord: transparent;
   --entete-texte: #f5efe6;

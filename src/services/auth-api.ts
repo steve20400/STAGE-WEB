@@ -95,6 +95,21 @@ interface VerifyResponse {
   setupToken?: string
   publicNumber?: string
   needsSetup?: boolean
+  /** Le code de récupération, tiré à l'inscription — avec adresse aussi (27/11/2026). */
+  idRecuperation?: string | null
+}
+
+/**
+ * Le code de récupération de la DERNIÈRE inscription avec adresse, pour
+ * l'écran de fin (27/11/2026). Rendu une fois, puis oublié : il ne doit pas
+ * traîner en mémoire.
+ */
+let codeRecuperationInscription: string | null = null
+
+export function prendreCodeRecuperationInscription(): string | null {
+  const code = codeRecuperationInscription
+  codeRecuperationInscription = null
+  return code
 }
 
 function shouldUsePrototypeFallback(error: unknown) {
@@ -314,6 +329,7 @@ export async function completeRegistration(draft: RegistrationDraft, otp: string
     if (verifyResponse.needsSetup === false) {
       throw new Error(tr("auth_already_setup"))
     }
+    codeRecuperationInscription = verifyResponse.idRecuperation ?? null
 
     const setupResponse = await apiRequest<AuthTokensResponse>("/api/auth/setup", {
       method: "POST",

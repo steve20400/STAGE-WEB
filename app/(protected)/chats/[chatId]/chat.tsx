@@ -6126,6 +6126,13 @@ export default function ChatRoomPage() {
   /** Fenetre de choix du contact a envoyer (repertoire ou numero compose). */
   const [partageContact, setPartageContact] = useState(false)
   const [infoPanelOpen, setInfoPanelOpen] = useState(panneauInfosParDefaut)
+  /** La fiche du contact ou du groupe : panneau sur grand écran, page sinon. */
+  const ouvrirFiche = () => {
+    if (window.matchMedia(MEDIA_LARGE).matches) {
+      setInfoPanelOpen(true)
+      retenirPanneauInfos(true)
+    } else navigate(`/chats/${chatId}/info`)
+  }
 
   /*
    * ⚠️ REMONTE ICI depuis une cinquantaine de lignes plus bas : la traduction
@@ -9147,10 +9154,11 @@ export default function ChatRoomPage() {
         </button>
 
         <div
-          className="room-av"
+          className="room-av room-ouvre-fiche"
           // Sans overflow: hidden, qui rognait le point de presence pose sur le
           // bord du cercle ; la photo est arrondie par elle-meme (20/11/2026).
           style={{ background: color.bg, color: color.text }}
+          onClick={ouvrirFiche}
         >
           {avatarDisplaySrc((chat as { avatar?: string | null }).avatar) ? (
             <img
@@ -9164,7 +9172,21 @@ export default function ChatRoomPage() {
           {peerOnline && !chat.isGroup && <div className="room-av-dot" />}
         </div>
 
-        <div className="room-info">
+        {/* Toucher le nom ouvre la fiche du contact ou du groupe (27/11/2026),
+            comme sur le mobile. */}
+        <div
+          className="room-info room-ouvre-fiche"
+          role="button"
+          tabIndex={0}
+          aria-label={t("cinfo_title")}
+          onClick={ouvrirFiche}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              ouvrirFiche()
+            }
+          }}
+        >
           <div className="room-name">
             {chat.name}
             {backendChat?.badge && <BadgeCompteImage badge={backendChat.badge} taille={17} />}
@@ -9352,12 +9374,7 @@ export default function ChatRoomPage() {
               className="action-btn"
               aria-label={t("cinfo_title")}
               title={t("cinfo_title")}
-              onClick={() => {
-                if (window.matchMedia(MEDIA_LARGE).matches) {
-                  setInfoPanelOpen(true)
-                  retenirPanneauInfos(true)
-                } else navigate(`/chats/${chatId}/info`)
-              }}
+              onClick={ouvrirFiche}
             >
               <svg
                 width="15"
