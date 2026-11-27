@@ -216,6 +216,28 @@ export default function StatusPage() {
   }, [reload])
 
   /*
+   * 🐛 « UN STATUT MIS SUR ANDROID N'APPARAIT PAS SUR LE WEB » (user,
+   * 27/11/2026). La liste n'etait lue qu'a l'ouverture de la page, et le
+   * serveur ne previent pas d'un nouveau statut : celui publie depuis le
+   * telephone pendant que la page etait ouverte n'apparaissait qu'apres
+   * l'avoir quittee. On relit au retour sur l'onglet, et chaque minute tant
+   * que la page est visible.
+   */
+  useEffect(() => {
+    const siVisible = () => {
+      if (document.visibilityState === "visible") void reload()
+    }
+    document.addEventListener("visibilitychange", siVisible)
+    window.addEventListener("focus", siVisible)
+    const minuteur = window.setInterval(siVisible, 60_000)
+    return () => {
+      document.removeEventListener("visibilitychange", siVisible)
+      window.removeEventListener("focus", siVisible)
+      window.clearInterval(minuteur)
+    }
+  }, [reload])
+
+  /*
    * OUVERT DEPUIS AILLEURS (01/11/2026, repris d'Alanya) :
    *  - `?u=<id>` : l'anneau d'un avatar dans la liste des discussions ;
    *  - `?statut=<id>&auteur=<id>` : la citation d'un statut dans une
