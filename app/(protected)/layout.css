@@ -91,8 +91,9 @@
  * pose desormais tel quel sur les quatre fonds.
  */
 .sb-school-logo {
-  width: 34px;
-  height: 34px;
+  /* Agrandi avec le nom (27/11/2026, demande du user). */
+  width: 40px;
+  height: 40px;
   object-fit: contain;
   flex-shrink: 0;
   /* Le logo du mobile tel quel, sans pastille ronde : elle rognait la queue
@@ -124,7 +125,8 @@
 
 .sb-logo-txt {
   font-family: var(--font-display);
-  font-size: 1.125rem;
+  /* « ALANYA WORK » plus grand (27/11/2026, demande du user). */
+  font-size: 1.4rem;
   font-weight: 800;
   color: var(--entete-texte);
   letter-spacing: -0.5px;
@@ -540,6 +542,21 @@
   }
 }
 
+/*
+ * PETIT ÉCRAN : PLUS DE BANDE « ALANYA WORK » EN HAUT (27/11/2026, demande du
+ * user : « fais comme sur le mobile »). Le téléphone n'en a pas — la barre du
+ * bas mène partout, et la carte de profil en tête des discussions ouvre les
+ * réglages. Le tiroir s'ouvre toujours au glissement.
+ */
+@media (max-width: 640px) {
+  .topbar {
+    display: none;
+  }
+  .layout-main {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
 @media (min-width: 901px) {
   /* Sur desktop, plus besoin de la sidebar mobile */
   .sidebar-mobile-wrap {
@@ -947,5 +964,35 @@
 @media (hover: hover) and (pointer: fine) {
   .barre-nav-onglet:not(.actif):hover {
     background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  }
+}
+
+/* ============================================================
+   LE BOUTON DE L'ASSISTANT (27/11/2026), au-dessus de celui des contacts,
+   comme sur le mobile : petit (40 px), fond de surface, icône à l'accent.
+   ============================================================ */
+.chats-fab-ia {
+  display: none;
+}
+@media (max-width: 900px) {
+  .chats-fab-ia {
+    display: flex;
+    position: absolute;
+    right: 28px;
+    bottom: calc(20px + 56px + 12px);
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+    background: var(--bg-elevated, var(--bg-surface));
+    color: var(--accent);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.14);
+  }
+  .avec-barre-nav .chats-fab-ia {
+    bottom: calc(var(--barre-nav-espace) + 4px + 56px + 12px) !important;
   }
 }

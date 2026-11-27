@@ -966,6 +966,29 @@ export default function ChatsPage() {
           Sa couleur suit le theme (`--fab-*`, globals.css) : orange dans les
           themes par defaut, l'accent du theme — celui de « Nouvelle
           discussion » — dans les themes doux. */}
+      {/* L'assistant, AU-DESSUS du bouton des contacts, en petit (27/11/2026) :
+          comme sur le mobile. Petit écran seulement — l'ordinateur a déjà
+          l'assistant dans la barre de gauche. */}
+      <button
+        className="chats-fab-ia"
+        onClick={() => navigate("/ai")}
+        aria-label={t("assistant")}
+        title={t("assistant")}
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+          <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z" />
+        </svg>
+      </button>
       <button
         className="chats-fab"
         onClick={() => navigate("/contacts")}

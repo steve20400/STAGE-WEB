@@ -1836,3 +1836,52 @@ textarea.room-textarea::placeholder {
     opacity: 1;
   }
 }
+
+/* ============================================================
+   L'EN-TÊTE DES CONVERSATIONS, EN DÉGRADÉ BRUN → VERT (27/11/2026) — le même
+   que l'en-tête de l'application (`--entete-fond`, la couleur de la fiche
+   « info contact » du mobile), demande du user. Texte et boutons blancs. En
+   thème sombre, `--entete-fond` est le chocolat des autres en-têtes : la
+   même règle les suit tous deux.
+   ============================================================ */
+.room-top {
+  background: var(--entete-fond, #91603f);
+  border-bottom-color: transparent;
+  color: #fff;
+}
+.room-top .room-name {
+  color: #fff;
+}
+/* `!important` : la ligne d'état pose sa couleur en ligne (en ligne, frappe),
+   illisible sur la terre cuite. */
+.room-top .room-sub {
+  color: rgb(255 255 255 / 0.85) !important;
+}
+.room-top .back-btn,
+.room-top .action-btn {
+  color: #fff;
+  background: rgb(255 255 255 / 0.14);
+  border-color: rgb(255 255 255 / 0.28);
+}
+@media (hover: hover) and (pointer: fine) {
+  .room-top .back-btn:hover,
+  .room-top .action-btn:hover {
+    background: rgb(255 255 255 / 0.24);
+    color: #fff;
+  }
+}
+
+/* Un bouton ACTIF (traduction, réservation) sur le dégradé : blanc plein,
+   icône sombre. L'aplat brun de l'accent jurait sur le dégradé (user,
+   27/11/2026). `!important` : la traduction pose sa couleur en ligne. */
+.room-top .action-btn[aria-pressed="true"],
+.room-top .action-btn-on {
+  background: #fff !important;
+  color: #4e5f45 !important;
+  border-color: #fff !important;
+}
+
+/* Toucher le nom ou la photo ouvre la fiche, comme sur le mobile. */
+.room-top .room-ouvre-fiche {
+  cursor: pointer;
+}

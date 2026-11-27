@@ -34,6 +34,7 @@ import { FichiersPartages } from "./fichiers-partages"
 import { GroupesCommuns } from "./groupes-communs"
 import { formatAlanyaNumber } from "../../../../src/lib/alanya-number"
 import { CartesContact } from "./cartes-contact"
+import "./carte-groupe.css"
 import {
   LANGUAGE_CODES,
   langueInitiale,
@@ -746,7 +747,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
       {/* La fiche d'un CONTACT a l'allure du mobile (27/11/2026) : en-tete en
           degrade, boutons ronds, cartes. Un groupe garde la sienne. */}
-      <div className={`cip-root${!conv.isGroup && conv.pairUserId && !conv.officiel ? " cip-contact" : ""}`}>
+      <div
+        className={`cip-root${!conv.isGroup && conv.pairUserId && !conv.officiel ? " cip-contact" : ""}${conv.isGroup ? " cip-groupe" : ""}`}
+      >
         <div className="cip-head">
           {onClose && (
             <button className="cip-back" onClick={onClose} aria-label={t("close")}>
@@ -1183,8 +1186,13 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
 
           {/* Groupe seulement : en tête-à-tête, cette section ne portait que le
               titre « Fichiers partagés », en double avec la vraie liste. */}
-          {conv.isGroup && tab === "membres" && (
+          {/* Groupe : les membres et les fichiers ensemble, en cartes, comme sur
+              le mobile (27/11/2026) — plus d'onglets. */}
+          {conv.isGroup && (
             <div className="cip-section" data-section-membres>
+              <div className="cip-section-title">
+                {t("cinfo_tab_members", { count: members.length })}
+              </div>
               {conv.isGroup &&
                 membresAffiches.map((member) => {
                   const memberColor = COLORS[member.color]
@@ -1532,9 +1540,9 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
           {/* Les groupes que je partage avec cette personne (14/11/2026). */}
           {!conv.isGroup && conv.pairUserId && <GroupesCommuns userId={conv.pairUserId} />}
 
-          {(tab === "fichiers" || !conv.isGroup) && (
-            <div className="cip-section">
-              {!conv.isGroup && <div className="cip-section-title">{t("cinfo_shared_files")}</div>}
+          {(
+            <div className="cip-section" data-section-fichiers>
+              <div className="cip-section-title">{t("cinfo_shared_files")}</div>
               {/* 🐛 La liste était initialisée à vide, en dur, et jamais remplie
                   (user, 10/10/2026). Voir `fichiers-partages.tsx`. */}
               <FichiersPartages
