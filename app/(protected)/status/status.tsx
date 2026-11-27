@@ -1,3 +1,4 @@
+import { confirmer } from "../../../src/components/confirmation"
 import { langueInitiale, traduire, useTranslation } from "../../../src/i18n"
 import { Icone } from "../../../src/components/icone"
 import { useCallback, useEffect, useRef, useState } from "react"
@@ -738,6 +739,14 @@ export default function StatusPage() {
   const handleDeleteCurrent = async () => {
     if (!viewer || !viewer.isMine) return
     const status = viewer.group.statuses[viewer.index]
+    // Toujours confirmer une suppression (demande du user, 27/11/2026).
+    const oui = await confirmer({
+      titre: t("suppr_statut_q"),
+      texte: t("suppr_statut_d"),
+      confirmer: t("delete"),
+      annuler: t("cancel"),
+    })
+    if (!oui) return
     try {
       await deleteStatus(status.id)
       success(t("l2_status_deleted"), "")

@@ -512,7 +512,8 @@ export function ConvInfoPanel({ convId, onClose, info: propInfo }: ConvInfoPanel
   const deleteConv = () => {
     setPendingAction({
       title: conv.isGroup ? t("cinfo_delete_group_title") : t("cinfo_delete_conversation_title"),
-      description: t("cinfo_irreversible_detail"),
+      // Pour moi seul depuis le 27/11/2026 (voir la route du serveur).
+      description: t("suppr_pour_vous_d"),
       confirmLabel: conv.isGroup ? t("cinfo_delete_group") : t("delete"),
       tone: "danger",
       onConfirm: () => {
