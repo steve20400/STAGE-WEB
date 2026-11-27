@@ -15,6 +15,9 @@ import {
   type Serrure,
   type TypeSerrure,
 } from "./e2ee-serrures"
+import { deballerCle, emballerCle, genererPaireCompte, type ContexteEmballage } from "./e2ee-groupe"
+import { getOrCreateWebDeviceId } from "./appareils-service"
+import { sendSignalSauvegarde } from "./websocket-service"
 
 /**
  * 🔴 LA CLÉ DU COMPTE DÈS QUE LA CLÉ MAÎTRESSE EST LÀ (groupes v2, 13/11/2026)
@@ -130,6 +133,135 @@ async function lireMatiere(): Promise<ArrayBuffer | null> {
   }
 }
 
+/* ══════════════════ LE BLOC DE CONTRÔLE (27/11/2026) ══════════════════ */
+
+/*
+ * 🔴 UNE CLÉ SE PROUVE AVANT DE SERVIR. Un texte connu, chiffré par la clé
+ * maîtresse, vit sur le serveur : un appareil vérifie ainsi que la clé qu'il
+ * tient — ou qu'on vient de lui transmettre — est LA bonne, avant de refaire
+ * une serrure avec elle. Une clé restée d'une sauvegarde supprimée puis
+ * recréée ailleurs fermerait sinon la sauvegarde pour de bon.
+ *
+ * ⚠️ MÊME FORME QUE LES COPIES DE TROUSSEAU : base64( 0x01 | nonce 12 |
+ * AES-256-GCM ). Le jumeau mobile le fabrique avec `chiffrerCopie`.
+ */
+const TEXTE_CONTROLE = "alanya-controle-archive-v1"
+
+function aadControle(compte: string): Uint8Array<ArrayBuffer> {
+  return new TextEncoder().encode(`alanya.e2ee.controle\n${compte}`) as Uint8Array<ArrayBuffer>
+}
+
+async function dechiffrerAvec(
+  matiere: ArrayBuffer,
+  corps: string,
+  aad: Uint8Array<ArrayBuffer>,
+): Promise<string> {
+  const brut = new Uint8Array(depuisB64Local(corps))
+  if (brut.length < 1 + 12 + 16 || brut[0] !== 0x01) throw new Error("bloc mal formé")
+  const clair = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: brut.slice(1, 13), additionalData: aad },
+    await cleDepuisMatiere(matiere),
+    brut.slice(13),
+  )
+  return new TextDecoder().decode(clair)
+}
+
+/** Fabrique le bloc de contrôle de [matiere] pour le compte [compte]. */
+export async function creerControle(matiere: ArrayBuffer, compte: string): Promise<string> {
+  const nonce = crypto.getRandomValues(new Uint8Array(12))
+  const chiffre = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: nonce, additionalData: aadControle(compte) },
+      await cleDepuisMatiere(matiere),
+      new TextEncoder().encode(TEXTE_CONTROLE),
+    ),
+  )
+  const tout = new Uint8Array(1 + nonce.length + chiffre.length)
+  tout[0] = 0x01
+  tout.set(nonce, 1)
+  tout.set(chiffre, 1 + nonce.length)
+  return versB64Local(tout.buffer)
+}
+
+/** [matiere] ouvre-t-elle le bloc de contrôle ? Faux en cas de doute. */
+export async function controleValide(matiere: ArrayBuffer, controle: string, compte: string): Promise<boolean> {
+  try {
+    return (await dechiffrerAvec(matiere, controle, aadControle(compte))) === TEXTE_CONTROLE
+  } catch {
+    return false
+  }
+}
+
+/** Le coffre tel que le serveur le rend, avec les dates et le bloc de contrôle. */
+interface EtatCoffre {
+  serrures: Serrure[]
+  refusee: boolean
+  /** `undefined` : serveur d'avant cette date. */
+  motDePasseChangeLe: string | null | undefined
+  /** `undefined` : serveur d'avant le bloc ; `null` : pas encore posé. */
+  controle: string | null | undefined
+}
+
+/** Lève sur une panne réseau — à l'appelant de décider. */
+async function lireCoffreComplet(): Promise<EtatCoffre> {
+  const r = await apiRequest<{
+    serrures?: Serrure[]
+    refusee?: boolean
+    motDePasseChangeLe?: string | null
+    controle?: string | null
+  }>("/api/e2ee/coffre", { cache: "no-store" })
+  return {
+    serrures: r.serrures ?? [],
+    refusee: r.refusee === true,
+    motDePasseChangeLe: r.motDePasseChangeLe,
+    controle: r.controle,
+  }
+}
+
+/** Dépose le bloc de contrôle — une fois prouvée la clé. Ne lève jamais. */
+async function deposerControle(matiere: ArrayBuffer): Promise<boolean> {
+  const compte = moi()
+  if (!compte) return false
+  try {
+    await apiRequest("/api/e2ee/controle", {
+      method: "PUT",
+      body: { controle: await creerControle(matiere, compte) },
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * La clé de cet appareil, PROUVÉE — ou `null`.
+ *
+ * Par le bloc de contrôle s'il existe. Sinon par la copie de la clé de compte,
+ * chiffrée par la même clé maîtresse : l'ouvrir prouve la clé, et l'on dépose
+ * alors le bloc pour les suivants. Sans l'un ni l'autre, rien ne prouve la clé.
+ */
+async function matiereProuvee(controle: string | null | undefined): Promise<ArrayBuffer | null> {
+  const matiere = await lireMatiere()
+  const compte = moi()
+  if (!matiere || !compte) return null
+  if (typeof controle === "string") return (await controleValide(matiere, controle, compte)) ? matiere : null
+  try {
+    const r = await apiRequest<{ cle: { version: number; priveeChiffree: string } | null }>(
+      "/api/e2ee/compte",
+      { cache: "no-store" },
+    )
+    if (!r.cle) return null
+    const aad = new TextEncoder().encode(
+      `alanya-compte-v1\n${compte}\n${r.cle.version}`,
+    ) as Uint8Array<ArrayBuffer>
+    await dechiffrerAvec(matiere, r.cle.priveeChiffree, aad)
+  } catch {
+    return null
+  }
+  if (controle === null) await deposerControle(matiere)
+  return matiere
+}
+
 /**
  * La serrure « mot de passe » refuse-t-elle [motDePasse] ? Alors elle est
  * périmée : on la refait avec la clé de cet appareil. Ne lève jamais ; rend
@@ -148,6 +280,7 @@ async function reparerSerrureSiPerimee(
   try {
     await ouvrirArchiveBrute(motDePasse, serrure)
     if (refaireSiOuvre) await relierAuMotDePasse(motDePasse)
+    marquerEprouvee()
     return false // Elle s'ouvre : rien à réparer.
   } catch {
     // Elle refuse ce mot de passe : périmée.
@@ -156,6 +289,7 @@ async function reparerSerrureSiPerimee(
     const matiere = await lireMatiere()
     if (!matiere) return false
     await poserSerrure(await serrureDepuisMatiere("motdepasse", motDePasse, matiere))
+    marquerEprouvee()
     console.info("[e2ee] serrure « mot de passe » périmée, refaite.")
     return true
   } catch (e) {
@@ -175,7 +309,15 @@ async function reparerSerrureSiPerimee(
 export async function relierAuMotDePasse(motDePasse: string): Promise<boolean> {
   if (!motDePasse) return false
   try {
-    const matiere = await lireMatiere()
+    // ⚠️ La clé se prouve d'abord (bloc de contrôle) : la poser fausse
+    // fermerait la sauvegarde aux autres appareils.
+    let controle: string | null | undefined
+    try {
+      controle = (await lireCoffreComplet()).controle
+    } catch {
+      controle = undefined
+    }
+    const matiere = typeof controle === "string" ? await matiereProuvee(controle) : await lireMatiere()
     if (!matiere) return false
     await poserSerrure(await serrureDepuisMatiere("motdepasse", motDePasse, matiere))
     return true
@@ -198,11 +340,44 @@ export async function relierAuMotDePasse(motDePasse: string): Promise<boolean> {
  */
 function aEprouver(serrure: Serrure, changeLe: string | null | undefined): boolean {
   if (changeLe === undefined) return true
-  if (changeLe === null) return false
+  if (perimeeSelonDates(serrure, changeLe)) return true
+  /*
+   * ⚠️ DATE VIDE : mot de passe jamais changé depuis l'ajout de la colonne.
+   * Une serrure posée AVANT a pu se périmer sans laisser de trace : on
+   * l'éprouve UNE fois sur cet appareil, en silence.
+   */
+  return changeLe === null && !eprouveeIci()
+}
+
+/** La serrure est-elle plus ancienne que le dernier changement de mot de passe ? */
+function perimeeSelonDates(serrure: Serrure, changeLe: string | null | undefined): boolean {
+  if (typeof changeLe !== "string") return false
   const posee = serrure.updatedAt ? Date.parse(serrure.updatedAt) : NaN
   const change = Date.parse(changeLe)
   if (Number.isNaN(change)) return false
   return Number.isNaN(posee) || posee < change
+}
+
+const cleEprouvee = (compte: string) => `alanya-serrure-eprouvee-${compte}`
+
+function eprouveeIci(): boolean {
+  const compte = moi()
+  if (!compte) return false
+  try {
+    return localStorage.getItem(cleEprouvee(compte)) === "1"
+  } catch {
+    return false
+  }
+}
+
+function marquerEprouvee(): void {
+  const compte = moi()
+  if (!compte) return
+  try {
+    localStorage.setItem(cleEprouvee(compte), "1")
+  } catch {
+    // stockage indisponible : on éprouvera de nouveau, sans gravité.
+  }
 }
 
 /**
@@ -461,6 +636,8 @@ export async function activerSauvegarde(opts: {
   maitresse = neuve
   await ranger(matiere)
   cleCompteDesMaintenant()
+  // La clé vient d'être tirée : c'est la bonne par définition (27/11/2026).
+  void deposerControle(matiere)
 
   /*
    * 🔴 ON SAUVEGARDE CE QUI EXISTE DÉJÀ, PAS SEULEMENT CE QUI SUIVRA.
@@ -856,6 +1033,339 @@ export async function suivreChangementMotDePasse(
   }
 }
 
+/* ══════════════════ COUCHE A : LA SERRURE AVEC LE MOT DE PASSE ══════════════════ */
+
+/**
+ * Fabrique, AVANT le changement de mot de passe, la serrure du nouveau
+ * (27/11/2026). Elle part dans la même requête que lui et le serveur écrit les
+ * deux ensemble : une coupure ne peut plus les séparer.
+ *
+ * La clé vient de l'ancienne serrure ouverte par l'ancien mot de passe — ce
+ * qui la prouve — ou, si celle-ci est déjà périmée, de cet appareil, prouvée
+ * par le bloc de contrôle. `null` : rien à joindre (pas de sauvegarde, ou
+ * aucune clé sûre ici) ; le changement se fait sans, et la couche B prendra
+ * le relais.
+ */
+export async function preparerSerrureMotDePasse(
+  ancien: string,
+  nouveau: string,
+): Promise<Serrure | null> {
+  try {
+    const etat = await lireCoffreComplet()
+    if (etat.serrures.length === 0) return null
+    const ancienne = etat.serrures.find((s) => s.type === "motdepasse")
+    if (ancienne) {
+      try {
+        const m = await ouvrirArchiveBrute(ancien, ancienne)
+        return await serrureDepuisMatiere("motdepasse", nouveau, m)
+      } catch {
+        // Périmée : on passe à la clé de cet appareil.
+      }
+    }
+    const m = await matiereProuvee(etat.controle)
+    return m ? await serrureDepuisMatiere("motdepasse", nouveau, m) : null
+  } catch {
+    return null
+  }
+}
+
+/* ══════════════════ COUCHE B : LA SERRURE PÉRIMÉE ══════════════════ */
+
+/**
+ * Cet appareil a-t-il la clé, alors que la serrure « mot de passe » ne suit
+ * plus le mot de passe du compte ? (27/11/2026) Les autres appareils trouvent
+ * alors la sauvegarde fermée : celui-ci peut la réparer, s'il connaît le mot
+ * de passe actuel — d'où le bandeau qui le demande. Faux en cas de doute.
+ */
+export async function serrureMotDePassePerimee(): Promise<boolean> {
+  if (!(await laCle())) return false
+  let etat: EtatCoffre
+  try {
+    etat = await lireCoffreComplet()
+  } catch {
+    return false
+  }
+  if (etat.serrures.length === 0) return false
+  if (!(await matiereProuvee(etat.controle))) return false
+  const s = etat.serrures.find((x) => x.type === "motdepasse")
+  return !s || perimeeSelonDates(s, etat.motDePasseChangeLe)
+}
+
+/* ══════════════════ COUCHE C : LA CLÉ PASSE D'UN APPAREIL À L'AUTRE ══════════════════ */
+
+/*
+ * 🔴 LE CAS QUE TOUT CELA RÈGLE (27/11/2026) : le mot de passe a changé, la
+ * serrure n'a pas suivi, et l'on se connecte sur un NOUVEL appareil — la
+ * sauvegarde y reste fermée. Un appareil déjà connecté, lui, a la clé.
+ *
+ * Le nouvel appareil tire une paire éphémère et dépose la publique ; l'autre
+ * lui scelle la clé maîtresse (le format des emballages de groupe, éprouvé et
+ * jumeau du mobile) ; le nouvel appareil la vérifie par le bloc de contrôle,
+ * la range, et refait la serrure avec le mot de passe qu'il vient de taper.
+ *
+ * ⚠️ LE SERVEUR NE VOIT QUE DES CLÉS PUBLIQUES ET DU CHIFFRÉ. L'accord est
+ * automatique quand le demandeur a prouvé le mot de passe actuel (il ouvrirait
+ * de toute façon la serrure réparée) ; il est demandé à l'utilisateur après un
+ * « mot de passe oublié ».
+ */
+
+/** Où la demande en cours attend, dans le coffre local : sa clé privée y est. */
+const CLE_DEMANDE = "archive.demande"
+
+interface DemandeLocale {
+  id: string
+  priv: string
+  expireLe: string
+}
+
+function contexteDemande(id: string, compte: string): ContexteEmballage {
+  return { convId: id, destinataireId: compte, version: 1, versionCompte: 1 }
+}
+
+function versB64Octets(o: Uint8Array): string {
+  return versB64Local(o.slice().buffer)
+}
+
+/** « Chrome · Windows » : ce que l'autre appareil montre de celui-ci. */
+function decrireNavigateur(): string {
+  const ua = typeof navigator === "undefined" ? "" : navigator.userAgent
+  const nav = /Edg\//.test(ua)
+    ? "Edge"
+    : /OPR\//.test(ua)
+      ? "Opera"
+      : /Firefox\//.test(ua)
+        ? "Firefox"
+        : /Chrome\//.test(ua)
+          ? "Chrome"
+          : /Safari\//.test(ua)
+            ? "Safari"
+            : "Web"
+  const os = /Android/.test(ua)
+    ? "Android"
+    : /iPhone|iPad|iPod/.test(ua)
+      ? "iOS"
+      : /Windows/.test(ua)
+        ? "Windows"
+        : /Mac OS X/.test(ua)
+          ? "macOS"
+          : /Linux/.test(ua)
+            ? "Linux"
+            : ""
+  return os ? `${nav} · ${os}` : nav
+}
+
+function lireDemandeLocale(): DemandeLocale | null {
+  try {
+    const d = lireSecret<DemandeLocale>(CLE_DEMANDE)
+    return d && typeof d.id === "string" && typeof d.priv === "string" ? d : null
+  } catch {
+    return null
+  }
+}
+
+function oublierDemandeLocale(): void {
+  try {
+    effacerSecret(CLE_DEMANDE)
+  } catch {
+    // coffre indisponible : la demande expirera d'elle-même.
+  }
+}
+
+/**
+ * Demande la clé aux autres appareils du compte. [motDePasse] : celui qu'on
+ * vient de taper, vérifié par le serveur — c'est ce qui rend l'accord
+ * automatique possible. Rend l'identifiant de la demande, ou `null`.
+ */
+export async function demanderCleAuxAppareils(motDePasse?: string): Promise<string | null> {
+  try {
+    const paire = await genererPaireCompte()
+    const r = await apiRequest<{ id: string; expireLe: string }>("/api/e2ee/demandes-cle", {
+      method: "POST",
+      body: {
+        appareil: getOrCreateWebDeviceId(),
+        libelle: decrireNavigateur(),
+        clePublique: versB64Octets(paire.pub),
+        ...(motDePasse ? { motDePasse } : {}),
+      },
+    })
+    await ouvrirCoffre()
+    ecrireSecret(CLE_DEMANDE, { id: r.id, priv: versB64Octets(paire.priv), expireLe: r.expireLe })
+    sendSignalSauvegarde("demande_cle", r.id)
+    return r.id
+  } catch (e) {
+    console.warn("[e2ee] demande de clé impossible :", e)
+    return null
+  }
+}
+
+/** Une demande de ce navigateur attend-elle encore ? */
+export async function demandeCleEnAttente(): Promise<boolean> {
+  try {
+    await ouvrirCoffre()
+  } catch {
+    return false
+  }
+  const d = lireDemandeLocale()
+  return d !== null && Date.parse(d.expireLe) > Date.now()
+}
+
+export type IssueDemande = "aucune" | "attente" | "recue" | "refusee" | "expiree" | "rejetee"
+
+/**
+ * Relit la demande de ce navigateur. `recue` : la clé est là, vérifiée et
+ * rangée — la sauvegarde est ouverte. [motDePasse] : s'il est connu, la
+ * serrure est refaite avec lui aussitôt (la couche B le fera sinon).
+ *
+ * `rejetee` : la clé reçue ne passe pas le bloc de contrôle. On ne s'en sert
+ * pas — une clé fausse, rangée puis posée, fermerait la sauvegarde pour tous.
+ */
+export async function relireDemandeCle(motDePasse?: string): Promise<IssueDemande> {
+  try {
+    await ouvrirCoffre()
+  } catch {
+    return "aucune"
+  }
+  const locale = lireDemandeLocale()
+  if (!locale) return "aucune"
+  const compte = moi()
+  if (!compte) return "attente"
+
+  let r: { etat: string; enveloppe?: string }
+  try {
+    r = await apiRequest<{ etat: string; enveloppe?: string }>(
+      `/api/e2ee/demandes-cle/${encodeURIComponent(locale.id)}`,
+      { cache: "no-store" },
+    )
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      oublierDemandeLocale()
+      return "aucune"
+    }
+    return "attente"
+  }
+  if (r.etat === "ouverte") return "attente"
+
+  if (r.etat === "servie" && r.enveloppe) {
+    let matiere: ArrayBuffer
+    try {
+      const brut = await deballerCle(
+        r.enveloppe,
+        new Uint8Array(depuisB64Local(locale.priv)),
+        contexteDemande(locale.id, compte),
+      )
+      matiere = brut.slice().buffer
+    } catch {
+      oublierDemandeLocale()
+      return "rejetee"
+    }
+    let controle: string | null | undefined
+    try {
+      controle = (await lireCoffreComplet()).controle
+    } catch {
+      controle = undefined
+    }
+    // L'appareil qui sert dépose le bloc avant de servir : sans lui, refus.
+    if (typeof controle !== "string" || !(await controleValide(matiere, controle, compte))) {
+      oublierDemandeLocale()
+      return "rejetee"
+    }
+    await ranger(matiere)
+    maitresse = await cleDepuisMatiere(matiere)
+    cleCompteDesMaintenant()
+    if (!ecouteurPose) {
+      surEffacement()
+      ecouteurPose = true
+    }
+    oublierDemandeLocale()
+    if (motDePasse) void relierAuMotDePasse(motDePasse)
+    return "recue"
+  }
+
+  oublierDemandeLocale()
+  if (r.etat === "refusee") return "refusee"
+  // `livree` : relue par un autre onglet, qui a rangé la clé dans le coffre commun.
+  if (r.etat === "livree" && (await laCle())) return "recue"
+  return "expiree"
+}
+
+/** Une demande d'un AUTRE appareil du compte, vue par celui qui a la clé. */
+export interface DemandeCle {
+  id: string
+  appareil: string
+  libelle: string
+  clePublique: string
+  creeLe: string
+  /** La clé peut partir sans rien demander (voir le serveur). */
+  auto: boolean
+}
+
+/** Les demandes ouvertes des autres appareils — seulement si la clé est ici. */
+export async function demandesCleOuvertes(): Promise<DemandeCle[]> {
+  if (!(await laCle())) return []
+  try {
+    const r = await apiRequest<{ demandes?: DemandeCle[] }>(
+      `/api/e2ee/demandes-cle?appareil=${encodeURIComponent(getOrCreateWebDeviceId())}`,
+      { cache: "no-store" },
+    )
+    return r.demandes ?? []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Scelle la clé maîtresse pour l'appareil qui la demande.
+ *
+ * ⚠️ SEULEMENT UNE CLÉ PROUVÉE (bloc de contrôle, ou copie de la clé de
+ * compte — le bloc est alors posé). Transmettre une clé fausse ferait plus de
+ * mal que de ne rien transmettre.
+ */
+export async function servirDemandeCle(d: DemandeCle): Promise<boolean> {
+  const compte = moi()
+  if (!compte) return false
+  let etat: EtatCoffre
+  try {
+    etat = await lireCoffreComplet()
+  } catch {
+    return false
+  }
+  const matiere = await matiereProuvee(etat.controle)
+  if (!matiere) return false
+  try {
+    const enveloppe = await emballerCle(
+      new Uint8Array(matiere),
+      new Uint8Array(depuisB64Local(d.clePublique)),
+      contexteDemande(d.id, compte),
+    )
+    await apiRequest(`/api/e2ee/demandes-cle/${encodeURIComponent(d.id)}/reponse`, {
+      method: "POST",
+      body: { enveloppe },
+    })
+    sendSignalSauvegarde("demande_cle_traitee", d.id)
+    return true
+  } catch (e) {
+    console.warn("[e2ee] clé non transmise :", e)
+    return false
+  }
+}
+
+/**
+ * « Ce n'est pas moi » : refuse, et le serveur déconnecte l'appareil. Rend son
+ * identifiant, à annoncer au temps réel (`session_revoked`), ou `null`.
+ */
+export async function refuserDemandeCle(d: DemandeCle): Promise<string | null> {
+  try {
+    const r = await apiRequest<{ appareil?: string }>(
+      `/api/e2ee/demandes-cle/${encodeURIComponent(d.id)}/refus`,
+      { method: "POST" },
+    )
+    sendSignalSauvegarde("demande_cle_traitee", d.id)
+    return r.appareil ?? null
+  } catch {
+    return null
+  }
+}
+
 /* ══════════════════ LA RESTAURATION AUTOMATIQUE ══════════════════ */
 
 /**
@@ -958,15 +1468,13 @@ export async function restaurerALaConnexionSuivie(
   let serrures: Serrure[]
   let refusee: boolean
   let motDePasseChangeLe: string | null | undefined
+  let controle: string | null | undefined
   try {
-    const r = await apiRequest<{
-      serrures?: Serrure[]
-      refusee?: boolean
-      motDePasseChangeLe?: string | null
-    }>("/api/e2ee/coffre")
-    serrures = r.serrures ?? []
-    refusee = r.refusee === true
-    motDePasseChangeLe = r.motDePasseChangeLe
+    const etat = await lireCoffreComplet()
+    serrures = etat.serrures
+    refusee = etat.refusee
+    motDePasseChangeLe = etat.motDePasseChangeLe
+    controle = etat.controle
   } catch {
     return echec
   }
@@ -985,6 +1493,25 @@ export async function restaurerALaConnexionSuivie(
 
   // Ce navigateur a peut-être déjà la clé : pas besoin du mot de passe.
   let cle = await laCle()
+  /*
+   * 🔴 LA CLÉ DE CE NAVIGATEUR EST-ELLE ENCORE LA BONNE ? (27/11/2026) Si le
+   * bloc de contrôle la refuse, elle vient d'une sauvegarde supprimée puis
+   * recréée ailleurs : on l'oublie, et l'on rouvre par le mot de passe.
+   */
+  if (cle && typeof controle === "string") {
+    const m = await lireMatiere()
+    const compte = moi()
+    if (m && compte && !(await controleValide(m, controle, compte))) {
+      console.warn("[e2ee] la clé de ce navigateur n'est plus celle de la sauvegarde : oubliée.")
+      maitresse = null
+      try {
+        effacerSecret(CLE_COFFRE)
+      } catch {
+        // coffre indisponible : la clé restera en mémoire nulle, sans plus.
+      }
+      cle = null
+    }
+  }
   const dejaSurAppareil = cle !== null
   if (!cle) {
     if (!serrures.some((s) => s.type === "motdepasse")) return fermee
@@ -995,8 +1522,14 @@ export async function restaurerALaConnexionSuivie(
     // serveur la dit antérieure au dernier changement, on la repose pour que
     // la question ne revienne pas (27/11/2026).
     const ouverte = serrures.find((s) => s.type === "motdepasse")
-    if (ouverte && motDePasseChangeLe !== undefined && aEprouver(ouverte, motDePasseChangeLe)) {
+    if (ouverte && perimeeSelonDates(ouverte, motDePasseChangeLe)) {
       void relierAuMotDePasse(motDePasse)
+    }
+    marquerEprouvee()
+    // Ouverte par une serrure : la clé est prouvée, le bloc peut se poser.
+    if (controle === null) {
+      const m = await lireMatiere()
+      if (m) void deposerControle(m)
     }
   }
 
@@ -1023,12 +1556,22 @@ export async function restaurerALaConnexionSuivie(
      * que c'est la bonne. EN FOND : Argon2id prend une à deux secondes.
      */
     const serrureMdp = serrures.find((s) => s.type === "motdepasse")
-    if (dejaSurAppareil && messages.length > 0) {
+    // Prouvée par le bloc (vérifié plus haut), ou par un message déchiffré.
+    const prouvee = typeof controle === "string" || messages.length > 0
+    if (dejaSurAppareil && prouvee) {
       if (!serrureMdp) {
         // Pas de serrure « mot de passe » : on la pose, comme le téléphone.
         void relierAuMotDePasse(motDePasse)
       } else if (aEprouver(serrureMdp, motDePasseChangeLe)) {
-        void reparerSerrureSiPerimee(motDePasse, serrureMdp, motDePasseChangeLe !== undefined)
+        void reparerSerrureSiPerimee(
+          motDePasse,
+          serrureMdp,
+          perimeeSelonDates(serrureMdp, motDePasseChangeLe),
+        )
+      }
+      if (controle === null) {
+        const m = await lireMatiere()
+        if (m) void deposerControle(m)
       }
     }
     return { issue: "restauree", restaures: messages.length, illisibles: blocsIllisibles }

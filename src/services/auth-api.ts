@@ -424,8 +424,14 @@ export async function changePasswordApi(
    * toutes les sessions du compte sauf celles de ce navigateur.
    */
   deconnecterAutres = false,
-): Promise<{ appareilsRevoques: string[] }> {
-  const r = await apiRequest<{ message?: string; appareilsRevoques?: string[] }>(
+  /**
+   * La serrure « mot de passe » du nouveau, fabriquée par
+   * `preparerSerrureMotDePasse` (couche A, 27/11/2026) : le serveur l'écrit
+   * dans la même transaction que le mot de passe.
+   */
+  serrure: object | null = null,
+): Promise<{ appareilsRevoques: string[]; serrurePosee: boolean }> {
+  const r = await apiRequest<{ message?: string; appareilsRevoques?: string[]; serrurePosee?: boolean }>(
     "/api/account/password",
     {
       method: "POST",
@@ -442,11 +448,15 @@ export async function changePasswordApi(
              * serveur garde la session de ce jeton quoi qu'il arrive.
              */
             jetonCourant: loadRefreshToken() ?? undefined,
+            ...(serrure ? { serrure } : {}),
           }
-        : { currentPassword, newPassword },
+        : { currentPassword, newPassword, ...(serrure ? { serrure } : {}) },
     },
   )
-  return { appareilsRevoques: Array.isArray(r?.appareilsRevoques) ? r.appareilsRevoques : [] }
+  return {
+    appareilsRevoques: Array.isArray(r?.appareilsRevoques) ? r.appareilsRevoques : [],
+    serrurePosee: r?.serrurePosee === true,
+  }
 }
 
 /** POST /api/account/verify-password — lève si le mot de passe est faux. */

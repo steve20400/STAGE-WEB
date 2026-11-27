@@ -21,11 +21,14 @@ import { Icone } from "../../../src/components/icone"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
   aUneCleDeRecuperation,
+  demanderCleAuxAppareils,
   ouvrir,
   relierAuMotDePasse,
+  relireDemandeCle,
   restaurerALaConnexionSuivie,
   type IssueConnexion,
 } from "../../../src/services/e2ee-sauvegarde"
+import { subscribeToSignalSauvegarde } from "../../../src/services/websocket-service"
 import { useTranslation } from "../../../src/i18n"
 import { reprendreMotDePasse } from "../../../src/services/restauration-en-attente"
 import { cacheMessage } from "../../../src/services/indexeddb-cache"
@@ -127,6 +130,15 @@ export default function RestaurationPage() {
   const [ouverture, setOuverture] = useState(false)
   const [erreurCle, setErreurCle] = useState<string | null>(null)
 
+  /*
+   * 🔴 COUCHE C (27/11/2026) : la sauvegarde reste fermée ici, mais un autre
+   * appareil du compte a la clé. On la lui demande dès l'arrivée ; elle arrive
+   * toute seule s'il est ouvert, ou plus tard (la veille la reprendra).
+   */
+  const [attente, setAttente] = useState(false)
+  const [refusParAppareil, setRefusParAppareil] = useState(false)
+  const [motsVisibles, setMotsVisibles] = useState(false)
+
   /**
    * Les 12 mots : on ouvre, on RELIE l'archive au mot de passe qu'on vient de
    * taper (les appareils suivants s'ouvriront avec lui), puis la restauration
@@ -175,16 +187,21 @@ export default function RestaurationPage() {
         oublier()
         navigate(suite, { replace: true })
       } else if (r.issue === "fermee") {
-        void aUneCleDeRecuperation().then((avecCle) => {
+        void aUneCleDeRecuperation().then(async (avecCle) => {
           if (!actif) return
           if (avecCle && propositionReportee(moi)) {
-            // Déjà proposée et remise à plus tard : on entre, sans rien dire.
+            // Déjà proposée et remise à plus tard : on entre, sans rien dire —
+            // la demande aux autres appareils part quand même, la veille la
+            // reprendra.
+            void demanderCleAuxAppareils(motDePasse ?? undefined)
             oublier()
             navigate(suite, { replace: true })
             return
           }
           setProposerCle(avecCle)
           setIssue("fermee")
+          const id = await demanderCleAuxAppareils(motDePasse ?? undefined)
+          if (actif) setAttente(id !== null)
         })
       } else {
         setIssue(r.issue)
@@ -196,6 +213,40 @@ export default function RestaurationPage() {
     }
     // `essai` relance : « Réessayer ».
   }, [essai, navigate, suite, moi])
+
+  // La clé arrive : relue toutes les quatre secondes, et dès qu'un appareil
+  // signale qu'il l'a traitée.
+  useEffect(() => {
+    if (issue !== "fermee" || !attente) return
+    let actif = true
+    let enLecture = false
+    const relire = async () => {
+      if (!actif || enLecture) return
+      enLecture = true
+      const r = await relireDemandeCle(motDePasse ?? undefined)
+      enLecture = false
+      if (!actif) return
+      if (r === "recue") {
+        setAttente(false)
+        setIssue(null)
+        setEssai((n) => n + 1)
+      } else if (r === "refusee") {
+        setAttente(false)
+        setRefusParAppareil(true)
+      } else if (r !== "attente") {
+        setAttente(false)
+      }
+    }
+    const minuterie = window.setInterval(() => void relire(), 4000)
+    const desabonner = subscribeToSignalSauvegarde((quoi) => {
+      if (quoi === "demande_cle_traitee") void relire()
+    })
+    return () => {
+      actif = false
+      window.clearInterval(minuterie)
+      desabonner()
+    }
+  }, [issue, attente])
 
   const fraction = fractionGlobale(progression)
   const texteCompteur = compteur(progression, {
@@ -213,7 +264,9 @@ export default function RestaurationPage() {
         <h1>
           {issue === null
             ? t("rest_titre")
-            : issue === "fermee" && proposerCle
+            : issue === "fermee" && attente
+              ? t("arch_attente_titre")
+              : issue === "fermee" && proposerCle
               ? t("arch_cle_proposee_titre")
               : issue === "fermee"
                 ? t("rest_ferme_titre")
@@ -244,9 +297,30 @@ export default function RestaurationPage() {
           </>
         )}
 
-        {issue === "fermee" && proposerCle && (
+        {issue === "fermee" && attente && (
           <>
-            <p className="sous">{t("arch_cle_proposee_texte")}</p>
+            <p className="sous">{t("arch_attente_texte")}</p>
+            <div className="piste animee" role="progressbar" aria-busy="true">
+              <div className="remplissage" />
+            </div>
+          </>
+        )}
+
+        {issue === "fermee" && refusParAppareil && (
+          <p className="erreur" role="alert">
+            {t("arch_demande_refusee")}
+          </p>
+        )}
+
+        {issue === "fermee" && proposerCle && attente && !motsVisibles && (
+          <button type="button" className="secondaire" onClick={() => setMotsVisibles(true)}>
+            {t("arch_jai_ma_cle")}
+          </button>
+        )}
+
+        {issue === "fermee" && proposerCle && (!attente || motsVisibles) && (
+          <>
+            {!attente && <p className="sous">{t("arch_cle_proposee_texte")}</p>}
             <textarea
               className="mots"
               rows={3}
@@ -273,21 +347,30 @@ export default function RestaurationPage() {
             >
               {ouverture ? "…" : t("arch_cle_restaurer")}
             </button>
-            <button
-              type="button"
-              className="secondaire"
-              disabled={ouverture}
-              onClick={() => {
-                reporterProposition(moi)
-                entrer()
-              }}
-            >
-              {t("arch_plus_tard")}
-            </button>
           </>
         )}
 
-        {issue === "fermee" && !proposerCle && (
+        {issue === "fermee" && proposerCle && (
+          <button
+            type="button"
+            className="secondaire"
+            disabled={ouverture}
+            onClick={() => {
+              reporterProposition(moi)
+              entrer()
+            }}
+          >
+            {attente ? t("arch_attente_continuer") : t("arch_plus_tard")}
+          </button>
+        )}
+
+        {issue === "fermee" && !proposerCle && attente && (
+          <button type="button" className="secondaire" onClick={entrer}>
+            {t("arch_attente_continuer")}
+          </button>
+        )}
+
+        {issue === "fermee" && !proposerCle && !attente && (
           <>
             <p className="sous">{t("rest_ferme_texte")}</p>
             <button

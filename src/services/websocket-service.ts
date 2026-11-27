@@ -668,6 +668,29 @@ export function subscribeToPresence(handler: (event: PresenceEvent) => void): ()
  * uniquement aux sockets du meme compte — on ne peut donc deconnecter que ses
  * propres appareils.
  */
+/**
+ * Signaux de la sauvegarde entre MES appareils (27/11/2026) : « va voir », et
+ * jamais un secret. Le serveur les relaie aux seules sockets de mon compte ;
+ * chaque appareil vérifie ensuite auprès de l'API.
+ */
+export type SignalSauvegarde = "demande_cle" | "demande_cle_traitee" | "serrure_perimee"
+const SIGNAUX_SAUVEGARDE = new Set<string>(["demande_cle", "demande_cle_traitee", "serrure_perimee"])
+
+export function sendSignalSauvegarde(quoi: SignalSauvegarde, id?: string) {
+  sendRaw({ type: "e2ee_sauvegarde", quoi, ...(id ? { id } : {}) })
+}
+
+export function subscribeToSignalSauvegarde(
+  handler: (quoi: SignalSauvegarde, id: string | null) => void,
+): () => void {
+  return addListener((event) => {
+    if (event.type !== "e2ee_sauvegarde") return
+    const quoi = String(event.quoi ?? "")
+    if (!SIGNAUX_SAUVEGARDE.has(quoi)) return
+    handler(quoi as SignalSauvegarde, typeof event.id === "string" ? event.id : null)
+  })
+}
+
 /** Raison portee par `session_revoked` quand c'est une connexion ailleurs. */
 export const RAISON_EVICTION = "eviction"
 

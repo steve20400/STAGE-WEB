@@ -8,6 +8,7 @@ import { ActiveCallFloating } from "../../src/components/active-call-floating"
 import { RepondeurRetour } from "../../src/components/repondeur-retour"
 import { PseudoAppareilGate } from "../../src/components/pseudo-appareil-gate"
 import { InvitationCleRecuperation } from "../../src/components/invitation-cle-recuperation"
+import { VeilleSauvegarde } from "../../src/components/veille-sauvegarde"
 import IncomingCallOverlay from "../../src/components/incoming-call-overlay"
 import { useCallState } from "../../src/hooks/use-call"
 import {
@@ -777,6 +778,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           session, et la demande y serait sautee. */}
       <PseudoAppareilGate />
       <InvitationCleRecuperation />
+      <VeilleSauvegarde />
       <ActiveCallFloating />
       {/* Le repondeur s'affiche DANS l'ecran d'appel. Ce composant-ci ne
           dessine rien : il y ramene quand on l'avait quitte — fenetre reduite

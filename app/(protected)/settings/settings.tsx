@@ -124,7 +124,7 @@ import {
   type DisponibiliteCouple,
 } from "../../../src/services/traduction-locale"
 import { type EtatCacheTraductions } from "../../../src/services/traduction-cache"
-import { sendSessionRevoked } from "../../../src/services/websocket-service"
+import { sendSessionRevoked, sendSignalSauvegarde } from "../../../src/services/websocket-service"
 import { avatarDisplaySrc, uploadAvatarDataUrl } from "../../../src/lib/avatar"
 import { ReglageQualiteVideo } from "../../../src/components/reglage-qualite-video"
 import {
@@ -138,6 +138,7 @@ import { EmpreintePanneau } from "./empreinte-panneau"
 import {
   aUneArchive,
   estOuverte as sauvegardeOuverte,
+  preparerSerrureMotDePasse,
   suivreChangementMotDePasse,
 } from "../../../src/services/e2ee-sauvegarde"
 import { useTelechargementAuto } from "../../../src/hooks/use-telechargement-auto"
@@ -2460,10 +2461,17 @@ export default function SettingsPage() {
       return toastError(t("set_password_same"), t("set_choose_different_password"))
     setSaving(true)
     try {
-      const { appareilsRevoques } = await changePasswordApi(
+      /*
+       * 🔴 COUCHE A (27/11/2026) : la serrure du nouveau mot de passe est
+       * fabriquée AVANT, et part dans la même requête. Le serveur écrit les
+       * deux ensemble ; il n'y a plus rien à faire suivre après coup.
+       */
+      const serrure = await preparerSerrureMotDePasse(security.currentPwd, security.newPwd)
+      const { appareilsRevoques, serrurePosee } = await changePasswordApi(
         security.currentPwd,
         security.newPwd,
         deconnecterAutres && !deconnecterBloque,
+        serrure,
       )
       // Les sockets des appareils révoqués se ferment tout de suite : sans
       // cette annonce, ils garderaient le temps réel jusqu'à 15 minutes.
@@ -2485,7 +2493,9 @@ export default function SettingsPage() {
        * à ré-envelopper — et on aurait posé une serrure pour un mot de passe
        * que le compte n'a pas.
        */
-      const suivi = await suivreChangementMotDePasse(security.currentPwd, security.newPwd)
+      // Serveur d'avant la couche A, ou serrure impossible à fabriquer ici.
+      const suivi =
+        serrurePosee || (await suivreChangementMotDePasse(security.currentPwd, security.newPwd))
 
       setSecurity({ currentPwd: "", newPwd: "", confirmPwd: "" })
       setDeconnecterAutres(false)
@@ -2496,6 +2506,8 @@ export default function SettingsPage() {
        * prochaine connexion sur ce navigateur la répare.
        */
       if (!suivi && (await aUneArchive())) {
+        // Les appareils qui ont la clé affichent le bandeau de la couche B.
+        sendSignalSauvegarde("serrure_perimee")
         toast({
           type: "warning",
           title: t("set_password_changed"),
