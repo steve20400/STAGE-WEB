@@ -27,7 +27,11 @@
 import { MOTS_RECUPERATION } from "./mots-recuperation"
 
 /** D'où vient le secret qui ouvre une serrure. */
-export type TypeSerrure = "trousseau" | "motdepasse" | "recuperation"
+/**
+ * `contacts` (27/11/2026, chantier 2) : un secret tiré au sort, partagé en 2 sur
+ * 3 entre les contacts de récupération. Personne ne le tape, personne ne le voit.
+ */
+export type TypeSerrure = "trousseau" | "motdepasse" | "recuperation" | "contacts"
 
 /** Une serrure, telle qu'elle se range sur le serveur. */
 export interface Serrure {
@@ -107,6 +111,8 @@ const REGLAGES: Record<TypeSerrure, Reglage> = {
    */
   trousseau: { algo: "pbkdf2-sha256", parametres: { iterations: 1 } },
   recuperation: { algo: "pbkdf2-sha256", parametres: { iterations: 1 } },
+  // 256 bits tirés au sort, comme le trousseau : une itération suffit.
+  contacts: { algo: "pbkdf2-sha256", parametres: { iterations: 1 } },
 }
 
 /* ══════════════════ OUTILS ══════════════════ */

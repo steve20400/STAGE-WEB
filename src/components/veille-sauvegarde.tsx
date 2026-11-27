@@ -7,7 +7,21 @@ import { cacheMessage } from "../services/indexeddb-cache"
 import { entreeCacheDechiffree } from "../services/e2ee-entree-cache"
 import { restaurerTousLesTrousseaux } from "../services/e2ee-groupe-fil"
 import { verifierMotDePasseApi } from "../services/auth-api"
-import { sendSessionRevoked, subscribeToSignalSauvegarde } from "../services/websocket-service"
+import {
+  sendSessionRevoked,
+  subscribeToRecuperation,
+  subscribeToSignalSauvegarde,
+} from "../services/websocket-service"
+import {
+  aTraiterRecuperation,
+  aideEnAttente,
+  aider,
+  refuserAide,
+  relireAideContacts,
+  repondreInvitation,
+  type DemandeAide,
+  type InvitationRecuperation,
+} from "../services/e2ee-contacts-recuperation"
 import {
   demandeCleEnAttente,
   demandesCleOuvertes,
@@ -39,6 +53,16 @@ import "./confirmation.css"
  * ⚠️ RIEN NE BLOQUE : « Plus tard » ferme tout jusqu'au prochain démarrage.
  */
 const PAUSE_MS = 60_000
+
+/**
+ * Une AUTRE fenêtre est-elle ouverte (nom de l'appareil, invitation à noter sa
+ * clé, une confirmation) ? Alors la nôtre attend le tour suivant : trois
+ * fenêtres empilées au premier écran, la dernière ne se cliquait plus.
+ */
+function autreFenetreOuverte(): boolean {
+  if (typeof document === "undefined") return false
+  return document.querySelector(".pseudo-gate-overlay, .confirmation-voile:not([data-veille])") !== null
+}
 /**
  * Les demandes des autres appareils se relisent aussi d'elles-mêmes, page
  * visible : le signal temps réel peut se perdre (socket qui se rouvre au même
@@ -54,6 +78,9 @@ export function VeilleSauvegarde() {
   const { success, warning, error } = useToast()
 
   const [demande, setDemande] = useState<DemandeCle | null>(null)
+  // Contacts de récupération (chantier 2) : ce que J'AI à traiter pour d'autres.
+  const [invitation, setInvitation] = useState<InvitationRecuperation | null>(null)
+  const [aide, setAide] = useState<DemandeAide | null>(null)
   const [bandeau, setBandeau] = useState(false)
   const [saisie, setSaisie] = useState<string | null>(null)
   const [occupe, setOccupe] = useState(false)
@@ -67,6 +94,18 @@ export function VeilleSauvegarde() {
   const dernier = useRef(0)
   // La page de restauration fait elle-même ce travail : on ne s'y croise pas.
   const surRestauration = pathname.startsWith("/restauration")
+
+  /** Invitations et demandes d'aide qui m'attendent, en tant que contact. */
+  const relireRecuperation = useCallback(async () => {
+    if (autreFenetreOuverte()) return
+    const { invitations, demandes } = await aTraiterRecuperation()
+    const inv = invitations.find((i) => !ecartees.current.has(i.id))
+    setInvitation(inv ?? null)
+    const dem = demandes.find((d) => !ecartees.current.has(d.id))
+    // Une demande close ailleurs (deux accords, un refus) disparaît d'ici :
+    // la carte se « grise » d'elle-même.
+    setAide(inv ? null : (dem ?? null))
+  }, [])
 
   const verifier = useCallback(
     async (force = false) => {
@@ -98,11 +137,24 @@ export function VeilleSauvegarde() {
             await servirDemandeCle(d)
             continue
           }
-          if (!ecartees.current.has(d.id)) {
+          if (!ecartees.current.has(d.id) && !autreFenetreOuverte()) {
             setDemande((deja) => deja ?? d)
             break
           }
         }
+        // ①bis Mon aide demandée à mes contacts : arrivée ?
+        if ((await aideEnAttente()) && (await relireAideContacts()).etat === "recue") {
+          success(t("arch_cle_recue"))
+          try {
+            const { messages } = await restaurerTout()
+            for (const m of messages) await cacheMessage(entreeCacheDechiffree(m))
+          } catch {
+            // Le rattrapage des fils reprendra ce qui manque.
+          }
+          void restaurerTousLesTrousseaux().catch(() => undefined)
+        }
+        // ②bis Ce que d'autres me demandent, en tant que contact de récupération.
+        await relireRecuperation()
         // ③ La serrure périmée.
         if (!bandeauEcarte.current) setBandeau(await serrureMotDePassePerimee())
       } finally {
@@ -113,7 +165,7 @@ export function VeilleSauvegarde() {
         }
       }
     },
-    [moi, success, t],
+    [moi, success, t, relireRecuperation],
   )
 
   /** Seulement les demandes des autres appareils : le tour léger. */
@@ -121,12 +173,14 @@ export function VeilleSauvegarde() {
     if (!moi || enCours.current || document.visibilityState !== "visible") return
     enCours.current = true
     try {
+      // Les invitations et demandes d'aide en attente reviennent aussi ici.
+      await relireRecuperation()
       for (const d of await demandesCleOuvertes()) {
         if (d.auto) {
           await servirDemandeCle(d)
           continue
         }
-        if (!ecartees.current.has(d.id)) {
+        if (!ecartees.current.has(d.id) && !autreFenetreOuverte()) {
           setDemande((deja) => deja ?? d)
           break
         }
@@ -134,7 +188,7 @@ export function VeilleSauvegarde() {
     } finally {
       enCours.current = false
     }
-  }, [moi])
+  }, [moi, relireRecuperation])
 
   useEffect(() => {
     if (!moi || surRestauration) return
@@ -144,9 +198,11 @@ export function VeilleSauvegarde() {
     }
     document.addEventListener("visibilitychange", auRetour)
     const desabonner = subscribeToSignalSauvegarde(() => void verifier(true))
+    const desabonnerRecuperation = subscribeToRecuperation(() => void verifier(true))
     const releve = window.setInterval(() => void relireDemandes(), RELECTURE_DEMANDES_MS)
     return () => {
       window.clearInterval(releve)
+      desabonnerRecuperation()
       window.clearTimeout(premier)
       document.removeEventListener("visibilitychange", auRetour)
       desabonner()
@@ -170,6 +226,34 @@ export function VeilleSauvegarde() {
     if (appareil) sendSessionRevoked(appareil)
     warning(t("arch_demande_refusee_ok"))
     setDemande(null)
+  }
+
+  const repondre = async (accepte: boolean) => {
+    if (!invitation) return
+    setOccupe(true)
+    await repondreInvitation(invitation.id, accepte)
+    setOccupe(false)
+    setInvitation(null)
+    void relireRecuperation()
+  }
+
+  const aiderOuRefuser = async (oui: boolean) => {
+    if (!aide) return
+    setOccupe(true)
+    const ok = oui ? await aider(aide) : await refuserAide(aide)
+    setOccupe(false)
+    if (oui) {
+      if (ok) success(t("recup_aide_envoyee"))
+      else error(t("error"))
+    }
+    setAide(null)
+    void relireRecuperation()
+  }
+
+  const ecarter = (id: string) => {
+    ecartees.current.add(id)
+    setInvitation(null)
+    setAide(null)
   }
 
   const plusTard = () => {
@@ -244,7 +328,7 @@ export function VeilleSauvegarde() {
       )}
 
       {saisie !== null && (
-        <div className="confirmation-voile" onClick={() => !occupe && setSaisie(null)}>
+        <div className="confirmation-voile" data-veille onClick={() => !occupe && setSaisie(null)}>
           <div
             className="confirmation-boite"
             role="dialog"
@@ -301,8 +385,48 @@ export function VeilleSauvegarde() {
         </div>
       )}
 
+      {!demande && invitation && (
+        <div className="confirmation-voile" data-veille>
+          <div className="confirmation-boite" role="alertdialog" aria-modal="true" aria-labelledby="recup-inv-titre">
+            <h2 id="recup-inv-titre">{t("recup_titre")}</h2>
+            <p>{t("recup_invitation_texte").split("{nom}").join(invitation.nom ?? "—")}</p>
+            <div className="confirmation-actions" style={{ flexWrap: "wrap" }}>
+              <button type="button" disabled={occupe} onClick={() => ecarter(invitation.id)}>
+                {t("arch_plus_tard")}
+              </button>
+              <button type="button" disabled={occupe} onClick={() => void repondre(false)}>
+                {t("recup_refuser")}
+              </button>
+              <button type="button" className="principal" disabled={occupe} onClick={() => void repondre(true)}>
+                {t("recup_accepter")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!demande && !invitation && aide && (
+        <div className="confirmation-voile" data-veille>
+          <div className="confirmation-boite" role="alertdialog" aria-modal="true" aria-labelledby="recup-aide-titre">
+            <h2 id="recup-aide-titre">{t("recup_demande_titre").split("{nom}").join(aide.nom ?? "—")}</h2>
+            <p>{t("recup_demande_texte").split("{nom}").join(aide.nom ?? "—")}</p>
+            <div className="confirmation-actions" style={{ flexWrap: "wrap" }}>
+              <button type="button" disabled={occupe} onClick={() => ecarter(aide.id)}>
+                {t("arch_plus_tard")}
+              </button>
+              <button type="button" className="danger" disabled={occupe} onClick={() => void aiderOuRefuser(false)}>
+                {t("recup_je_refuse")}
+              </button>
+              <button type="button" className="principal" disabled={occupe} onClick={() => void aiderOuRefuser(true)}>
+                {t("recup_aider")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {demande && (
-        <div className="confirmation-voile">
+        <div className="confirmation-voile" data-veille>
           <div
             className="confirmation-boite"
             role="alertdialog"

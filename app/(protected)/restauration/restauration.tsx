@@ -30,8 +30,14 @@ import {
 } from "../../../src/services/e2ee-sauvegarde"
 import {
   sendSignalSauvegarde,
+  subscribeToRecuperation,
   subscribeToSignalSauvegarde,
 } from "../../../src/services/websocket-service"
+import {
+  demanderAideAuxContacts,
+  mesContactsRecuperation,
+  relireAideContacts,
+} from "../../../src/services/e2ee-contacts-recuperation"
 import { useTranslation } from "../../../src/i18n"
 import { reprendreMotDePasse } from "../../../src/services/restauration-en-attente"
 import { cacheMessage } from "../../../src/services/indexeddb-cache"
@@ -143,6 +149,25 @@ export default function RestaurationPage() {
   const [refusParAppareil, setRefusParAppareil] = useState(false)
   const [motsVisibles, setMotsVisibles] = useState(false)
 
+  /*
+   * 🔴 CHANTIER 2 (27/11/2026) : les contacts de récupération, troisième
+   * sortie. Proposés quand la sauvegarde reste fermée et que deux contacts au
+   * moins ont accepté.
+   */
+  const [contactsActifs, setContactsActifs] = useState(false)
+  const [aide, setAide] = useState<{ accords: number } | null>(null)
+  const [aideMessage, setAideMessage] = useState<string | null>(null)
+
+  const demanderAuxContacts = async () => {
+    setAideMessage(null)
+    const r = await demanderAideAuxContacts()
+    if (r.etat === "envoyee") setAide({ accords: 0 })
+    else if (r.etat === "trop") {
+      const date = r.jusquA ? new Date(r.jusquA).toLocaleString() : "…"
+      setAideMessage(t("recup_trop").replace("{date}", date))
+    } else setAideMessage(t("error"))
+  }
+
   /**
    * Les 12 mots : on ouvre, on RELIE l'archive au mot de passe qu'on vient de
    * taper (les appareils suivants s'ouvriront avec lui), puis la restauration
@@ -210,6 +235,9 @@ export default function RestaurationPage() {
           setAttente(id !== null)
           setProposerCle(avecCle)
           setIssue("fermee")
+          void mesContactsRecuperation()
+            .then((r) => actif && setContactsActifs(r.actif))
+            .catch(() => undefined)
         })
       } else {
         setIssue(r.issue)
@@ -261,6 +289,38 @@ export default function RestaurationPage() {
       desabonner()
     }
   }, [issue, attente, idDemande])
+
+  // L'aide des contacts : relue toutes les quatre secondes, et à chaque réponse.
+  const aideEnCours = aide !== null
+  useEffect(() => {
+    if (issue !== "fermee" || !aideEnCours) return
+    let actif = true
+    const relire = async () => {
+      const r = await relireAideContacts(motDePasse ?? undefined)
+      if (!actif) return
+      if (r.etat === "attente") setAide({ accords: r.accords })
+      else if (r.etat === "recue") {
+        setAide(null)
+        setAttente(false)
+        setIssue(null)
+        setEssai((n) => n + 1)
+      } else {
+        setAide(null)
+        setAideMessage(
+          r.etat === "refusee" ? t("recup_refusee") : r.etat === "echec" ? t("recup_echec") : t("error"),
+        )
+      }
+    }
+    const minuterie = window.setInterval(() => void relire(), 4000)
+    const desabonner = subscribeToRecuperation((quoi) => {
+      if (quoi === "demande_contacts_traitee") void relire()
+    })
+    return () => {
+      actif = false
+      window.clearInterval(minuterie)
+      desabonner()
+    }
+  }, [issue, aideEnCours, t])
 
   const fraction = fractionGlobale(progression)
   const texteCompteur = compteur(progression, {
@@ -318,6 +378,20 @@ export default function RestaurationPage() {
               <div className="remplissage" />
             </div>
           </>
+        )}
+
+        {issue === "fermee" && contactsActifs && !aide && (
+          <button type="button" className="secondaire" onClick={() => void demanderAuxContacts()}>
+            {t("recup_demander")}
+          </button>
+        )}
+        {issue === "fermee" && aide && (
+          <p className="sous">{t("recup_attente").replace("{n}", String(aide.accords))}</p>
+        )}
+        {issue === "fermee" && aideMessage && (
+          <p className="erreur" role="alert">
+            {aideMessage}
+          </p>
         )}
 
         {issue === "fermee" && refusParAppareil && (

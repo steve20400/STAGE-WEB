@@ -691,6 +691,17 @@ export function subscribeToSignalSauvegarde(
   })
 }
 
+/**
+ * Les contacts de récupération (27/11/2026) : le SERVEUR prévient — une
+ * invitation, une demande d'aide, une réponse. Des mots, jamais un secret.
+ */
+export function subscribeToRecuperation(handler: (quoi: string) => void): () => void {
+  return addListener((event) => {
+    if (event.type !== "e2ee_recuperation") return
+    handler(String(event.quoi ?? ""))
+  })
+}
+
 /** Raison portee par `session_revoked` quand c'est une connexion ailleurs. */
 export const RAISON_EVICTION = "eviction"
 

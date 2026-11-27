@@ -65,6 +65,11 @@ export function InvitationCleRecuperation() {
         minuterie = window.setTimeout(() => void essayer(), ATTENTE_APPEL_MS)
         return
       }
+      // Une autre fenêtre est ouverte (nom de l'appareil…) : on ne s'empile pas.
+      if (document.querySelector(".pseudo-gate-overlay, .confirmation-voile")) {
+        minuterie = window.setTimeout(() => void essayer(), 10_000)
+        return
+      }
       if (!(await estOuverte())) return
       if (await aUneCleDeRecuperation()) {
         marquer()

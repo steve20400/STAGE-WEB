@@ -1069,6 +1069,23 @@ export async function preparerSerrureMotDePasse(
   }
 }
 
+/**
+ * Pose (ou remplace) la serrure « contacts » avec [secret] — chantier 2,
+ * 27/11/2026. La clé doit être prouvée : poser une serrure sur une clé fausse
+ * rendrait les parts des contacts inutiles. Rend faux sinon.
+ */
+export async function poserSerrureContacts(secret: string): Promise<boolean> {
+  try {
+    const etat = await lireCoffreComplet()
+    const m = await matiereProuvee(etat.controle)
+    if (!m) return false
+    await poserSerrure(await serrureDepuisMatiere("contacts", secret, m))
+    return true
+  } catch {
+    return false
+  }
+}
+
 /* ══════════════════ COUCHE B : LA SERRURE PÉRIMÉE ══════════════════ */
 
 /**

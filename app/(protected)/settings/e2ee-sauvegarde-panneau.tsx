@@ -15,6 +15,7 @@ import { entreeCacheDechiffree } from "../../../src/services/e2ee-entree-cache"
 import { verifierMotDePasseApi } from "../../../src/services/auth-api"
 import { useTranslation } from "../../../src/i18n"
 import "./e2ee-sauvegarde-panneau.css"
+import { ContactsRecuperation } from "./contacts-recuperation"
 
 /**
  * LA SAUVEGARDE CHIFFRÉE, DANS LES RÉGLAGES.
@@ -453,6 +454,8 @@ export function E2eeSauvegardePanneau() {
             </div>
           )}
           {relie && <p className="sauv-resultat">{t("arch_relier_ok")}</p>}
+
+          <ContactsRecuperation />
 
           <div className="sauv-danger">
             {!confirmeEffacement ? (
