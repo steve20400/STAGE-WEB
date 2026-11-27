@@ -1,7 +1,8 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
-import { requestRegistrationOtp } from "../../../src/services/auth-api"
+import { prendreCodeRecuperationInscription, requestRegistrationOtp } from "../../../src/services/auth-api"
+import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
 import { drapeau, listerPays, type Pays } from "../../../src/services/pays-service"
 import { formaterTelephone } from "../../../src/services/telephone"
 import { useTranslation } from "../../../src/i18n"
@@ -156,6 +157,12 @@ export default function SignUpPage() {
    */
   const [alanyaId, setAlanyaId] = useState("")
   const [codeNote, setCodeNote] = useState(false)
+  // Ce qu'on vient de copier, pour le dire sur le bouton (comme le mobile).
+  const [copie, setCopie] = useState<"numero" | "code" | null>(null)
+  const copier = (valeur: string, quoi: "numero" | "code") => {
+    void navigator.clipboard?.writeText(valeur)
+    setCopie(quoi)
+  }
   /**
    * Parcours SANS adresse, choisi a l'etape 1.
    *
@@ -291,7 +298,7 @@ export default function SignUpPage() {
     }
 
     try {
-      await register(
+      const nouveau = await register(
         {
           name: form.name.trim(),
           // Le téléphone et le pays voyagent enfin : ils étaient laissés vides
@@ -305,7 +312,14 @@ export default function SignUpPage() {
         },
         entered
       )
-      navigate(destination, { replace: true })
+      /*
+       * 🔴 L'ÉCRAN DE FIN, AVEC ADRESSE AUSSI (27/11/2026), comme sur le
+       * mobile : on n'entre plus sans avoir vu son Alanya ID — ni son code de
+       * récupération, que tout compte reçoit désormais.
+       */
+      setCodeRecuperation(prendreCodeRecuperationInscription() ?? "")
+      setAlanyaId(nouveau.phone)
+      setStep(4)
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : t("x2_verify_failed"))
       setOtpDigits(Array(OTP_LEN).fill(""))
@@ -631,63 +645,144 @@ export default function SignUpPage() {
             sera plus montre ici : la case a cocher est ce qui distingue un
             geste conscient d'un appui reflexe sur « Continuer ».
           */}
+          {/*
+            ETAPE 4 — LA FIN DE L'INSCRIPTION, POUR TOUT LE MONDE (27/11/2026),
+            jumelle de `fin_inscription_screen.dart` : l'Alanya ID, puis le code
+            de récupération que tout compte reçoit désormais, avec ou sans
+            adresse. Le code ne sera plus montré ici : la case à cocher
+            distingue un geste conscient d'un appui réflexe sur « Continuer ».
+          */}
           {step === 4 && (
             <div>
-              <StepHeader
-                step={4}
-                title={t("auth_recovery_code_title")}
-                subtitle={t("auth_recovery_code_keep")}
-              />
+              <div style={{ textAlign: "center", color: "var(--accent)", marginTop: 8 }} aria-hidden="true">
+                <svg
+                  width="48"
+                  height="48"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 12.5l2.8 2.8L16.5 9.5" />
+                </svg>
+              </div>
+              <h1 className="step-title" style={{ textAlign: "center", marginTop: 12 }}>
+                {t("signup_done_title")}
+              </h1>
+
               <div
                 style={{
-                  fontFamily: "monospace",
-                  fontSize: "1.625rem",
-                  fontWeight: 700,
-                  letterSpacing: 4,
+                  marginTop: 20,
+                  padding: "18px 16px 10px",
+                  borderRadius: 16,
                   textAlign: "center",
-                  padding: "20px 0",
-                  margin: "8px 0",
-                  border: "1px dashed currentColor",
-                  borderRadius: 12,
+                  background: "var(--accent-dim)",
+                  border: "1px solid var(--accent-border, var(--accent-dim))",
                 }}
               >
-                {codeRecuperation.slice(0, 5)} {codeRecuperation.slice(5)}
+                <div style={{ fontSize: "0.8125rem", opacity: 0.8 }}>{t("alanya_number")}</div>
+                <div
+                  style={{
+                    fontSize: "1.75rem",
+                    fontWeight: 700,
+                    letterSpacing: 2,
+                    color: "var(--accent)",
+                    margin: "6px 0",
+                  }}
+                >
+                  {formatAlanyaNumber(alanyaId)}
+                </div>
+                <div style={{ fontSize: "0.78rem", opacity: 0.75, lineHeight: 1.4 }}>
+                  {t("signup_done_number_help")}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copier(alanyaId, "numero")}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--accent)",
+                    cursor: "pointer",
+                    font: "inherit",
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    padding: "10px 8px",
+                  }}
+                >
+                  {copie === "numero" ? t("alanya_number_copied") : t("recovery_id_copy")}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  // La valeur BRUTE, sans l'espace de presentation : ce qui est
-                  // colle doit pouvoir etre renvoye tel quel.
-                  void navigator.clipboard?.writeText(codeRecuperation)
-                }}
-                style={{ background: "none", border: "none", textDecoration: "underline", cursor: "pointer", width: "100%" }}
-              >
-                {t("auth_recovery_code_copied")}
-              </button>
 
-              {/*
-                L'Alanya ID est rappele ICI parce que la REPRISE en a besoin :
-                le code sert a reinitialiser le mot de passe, mais le serveur
-                exige aussi le numero du compte. Meme rappel que sur le mobile.
-              */}
-              <div style={{ textAlign: "center", fontSize: "0.8125rem", opacity: 0.75, marginTop: 8 }}>
-                {t("auth_recovery_code_your_number", { number: alanyaId })}
-              </div>
-
-              <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "16px 0", fontSize: "0.875rem" }}>
-                <input
-                  type="checkbox"
-                  checked={codeNote}
-                  onChange={(e) => setCodeNote(e.target.checked)}
-                />
-                {t("auth_recovery_code_confirm")}
-              </label>
+              {codeRecuperation && (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 26 }}>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--accent)"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="7.5" cy="15.5" r="4.5" />
+                      <path d="M10.7 12.3L21 2M17 6l3 3M14.5 8.5l2 2" />
+                    </svg>
+                    <strong style={{ fontSize: "1rem" }}>{t("recovery_id_title")}</strong>
+                  </div>
+                  <p style={{ fontSize: "0.85rem", opacity: 0.8, lineHeight: 1.45, margin: "8px 0 12px" }}>
+                    {t("recovery_id_body")}
+                  </p>
+                  <div
+                    style={{
+                      fontFamily: "monospace",
+                      fontSize: "1.625rem",
+                      fontWeight: 700,
+                      letterSpacing: 3,
+                      textAlign: "center",
+                      padding: "18px 0",
+                      borderRadius: 12,
+                      background: "var(--accent-dim)",
+                    }}
+                  >
+                    {codeRecuperation.slice(0, 5)} {codeRecuperation.slice(5)}
+                  </div>
+                  <button
+                    type="button"
+                    // La valeur BRUTE, sans l'espace de présentation : ce qui est
+                    // collé doit pouvoir être renvoyé tel quel.
+                    onClick={() => copier(codeRecuperation, "code")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      font: "inherit",
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      padding: "10px 0",
+                    }}
+                  >
+                    {copie === "code" ? t("recovery_id_copied") : t("recovery_id_copy")}
+                  </button>
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", margin: "4px 0 8px", fontSize: "0.875rem" }}>
+                    <input type="checkbox" checked={codeNote} onChange={(e) => setCodeNote(e.target.checked)} />
+                    {t("recovery_id_confirm")}
+                  </label>
+                </>
+              )}
 
               <button
                 type="button"
                 className="btn-submit"
-                disabled={!codeNote}
-                onClick={() => navigate(destination)}
+                style={{ marginTop: 12 }}
+                disabled={!!codeRecuperation && !codeNote}
+                onClick={() => navigate(destination, { replace: true })}
               >
                 {t("auth_continue")}
               </button>
