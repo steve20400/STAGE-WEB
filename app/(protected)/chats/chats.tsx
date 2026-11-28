@@ -245,9 +245,29 @@ function FenetreNouvelleListe({
 }
 
 export default function ChatsPage() {
-  // Les anneaux de statut autour des avatars (01/11/2026).
+  /*
+   * Les anneaux de statut autour des avatars (01/11/2026).
+   *
+   * 🐛 ILS NE SUIVAIENT PAS NON PLUS (28/11/2026). Le fil n'etait lu qu'a
+   * l'arrivee sur cette page, et le serveur ne previent pas d'un nouveau
+   * statut : un statut publie depuis le telephone n'entourait aucun avatar
+   * tant qu'on ne quittait pas la liste. La page Statuts a recu ce remede-la
+   * le 27/11 ; cette page-ci l'attendait encore. Meme cadence, pour que les
+   * deux disent la meme chose en meme temps.
+   */
   useEffect(() => {
-    void chargerFil()
+    const siVisible = () => {
+      if (document.visibilityState === "visible") void chargerFil()
+    }
+    siVisible()
+    document.addEventListener("visibilitychange", siVisible)
+    window.addEventListener("focus", siVisible)
+    const minuteur = window.setInterval(siVisible, 60_000)
+    return () => {
+      document.removeEventListener("visibilitychange", siVisible)
+      window.removeEventListener("focus", siVisible)
+      window.clearInterval(minuteur)
+    }
   }, [])
 
   /*
