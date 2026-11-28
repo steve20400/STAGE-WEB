@@ -7093,20 +7093,51 @@ export default function ChatRoomPage() {
     )
   }, [chat, messages])
 
-  // Scroll intelligent : le chargement des previews ou la synchronisation ne doit
-  // jamais déplacer quelqu'un qui consulte les anciens messages.
+  /*
+   * LA VUE SUIT TOUJOURS LE DERNIER MESSAGE (demande du user, 28/11/2026).
+   *
+   * Avant, la descente etait conditionnee a « etre deja en bas ». Deux
+   * consequences, toutes deux signalees :
+   *
+   *  - À L'ENVOI : qui ecrivait depuis un peu plus haut dans le fil ne voyait
+   *    pas partir son propre message. Il restait a l'ecran precedent, sans
+   *    aucun signe que l'envoi avait eu lieu.
+   *  - À LA RECEPTION : le message arrive restait hors de vue. Seule une
+   *    frontiere « non lus » le signalait, plus haut, a un endroit que
+   *    personne ne regarde.
+   *
+   * Desormais tout nouveau dernier message amene la vue en bas, sans
+   * condition. Le chargement des apercus, lui, ne deplace toujours personne :
+   * il ne change pas le dernier message, et cet effet ne se declenche donc pas.
+   *
+   * ⚠️ CE QUE CELA COUTE, ET C'EST VOULU : quelqu'un qui relit une vieille
+   * partie de la conversation est ramene en bas des qu'un message arrive. La
+   * frontiere « non lus » reste posee au-dessus pour qu'il puisse retrouver ou
+   * il en etait.
+   *
+   * La descente est INSTANTANEE quand on venait de loin : une animation sur
+   * plusieurs ecrans de hauteur n'est pas lisible, et elle retarde ce qu'on
+   * cherche justement a montrer.
+   */
   useEffect(() => {
     if (messages.length === 0) return
-    const newestId = messages[messages.length - 1]?.id ?? null
+    const dernier = messages[messages.length - 1]
+    const newestId = dernier?.id ?? null
     if (!initialScrollDoneRef.current) {
       bottomRef.current?.scrollIntoView({ behavior: "auto" })
       initialScrollDoneRef.current = true
-    } else if (newestId !== lastMessageIdRef.current && isNearBottomRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-    } else if (newestId !== lastMessageIdRef.current && !isNearBottomRef.current) {
-      // Arrive pendant qu'on lisait plus haut : on marque la frontiere une
-      // seule fois, sur le PREMIER de la salve. Les suivants viennent apres.
-      setFrontiereNonLus((actuelle) => actuelle ?? newestId)
+    } else if (newestId !== lastMessageIdRef.current) {
+      const loin = !isNearBottomRef.current
+      bottomRef.current?.scrollIntoView({ behavior: loin ? "auto" : "smooth" })
+      // La frontiere se pose une seule fois, sur le PREMIER de la salve — et
+      // jamais pour mes propres envois : rien n'est « non lu » dans ce que
+      // je viens d'ecrire.
+      if (loin && dernier?.senderId !== "me") {
+        setFrontiereNonLus((actuelle) => actuelle ?? newestId)
+      }
+      // On est en bas : l'etat le dit tout de suite, sans attendre l'evenement
+      // de defilement que le navigateur enverra apres l'animation.
+      isNearBottomRef.current = true
     }
     lastMessageIdRef.current = newestId
   }, [messages])
