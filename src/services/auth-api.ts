@@ -319,7 +319,16 @@ export async function completeRegistration(draft: RegistrationDraft, otp: string
       method: "POST",
       headers: { Authorization: `Bearer ${verifyResponse.setupToken}` },
       body: {
-        pseudo: draft.name.trim(),
+        /*
+         * ⚠️ TRONQUE A 50, COMME LE MOBILE (28/11/2026). La colonne
+         * `users.pseudo` s arrete a 50 caracteres, `users.nom` va jusqu a
+         * 100. Le nom partait ici dans LES DEUX champs sans etre coupe : un
+         * nom de 51 caracteres faisait echouer l inscription a la derniere
+         * etape, une fois le courriel deja verifie, sur un « Pseudo trop
+         * long » que le formulaire ne pouvait pas expliquer. Le telephone
+         * coupait depuis toujours (`auth_repository.dart`).
+         */
+        pseudo: draft.name.trim().slice(0, 50),
         password: draft.password,
         // Le nom, le telephone et le pays voyagent comme sur mobile. Ils
         // etaient omis ici : deux portes d entree, deux comptes de

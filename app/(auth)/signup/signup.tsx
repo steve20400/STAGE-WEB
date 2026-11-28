@@ -385,10 +385,18 @@ export default function SignUpPage() {
               />
 
               <div className="field">
+                {/*
+                  * 100 : la longueur de la colonne `nom`. Le champ n'avait
+                  * AUCUNE borne, et un nom plus long partait tel quel : le
+                  * serveur le refusait a la toute derniere etape, apres la
+                  * verification du courriel, avec un message parlant d'un
+                  * « Pseudo » jamais demande. Le telephone, lui, borne.
+                  */}
                 <input
                   id="name"
                   type="text"
                   placeholder=" "
+                  maxLength={100}
                   value={form.name}
                   onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                   required

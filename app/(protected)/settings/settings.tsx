@@ -2310,10 +2310,19 @@ export default function SettingsPage() {
         ? await uploadAvatarDataUrl(draft.avatar)
         : (draft.avatar ?? null)
 
-      // Persistance reelle cote backend : c'est ce qui rend le profil (photo
-      // comprise) visible par les autres et le fait survivre aux reconnexions.
+      /*
+       * Persistance reelle cote backend : c'est ce qui rend le profil (photo
+       * comprise) visible par les autres et le fait survivre aux reconnexions.
+       *
+       * ⚠️ COUPE A 50, LA LONGUEUR QUE LE SERVEUR ACCEPTE. Le champ s'y borne
+       * deja a la saisie, mais un nom POSE A L'INSCRIPTION peut aller jusqu'a
+       * 100 : il s'affiche alors en entier dans le champ, et changer une seule
+       * lettre faisait repartir les 100 caracteres — refus du serveur sur un
+       * « Pseudo trop long » que cet ecran ne pouvait pas expliquer.
+       */
+      const nomAEnregistrer = draft.name.trim().slice(0, 50)
       const saved = await updateProfileApi({
-        pseudo: draft.name.trim(),
+        pseudo: nomAEnregistrer,
         statusMsg: draft.statusMsg || null,
         avatarUrl,
       })
@@ -2321,7 +2330,7 @@ export default function SettingsPage() {
       setDraft((prev) => ({ ...prev, avatar: nextAvatar }))
       setProfile({ ...draft, avatar: nextAvatar })
       updateUser({
-        name: saved.pseudo ?? draft.name.trim(),
+        name: saved.pseudo ?? nomAEnregistrer,
         phone: draft.phone,
         email: draft.email,
         statusMsg: saved.statusMsg ?? draft.statusMsg,
@@ -3314,11 +3323,18 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                {/*
+                  * 50 ET NON 60. C'est la longueur que le serveur accepte
+                  * (`updateProfileSchema`), et celle du champ du telephone.
+                  * A 60, on laissait taper dix caracteres que la sauvegarde
+                  * allait refuser — et le refus parlait d'un « Pseudo » que
+                  * cet ecran ne montre nulle part.
+                  */}
                 <Field
                   label={t("full_name")}
                   value={draft.name}
                   onChange={setD("name")}
-                  maxLength={60}
+                  maxLength={50}
                   placeholder={t("your_name")}
                 />
                 <Field
