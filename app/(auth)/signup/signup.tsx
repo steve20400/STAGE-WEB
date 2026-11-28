@@ -3,6 +3,11 @@ import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../../src/components/auth-provider"
 import { prendreCodeRecuperationInscription, requestRegistrationOtp } from "../../../src/services/auth-api"
 import { formatAlanyaNumber } from "../../../src/lib/alanya-number"
+import {
+  commencerFinInscription,
+  terminerFinInscription,
+} from "../../../src/services/fin-inscription"
+import { restaurationEnAttente } from "../../../src/services/restauration-en-attente"
 import { drapeau, listerPays, type Pays } from "../../../src/services/pays-service"
 import { formaterTelephone } from "../../../src/services/telephone"
 import { useTranslation } from "../../../src/i18n"
@@ -265,6 +270,8 @@ export default function SignUpPage() {
 
     setLoading(true)
     try {
+      // Le compte créé connecte : le garde doit laisser l'écran de fin.
+      commencerFinInscription()
       const { user, idRecuperation } = await registerWithoutEmail({
         name: form.name.trim(),
         phone: form.phone.trim(),
@@ -278,6 +285,7 @@ export default function SignUpPage() {
       setAlanyaId(user.phone)
       setStep(4)
     } catch (e) {
+      terminerFinInscription()
       setError(e instanceof Error ? e.message : t("auth_otp_send_failed"))
     } finally {
       setLoading(false)
@@ -298,6 +306,7 @@ export default function SignUpPage() {
     }
 
     try {
+      commencerFinInscription()
       const nouveau = await register(
         {
           name: form.name.trim(),
@@ -321,6 +330,7 @@ export default function SignUpPage() {
       setAlanyaId(nouveau.phone)
       setStep(4)
     } catch (submitError) {
+      terminerFinInscription()
       setError(submitError instanceof Error ? submitError.message : t("x2_verify_failed"))
       setOtpDigits(Array(OTP_LEN).fill(""))
     } finally {
@@ -782,7 +792,12 @@ export default function SignUpPage() {
                 className="btn-submit"
                 style={{ marginTop: 12 }}
                 disabled={!!codeRecuperation && !codeNote}
-                onClick={() => navigate(destination, { replace: true })}
+                onClick={() => {
+                  // On entre : par la restauration si elle attend (comme le
+                  // garde le faisait), sinon là où l'on allait.
+                  terminerFinInscription()
+                  navigate(restaurationEnAttente() ? "/restauration" : destination, { replace: true })
+                }}
               >
                 {t("auth_continue")}
               </button>
