@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom"
 import { useAuth } from "./auth-provider"
 import { useTranslation } from "../i18n"
 import { restaurationEnAttente } from "../services/restauration-en-attente"
+import { finInscriptionEnCours } from "../services/fin-inscription"
 
 function RouteGuardFallback() {
   const { t } = useTranslation()
@@ -76,7 +77,9 @@ export function PublicOnlyRoute({ children }: { children: ReactNode }) {
     return <RouteGuardFallback />
   }
 
-  if (isAuthenticated) {
+  // ⚠️ La fin d'une inscription (Alanya ID, code de récupération) se montre
+  // jusqu'au bout : voir `fin-inscription.ts`.
+  if (isAuthenticated && !finInscriptionEnCours()) {
     // ⚠️ Juste après la connexion, l'historique chiffré revient d'abord : ce
     // garde ne doit pas court-circuiter sa page. Voir `restauration-en-attente.ts`.
     return <Navigate to={restaurationEnAttente() ? "/restauration" : "/chats"} replace />
